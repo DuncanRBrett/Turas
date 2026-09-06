@@ -28,6 +28,10 @@
     var chipDefault = panel.getAttribute("data-chip-default") || "focal_only";
     var panelData = readWomPanelData(panel);
     var selectorHandle = bindWomBrandSelector(panel, table, panelData, catCode, chipDefault);
+    // The "Chart brands" control drives this handle's chart-only set. One
+    // property name across all four split-mode panels so BrandChartFocus
+    // can find it by walking up from its mount.
+    panel.__brChartSelector = selectorHandle;
 
     // --- Focal brand dropdown
     var select = panel.querySelector(".wom-focus-select");
@@ -146,8 +150,15 @@
     var insight   = insightEl ? insightEl.value.trim() : "";
 
     var catCode = panel.getAttribute("data-cat-code") || "";
+    // Chart brands: the chart and the table go into one payload here, so a
+    // deviating chart is named on the card.
+    var womTitle = "Word of Mouth" + (catCode ? ": " + catCode : "");
+    if (typeof window.brTitleWithChartDeviation === "function") {
+      womTitle = window.brTitleWithChartDeviation(
+        womTitle, window.brChartDeviationClause(panel), !!chartSvg);
+    }
     TurasPins.add({
-      title:   "Word of Mouth" + (catCode ? ": " + catCode : ""),
+      title:   womTitle,
       html:    chartSvg + tableHtml,
       insight: insight
     });

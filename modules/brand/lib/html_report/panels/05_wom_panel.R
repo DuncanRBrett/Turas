@@ -165,12 +165,20 @@ build_wom_panel_html <- function(panel_data,
     error = function(e) '<div class="wom-chart-placeholder">Chart unavailable.</div>'
   )
 
+  # Chart brands: the per-chart deviation from the header's comparison set.
+  # Word of Mouth keeps a chart-only hidden set (__womHiddenChart), so a brand
+  # can be dropped from the chart while its row stays in the table. Guarded
+  # because the panel tests source this file alone.
+  chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control("wom") else ""
+
   sprintf(
     '<section class="wom-chart-section" data-wom-scope="%s" data-wom-variant="heard" hidden>
+       %s
        <div class="wom-chart-variant" data-wom-variant="heard">%s</div>
        <div class="wom-chart-variant" data-wom-variant="said" hidden>%s</div>
      </section>',
-    .wom_esc(category_code), heard_svg, said_svg)
+    .wom_esc(category_code), chart_focus, heard_svg, said_svg)
 }
 
 

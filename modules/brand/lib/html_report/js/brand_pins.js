@@ -26,6 +26,10 @@
     '.fn-controls', '.ma-controls', '.controls-bar',
     '.fn-pin-dropdown-btn', '.fn-pin-dropdown',
     '.fn-rel-chart-controls',
+    // The Chart brands control. Its NOTE (.br-cf-note) is deliberately not
+    // stripped: it is the only thing that tells a reader why a captured
+    // chart shows fewer brands than the table beside it.
+    '.br-cf',
     '.br-pin-btn', '.br-png-btn', '.br-export-btn', '.br-insight-toggle',
     '.fn-png-btn', '.ma-png-btn', '.fn-export-btn', '.ma-export-btn',
     '.toggle-label', '.sig-level-switcher',
@@ -38,6 +42,27 @@
     d.innerHTML = html;
     d.querySelectorAll(INTERACTIVE_SELECTORS).forEach(function(el) { el.remove(); });
     return d.innerHTML;
+  };
+
+  // --- Chart brands: the clause a captured chart carries ---
+  // Returns "" unless a chart inside this root is showing fewer brands than
+  // its table. The words come from the note element BrandChartFocus paints,
+  // so the pin, the PNG and the page all say the same thing.
+  window.brChartDeviationClause = function(root) {
+    if (!root) return "";
+    if (window.BrandChartFocus &&
+        typeof window.BrandChartFocus.clauseFor === "function") {
+      return window.BrandChartFocus.clauseFor(root);
+    }
+    return "";
+  };
+
+  // Append the clause to a pin or PNG title, but only when the capture
+  // actually carries the chart. A table pinned on its own is not deviating
+  // from anything and must not be labelled as though it were.
+  window.brTitleWithChartDeviation = function(title, clause, includeChart) {
+    if (!includeChart || !clause) return title;
+    return title + " (" + clause + ")";
   };
 
   // --- Read the active "Base:" toggle label inside a captured root ---
@@ -173,6 +198,12 @@
     var baseLabel = window.brReadBaseLabel(root);
     var subtitle  = baseLabel ? "Base: " + baseLabel : "";
 
+    // Chart brands: if a chart in this root is showing fewer brands than its
+    // table, the clause travels with the capture. It is kept as its own
+    // field rather than folded into the title here, because whether it
+    // belongs on the card depends on whether the caller pins the chart.
+    var chartDeviation = window.brChartDeviationClause(root);
+
     return {
       sectionKey: sectionKey || (root.id || ""),
       title: titleText,
@@ -181,7 +212,8 @@
       chartSvg: chartSvg,
       chartHtml: chartHtml,
       tableHtml: tableHtml,
-      insightText: insightText
+      insightText: insightText,
+      chartDeviation: chartDeviation
     };
   }
 
@@ -302,6 +334,9 @@
     };
     content.pinMode = "custom";
 
+    content.title = window.brTitleWithChartDeviation(
+      content.title, content.chartDeviation, !!flags.chart);
+
     if (!flags.chart)   content.chartSvg = "";
     if (!flags.table)   content.tableHtml = "";
     if (!flags.insight) content.insightText = "";
@@ -355,7 +390,8 @@
 
     function doExport(flags) {
       TurasPins.exportContentAsPNG({
-        title:       content.title,
+        title:       window.brTitleWithChartDeviation(
+                       content.title, content.chartDeviation, !!flags.chart),
         subtitle:    content.subtitle || "",
         baseText:    content.baseText || "",
         chartSvg:    flags.chart   ? content.chartSvg   : "",
@@ -439,7 +475,8 @@
         exportTableHtml = content.chartHtml + (exportTableHtml ? exportTableHtml : "");
       }
       TurasPins.exportContentAsPNG({
-        title:       content.title,
+        title:       window.brTitleWithChartDeviation(
+                       content.title, content.chartDeviation, !!flags.chart),
         subtitle:    content.subtitle || "",
         baseText:    content.baseText || "",
         chartSvg:    (flags.chart && content.chartSvg) ? content.chartSvg : "",

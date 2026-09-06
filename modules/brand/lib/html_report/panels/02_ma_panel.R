@@ -293,12 +293,20 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 #' been removed; the SVG legend below is JS-populated.
 #' @keywords internal
 .ma_chart_placeholder <- function(stim, pd) {
+  # Chart brands: the per-chart deviation from the header's comparison set.
+  # The attribute and CEP matrices keep a chart-only visibility map
+  # (__maState.chartVisible), so a brand can be dropped from the dot chart
+  # while its column stays in the matrix. Guarded because the panel tests
+  # source this file alone.
+  chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control(stim) else ""
   sprintf(
     '<section class="ma-chart-section" data-ma-stim="%s">
+       %s
        <div class="ma-chart-legend"></div>
        <svg class="ma-bar-chart" data-ma-stim="%s" xmlns="http://www.w3.org/2000/svg"></svg>
      </section>',
-    stim, stim)
+    stim, chart_focus, stim)
 }
 
 

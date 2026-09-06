@@ -36,8 +36,16 @@ build_funnel_chart_section <- function(pd, focal_colour = "#1A5276") {
 
   svg <- .fn_slope_svg(sc, stage_keys, stage_labels, focal_colour)
 
+  # Chart brands: the per-chart deviation from the header's comparison set.
+  # The funnel keeps a chart-only visibility map (__fnState.chartBrands), so
+  # a brand can be dropped from the slope or bar chart while its row stays in
+  # the table. Guarded because the panel tests source this file alone.
+  chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control("funnel") else ""
+
   paste0(
     '<section class="fn-section fn-chart-section">',
+    chart_focus,
     '<div class="fn-chart-wrap" data-fn-chart="slope">',
     svg,
     '</div>',

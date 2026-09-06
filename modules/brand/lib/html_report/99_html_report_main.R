@@ -279,6 +279,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   panel_js <- paste(
     .resolve_js("brand_colours.js"),
     .resolve_js("brand_selector_dropdown.js"),
+    .resolve_js("brand_chart_focus.js"),
     .resolve_js("brand_funnel_panel.js"),
     .resolve_js("brand_ma_panel.js"),
     .resolve_js("brand_ma_advantage.js"),

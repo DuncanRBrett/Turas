@@ -159,6 +159,215 @@ DRIVER = """
     });
   }
 
+  // Views that cannot narrow at all must carry no Chart brands control:
+  // a control that does nothing is what made the old Dirichlet Norms filter
+  // read "1 of 11" beside a table of eleven brands.
+  var NO_CHART_FOCUS = { 'cb-context': 1, 'cb-norms': 1, 'cb-dop': 1,
+                         'cb-shopper': 1, 'demographics': 1,
+                         'ma-advantage': 1, 'ma-metrics': 1,
+                         'fn-relationship': 1 };
+
+  function chartFocusHandle(mount) {
+    var el = mount.parentElement;
+    while (el) {
+      if (el.__brChartSelector) return el.__brChartSelector;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function codesIn(nodes) {
+    var seen = {};
+    Array.prototype.forEach.call(nodes, function (el) {
+      var v = el.getAttribute('data-cb-brand');
+      if (v) seen[v] = true;
+    });
+    return Object.keys(seen).sort();
+  }
+
+  function setToSorted(s) {
+    var out = [];
+    s.forEach(function (c) { out.push(c); });
+    return out.sort();
+  }
+
+  function runChartFocus(panel, tab) {
+    // Scope first: only the leaves that genuinely have a table, a chart and
+    // a chart-only visibility map behind them carry a mount.
+    panel.querySelectorAll('.br-subpanel').forEach(function (host) {
+      var leaf = host.getAttribute('data-leaf');
+      if (!NO_CHART_FOCUS[leaf]) return;
+      check(tab + '/' + leaf + ': carries no Chart brands control',
+            host.querySelectorAll('.br-cf').length === 0,
+            String(host.querySelectorAll('.br-cf').length));
+    });
+
+    var mounts = panel.querySelectorAll('.br-cf[data-chartfocus]');
+    check(tab + ': Chart brands controls are mounted', mounts.length > 0,
+          String(mounts.length) + ' mounts');
+
+    // Every mount built exactly one trigger, and the control census counts
+    // them by name so they never read as strays. Visibility is counted per
+    // mount below, once its host has been laid out: a control inside an
+    // inactive destination or a collapsed drawer has no geometry to measure.
+    var built = 0;
+    Array.prototype.forEach.call(mounts, function (m) {
+      if (m.querySelectorAll('.br-cf-trigger').length === 1) built++;
+    });
+    check(tab + ': one Chart brands trigger per mount, no more',
+          built === mounts.length, built + ' of ' + mounts.length);
+    var census = { mounts: mounts.length, built: built, visible: 0,
+                   behindShowChart: 0 };
+    out.chartFocus = census;
+
+    // Open the header on all brands so there is something to narrow from.
+    panel.querySelector('.br-cmp-mode[data-cmp-set="all"]').click();
+
+    Array.prototype.forEach.call(mounts, function (mount) {
+      var scope = mount.getAttribute('data-chartfocus');
+      var host = mount.closest('.br-subpanel');
+      if (host) exposeHost(panel, host);
+      var handle = chartFocusHandle(mount);
+      check(tab + '/' + scope + ': the control reaches a split-mode handle',
+            !!handle && typeof handle.setHiddenChart === 'function');
+      if (!handle) return;
+
+      var note = mount.parentElement.querySelector(
+        '.br-cf-note[data-chartfocus-note="' + scope + '"]');
+      var trigger = mount.querySelector('.br-cf-trigger');
+      var label = trigger ? trigger.querySelector('.br-cf-label') : null;
+
+      // Discoverability. The control has to be on screen beside the chart it
+      // governs, not folded into a menu. Two chart areas ship collapsed
+      // behind their panel's own "Show chart" toggle; there the control
+      // appears with the chart, which is right, because with no chart there
+      // is nothing to deviate.
+      var areaHidden = !!(mount.parentElement &&
+                          mount.parentElement.hasAttribute('hidden'));
+      if (areaHidden) census.behindShowChart++;
+      else if (visible(trigger)) census.visible++;
+      check(tab + '/' + scope + ': the control is on screen beside its chart',
+            areaHidden || visible(trigger),
+            areaHidden ? 'chart area collapsed by Show chart'
+                       : (visible(trigger) ? 'on screen' : 'NOT on screen'));
+
+      // State one: no deviation.
+      check(tab + '/' + scope + ': opens matching its table',
+            !!note && note.hidden === true &&
+            !!label && label.textContent === 'Chart brands: same as table',
+            label ? label.textContent : 'no label');
+
+      var tableBefore = setToSorted(handle.getHidden());
+
+      // Deviate: untick the first brand the control offers that is not the
+      // focal brand. The focal brand's box is locked on, because a chart
+      // without it is a category chart.
+      trigger.click();
+      var pop = mount.querySelector('.br-cf-pop');
+      check(tab + '/' + scope + ': the popover opens', !!pop && !pop.hidden);
+      var boxes = mount.querySelectorAll('.br-cf-check');
+      var locked = 0;
+      Array.prototype.forEach.call(boxes, function (b) { if (b.disabled) locked++; });
+      check(tab + '/' + scope + ': the focal brand cannot be dropped',
+            locked === 1, locked + ' locked of ' + boxes.length);
+      // The popover offers exactly what the header shows, never more, so it
+      // can only narrow.
+      var offered = boxes.length;
+      var headerShows = handle.getBrands().length - handle.getHidden().size;
+      check(tab + '/' + scope + ': it offers only what the header shows',
+            offered === headerShows, offered + ' offered, ' + headerShows + ' shown');
+
+      var dropped = null;
+      Array.prototype.forEach.call(boxes, function (b) {
+        if (dropped || b.disabled) return;
+        dropped = b.value;
+        b.checked = false;
+        b.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      if (!dropped) return;
+
+      // The table is untouched. This is the whole point of the control.
+      check(tab + '/' + scope + ': the table set is unchanged',
+            setToSorted(handle.getHidden()).join(',') === tableBefore.join(','),
+            setToSorted(handle.getHidden()).join(','));
+      // The chart set is the table set plus exactly the dropped brand.
+      var wantChart = tableBefore.concat([dropped]).sort();
+      check(tab + '/' + scope + ': the chart set is the table set minus one',
+            setToSorted(handle.getHiddenChart()).join(',') === wantChart.join(','),
+            setToSorted(handle.getHiddenChart()).join(','));
+
+      // The deviation is marked, on the control and in a note that a
+      // capture carries.
+      check(tab + '/' + scope + ': the trigger names the deviation',
+            !!label && /^Chart brands: \d+ of \d+$/.test(label.textContent) &&
+            trigger.classList.contains('br-cf-on'),
+            label ? label.textContent : 'no label');
+      check(tab + '/' + scope + ': the note is shown and names what is missing',
+            !!note && note.hidden === false &&
+            note.textContent.indexOf('Hidden from the chart:') >= 0,
+            note ? note.textContent : 'no note');
+      var clause = window.brChartDeviationClause(host || mount.parentElement);
+      check(tab + '/' + scope + ': a capture of the chart carries the clause',
+            !!clause && window.brTitleWithChartDeviation('T', clause, true) !== 'T',
+            clause);
+      check(tab + '/' + scope + ': a capture without the chart does not',
+            window.brTitleWithChartDeviation('T', clause, false) === 'T');
+
+      // Where the chart and the table both key on brand codes, read them
+      // apart rather than trusting the state object.
+      var chartRows = host ? host.querySelectorAll(
+        '.fn-rel-chart [data-cb-brand]') : [];
+      var tableRows = host ? host.querySelectorAll(
+        '.cb-rel-table tbody tr[data-cb-brand]') : [];
+      if (chartRows.length > 0 && tableRows.length > 0) {
+        var chartCodes = codesIn(chartRows);
+        var tableCodes = codesIn(Array.prototype.filter.call(
+          tableRows, function (tr) { return visible(tr); }));
+        check(tab + '/' + scope + ': the chart really drops the brand',
+              chartCodes.indexOf(dropped) < 0, chartCodes.join(','));
+        check(tab + '/' + scope + ': the table really keeps it',
+              tableCodes.indexOf(dropped) >= 0, tableCodes.join(','));
+        check(tab + '/' + scope + ': chart equals table minus the one brand',
+              chartCodes.length === tableCodes.length - 1,
+              chartCodes.length + ' chart, ' + tableCodes.length + ' table');
+      }
+
+      // The capture claim, executed rather than reasoned about. The panels
+      // clone their chart area with capturePortableHtml and then run
+      // brStripInteractive over it. The note has to come through that and
+      // the control has to be removed by it.
+      var area = mount.parentElement;
+      if (area && typeof TurasPins !== 'undefined' &&
+          TurasPins.capturePortableHtml) {
+        var captured = window.brStripInteractive(
+          TurasPins.capturePortableHtml(area));
+        check(tab + '/' + scope + ': the note survives a capture of the chart',
+              captured.indexOf('Hidden from the chart:') >= 0,
+              String(captured.length) + ' chars captured');
+        check(tab + '/' + scope + ': the control does not survive it',
+              captured.indexOf('br-cf-trigger') < 0 &&
+              captured.indexOf('br-cf-check') < 0);
+      }
+
+      // The header is the source of truth: changing it clears the deviation.
+      panel.querySelector('.br-cmp-mode[data-cmp-set="focal"]').click();
+      check(tab + '/' + scope + ': a header change clears the deviation',
+            note.hidden === true &&
+            label.textContent === 'Chart brands: same as table' &&
+            !trigger.classList.contains('br-cf-on'),
+            label.textContent + ' note-hidden=' + note.hidden);
+      check(tab + '/' + scope + ': and the chart set follows the table set',
+            setToSorted(handle.getHiddenChart()).join(',') ===
+            setToSorted(handle.getHidden()).join(','),
+            setToSorted(handle.getHiddenChart()).join(','));
+
+      // Back to all brands for the next mount.
+      panel.querySelector('.br-cmp-mode[data-cmp-set="all"]').click();
+    });
+
+    panel.querySelector('.br-cmp-mode[data-cmp-set="focal"]').click();
+  }
+
   function run() {
     var catPanels = document.querySelectorAll('.br-panel[id^="panel-cat-"]');
     check('at least one category panel', catPanels.length > 0,
@@ -370,6 +579,14 @@ DRIVER = """
       }
 
 
+      // --- Chart brands: the per-chart deviation from the header set ---
+      // Stage 2 removed the split-mode brand filter, and with it the one way
+      // an analyst had of hiding a brand from a chart while keeping it in
+      // the table. These checks prove it is back, that it can only narrow,
+      // that a deviating chart says so on its face, and that a header change
+      // clears it.
+      runChartFocus(panel, tab);
+
       // --- the Overview route into the Summary tab ---
       var stubBtn = panel.querySelector('.br-overview-stub-btn');
       if (stubBtn) {
@@ -454,6 +671,12 @@ def main(argv):
     for c in res["checks"]:
         mark = "ok  " if c["ok"] else "FAIL"
         print("  %s %s%s" % (mark, c["name"], (" -> " + c["detail"]) if c["detail"] else ""))
+    cf = res.get("chartFocus")
+    if cf:
+        print("\nChart brands controls: %d mounted, %d built, %d visible "
+              "beside their chart, %d behind a Show chart toggle"
+              % (cf["mounts"], cf["built"], cf["visible"],
+                 cf["behindShowChart"]))
     print("\nDestinations reached: %d" % len(res["destinations"]))
     for d in res["destinations"]:
         print("  %s / %-9s hosts=%d stub=%d advanced=%d"

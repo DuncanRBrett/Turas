@@ -357,6 +357,10 @@
         applyMaSelectorChange(panel, hiddenSet, scope);
       }
     });
+    // The "Chart brands" control drives this handle's chart-only set. One
+    // property name across all four split-mode panels so BrandChartFocus
+    // can find it by walking up from its mount.
+    panel.__brChartSelector = panel.__maSelector;
   }
 
   // Apply a hidden-set change from the panel-level BrandSelector across all
@@ -2291,9 +2295,16 @@
       var maSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="' + activeKey + '"]') || panel;
       var maBaseLabel = (typeof window.brReadBaseLabel === 'function')
         ? window.brReadBaseLabel(maSubtab) : '';
+      // Chart brands: the dot chart and its matrix travel together here,
+      // so a deviating chart is named on the card.
+      var maTitle = baseTitle + ', ' + subLabel;
+      if (typeof window.brTitleWithChartDeviation === 'function') {
+        maTitle = window.brTitleWithChartDeviation(
+          maTitle, window.brChartDeviationClause(maSubtab), !!chartSvg);
+      }
       TurasPins.add({
         sectionKey: 'ma-' + activeKey + '-' + Date.now(),
-        title: baseTitle + ', ' + subLabel,
+        title: maTitle,
         subtitle: maBaseLabel ? 'Base: ' + maBaseLabel : '',
         baseText: maBaseLabel,
         chartSvg: chartSvg, chartHtml: '',

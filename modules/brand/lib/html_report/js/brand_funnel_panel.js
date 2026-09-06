@@ -794,6 +794,10 @@
         }
       }
     });
+    // The "Chart brands" control drives this handle's chart-only set. One
+    // property name across all four split-mode panels so BrandChartFocus
+    // can find it by walking up from its mount.
+    panel.__brChartSelector = panel.__fnSelector;
   }
 
   function applyTableVisibility(panel) {
@@ -2365,9 +2369,16 @@
         var baseLabel = (typeof window.brReadBaseLabel === "function")
           ? window.brReadBaseLabel(panel) : "";
 
+        // Chart brands: the funnel chart and its table travel together
+        // here, so a deviating chart is named on the card.
+        var fnTitle = title;
+        if (typeof window.brTitleWithChartDeviation === "function") {
+          fnTitle = window.brTitleWithChartDeviation(
+            fnTitle, window.brChartDeviationClause(panel), hasChart);
+        }
         TurasPins.add({
           sectionKey:  "fn-" + Date.now(),
-          title:       title,
+          title:       fnTitle,
           subtitle:    baseLabel ? "Base: " + baseLabel : "",
           baseText:    baseLabel,
           chartSvg:    chartSvg,

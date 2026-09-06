@@ -571,3 +571,232 @@ was replaced.
 A `launch_turas()` run on the real IPK project, where he first saw the
 duplication, then the five destinations eyeballed with the header control
 driven through its three states. Not merged, not pushed.
+
+
+# Stage 2 follow-up, part two: Chart brands, 6 September 2026
+
+Duncan confirmed he used the split-mode brand filter: with "Sync table and
+chart" off he could hide a brand from a chart while keeping it in the table.
+The Stage 2 follow-up hid the per-panel filters and took that with them. It is
+back, as a control of its own rather than as a side effect of a duplicated
+dropdown. He also confirmed the Demographics change is fine as it stands, and
+it was left alone.
+
+Baseline executed before the first edit, in this worktree at a362238d: brand
+suite **FAIL 0, WARN 1, SKIP 2, PASS 2780**, 93.4 s. It matches the brief. The
+tip's IPK fixture report was regenerated from a `git archive` of a362238d and
+came to **3,926,103 bytes**, which is the figure the previous session
+recorded, so the before-and-after diffs are against a reproduced baseline
+rather than a remembered one.
+
+## What was built, and why it is a deviation and not a second selection
+
+**"Chart brands", one control per chart.** It sits beside the chart it
+governs, reads `Chart brands: same as table`, and opens a checkbox list.
+Unticking a brand drops it from that chart alone.
+
+Three properties make it a deviation from the header rather than a competing
+selection, and each is a mechanism rather than a rule someone has to remember.
+
+1. **It can only narrow.** The popover is rebuilt on every open from the
+   brands the header shows at that moment, and the set it publishes is the
+   union of the header's hidden set and the brands unticked here. A brand the
+   header excluded cannot come back into a chart through this control.
+2. **Any header change resets it.** This needed no new code.
+   `applyRemoteHiddenSet` in `brand_selector_dropdown.js` already writes
+   `hiddenChart` from `hiddenTable` on every published set, and
+   `brApplyComparisonSet` publishes on every header change. The reset is the
+   substrate's own behaviour. What was added is one call at the end of
+   `brApplyComparisonSet` so the controls and their notes repaint, and the
+   removal of an early `return` in the all-brands branch so it runs in all
+   three header states rather than two.
+3. **It is neither a focal control nor a brand-set control.** It carries no
+   `bs-trigger` and no `*-focus-select` class, and it selects no set of its
+   own. The single-control census is untouched.
+
+**No new store.** The per-host `BrandSelector` instance is still created in
+split mode and still holds `hiddenChart`, and each panel's own
+`onChange(set, "chart")` handler is the proven path that writes
+`chart_visible`, `chartVisible`, `chartBrands` and `__womHiddenChart`. Two
+entry points were added to the handle: `getBrands()` and `setHiddenChart()`.
+The setter deliberately does not go through `emit()`, which fires `onChange`
+twice for a chart-scope change, the first time with the table set. It
+publishes nothing to the category store, so a chart deviation cannot reach the
+header or a sibling host.
+
+**The focal brand is locked into its own chart.** Its checkbox is disabled and
+ticked. A chart without the focal brand is a category chart, and the header's
+premise is focal first. A minor choice, made rather than asked.
+
+## Where it is offered, and where it is not
+
+The rule is: a chart, a table beside it, and a chart-only visibility map
+already behind the chart. That is eight charts across six emission sites.
+
+| Leaf | Chart-only map |
+|---|---|
+| fn-funnel | `__fnState.chartBrands`, slope and bar |
+| ma-attributes, ma-ceps | `__maState.chartVisible.<stim>`, dot charts |
+| cb-brands | `__cbState.chart_visible.brands`, bar chart |
+| cb-loyalty, cb-dist, cb-heaviness | `__cbState.chart_visible.<scope>`, stacked bars |
+| wom | `__womHiddenChart` |
+
+Deliberately excluded, each for a stated reason.
+
+- **Category Context, Dirichlet Norms, Duplication of Purchase and Shopper
+  Behaviour.** Out of scope in the brief, and they do not narrow at all.
+- **Demographics.** Its selector is unified mode. It never had the split, and
+  Duncan said to leave it alone.
+- **Brand Attitude (fn-relationship).** Its selector is unified mode too. The
+  comment at `brand_funnel_panel.js` line 778 says so in as many words: the
+  relationship view has no separate chart-only selection. Restoring a split
+  there would be new capability, not restoration.
+- **MA Metrics.** `renderMAScatter` and `renderMABarChart` both read
+  `getHidden()`, the TABLE set, not `getHiddenChart()`. That is what shipped:
+  in split mode those two charts followed the table column. Changing them to
+  read the chart set would be a behaviour change beyond the ask. Recorded here
+  as a candidate, not done.
+- **Mental Advantage.** The MA selector's chart branch does not touch it; its
+  matrix follows `__maAdvHiddenBrands`, written in the table branch. Same
+  reasoning.
+
+## How a deviating chart is marked, and what a capture carries
+
+Three layers, because a reader can meet the chart on the page, in a pin card
+or in a PNG.
+
+1. **The control names its own state.** `Chart brands: 12 of 15`, in amber,
+   with a border to match.
+2. **A note sits above the chart.** "Chart shows 12 of the 15 brands in the
+   table. Hidden from the chart: Robertsons, Knorr, Cartwright's." It is a
+   plain text node with no control in it, so `brStripInteractive` leaves it
+   alone while removing the control beside it, and `capturePortableHtml`
+   clones it with its colour, weight and rail inlined. It is emitted by R,
+   inside the chart-area element the cat-buying pin and PNG paths already
+   clone, so it travels with those captures without any of them being told
+   about it.
+3. **A clause on the pin and PNG title.** `captureFromRoot` reads the note and
+   carries `chartDeviation` on the payload as its own field.
+   `brTitleWithChartDeviation()` appends it, and only when the capture
+   actually includes the chart: a table pinned alone is not deviating from
+   anything and must not be labelled as though it were. The four panel-local
+   paths that put a chart and its table on one card were audited and wired
+   individually: `cbExecutePin` and `cbExecutePng` in the cat-buying panel,
+   the attributes and CEPs pin in the MA panel, the funnel drop-down pin, and
+   `pinWomView`. The MA metrics, Mental Advantage, DoP and Category Context
+   paths were read and left alone, because no chart they capture can deviate.
+
+**Why the title and not the subtitle.** `subtitle` renders on a pin card but
+not in the PNG, and `baseText` renders in the PNG behind a fixed "Base: "
+prefix. `title` renders plainly in both, and `modules/shared` is out of scope
+for this change, so the shared renderer could not be given a field of its own.
+
+**Excel is coherent by construction and nothing was added for it.**
+`_brExportPanel` walks `table` elements, and so do the panel-local `.xls`
+writers. The table never deviates, so an exported sheet always matches the
+header set. A test asserts the exporter reads no chart DOM, so the claim
+breaks loudly if that ever changes.
+
+## The two chart areas that ship collapsed
+
+Brand Summary and Word of Mouth render their chart behind the panel's own
+"Show chart" toggle, so their Chart brands control appears with the chart. That
+is right: with no chart there is nothing to deviate. The Chrome census counts
+those two separately rather than reporting them as controls that failed to
+appear.
+
+## Executed, with the numbers
+
+| Check | Result |
+|---|---|
+| Brand suite, before the first edit | FAIL 0, WARN 1, SKIP 2, PASS 2780 |
+| Brand suite, after | **FAIL 0, WARN 1, SKIP 2, PASS 2865** |
+| `test_chart_focus.R` alone | 85 assertions, 0 failures |
+| `tests/qa/reachability_check.py` | **PASS**. data-subpanel 5 identical, data-section 29 identical, section ids 13 identical, island classes 8 identical, every parseable island numerically identical, the one unparseable span named in both |
+| `tests/qa/drive_destinations.py` | **259 checks, 0 failed**, no console error and no uncaught exception, against 113 before |
+| `tests/qa/drive_two_categories.py` | **15 checks, 0 failed**, no console error |
+| IPK fixture report | 3,926,103 bytes before, **3,946,054 after**, 0.5 percent larger |
+
+Both reports were generated to the session scratchpad. Nothing was written
+into the repo, into OneDrive or into TurasProjects, and `preview_start` was
+not used.
+
+**The control census, named rather than counted loosely.** In the fixture's
+one full-depth category: header focal selects 1 of 1 visible, header brand-set
+triggers 1 of 1 visible, per-panel focal selects 0 of 15 visible, per-panel
+brand filters 0 of 16 visible, and Chart brands controls 8 mounted, 8 built,
+6 visible beside their chart with 2 behind a Show chart toggle. The eight are
+intended and are counted by name so they never read as strays.
+
+**What the Chrome harness now proves about the split.** Per chart: the control
+opens matching its table; the popover offers exactly what the header shows and
+no more; the focal brand cannot be dropped; after unticking one brand the
+table set is unchanged and the chart set is the table set plus that one brand;
+the trigger reads "N of M" and carries the deviating style; the note is shown
+and names what is missing; a capture of the chart area carries the note and
+does not carry the control; and a header change clears the deviation and puts
+the chart set back in step with the table set. On the three stacked-bar hosts,
+where the chart rows and the table rows both key on `data-cb-brand`, the two
+are read apart in the DOM rather than trusted from the state object: the chart
+really drops the brand, the table really keeps it, and the chart has exactly
+one row fewer.
+
+## The two-category gap, closed as far as a clone can close it
+
+The previous session recorded that `brApplyAllComparisonSets` had never run in
+a browser across more than one category, because the IPK fixture has one
+full-depth category and the three example generators are broken on main.
+
+`modules/brand/tests/qa/drive_two_categories.py` closes part of that. It
+clones the fixture's category panel in the browser under a second key, before
+the panel scripts register, so both panels register real subscribers with real
+tables and real charts. It passes 15 checks: two distinct groups are found and
+both are driven, each header reaches only its own category's panels, the two
+headers hold different states at the same time, a Chart brands deviation in
+one category does not appear in the other, a header change next door does not
+clear it while its own header change does, and nothing throws.
+
+**What it does not prove, stated plainly.** The clone is the same category
+twice, with the same brand list, the same numbers and the same labels. It says
+nothing about two categories with different brand lists, and nothing about the
+category switcher on real, differently shaped data. A genuine second
+full-depth category cannot be built from this fixture without inventing survey
+data, and that was not done. The loop is no longer untested; it is not yet
+tested against real variety.
+
+## Known limits, stated rather than left to be discovered
+
+- **The four elements that have never rendered through the shell with real
+  panel fragments still have not.** Branded Reach, Ad Hoc, Audience Lens and
+  Shopper Behaviour are absent from the fixture. None of them is in the Chart
+  brands scope, so this change adds nothing new to that gap.
+- **The deviation does not survive Save.** Same reason as the comparison set:
+  a checkbox's `checked` is a property, not an attribute, and the Save button
+  serialises `outerHTML`. The note element's text and its
+  `data-chartfocus-clause` attribute would survive, so a saved copy could show
+  a note with no deviation behind it. That is a real inconsistency and it is
+  the same one the comparison set already has. Not fixed here, because fixing
+  it properly means giving the lift's mirror a way to serialise control state,
+  which is a change to the save path rather than to this control.
+- **MA Metrics and Mental Advantage charts still follow the table set.** By
+  design, as above. If Duncan wants the split there it is a one-word change in
+  two functions plus two more mounts, and it is a behaviour change.
+- **`styler` was not run,** for the same reason as the previous session: the
+  files this touches would be reformatted whole and the churn would bury the
+  change.
+- **One pre-existing quirk was observed and left alone.** `brExecutePin` clears
+  `content.chartSvg` when the chart is not pinned but never clears
+  `content.chartHtml`. It predates this work and is not touched by it.
+- **`pinWomView` builds its payload with `html` and `insight` keys** where
+  `TurasPins.add` reads `chartSvg`, `tableHtml` and `insightText`. That looks
+  wrong and predates this work. The title clause was added there anyway, since
+  the title key is honoured, but no claim is made that a WOM pin renders its
+  chart today.
+
+## What Duncan still owes
+
+A `launch_turas()` run on the real IPK project: open a chart with several
+brands showing, drop one from the chart, check the note reads right, pin it
+and confirm the pin card says the chart is narrower than its table. Then the
+Fable pre-merge review, briefed as independent of this session. Not merged,
+not pushed.

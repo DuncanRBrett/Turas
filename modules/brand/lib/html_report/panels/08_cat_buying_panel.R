@@ -462,8 +462,16 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
 
   # Chart placeholder (hidden until Show chart is checked), BELOW the table.
   # Column selector + single bar chart + legend chip explaining cat-avg line.
+  # Chart brands: the per-chart deviation from the header's comparison set.
+  # Brand Summary keeps a chart-only visibility map
+  # (__cbState.chart_visible.brands), so a brand can be dropped from the bar
+  # chart while its row stays in the table. Guarded because the panel tests
+  # source this file alone.
+  brands_chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control("brands") else ""
   parts <- c(parts,
     '<div class="cb-brands-chart-area" data-cb-scope="brands" hidden>',
+    brands_chart_focus,
     '  <div class="cb-brands-chart-ctl">',
     '    <label class="cb-brands-chart-ctl-label">Column</label>',
     '    <select class="cb-brands-chart-col" data-cb-action="brandschart-col">',
@@ -652,11 +660,17 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
   # INSIDE .fn-rel-chart-area so pin / PNG capture (which clones that
   # element) carries the colour key with it.
   parts <- c(parts, .cb_rel_emphasis_chips(scope, seg_codes, seg_labels))
+  # Chart brands sits inside the captured chart area with the colour key, so
+  # its deviation note travels with a pin or a PNG of this chart.
+  rel_chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control(scope) else ""
   parts <- c(parts, sprintf(
     '<div class="fn-rel-chart-area" data-cb-scope="%s">
   %s
+  %s
   <div class="fn-rel-chart" data-cb-stacked-chart="%s"></div>
-</div>', scope, .cb_rel_chart_legend(scope, seg_codes, seg_labels), scope))
+</div>', scope, rel_chart_focus,
+    .cb_rel_chart_legend(scope, seg_codes, seg_labels), scope))
 
   # Bottom-of-page callout (registry: brand.cat_buying_loyalty or _dist).
   callout_key <- if (identical(scope, "loyalty")) "cat_buying_loyalty" else "cat_buying_dist"
@@ -768,11 +782,17 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
 
   # Emphasis chips + stacked H/M/L chart (JS renders via SEG_COLORS.heaviness)
   parts <- c(parts, .cb_rel_emphasis_chips(scope, seg_codes, seg_labels))
+  # Chart brands sits inside the captured chart area with the colour key, so
+  # its deviation note travels with a pin or a PNG of this chart.
+  hv_chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control(scope) else ""
   parts <- c(parts, sprintf(
     '<div class="fn-rel-chart-area" data-cb-scope="%s">
   %s
+  %s
   <div class="fn-rel-chart" data-cb-stacked-chart="%s"></div>
-</div>', scope, .cb_rel_chart_legend(scope, seg_codes, seg_labels), scope))
+</div>', scope, hv_chart_focus,
+    .cb_rel_chart_legend(scope, seg_codes, seg_labels), scope))
 
   # In-flow "How to read this tab" explainer. Inline rather than via the
   # central callout registry so the Light-buyer index interpretation lives

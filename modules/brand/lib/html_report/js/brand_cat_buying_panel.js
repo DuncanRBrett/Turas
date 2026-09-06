@@ -298,6 +298,10 @@
         }
       }
     });
+    /* The "Chart brands" control drives this handle's chart-only set. One
+       property name across all four split-mode panels so BrandChartFocus
+       can find it by walking up from its mount. */
+    panel.__brChartSelector = panel.__cbSelector;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -2011,6 +2015,14 @@
     /* Chart HTML precedes table HTML so the pin card reads top-to-bottom */
     content.tableHtml = capturedChartHtml + capturedTableHtml;
 
+    /* Chart brands: this pin can carry a chart and its table together, so a
+       deviating chart must say so on the card, not only inside the captured
+       chart area. */
+    if (typeof window.brTitleWithChartDeviation === 'function') {
+      content.title = window.brTitleWithChartDeviation(
+        content.title, window.brChartDeviationClause(activeTab), !!flags.chart);
+    }
+
     if (flags.insight && editor) content.insightText = editor.value.trim();
 
     /* CB charts are HTML-based and stored in tableHtml (not chartSvg).
@@ -2200,6 +2212,12 @@
     /* Chart HTML prepended to table HTML: both rendered by html2canvas in export.
        Same pinFlags.table fix as cbExecutePin: must be true whenever there is any
        HTML content, not just when the user's "Table" checkbox was ticked. */
+    /* Chart brands: same clause as the pin, for the same reason. */
+    if (typeof window.brTitleWithChartDeviation === 'function') {
+      title = window.brTitleWithChartDeviation(
+        title, window.brChartDeviationClause(activeTab), !!flags.chart);
+    }
+
     TurasPins.exportContentAsPNG({
       title:       title,
       chartSvg:    '',

@@ -324,19 +324,27 @@
 
     // The visible set follows the state exactly, in all three states, so
     // the words on the trigger and the rows in the tables never disagree.
-    if (typeof window.BrandSelector === "undefined" ||
-        !window.BrandSelector.setCategoryHidden) return;
-    if (st.mode === "all") {
-      window.BrandSelector.setCategoryHidden(group, []);
-      return;
+    if (typeof window.BrandSelector !== "undefined" &&
+        window.BrandSelector.setCategoryHidden) {
+      if (st.mode === "all") {
+        window.BrandSelector.setCategoryHidden(group, []);
+      } else {
+        var show = {};
+        show[st.focal] = true;
+        st.comparators.forEach(function (c) { show[c] = true; });
+        var hidden = window.BrandSelector.categoryBrands(group).filter(function (c) {
+          return !show[c];
+        });
+        window.BrandSelector.setCategoryHidden(group, hidden);
+      }
     }
-    var show = {};
-    show[st.focal] = true;
-    st.comparators.forEach(function (c) { show[c] = true; });
-    var hidden = window.BrandSelector.categoryBrands(group).filter(function (c) {
-      return !show[c];
-    });
-    window.BrandSelector.setCategoryHidden(group, hidden);
+
+    // Every published set resets each panel's chart-only set to its table
+    // set, so any live "Chart brands" deviation is already gone by here.
+    // This repaints the controls and clears their notes so the face of the
+    // report says so too. It runs on all three header states, which is why
+    // the all-brands branch above no longer returns early.
+    if (window.BrandChartFocus) window.BrandChartFocus.refreshAll();
   };
 
   window.brComparisonFocalChanged = function(sel) {

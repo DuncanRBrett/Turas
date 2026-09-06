@@ -417,6 +417,36 @@
         refreshTriggerCount(state);
         if (state.popoverEl) rebuildBody(state);
       },
+      // The brands this panel knows, with their labels and which one is
+      // focal. The "Chart brands" control needs the labels to name what it
+      // has hidden, and it needs isFocal so the focal brand's box can be
+      // locked on: a chart without the focal brand is a category chart, and
+      // the header's whole premise is focal-first.
+      getBrands: function () {
+        return state.brands.map(function (b) {
+          return { code: b.code, label: b.label, isFocal: !!b.isFocal };
+        });
+      },
+      // Hide brands from the CHART only, leaving the table alone. This is
+      // the split-mode capability the "Sync table and chart" toggle used to
+      // give, reached now through a control of its own.
+      //
+      // It deliberately does not go through emit(): emit() with scope
+      // "chart" fires onChange twice, the first time with the TABLE set, and
+      // it is the wrong place to reason about a chart-only change. Nothing
+      // is published to the category store either, so a chart deviation
+      // stays inside its own panel and can never reach the header or a
+      // sibling host. applyRemoteHiddenSet resets hiddenChart from
+      // hiddenTable on the next published set, which is what makes the
+      // header the source of truth without any extra bookkeeping.
+      setHiddenChart: function (codes) {
+        if (state.mode !== "split") return false;
+        state.hiddenChart = arrToSet(codes);
+        if (state.popoverEl) rebuildBody(state);
+        state.opts.onChange(state.hiddenChart, "chart");
+        return true;
+      },
+      isSplit: function () { return state.mode === "split"; },
       refreshCount: function () { refreshTriggerCount(state); },
       destroy: function () {
         delete REGISTRY[state.panelId];

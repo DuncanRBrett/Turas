@@ -1895,6 +1895,19 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 
 ')
 
+  # Chart brands: the per-chart deviation from the header set. The rules come
+  # from the widget that emits the markup, so the two cannot drift apart, and
+  # they land in the page's own stylesheet rather than a panel's. Every one of
+  # them names its class with no ancestor: a rule scoped under a panel or a
+  # destination would look right on screen and vanish from a pin, which is the
+  # one place the deviation note has to survive.
+  if (exists("build_chart_focus_styles", mode = "function")) {
+    module_css <- paste0(
+      module_css,
+      "\n/* === Chart brands ====================================== */\n",
+      build_chart_focus_styles(), "\n")
+  }
+
   # --- Panels ---
   category_names <- names(results$results$categories)
   # Build per-category lookup maps (key = category display-name key).
