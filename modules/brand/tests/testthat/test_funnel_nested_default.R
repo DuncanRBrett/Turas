@@ -492,3 +492,67 @@ test_that("the nested figure is a weighted proportion when weights are real", {
   expect_equal(.fn_chain_pct(cell, sum_w), unname(nested[3]),
                tolerance = 1e-12)
 })
+
+
+# ==============================================================================
+# The category-average row's range bar is drawn at the same base as its figure
+# ==============================================================================
+# The first cut of this stage rendered the cat-avg figure at the chain base
+# and left the bar, the tick and the lo/hi labels under it at the absolute
+# base, so on the fixture a mean of 6% sat inside a band of 8% to 17%. The
+# JS redraws all three on every toggle; the file as written has to be right
+# too, for the first paint and for print.
+
+test_that("the category-average band is computed at the nested base", {
+  html <- .fnd_flat(build_funnel_table_section(.fnd_panel()))
+  avg_row <- regmatches(html, regexpr(
+    '<tr class="ct-row fn-row-avg-all".*?</tr>', html, perl = TRUE))
+  expect_length(avg_row, 1)
+
+  for (i in seq_along(.FND_STAGES)) {
+    k <- .FND_STAGES[i]
+    td <- regmatches(avg_row, regexpr(
+      sprintf('<td[^>]*data-fn-stage="%s".*?</td>', k), avg_row, perl = TRUE))
+    expect_length(td, 1)
+    shown <- as.numeric(sub("%", "", sub(
+      '.*<span class="ct-val fn-pct-primary">([0-9]+)%</span>.*', "\\1", td)))
+    # A lower bound can be negative on two brands with a wide spread, and
+    # the cell prints it as written rather than clamping it to zero.
+    limits <- as.numeric(gsub("%", "", regmatches(td, gregexpr(
+      '(?<=<span>)-?[0-9]+%(?=</span>)', td, perl = TRUE))[[1]]))
+    expect_length(limits, 2)
+
+    vals <- c(.FND_CHAIN$IPK[i], .FND_CHAIN$ROB[i]) / .FND_N_W
+    m  <- mean(vals)
+    se <- stats::sd(vals) / sqrt(length(vals))
+    expect_equal(shown, round(100 * m), info = k)
+    expect_equal(limits[1], round(100 * (m - 1.96 * se)), info = k)
+    expect_equal(limits[2], round(100 * (m + 1.96 * se)), info = k)
+    # The figure sits inside its own band, which is the thing that broke.
+    expect_true(shown >= limits[1] && shown <= limits[2], info = k)
+  }
+})
+
+test_that("the JS redraws that band once at init, not only on a click", {
+  js <- paste(readLines(file.path(ROOT_FND, "modules", "brand", "lib",
+                                  "html_report", "js",
+                                  "brand_funnel_panel.js"),
+                        warn = FALSE), collapse = "\n")
+  init <- sub(".*function initPanel\\(panel\\) \\{", "", js)
+  init <- sub("\n  \\}\n.*", "", init)
+  expect_true(grepl("updateAvgRowRangeBars(panel)", init, fixed = TRUE))
+})
+
+test_that("the bar chart reads the active base, not the absolute figure", {
+  js <- paste(readLines(file.path(ROOT_FND, "modules", "brand", "lib",
+                                  "html_report", "js",
+                                  "brand_funnel_panel.js"),
+                        warn = FALSE), collapse = "\n")
+  bar <- sub(".*function buildBarChart\\(panel\\) \\{", "", js)
+  bar <- substr(bar, 1, 4000)
+  expect_true(grepl("cellValueForMode(c, barMode", bar, fixed = TRUE))
+  expect_false(grepl("valMap[c.brand_code] = c.pct_absolute", bar,
+                     fixed = TRUE))
+  # And the toggle repaints whichever chart view is on screen.
+  expect_true(grepl("applyChartVisibility(panel);", js, fixed = TRUE))
+})

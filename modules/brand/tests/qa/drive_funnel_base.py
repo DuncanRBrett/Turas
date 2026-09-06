@@ -20,6 +20,10 @@ What it asserts, on the first funnel panel it finds:
     and the summary cards to that view, and the cards agree with the table;
   no significance mark of either kind is on screen in the nested view, and
     the marks come back in the absolute view when the engine gave any;
+  the category-average row's range bar is drawn at the same base as the
+    figure above it, so the figure sits inside its own band in every view;
+  the bar chart carries the figure for the active base at a LATE stage,
+    where the chain and the absolute figure are not the same number;
   the "How this works" drawer starts collapsed and opens;
   the Excel export names the view it carries;
   no console error or uncaught exception anywhere in the run.
@@ -240,6 +244,64 @@ DRIVER = """
       check(m.mode + ': the card strip names its base',
             !!note && txt(note).indexOf('Base:') === 0 && txt(note).length > 6,
             txt(note));
+
+      // The category-average row draws a range bar under its figure. The
+      // bar, the tick and the lo/hi labels are base-dependent like the
+      // figure, and a figure sitting outside its own band is the symptom
+      // of the two being computed at different bases.
+      stageKeys.forEach(function (k) {
+        var td = $('tr.fn-row-avg-all td[data-fn-brand="__avg__"]' +
+                   '[data-fn-stage="' + k + '"]', panel);
+        if (!td) return;
+        var lim = $$('.ma-ci-limits span', td).map(function (e) {
+          return parseFloat(txt(e));
+        });
+        var shown = parseFloat(pctOf(td));
+        if (lim.length < 2 || isNaN(shown) || isNaN(lim[0]) || isNaN(lim[1])) {
+          return;
+        }
+        check(m.mode + ': the avg figure at ' + k + ' sits inside its band',
+              shown >= lim[0] - 1 && shown <= lim[1] + 1,
+              shown + ' in [' + lim[0] + ', ' + lim[1] + ']');
+      });
+
+      /* Bar view: it plots one stage across brands and used to read the
+         absolute figure whatever the toggle said. A LATE stage is chosen
+         on purpose: at the first stage the chain and the absolute figure
+         are the same number, so the check would pass on a chart that
+         ignored the toggle entirely. */
+      var barBtn = $('button[data-fn-view="bar"]', panel);
+      var lateStage = stageKeys[stageKeys.length - 1];
+      var stageChip = $('.fn-stk-emph-chip[data-fn-stk-emphasis="' +
+                        lateStage + '"]', panel);
+      if (barBtn && stageChip) {
+        barBtn.click();
+        stageChip.click();
+        var wantBar = pct(want[lateStage] ? want[lateStage][m.field] : null);
+        var barTexts = $$('.fn-bar-svg text', panel).map(function (t) {
+          return txt(t);
+        });
+        if (wantBar != null) {
+          check(m.mode + ': the bar view carries the figure for ' + lateStage,
+                barTexts.indexOf(wantBar) >= 0,
+                'wanted ' + wantBar + ', saw ' +
+                barTexts.slice(0, 10).join(' '));
+        }
+        // And its title names the base it drew, rather than the one it
+        // used to hard-code.
+        var barTitle = barTexts.length ? barTexts[0] : '';
+        check(m.mode + ': the bar chart title names its base',
+              barTitle.indexOf('% of total respondents') === -1 ||
+              m.mode === 'total', barTitle);
+        check(m.mode + ': the bar chart title names its stage, not the key',
+              barTitle.indexOf(lateStage) === -1, barTitle);
+        var slopeBtn = $('button[data-fn-view="slope"]', panel);
+        if (slopeBtn) slopeBtn.click();
+      } else {
+        check(m.mode + ': the bar view and its stage chips are reachable',
+              !!barBtn && !!stageChip,
+              'bar=' + !!barBtn + ' chip=' + !!stageChip);
+      }
     });
 
     // Some view other than the nested one must be able to show a mark, or

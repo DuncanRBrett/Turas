@@ -43,8 +43,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   # n_weighted is the same denominator pct_absolute uses, so the view needs
   # no new engine number. See .fn_chain_pct().
   n_weighted <- as.numeric(pd$meta$n_weighted %||% NA_real_)
-  chain_avg  <- .fn_chain_avg_by_stage(table$cells, stage_keys, brand_codes,
-                                       n_weighted)
+  chain_avg  <- .fn_chain_stats_by_stage(table$cells, stage_keys, brand_codes,
+                                         n_weighted)
 
   paste0(
     '<section class="fn-section fn-table-section">',
@@ -84,14 +84,23 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' Category-average chain percentage per stage.
+#' Category-average chain statistics per stage.
 #'
-#' Same convention as \code{.avg_all_brands_row()} in 03c_funnel_panel_data.R:
+#' The mean follows \code{.avg_all_brands_row()} in 03c_funnel_panel_data.R:
 #' apply the view's formula per brand, then average across brands. Not the
 #' ratio of the summed counts.
+#'
+#' The CI bounds and the column maximum come with it, because the cat-avg
+#' cell draws a range bar and its labels underneath the figure. Rendering
+#' the figure at the chain base and the bar at the absolute base would put
+#' a mean of six percent inside a band of eight to seventeen, which is what
+#' the first cut of this stage did. Mirrors updateAvgRowRangeBars() in
+#' brand_funnel_panel.js, which redraws the same bar on every toggle.
 #' @keywords internal
-.fn_chain_avg_by_stage <- function(cells, stage_keys, brand_codes, n_weighted) {
-  vapply(stage_keys, function(k) {
+.fn_chain_stats_by_stage <- function(cells, stage_keys, brand_codes,
+                                     n_weighted) {
+  out <- list()
+  for (k in stage_keys) {
     vals <- vapply(cells, function(c) {
       if (!identical(c$stage_key, k) || !(c$brand_code %in% brand_codes)) {
         return(NA_real_)
@@ -99,8 +108,21 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
       .fn_chain_pct(c, n_weighted)
     }, numeric(1))
     vals <- vals[is.finite(vals)]
-    if (length(vals) == 0) NA_real_ else mean(vals)
-  }, numeric(1), USE.NAMES = TRUE)
+    if (length(vals) == 0) {
+      out[[k]] <- list(mean = NA_real_, ci_lo = NA_real_, ci_hi = NA_real_,
+                       col_max = NA_real_)
+      next
+    }
+    m <- mean(vals)
+    lo <- NA_real_; hi <- NA_real_
+    if (length(vals) >= 2) {
+      se <- stats::sd(vals) / sqrt(length(vals))
+      lo <- m - 1.96 * se
+      hi <- m + 1.96 * se
+    }
+    out[[k]] <- list(mean = m, ci_lo = lo, ci_hi = hi, col_max = max(vals))
+  }
+  out
 }
 
 
@@ -217,20 +239,28 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     # with any real brand code.
     pct_nes <- r$pct_nested %||% pct_abs
     pct_aw  <- r$pct_aware  %||% pct_abs
-    pct_chn <- if (is.null(chain_avg)) NA_real_ else chain_avg[[k]] %||% NA_real_
-    if (!is.finite(pct_chn %||% NA_real_)) pct_chn <- pct_abs
-    ci_lo   <- r$ci_lo %||% NA_real_
-    ci_hi   <- r$ci_hi %||% NA_real_
-    safe_max <- max(0.01, as.numeric(col_max[[k]] %||% 1), na.rm = TRUE)
-    # Rendered text is the DEFAULT view (the nested chain), so the emitted
-    # file reads correctly before any script runs and when it is printed.
+    # The whole cell is drawn at the DEFAULT view (the nested chain): the
+    # figure, the range bar behind it and the lo/hi labels under it. Drawing
+    # the figure at one base and the bar at another put a mean of 6% inside
+    # a band of 8% to 17% on the fixture. updateAvgRowRangeBars() in
+    # brand_funnel_panel.js redraws all three on every toggle, including once
+    # at init, so this only has to be right for the file as written.
+    cs      <- if (is.null(chain_avg)) NULL else chain_avg[[k]]
+    pct_chn <- if (is.null(cs)) NA_real_ else cs$mean %||% NA_real_
+    use_chain <- is.finite(pct_chn %||% NA_real_)
+    if (!use_chain) pct_chn <- pct_abs
+    ci_lo   <- if (use_chain) cs$ci_lo %||% NA_real_ else r$ci_lo %||% NA_real_
+    ci_hi   <- if (use_chain) cs$ci_hi %||% NA_real_ else r$ci_hi %||% NA_real_
+    safe_max <- if (use_chain && is.finite(cs$col_max %||% NA_real_))
+      max(0.01, as.numeric(cs$col_max))
+    else max(0.01, as.numeric(col_max[[k]] %||% 1), na.rm = TRUE)
     disp    <- sprintf("%.0f%%", 100 * pct_chn)
     lo_disp <- if (is.finite(ci_lo)) sprintf("%.0f%%", 100 * ci_lo) else ""
     hi_disp <- if (is.finite(ci_hi)) sprintf("%.0f%%", 100 * ci_hi) else ""
     fill_left <- if (nzchar(lo_disp)) max(0, min(94, 100 * ci_lo / safe_max)) else 0
     fill_w    <- if (nzchar(lo_disp) && nzchar(hi_disp))
                   max(4, min(100 - fill_left, 100 * (ci_hi - ci_lo) / safe_max)) else 0
-    mean_pct  <- max(1, min(99, 100 * pct_abs / safe_max))
+    mean_pct  <- max(1, min(99, 100 * pct_chn / safe_max))
     ci_bar <- if (nzchar(lo_disp) && nzchar(hi_disp)) paste0(
       sprintf('<div class="ma-ci-bar-wrap" title="95%% CI: %s \u2013 %s">', lo_disp, hi_disp),
       sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>', fill_left, fill_w),

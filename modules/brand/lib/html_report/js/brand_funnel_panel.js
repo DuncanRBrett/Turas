@@ -98,6 +98,10 @@
     applyPctMode(panel);
     applyTableShading(panel, "off");
     applyTableSigMarkers(panel);
+    /* The cat-avg row's range bar is base-dependent like everything else in
+       the row. R renders it at the default view, and this keeps it in step
+       when a panel opens on some other state. */
+    updateAvgRowRangeBars(panel);
     bindSubTabs(panel);
     bindPinDropdown(panel);
     initRelChart(panel);
@@ -362,8 +366,10 @@
           b.setAttribute("aria-pressed", active ? "true" : "false");
         });
         applyPctMode(panel);
-        buildMiniFunnels(panel);   // mini funnels must reflect the new % base
-        drawSlopeSvg(panel);       // slope chart re-renders with new base
+        /* Repaints whichever chart view is showing and rebuilds the mini
+           funnels on the way. This used to call drawSlopeSvg directly,
+           which left a reader in Bar view looking at the old base. */
+        applyChartVisibility(panel);
         // Sig arrows + heatmap (both modes) are base-dependent, re-render
         // so they line up with the values now displayed in each cell.
         applyTableSigMarkers(panel);
@@ -3579,15 +3585,31 @@
       return;
     }
 
-    var stageLabel = stageLabels[barStage] || barStage;
+    /* stage_labels is an array parallel to stage_keys, so it has to be
+       looked up by position. Indexing it by the key returned undefined and
+       the chart titled itself with the raw stage key. */
+    var stageIdxBar = stageKeys.indexOf(barStage);
+    var stageLabel = (stageIdxBar >= 0 && stageLabels[stageIdxBar])
+      ? stageLabels[stageIdxBar] : barStage;
 
-    // Value map: brandCode -> pct_absolute for selected stage
+    /* Value map: brandCode -> the figure at the ACTIVE base for the
+       selected stage. It read pct_absolute whatever the toggle said, so
+       the Bar view showed one set of numbers while the table above it
+       showed another. Under the nested default that was every report. */
+    var barMode   = (state && state.pctMode) || "chain";
+    var nWeightedBar = nWeightedOf(pd);
+    var awareKeyBar  = stageKeys[0];
+    var brandAwareBar = {};
+    cells.forEach(function (c) {
+      if (c.stage_key === awareKeyBar) brandAwareBar[c.brand_code] = c.pct_absolute;
+    });
     var valMap = {};
     for (var ci = 0; ci < cells.length; ci++) {
       var c = cells[ci];
-      if (c.stage_key === barStage && c.pct_absolute != null) {
-        valMap[c.brand_code] = c.pct_absolute;
-      }
+      if (c.stage_key !== barStage) continue;
+      var bv = cellValueForMode(c, barMode, awareKeyBar, brandAwareBar,
+                                nWeightedBar);
+      if (bv != null && !isNaN(bv)) valMap[c.brand_code] = bv;
     }
 
     // Visible brands (cat avg chip excluded)
@@ -3626,13 +3648,24 @@
       });
     }
 
-    // Category average reference value
+    /* Category average reference line, at the active base like the bars
+       it sits behind. avg_all_brands carries the other three views;
+       the chain average is computed the same way the table row does it,
+       per brand and then averaged. */
     var catAvgVal = null;
-    if (pd.table.avg_all_brands) {
+    if (barMode === "chain") {
+      var barChainAvg = chainAvgByStage(cells, stageKeys, nWeightedBar);
+      catAvgVal = barChainAvg[barStage];
+    } else if (pd.table.avg_all_brands) {
       for (var ai = 0; ai < pd.table.avg_all_brands.length; ai++) {
-        if (pd.table.avg_all_brands[ai].stage_key === barStage) {
-          catAvgVal = pd.table.avg_all_brands[ai].pct_absolute; break;
-        }
+        var ar = pd.table.avg_all_brands[ai];
+        if (ar.stage_key !== barStage) continue;
+        catAvgVal = barMode === "previous" ? (ar.pct_nested != null
+                        ? ar.pct_nested : ar.pct_absolute)
+                  : barMode === "aware"    ? (ar.pct_aware != null
+                        ? ar.pct_aware : ar.pct_absolute)
+                  : ar.pct_absolute;
+        break;
       }
     }
     if (catAvgVal == null) {
@@ -3648,7 +3681,7 @@
     var parts = [];
 
     // Stage title
-    parts.push('<text x="' + (labelW + barAreaW / 2) + '" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="#64748b">' + escSvg(stageLabel) + ': % of total respondents</text>');
+    parts.push('<text x="' + (labelW + barAreaW / 2) + '" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="#64748b">' + escSvg(stageLabel) + ': ' + escSvg(baseModeLabelFor(barMode)) + '</text>');
 
     // Category average dashed reference line
     if (catAvgVal != null) {
