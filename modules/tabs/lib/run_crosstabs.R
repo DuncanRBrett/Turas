@@ -998,6 +998,31 @@ if (.html_report_v2_on) {
                            "    The config's setting is not lowered by the GUI, only raised.\n"),
                     .delivery$config_mode, .delivery$mode))
       }
+
+      # The same floor, applied to the two dials that decide what the COMMENT
+      # island carries. A comment tagged with its author's full demographic
+      # combination names one person as surely as a respondent record does, so a
+      # client-safe build cannot be left to the operator remembering a Settings
+      # cell. Written back into the config so the island builder, the manifest
+      # and the source-exposure warning all read one set of values.
+      .qual_dials <- tabs_delivery_qual_dials(config_result$config_obj)
+      config_result$config_obj <- tabs_apply_qual_floor(config_result$config_obj,
+                                                        .qual_dials)
+      if (!identical(.qual_dials$cuts, .qual_dials$config_cuts)) {
+        cat(sprintf(paste0("\n  Comment demographic tags: the GUI choice raises this build ",
+                           "from '%s' to '%s'.\n"),
+                    .qual_dials$config_cuts, .qual_dials$cuts))
+        if (identical(.qual_dials$reason, "needs_k")) {
+          cat("    'safe' is a promise about min_reporting_base and none is set,\n")
+          cat("    so the tags are blocked instead. Set min_reporting_base to keep\n")
+          cat("    the comments following the filter.\n")
+        }
+      }
+      if (!identical(.qual_dials$text_mode, .qual_dials$config_text_mode)) {
+        cat(sprintf(paste0("\n  Verbatim text: the GUI choice raises this build from '%s' ",
+                           "to '%s'.\n"),
+                    .qual_dials$config_text_mode, .qual_dials$text_mode))
+      }
       if (identical(.delivery$reason, "needs_k")) {
         cat("\n┌─── TURAS DISCLOSURE WARNING ───────────────────────────────┐\n")
         cat("│ You chose a client-safe INTERACTIVE build, which needs a\n")

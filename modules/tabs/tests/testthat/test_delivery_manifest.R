@@ -7,7 +7,7 @@
 # ==============================================================================
 
 if (!exists("tabs_delivery_manifest", mode = "function")) {
-  source(file.path(rprojroot::find_root(rprojroot::has_dir(".git")),
+  source(file.path(rprojroot::find_root(rprojroot::has_dir("modules")),
                    "modules", "tabs", "lib", "delivery_manifest.R"))
 }
 
@@ -284,4 +284,133 @@ test_that("every mode the resolver returns is one the build knows how to make", 
                    info = paste(cm, g))
     }
   }
+})
+
+
+# ==============================================================================
+# THE QUALITATIVE FLOOR
+# ==============================================================================
+# The interactivity floor above decides whether respondent RECORDS ship. These
+# decide what the COMMENT island carries, which was left entirely to the config
+# until a review of the SACS 2025 client-safe build found 57 of its 144 tagged
+# commenters were the only person in their Campus, Department and Tenure
+# combination. A file whose crosstabs refuse any group under ten was naming
+# individuals in its comment payload.
+
+qd <- function(cuts = NULL, text = NULL, k = 10, gui = NA_character_) {
+  cfg <- list(min_reporting_base = k)
+  if (!is.null(cuts)) cfg$qual_demographic_cuts <- cuts
+  if (!is.null(text)) cfg$qual_confidentiality_mode <- text
+  tabs_delivery_qual_dials(cfg, gui)
+}
+
+test_that("no GUI choice leaves both qualitative dials exactly as they are", {
+  for (c0 in c("allow", "safe", "block")) {
+    for (t0 in c("full", "redacted", "hidden")) {
+      r <- qd(c0, t0)
+      expect_equal(r$cuts, c0, info = paste(c0, t0))
+      expect_equal(r$text_mode, t0, info = paste(c0, t0))
+      expect_equal(r$reason, "config", info = paste(c0, t0))
+    }
+  }
+})
+
+test_that("client safe interactive k-anonymises the tags rather than blocking them", {
+  # `safe` and not `block`: this mode's promise is that the comments follow the
+  # filter, and blocking the tags withdraws it.
+  r <- qd("allow", "redacted", gui = "client_safe_interactive")
+  expect_equal(r$cuts, "safe")
+  expect_equal(r$reason, "gui")
+  expect_equal(r$config_cuts, "allow")
+})
+
+test_that("a stricter config dial is never lowered by a client safe choice", {
+  r <- qd("block", "hidden", gui = "client_safe_interactive")
+  expect_equal(r$cuts, "block")
+  expect_equal(r$text_mode, "hidden")
+  expect_equal(r$reason, "config")
+})
+
+test_that("full report is a permission, so it floors neither dial", {
+  r <- qd("allow", "full", gui = "full")
+  expect_equal(r$cuts, "allow")
+  expect_equal(r$text_mode, "full")
+})
+
+test_that("a client safe build never ships raw verbatim text", {
+  # Direct identifiers only. A curated excerpt is the point of the tab; an email
+  # address inside it is not.
+  for (g in c("client_safe_interactive", "client_safe_frozen")) {
+    r <- qd("safe", "full", gui = g)
+    expect_equal(r$text_mode, "redacted", info = g)
+  }
+  # And a hidden config stays hidden.
+  expect_equal(qd("safe", "hidden", gui = "client_safe_frozen")$text_mode, "hidden")
+})
+
+test_that("client safe frozen blocks the tags, which serve no reader there", {
+  # Nothing in a frozen file can filter, so a demographic tag on a comment is
+  # exposure with no function.
+  r <- qd("allow", "redacted", gui = "client_safe_frozen")
+  expect_equal(r$cuts, "block")
+  expect_equal(r$reason, "gui")
+  # The retired two-option value behaves as the frozen choice, as it does for
+  # interactivity.
+  expect_equal(qd("allow", "redacted", gui = "client_safe")$cuts, "block")
+})
+
+test_that("safe without a threshold blocks the tags instead of promising nothing", {
+  # `safe` is a promise about k. Without one the island ships raw tags, so the
+  # floor takes the strictly safer branch and says which it took.
+  for (k in list(NULL, NA, 1, 0)) {
+    r <- tabs_delivery_qual_dials(
+      list(qual_demographic_cuts = "allow", min_reporting_base = k),
+      "client_safe_interactive")
+    expect_equal(r$cuts, "block", info = paste("k =", format(k)))
+    expect_equal(r$reason, "needs_k", info = paste("k =", format(k)))
+  }
+})
+
+test_that("an unset or unknown dial resolves to the island builder's own default", {
+  r <- tabs_delivery_qual_dials(list(min_reporting_base = 10), NA_character_)
+  expect_equal(r$cuts, "allow")        # qual_build_data_qual's default
+  expect_equal(r$text_mode, "hidden")  # and its safe default for text
+  r2 <- tabs_delivery_qual_dials(
+    list(qual_demographic_cuts = "Nonsense", qual_confidentiality_mode = "",
+         min_reporting_base = 10), NA_character_)
+  expect_equal(r2$cuts, "allow")
+  expect_equal(r2$text_mode, "hidden")
+})
+
+test_that("the floor is written back so every reader sees one set of values", {
+  cfg <- list(qual_demographic_cuts = "allow", qual_confidentiality_mode = "full",
+              min_reporting_base = 10)
+  out <- tabs_apply_qual_floor(cfg, tabs_delivery_qual_dials(cfg, "client_safe_interactive"))
+  expect_equal(out$qual_demographic_cuts, "safe")
+  expect_equal(out$qual_confidentiality_mode, "redacted")
+  # The manifest reads the config, so it now describes what the file carries.
+  m <- tabs_delivery_manifest(NULL, "{\"questions\":[]}", out)
+  expect_match(joined(m), "k-anonymised against k=10")
+  expect_match(joined(m), "direct identifiers scrubbed")
+})
+
+
+test_that("the run applies the qualitative floor before it builds the comment island", {
+  # A floor nobody calls is the failure this layer exists to prevent, and the
+  # unit tests above would all still pass with the call deleted. Nothing in the
+  # suite sets TURAS_DELIVERY_MODE and runs the pipeline, so this reads the
+  # source and checks the call is there and in the right ORDER. It is a wiring
+  # check, not a behaviour one: it cannot tell you the floor is correct, only
+  # that the island is not built ahead of it.
+  path <- file.path(rprojroot::find_root(rprojroot::has_dir("modules")),
+                    "modules", "tabs", "lib", "run_crosstabs.R")
+  src <- readLines(path, warn = FALSE)
+  resolve <- grep("tabs_delivery_qual_dials\\(", src)
+  apply_it <- grep("tabs_apply_qual_floor\\(", src)
+  island <- grep("build_integrated_qual_island\\(", src)
+  expect_true(length(resolve) >= 1)
+  expect_true(length(apply_it) >= 1)
+  expect_true(length(island) >= 1)
+  expect_lt(max(resolve), min(apply_it))
+  expect_lt(max(apply_it), min(island))
 })

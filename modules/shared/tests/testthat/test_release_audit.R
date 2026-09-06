@@ -8,7 +8,7 @@
 # ==============================================================================
 
 if (!exists("turas_release_audit", mode = "function")) {
-  .root <- rprojroot::find_root(rprojroot::has_dir(".git"))
+  .root <- rprojroot::find_root(rprojroot::has_dir("modules"))
   source(file.path(.root, "modules", "shared", "lib", "turas_release_audit.R"))
 }
 
