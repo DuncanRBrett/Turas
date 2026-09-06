@@ -294,8 +294,9 @@
     var anchors  = heroAnchors(snap);
     var verdict  = heroHeadline(snap, cat, catName, fname, anchors);
     var rankBadge = anchors.mms_rank
-      ? '<div class="brsum-hero-rank">#' + escHtml(anchors.mms_rank) +
-          ' by MMS in ' + escHtml(catName) + '</div>'
+      ? '<div class="brsum-hero-rank">Rank ' + escHtml(anchors.mms_rank) +
+          (anchors.mms_rank_of ? ' of ' + escHtml(anchors.mms_rank_of) : '') +
+          ' by Mental Market Share</div>'
       : '';
     var anchorsHtml = [
       heroAnchor('Mental Market Share', anchors.mms,   anchors.mms_avg,  col),
@@ -322,10 +323,54 @@
            '</div>';
   }
 
+  /* Normalise whatever a payload carries for a rank into { rank, of }.
+     The R payload writes the MMS rank as the string "Rank 1 / 15" on
+     snap.focal_metrics; earlier code looked for a bare number on
+     snap.ma_metrics, where no rank field has ever been written, so the
+     rank badge and the rank clause never rendered. This reader accepts
+     every shape the payload could carry: a number, "Rank 1 / 15",
+     "#1 of 15", "1/15", or an object with rank / of fields. Anything it
+     cannot read returns nulls, and the caller renders no rank rather
+     than a guessed one. */
+  function parseRank(v) {
+    var out = { rank: null, of: null };
+    if (v == null) return out;
+    if (typeof v === 'number') {
+      if (isFinite(v) && v > 0) out.rank = Math.round(v);
+      return out;
+    }
+    if (typeof v === 'object') {
+      var r = parseRank(v.rank);
+      out.rank = r.rank;
+      var o = parseRank(v.of != null ? v.of : v.n);
+      out.of = o.rank;
+      return out;
+    }
+    var nums = String(v).match(/\d+/g);
+    if (!nums || !nums.length) return out;
+    out.rank = parseInt(nums[0], 10);
+    if (nums.length > 1) out.of = parseInt(nums[1], 10);
+    if (!isFinite(out.rank) || out.rank <= 0) { out.rank = null; out.of = null; }
+    if (out.of != null && (!isFinite(out.of) || out.of <= 0)) out.of = null;
+    return out;
+  }
+
+  /* Find one entry in a metric list by matching its label. */
+  function metricByLabel(list, needles) {
+    if (!list || !list.length) return null;
+    for (var i = 0; i < list.length; i++) {
+      var lab = (list[i].label || '').toLowerCase();
+      for (var j = 0; j < needles.length; j++) {
+        if (lab.indexOf(needles[j]) >= 0) return list[i];
+      }
+    }
+    return null;
+  }
+
   /* Resolve the 4 anchor numbers + rank from the snapshot. Falls back to
      a "–" string when the source field is missing or NA. */
   function heroAnchors(snap) {
-    var out = { mms: '–', mms_avg: '–', mms_rank: null,
+    var out = { mms: '–', mms_avg: '–', mms_rank: null, mms_rank_of: null,
                 mpen: '–', mpen_avg: '–',
                 pen:  '–', pen_avg:  '–',
                 scr:  '–', scr_avg:  '–' };
@@ -335,10 +380,23 @@
         var lab = (m.label || '').toLowerCase();
         if (lab.indexOf('mental market share') >= 0 || lab === 'mms') {
           out.mms = m.value; out.mms_avg = m.cat_avg;
-          if (m.rank) out.mms_rank = m.rank;
+          if (m.rank) {
+            var rm = parseRank(m.rank);
+            out.mms_rank = rm.rank; out.mms_rank_of = rm.of;
+          }
         } else if (lab.indexOf('mental penetration') >= 0 || lab === 'mpen') {
           out.mpen = m.value; out.mpen_avg = m.cat_avg;
         }
+      }
+    }
+    /* The rank the R payload actually writes. focal_metrics carries it on
+       the MMS entry as "Rank 1 / 15"; ma_metrics above is kept only as a
+       fallback for a payload that starts carrying one there. */
+    if (out.mms_rank == null) {
+      var fm = metricByLabel(snap.focal_metrics, ['mental market share', 'mms']);
+      if (fm && fm.rank) {
+        var rf = parseRank(fm.rank);
+        out.mms_rank = rf.rank; out.mms_rank_of = rf.of;
       }
     }
     if (snap.brand_summary && snap.brand_summary.length) {
@@ -362,7 +420,10 @@
      the reader can verify against the anchor numbers above. */
   function heroHeadline(snap, cat, catName, fname, a) {
     var rank   = a.mms_rank ? parseInt(a.mms_rank, 10) : null;
-    var nBrands = (cat && cat.n_brands) ? cat.n_brands : null;
+    /* The denominator the rank was computed against wins over the count of
+       brands in the picker: the two diverge when a brand is in the picker
+       but absent from the MMS table. */
+    var nBrands = a.mms_rank_of || ((cat && cat.n_brands) ? cat.n_brands : null);
     var mpenCmp = compareToAvg(a.mpen, a.mpen_avg);
     var penCmp  = compareToAvg(a.pen,  a.pen_avg);
     var rankClause = '';
@@ -829,6 +890,27 @@
     var newPos = start + before.length + (selected || 'text').length;
     editor.setSelectionRange(newPos, newPos);
     window.brsumRenderInsight();
+  };
+
+  /* -------------------------------------------------------------------------
+   * Test seam
+   *
+   * The Overview's derived sentences are pure functions of one (category,
+   * brand) snapshot, and every one of them has to hold for a brand at the
+   * top of a category, in the middle and at the bottom. The renderers reach
+   * into the DOM, so the derivations are exposed here and exercised
+   * directly by modules/brand/tests/js/test_summary_overview.js. Nothing in
+   * the report calls these; they read the payload and return values.
+   * ------------------------------------------------------------------------- */
+  window.brsumDerive = {
+    parseRank: parseRank,
+    heroAnchors: heroAnchors,
+    heroHeadline: function (snap, cat, catName) {
+      var a = heroAnchors(snap);
+      var fname = (snap && snap.name) || 'Focal brand';
+      return { anchors: a, rank: a.mms_rank, of: a.mms_rank_of,
+               headline: heroHeadline(snap, cat, catName, fname, a) };
+    }
   };
 
   /* -------------------------------------------------------------------------
