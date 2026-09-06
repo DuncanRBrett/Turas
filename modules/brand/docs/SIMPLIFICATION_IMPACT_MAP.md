@@ -58,10 +58,10 @@ records whether the row rendered in the report generated this session.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | Brand Funnel | `fn-funnel` | `fn` | `funnel` | `section-funnel-dss` | `funnel-dss` (wrapper plus one toolbar) | `panels/03_funnel_panel.R`, `_chart`, `_table`, `_styling` | `js/brand_funnel_panel.js` | `element_funnel` and `Analysis_Depth = full` | yes | Brand and Buying, main view, first |
 | 2 | Brand Attitude | `fn-relationship` | `fn` | `relationship` | (shares `section-funnel-dss`) | `attitude-dss` | `panels/03_funnel_panel.R` (`.fn_relationship_section`) | `js/brand_funnel_panel.js` | `element_funnel` | yes | Brand Meaning, main view |
-| 3 | Brand Attributes | `ma-attributes` | `ma` | `attributes` | (shares `section-ma-dss`) | `attributes-dss` | `panels/02_ma_panel.R`, `_table`, `_chart` | `js/brand_ma_panel.js` | `element_mental_avail` plus CEP rows present | yes | Brand Meaning, main view |
-| 4 | Category Entry Points | `ma-ceps` | `ma` | `ceps` | (shares `section-ma-dss`) | `ceps-dss` | `panels/02_ma_panel.R`, `_table`, `_chart` | `js/brand_ma_panel.js` | `element_mental_avail` | yes | Mental Availability, main view, evidence |
-| 5 | Mental Advantage | `ma-advantage` | `ma` | `advantage` | (shares `section-ma-dss`) | `advantage-dss` | `panels/02_ma_panel_advantage.R`, `_styling` | `js/brand_ma_advantage.js` | `element_mental_avail` plus `cep_advantage` or `attribute_advantage` present | yes | Mental Availability: quadrant and action list in the main view, full matrix and buyer-gap diagnostic in Advanced |
-| 6 | MA Metrics | `ma-metrics` | `ma` | `metrics` | `section-ma-dss` (wrapper) | `ma-dss` (wrapper), `metrics-dss` (toolbar) | `panels/02_ma_panel.R` (`.ma_metrics_section`) | `js/brand_ma_panel.js` | `element_mental_avail` | yes | Mental Availability, main view, headline |
+| 3 | Brand Attributes | `ma-attributes` | `ma` | `attributes` | (shares `section-ma-dss`) | `attributes-dss` | `panels/02_ma_panel.R`, `_table`, `_chart` | `js/brand_ma_panel.js` | `element_mental_avail`, `Analysis_Depth = full` and at least one CEP row (`00_main.R:418` gates the whole MA element on `nrow(cat_ceps) > 0`) | yes | Brand Meaning, main view |
+| 4 | Category Entry Points | `ma-ceps` | `ma` | `ceps` | (shares `section-ma-dss`) | `ceps-dss` | `panels/02_ma_panel.R`, `_table`, `_chart` | `js/brand_ma_panel.js` | same gate as row 3 | yes | Mental Availability, main view, evidence |
+| 5 | Mental Advantage | `ma-advantage` | `ma` | `advantage` | (shares `section-ma-dss`) | `advantage-dss` | `panels/02_ma_panel_advantage.R`, `_styling` | `js/brand_ma_advantage.js` | row 3's gate plus `cep_advantage` or `attribute_advantage` present | yes | Mental Availability: quadrant and action list in the main view, full matrix and buyer-gap diagnostic in Advanced |
+| 6 | MA Metrics | `ma-metrics` | `ma` | `metrics` | `section-ma-dss` (wrapper) | `ma-dss` (wrapper), `metrics-dss` (toolbar) | `panels/02_ma_panel.R` (`.ma_metrics_section`) | `js/brand_ma_panel.js` | same gate as row 3 | yes | Mental Availability, main view, headline |
 | 7 | Category Buying | `rep` | `rep` | (none) | `section-repertoire-dss` | `repertoire-dss` | `panels/08_cat_buying_panel.R` and four siblings | `js/brand_cat_buying_panel.js` | `element_repertoire` and `Analysis_Depth = full` | yes | Split by sub-tab, see section 3 |
 | 8 | Word of Mouth | `wom` | `wom` | (none) | `section-wom-dss` | `wom-dss` | `panels/05_wom_panel.R`, `_chart`, `_styling` | `js/brand_wom_panel.js` | `element_wom` | yes | Brand Meaning, main view |
 | 9 | Branded Reach | `branded_reach` | `br` | (none) | `section-branded_reach-<cat_id>` | `branded_reach-<cat_id>` | `panels/10_branded_reach_panel.R` | `js/brand_branded_reach_panel.js` | `element_branded_reach`, default off, plus at least one ad | no | Brand Meaning, Advanced |
@@ -221,6 +221,41 @@ nineteen appears exactly once in the table above.
 
 ## 9. Findings that need a ruling before Stage 2
 
+0. **Two sub-panels straddle two destinations each, and this is the one finding
+   that changes the shape of the Stage 2 build.** Under the handover's own
+   mapping, the `fn` sub-panel splits: its `funnel` internal tab goes to Brand
+   and Buying, its `relationship` tab (labelled Brand Attitude) goes to Brand
+   Meaning. The `ma` sub-panel splits the same way: `attributes` goes to Brand
+   Meaning while `ceps`, `advantage` and `metrics` go to Mental Availability.
+   Each sub-panel is one DOM element carrying one JSON island and one internal
+   tab switcher, and both `switchCategorySubtab()` and the
+   `.br-insight-wrap[data-insight-internal-tab]` visibility logic assume the
+   active internal tab sits inside the active `.br-subpanel`. So a sub-panel
+   cannot be in two destinations at once. Three ways out:
+
+   - **(a) Split the render.** Emit one `.br-subpanel` per internal tab in
+     `build_br_category_panel()`, so `fn-funnel`, `fn-relationship` and the four
+     `ma-*` tabs each get their own host. Most work in the page builder, no
+     duplicated payload, and `switchCategorySubtab()`'s hidden-button route
+     still works because each host still contains the panel's own nav. It does
+     mean the funnel and MA panel HTML is emitted more than once per category,
+     which grows the file.
+   - **(b) Move DOM nodes on destination switch.** Keep one sub-panel and
+     re-parent the internal tab into whichever destination is active. Cheapest
+     to write, worst to live with: it breaks pin capture from a stable
+     ancestor and makes the DOM position of a `data-section` anchor
+     unpredictable.
+   - **(c) Keep whole panels together and change the mapping.** Put Brand
+     Attitude in Brand and Buying with the funnel it shares a panel with, and
+     Brand Attributes in Mental Availability with the CEPs it shares a panel
+     with. No render change at all. It departs from the handover mapping and
+     from the ChatGPT brief section 6, which both want attitude and attributes
+     under Brand Meaning.
+
+   Recommend **(a)**. It is the only one that gives the destinations the brief
+   asks for without making the anchors move. Duncan should rule before Stage 2
+   starts, because (a) and (c) are different sizes of job.
+
 1. **The funnel Summary cards are unreachable today.** Section 4. They need a
    home or an explicit decision to leave them dead.
 2. **The Category Buying KPI strip is split from the Dirichlet Norms tab.**
@@ -237,3 +272,22 @@ nineteen appears exactly once in the table above.
 4. **Two label mismatches**, both harmless today but worth settling while the
    nav is being rewritten: "MA Metrics" against "Headline Metrics", and "Brand
    Attitude" against the internal tab name "relationship".
+5. **The Summary hero's rank clause and rank badge never render.** Found while
+   building the mockup, verified against a headless Chrome DOM dump of the
+   fixture report. `heroAnchors()` in `js/brand_summary_panel.js` reads
+   `rank` off each `ma_metrics` entry, but the payload carries the rank on
+   `focal_metrics` instead, as the string `"Rank 1 / 15"`. So `mms_rank` is
+   always null, `.brsum-hero-rank` is never emitted, and `heroHeadline()` falls
+   through to the bare "<brand> in <category>" clause. The rendered verdict for
+   IPK is "Ina Paarman's Kitchen in Dry Seasonings and Spices. Strong on both
+   mental (MPen) and physical (% bought) availability.", where it should open
+   with the category-leader clause. A one-line JS fix, and the Overview is the
+   right moment to make it. Not in Stage 1 scope: recorded here for Stage 3.
+6. **What the persistent category switcher offers when most categories are
+   awareness-only.** Decision 4 asks for a switcher on every destination. On
+   this fixture only Dry Seasonings and Spices is full depth; the other eight
+   categories produce no category panel at all, so the switcher would hold one
+   entry. Options: list only full-depth categories, or list all of them and
+   disable the shallow ones with a reason on the face. Recommend listing only
+   full-depth categories and putting the awareness-only ones where they already
+   live, on the Portfolio tab.
