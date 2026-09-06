@@ -798,7 +798,10 @@ The data file (`.csv` or `.xlsx`) must follow these conventions:
     column contains the category code (e.g. `DSS`, `RM`) for each
     respondent's assigned focal category.
 -   **Weight column:** if `weight_variable` is set, this column contains
-    the post-stratification weight.
+    the post-stratification weight. Every respondent needs one. A
+    non-numeric cell refuses the run with `DATA_WEIGHT_NOT_NUMERIC` and a
+    blank cell refuses it with `DATA_WEIGHT_BLANK`, both naming the rows.
+    To run unweighted, leave `weight_variable` blank.
 
 ------------------------------------------------------------------------
 

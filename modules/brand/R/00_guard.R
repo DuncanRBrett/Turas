@@ -207,16 +207,22 @@ brand_with_refusal_handler <- function(expr) {
 #' stray "n/a", a thousands separator) used to error somewhere downstream
 #' with a message about arithmetic on non-numeric arguments. Now: numeric-
 #' looking text is coerced, anything else is a DATA_WEIGHT_NOT_NUMERIC
-#' refusal naming the offending values (review 2026-07-12, M8). Blank or
-#' NA cells become weight 0, which is what every element that uses
-#' \code{na.rm} already did; Mental Availability sums weights without it
-#' and returned NA for every brand on an NA weight, so the zero is applied
-#' here once and \code{run_brand()} carries a warning naming the rows.
+#' refusal naming the offending values (review 2026-07-12, M8).
+#'
+#' A blank or NA cell is a DATA_WEIGHT_BLANK refusal naming the data rows
+#' (review 2026-09-05, F3; Duncan's ruling 2026-09-06). Every earlier
+#' behaviour here was unsafe: NA propagated into Mental Availability,
+#' which sums weights without \code{na.rm} and returned NA for every
+#' brand, and the zero-fill that replaced it silently dropped those
+#' respondents from every weighted number. The data gets fixed before any
+#' numbers come out.
+#'
+#' A weight column that is not in the data at all never reaches this
+#' function; \code{run_brand()} skips it and runs unweighted.
 #'
 #' @param w Vector from the data frame.
 #' @param weight_col Column name, for the message.
-#' @return list(weights = numeric, n_blank = integer, blank_rows = integer)
-#'   or a refusal list.
+#' @return list(weights = numeric) or a refusal list.
 #' @keywords internal
 .brand_coerce_weights <- function(w, weight_col) {
   w_num <- suppressWarnings(as.numeric(as.character(w)))
@@ -229,7 +235,7 @@ brand_with_refusal_handler <- function(expr) {
       weight_col, sum(bad),
       paste(head(offenders, 8), collapse = ", "))
     cat("\n=== TURAS BRAND ERROR ===\n[DATA_WEIGHT_NOT_NUMERIC] ", msg,
-        "\nHow to fix: make every cell in the weight column a number (blank or NA rows are treated as weight 0).\n=========================\n\n", sep = "")
+        "\nHow to fix: make every cell in the weight column a number.\n=========================\n\n", sep = "")
     return(list(
       status = "REFUSED",
       code = "DATA_WEIGHT_NOT_NUMERIC",
@@ -238,9 +244,30 @@ brand_with_refusal_handler <- function(expr) {
         "Make every cell in '%s' numeric, or point weight_variable at a numeric column.",
         weight_col)))
   }
+
   blank_rows <- which(is.na(w_num))
-  w_num[blank_rows] <- 0
-  list(weights = w_num, n_blank = length(blank_rows), blank_rows = blank_rows)
+  if (length(blank_rows) > 0) {
+    how_to_fix <- sprintf(
+      paste0("Give every respondent a weight in '%s', or drop the rows with no ",
+             "weight from the data file, or clear weight_variable in Settings ",
+             "to run the report unweighted."),
+      weight_col)
+    msg <- sprintf(
+      "Weight column '%s' has %d blank cell(s) at data rows %s%s",
+      weight_col, length(blank_rows),
+      paste(head(blank_rows, 10), collapse = ", "),
+      if (length(blank_rows) > 10) ", ..." else "")
+    cat("\n=== TURAS BRAND ERROR ===\n[DATA_WEIGHT_BLANK] ", msg,
+        "\nHow to fix: ", how_to_fix,
+        "\n=========================\n\n", sep = "")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_WEIGHT_BLANK",
+      message = msg,
+      how_to_fix = how_to_fix))
+  }
+
+  list(weights = w_num)
 }
 
 

@@ -85,11 +85,9 @@ test_that("an engine refusal is an error verdict", {
 })
 
 test_that(".brand_coerce_weights coerces text numbers and refuses junk", {
-  ok <- .brand_coerce_weights(c("1.5", "2", NA, ""), "WT")
+  ok <- .brand_coerce_weights(c("1.5", "2", "0.7"), "WT")
   expect_null(ok$status)
-  expect_equal(ok$weights, c(1.5, 2, 0, 0))     # blanks become weight 0 ...
-  expect_equal(ok$n_blank, 2L)                   # ... and are counted for the run warning
-  expect_equal(ok$blank_rows, c(3L, 4L))
+  expect_equal(ok$weights, c(1.5, 2, 0.7))
   num <- .brand_coerce_weights(c(0.8, 1.2), "WT")
   expect_equal(num$weights, c(0.8, 1.2))
   bad <- .brand_coerce_weights(c("1", "n/a", "two"), "WT")
@@ -97,6 +95,30 @@ test_that(".brand_coerce_weights coerces text numbers and refuses junk", {
   expect_equal(bad$code, "DATA_WEIGHT_NOT_NUMERIC")
   expect_match(bad$message, "2 non-numeric")
   expect_match(bad$message, "n/a")
+})
+
+test_that(".brand_coerce_weights refuses blank weight cells and names the rows", {
+  # Duncan's ruling (2026-09-06, review F3): a weight column with a hole in
+  # it is a data problem, so no numbers come out until it is fixed. This
+  # replaces the earlier zero-fill plus PARTIAL warning.
+  blank <- .brand_coerce_weights(c("1.5", "2", NA, ""), "WT")
+  expect_equal(blank$status, "REFUSED")
+  expect_equal(blank$code, "DATA_WEIGHT_BLANK")
+  expect_match(blank$message, "2 blank cell", fixed = TRUE)
+  expect_match(blank$message, "rows 3, 4", fixed = TRUE)
+  expect_match(blank$how_to_fix, "weight_variable", fixed = TRUE)
+
+  # An all-blank column is refused on the same code. Zero-filling it would
+  # give every respondent weight 0 and every weighted number a base of 0.
+  all_blank <- .brand_coerce_weights(c(NA, NA, NA), "WT")
+  expect_equal(all_blank$status, "REFUSED")
+  expect_equal(all_blank$code, "DATA_WEIGHT_BLANK")
+  expect_match(all_blank$message, "3 blank cell", fixed = TRUE)
+
+  # More than ten blanks are truncated in the message, not dumped.
+  many <- .brand_coerce_weights(c(rep(NA_real_, 12), 1, 2), "WT")
+  expect_equal(many$status, "REFUSED")
+  expect_match(many$message, ", ...", fixed = TRUE)
 })
 
 test_that(".brand_as_refusal normalises both refusal shapes and ignores results", {

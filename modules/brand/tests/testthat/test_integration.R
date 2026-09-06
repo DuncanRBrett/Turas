@@ -421,10 +421,11 @@ test_that("run_brand refuses a non-numeric weight column with the offending valu
   expect_true(grepl("1,5", result$message, fixed = TRUE))
 })
 
-test_that("run_brand treats blank weight cells as 0 and warns with the rows", {
-  # The integration fixture carries no CEP data, so Mental Availability (the
-  # element that returned NA on an NA weight) is not exercised here; the
-  # coercion itself is unit-tested in test_gui_outcome.R.
+test_that("run_brand refuses blank weight cells and names the rows (F3)", {
+  # Duncan's ruling (2026-09-06, review F3): a blank cell in a weight column
+  # that otherwise has data stops the run so the data can be fixed. This test
+  # previously expected the zero-fill plus a PARTIAL warning; it was updated
+  # with the behaviour, not deleted.
   tmp_dir <- file.path(tempdir(), "brand_integration_blankweights")
   dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
   on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
@@ -432,10 +433,12 @@ test_that("run_brand treats blank weight cells as 0 and warns with the rows", {
   w <- as.character(round(runif(200, 0.5, 2), 3)); w[c(7, 120)] <- ""
   fixtures <- .create_integration_fixtures(tmp_dir, weight_values = w)
   result <- run_brand(fixtures$config_path, verbose = FALSE)
-  expect_equal(result$status, "PARTIAL")
-  expect_true(any(grepl("2 blank cell", result$warnings, fixed = TRUE)))
-  expect_true(any(grepl("rows 7, 120", result$warnings, fixed = TRUE)))
-  expect_false(is.null(result$results$categories[["Dry Seasonings & Spices"]]))
+  expect_equal(result$status, "REFUSED")
+  expect_equal(result$code, "DATA_WEIGHT_BLANK")
+  expect_true(grepl("2 blank cell", result$message, fixed = TRUE))
+  expect_true(grepl("rows 7, 120", result$message, fixed = TRUE))
+  expect_true(grepl("weight_variable", paste(result$how_to_fix, collapse = " "),
+                    fixed = TRUE))
 })
 
 test_that("run_brand coerces numeric-looking text weights and runs weighted (M8)", {

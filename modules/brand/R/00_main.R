@@ -291,19 +291,11 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   weight_col <- config$weight_variable
   if (!is.null(weight_col) && !is.na(weight_col) && nchar(trimws(weight_col)) > 0 &&
       weight_col %in% names(data)) {
+    # Non-numeric or blank weight cells refuse here (M8; review F3). The
+    # coercer has already written the boxed reason to the console.
     coerced <- .brand_coerce_weights(data[[weight_col]], weight_col)
     if (identical(coerced$status, "REFUSED")) return(coerced)
     weights <- coerced$weights
-    if (isTRUE(coerced$n_blank > 0)) {
-      blank_msg <- sprintf(
-        "Weight column '%s': %d blank cell(s) treated as weight 0 (rows %s%s)",
-        weight_col, coerced$n_blank,
-        paste(head(coerced$blank_rows, 10), collapse = ", "),
-        if (coerced$n_blank > 10) ", ..." else "")
-      cat("\n=== TURAS BRAND WARNING ===\n", blank_msg,
-          "\nHow to fix: give every respondent a weight, or drop the rows.\n===========================\n\n", sep = "")
-      warnings_list <- c(warnings_list, blank_msg)
-    }
   }
 
   categories <- config$categories
