@@ -337,6 +337,72 @@ test_that("a drawer holding one analysis has one level of disclosure", {
 })
 
 
+# --- every analysis says what it is on its face -----------------------------
+# Duncan, on Mental Availability: it "just lists everything and shows CEP and
+# attribute tables but does not say what they are". Stage 5 collected every
+# explanatory block into one collapsed drawer per view, methodology and
+# orientation together. The name of an analysis belongs on its face.
+
+test_that("every leaf host carries a heading naming it and the category", {
+  out <- render_cat()
+  host_leaves <- regmatches(out, gregexpr(
+    'class="br-subpanel active" data-group="dss" data-subpanel="[^"]*" data-internal-tab="[^"]*" data-cb-tab="[^"]*" data-leaf="[^"]*"',
+    out))[[1]]
+  keys <- sub('.*data-leaf="([^"]*)"$', "\\1", host_leaves)
+  expect_gt(length(keys), 0L)
+  for (k in keys) {
+    want <- sprintf('<h3 class="br-element-title br-leaf-title">%s: %s</h3>',
+                    .BR_LEAF_LABELS[[k]], "Dry Seasonings")
+    expect_true(grepl(want, out, fixed = TRUE),
+                info = paste("no leaf head for", k))
+  }
+  # One head per host, so no analysis is named twice and none is left bare.
+  expect_equal(n_dn(out, 'class="br-leaf-head"'), length(keys))
+})
+
+test_that("the leaf heading follows the label, including the ungated rename", {
+  ungated <- render_cat(cat_results = .dn_ungated_results())
+  expect_true(grepl(
+    '<h3 class="br-element-title br-leaf-title">Brand Stages: Dry Seasonings</h3>',
+    ungated, fixed = TRUE))
+  expect_false(grepl(
+    '<h3 class="br-element-title br-leaf-title">Brand Funnel: Dry Seasonings</h3>',
+    ungated, fixed = TRUE))
+})
+
+test_that("a lede is written only for a leaf that has a home", {
+  # The registry is sparse on purpose: a leaf gets a line only where its name
+  # does not already say what the table holds and the panel prints no intro
+  # of its own. What must hold is that no line is keyed to something that is
+  # not a leaf, which would silently never render.
+  expect_true(all(names(.BR_LEAF_LEDES) %in% names(.BR_LEAF_HOMES)))
+  expect_equal(anyDuplicated(names(.BR_LEAF_LEDES)), 0L)
+  for (k in names(.BR_LEAF_LEDES)) {
+    txt <- .BR_LEAF_LEDES[[k]]
+    expect_true(is.character(txt) && length(txt) == 1L && nzchar(txt),
+                info = k)
+    # No em dash reaches a client (project CLAUDE.md), and an empty cell is
+    # an en dash rather than "n/a".
+    expect_false(grepl("—", txt, fixed = TRUE), info = k)
+  }
+})
+
+test_that("the leaves Duncan named now carry a line saying what they show", {
+  out <- render_cat()
+  for (k in c("ma-ceps", "ma-attributes")) {
+    expect_true(grepl(sprintf('<p class="br-leaf-lede">%s</p>',
+                              .br_esc(.BR_LEAF_LEDES[[k]])),
+                      out, fixed = TRUE), info = k)
+  }
+  # A leaf whose panel prints its own intro gets no second line above it.
+  expect_null(.BR_LEAF_LEDES[["cb-context"]])
+  expect_null(.BR_LEAF_LEDES[["cb-brands"]])
+  expect_null(.BR_LEAF_LEDES[["cb-dop"]])
+  expect_null(.BR_LEAF_LEDES[["branded_reach"]])
+  expect_null(.BR_LEAF_LEDES[["cb-shopper"]])
+})
+
+
 # --- the contract that must not change --------------------------------------
 
 test_that("no display label is used as, or derived into, a data-* value", {

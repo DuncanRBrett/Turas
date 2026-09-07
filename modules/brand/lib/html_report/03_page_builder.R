@@ -691,7 +691,7 @@ build_br_summary_panel <- function(results, config) {
   "wom"             = "Word of Mouth",
   "branded_reach"   = "Branded Reach",
   "demographics"    = "Demographics",
-  "adhoc"           = "Ad Hoc",
+  "adhoc"           = "Ad Hoc Questions",
   "audience_lens"   = "Audience Lens"
 )
 
@@ -730,6 +730,104 @@ build_br_summary_panel <- function(results, config) {
   g <- cat_results$funnel$meta$gating
   if (is.null(g) || isTRUE(g$gated)) return(base)
   alt
+}
+
+
+#' One line on the face of a leaf saying what its tables show
+#'
+#' Stage 5 collected every explanatory block into one collapsed "How this
+#' works" drawer per destination. That was right for methodology and wrong
+#' for orientation. There is a difference between how a figure is computed,
+#' which belongs behind the drawer, and what a table is and why a reader
+#' would look at it, which belongs on its face; Stage 5 swept up both.
+#'
+#' The registry is deliberately sparse. A leaf gets a line only when its name
+#' does not already say what the table holds, and only when the panel does not
+#' already print an intro of its own. Category Context, Brand Summary,
+#' Duplication of Purchase, Branded Reach and Shopper Behaviour all print
+#' their own opening paragraph and are therefore absent from this list; a
+#' second line above them would say the same thing twice.
+#'
+#' Every line here was written against the table it describes, read out of a
+#' generated report or out of the builder that emits it. Bases are named only
+#' where the base was read in the engine: the loyalty split is a share of the
+#' category's buyers (`.bh_loyalty_segments`), and the purchase and heaviness
+#' splits are shares of the brand's own buyers (`.bh_freq_dist`,
+#' `calculate_buyer_heaviness`).
+#'
+#' The funnel line has to be true in both gating modes, because on an
+#' instrument that did not route the questions the leaf is called Brand
+#' Stages and shows four separate measures rather than a nested funnel
+#' (review finding F5).
+#'
+#' @keywords internal
+.BR_LEAF_LEDES <- list(
+  "fn-funnel" =
+    paste("How many people know each brand, consider it, and have bought it",
+          "in each window, with the base for every stage."),
+  "fn-relationship" =
+    paste("Where each brand sits on the attitude scale, from love through to",
+          "avoid, with no opinion counted rather than dropped."),
+  "ma-metrics" =
+    paste("How much of the category's memory each brand holds: mental market",
+          "share, mental penetration, network size and share of mind."),
+  "ma-ceps" =
+    paste("The share of people who link each brand to each buying situation",
+          "the category gets bought for, with the focal brand and the",
+          "category average side by side."),
+  "ma-attributes" =
+    paste("The share of people who link each brand to each attribute, with",
+          "the focal brand and the category average side by side."),
+  "ma-advantage" =
+    paste("Where the focal brand is stronger or weaker on an entry point or",
+          "attribute than its size alone would predict, and what that says",
+          "to defend, build or maintain."),
+  "cb-norms" =
+    paste("What the Dirichlet model expects each brand's penetration, buy",
+          "rate and loyalty to be, beside what the survey observed."),
+  "cb-loyalty" =
+    paste("Of all the category's buyers, the share who buy each brand solely,",
+          "mostly, occasionally or not at all."),
+  "cb-dist" =
+    paste("Of each brand's own buyers, the share who bought it once, twice,",
+          "three to five times, or six times and more."),
+  "cb-heaviness" =
+    paste("Whether each brand draws its buyers from the heavy, medium or",
+          "light third of the category's buyers."),
+  "audience_lens" =
+    paste("The focal brand's measures repeated for each named audience,",
+          "side by side with the total.")
+)
+
+
+#' The heading and the line that name one leaf on its face
+#'
+#' Emitted for every leaf in both tiers. The heading is the leaf's display
+#' label plus the category, which is the shape the five element titles it
+#' replaces already used and the shape the pin picker builds for a leaf with
+#' no anchor (`sectionsIn()` in `js/brand_report.js`). Keeping the two the
+#' same is what stops the picker offering one name and the card carrying
+#' another, which is review finding F2.
+#'
+#' The class `br-element-title` is kept on the heading because
+#' `captureFromRoot()` and `sectionsIn()` both look for
+#' `.br-element-title, h2, h3` when they name a pinned card.
+#'
+#' @param lf List. One leaf definition.
+#' @param cat_name Character. The category's display name.
+#' @param cat_results List. Passed to `.br_leaf_label()` for the funnel.
+#' @return Character. One HTML fragment.
+#' @keywords internal
+.br_leaf_head <- function(lf, cat_name, cat_results = NULL) {
+  label <- .br_leaf_label(lf$key, cat_results)
+  lede  <- .BR_LEAF_LEDES[[lf$key]]
+  paste0(
+    '<div class="br-leaf-head">',
+    sprintf('<h3 class="br-element-title br-leaf-title">%s: %s</h3>',
+            .br_esc(label), .br_esc(cat_name)),
+    if (!is.null(lede))
+      sprintf('<p class="br-leaf-lede">%s</p>', .br_esc(lede)) else "",
+    '</div>')
 }
 
 
@@ -1385,31 +1483,13 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       # render their own internal pin/PNG controls (different position).
       # the shared toolbar carries the insight editor which the embedded
       # controls do not.
-      if (el == "wom") {
+      if (el %in% c("wom", "branded_reach", "demographics", "adhoc",
+                    "audience_lens")) {
+        # These five carried a hand-written h3 each. They now take the same
+        # leaf head as every other leaf, emitted once below, so a reader
+        # meets one naming pattern across all five destinations rather than
+        # a heading on some analyses and nothing on the rest.
         parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Word of Mouth: %s</h3>',
-          .br_esc(cat_name)))
-      } else if (el == "branded_reach") {
-        parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Branded Reach: %s</h3>',
-          .br_esc(cat_name)))
-      } else if (el == "demographics") {
-        parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Demographics: %s</h3>',
-          .br_esc(cat_name)))
-      } else if (el == "adhoc") {
-        parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Ad Hoc Questions: %s</h3>',
-          .br_esc(cat_name)))
-      } else if (el == "audience_lens") {
-        parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Audience Lens: %s</h3>',
-          .br_esc(cat_name)))
       } else if (el == "funnel" || el == "ma") {
         # Per-sub-tab insight toolbars. The funnel panel has 2 internal
         # sub-tabs (funnel / relationship) and the MA panel has 4 (attributes
@@ -1444,6 +1524,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           check_note         = .br_insight_check_note(config, sub_anchor),
           require_text       = TRUE))
       }
+      # One naming pattern for every leaf: its own name, the category, and
+      # where the name does not say what the table holds, one line that
+      # does. The heading sits inside the anchor wrapper and ahead of the
+      # panel, so the pin picker and the pinned card both take their title
+      # from it (`sectionsIn()` and `captureFromRoot()`).
+      parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
       parts <- c(parts,
@@ -1459,15 +1545,11 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       wom_key <- paste0("wom_", cat_id)
       if (!is.null(panels[[wom_key]])) {
         parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Word of Mouth: %s</h3>',
-          .br_esc(cat_name)))
+        parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
         parts <- c(parts, panels[[wom_key]])
       } else {
         parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Word of Mouth: %s</h3>',
-          .br_esc(cat_name)))
+        parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
         parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
           'Percentage of category buyers who received or shared word-of-mouth about each brand ',
           'in the study\'s recall timeframe.</p>')
@@ -1515,6 +1597,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   </button>
 </div>',
           section_id, section_id, section_id, section_id, section_id))
+        parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
         parts <- c(parts, panels[[cb_panel_key]])
         # Cat-Buying insight footer. Supports Section_Insights prefill via
         # the standard config$section_insights lookup. When pre-filled the
@@ -1568,9 +1651,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       } else {
         # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
         parts <- c(parts, toolbar_for(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Category Buying: %s</h3>',
-          .br_esc(cat_name)))
+        parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
 
         cbf <- cat_results$cat_buying_frequency
         if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
@@ -2320,6 +2401,17 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 .br-howto-toggle[aria-expanded="true"] .br-howto-arrow { transform: rotate(180deg); }
 .br-howto-body { margin-top: 10px; }
 .br-howto-body > * { margin-bottom: 12px; }
+
+/* === The name on the face of every leaf ================================= */
+/* Selectors carry no panel or destination ancestor and the rules use no
+   value the TurasPins inliner reads as a default, so a pinned card and a
+   PNG carry the same heading the page does. */
+.br-leaf-head { margin: 0 0 12px; }
+.br-leaf-title { margin: 0; }
+.br-leaf-lede {
+  margin: 5px 0 0; font-size: 12.5px; line-height: 1.5; color: #475569;
+  max-width: 78ch;
+}
 
 ')
 

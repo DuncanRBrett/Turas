@@ -381,7 +381,9 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
 .cb_context_tab <- function(cbf, rep, dn = NULL, bh = NULL, dist_labels = NULL,
                              extra_chips = "") {
   parts <- character(0)
-  parts <- c(parts, '<div class="cb-section-title">Category Context</div>')
+  # The leaf head above this fragment already names the analysis and the
+  # category (`.br_leaf_head()` in 03_page_builder.R), so the panel's own
+  # copy of the name would print twice under the destination shell.
   # The closing sentence is the honesty note the header brand control needs:
   # this view has no brand dimension, so the comparison set cannot narrow it
   # and a reader must not be left wondering why nothing changed.
@@ -425,7 +427,6 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
 
 .cb_brands_tab <- function(dn, bh, focal, brand_labels, t_months) {
   parts <- character(0)
-  parts <- c(parts, '<div class="cb-section-title">Brand Performance Summary</div>')
   parts <- c(parts,
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">',
     '<strong>Base:</strong> all screened category respondents (incl. lapsed / zero-purchase). ',
@@ -518,7 +519,6 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
 .cb_norms_tab <- function(dn, cbf, focal, fcol, cat_code, brand_labels,
                            t_months) {
   parts <- character(0)
-  parts <- c(parts, '<div class="cb-section-title">Dirichlet Norms</div>')
   parts <- c(parts,
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
     'What the Dirichlet model expects each brand to achieve given its ',
@@ -552,7 +552,7 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
     parts <- c(parts, '<div class="cb-norms-chart-cell">')
     if (nzchar(scr_svg)) {
       parts <- c(parts,
-        '<div class="cb-norms-chart-title">Double Jeopardy</div>')
+        '<h4 class="cb-norms-chart-title">Double Jeopardy</h4>')
       parts <- c(parts, sprintf(
         '<div class="cb-toggle-bar">
   <button type="button" class="cb-toggle-btn active" onclick="_cbDJToggle(\'%s\',\'scr\',this)">SCR</button>
@@ -569,7 +569,7 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
     parts <- c(parts, '<div class="cb-norms-chart-cell">')
     if (nzchar(bars_svg)) {
       parts <- c(parts,
-        '<div class="cb-norms-chart-title">Share of category requirement</div>',
+        '<h4 class="cb-norms-chart-title">Share of category requirement</h4>',
         '<p style="font-size:11px;color:#94a3b8;margin:0 0 8px;">',
         'Bars are observed SCR. The tick on each bar is the Dirichlet ',
         'expectation, and the dotted line is the category mean.</p>')
@@ -1054,7 +1054,6 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
                          t_months = 3L) {
   parts <- character(0)
   parts <- c(parts, '<section class="cb-dop-section" data-cb-scope="dop">')
-  parts <- c(parts, '<div class="cb-section-title">Duplication of Purchase</div>')
   parts <- c(parts, sprintf(paste0(
     '<p style="font-size:12px;color:#64748b;margin:4px 0 10px;">',
     'Reads across a row: of this brand&apos;s buyers, what %% also bought each column brand ',

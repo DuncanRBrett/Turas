@@ -45,7 +45,6 @@ cb_shopper_tab_html <- function(panel_data) {
   buyers_pct_map <- .cb_shop_buyers_pct_map(panel_data$buyer_heaviness)
 
   parts <- character(0)
-  parts <- c(parts, '<div class="cb-section-title">Shopper Behaviour</div>')
   parts <- c(parts,
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
     'Where category buyers shop and what pack sizes they choose. ',
@@ -163,7 +162,7 @@ cb_shopper_context_chips <- function(panel_data) {
   base_n_map <- stats::setNames(as.numeric(data_df$Base_n), brands)
 
   parts <- character(0)
-  parts <- c(parts, sprintf('<div class="cb-section-title" style="margin-top:18px;">%s</div>',
+  parts <- c(parts, sprintf('<h4 class="cb-section-title" style="margin-top:18px;">%s</h4>',
                              .cb_esc(heading)))
   parts <- c(parts, .cb_shop_info_callout(scope, kind_label))
   parts <- c(parts, .cb_shop_controls_bar(scope))
@@ -312,9 +311,9 @@ cb_buying_location_html <- function(result, focal_colour = "#1A5276") {
       width, .cb_esc(focal_colour), pct)
   }, character(1)), collapse = "")
   sprintf(paste0(
-    '<div class="cb-section-title" style="margin-top:18px;">',
+    '<h4 class="cb-section-title" style="margin-top:18px;">',
       'Where category respondents shop',
-    '</div>',
+    '</h4>',
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
       'Multi-mention: respondents can pick more than one channel, so bars ',
       'may sum to more than 100%%. Base: %d category respondents.',

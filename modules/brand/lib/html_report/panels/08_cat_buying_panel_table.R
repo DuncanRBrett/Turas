@@ -206,7 +206,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
 
   # --- Category Purchase Frequency (BRANDPEN3 buckets) ---
   lines <- c(lines, '<div>')
-  lines <- c(lines, '<div class="cb-ctx-subtitle">Category Purchase Frequency</div>')
+  lines <- c(lines, '<h4 class="cb-ctx-subtitle">Category Purchase Frequency</h4>')
 
   freq_ok <- !is.null(cat_fd) && is.data.frame(cat_fd) && nrow(cat_fd) > 0 &&
              "Pct" %in% names(cat_fd)
@@ -238,7 +238,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
 
   # --- Repertoire Size Distribution ---
   lines <- c(lines, '<div>')
-  lines <- c(lines, '<div class="cb-ctx-subtitle">Repertoire Size</div>')
+  lines <- c(lines, '<h4 class="cb-ctx-subtitle">Repertoire Size</h4>')
 
   rep_ok <- !is.null(rep) && !identical(rep$status, "REFUSED") &&
             !is.null(rep$repertoire_size) && nrow(rep$repertoire_size) > 0

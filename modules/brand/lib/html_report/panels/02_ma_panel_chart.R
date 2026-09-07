@@ -114,7 +114,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   }
 
   paste0(
-    sprintf('<h3 class="ma-section-title ma-metrics-hero-title">%s: Headline Metrics</h3>',
+    sprintf('<h4 class="ma-section-title ma-metrics-hero-title">%s</h4>',
             .ma_esc(focal_name)),
     '<div class="ma-hero-strip tk-hero-strip">',
     card("Mental Penetration (MPen)", hero$mpen, avg$mpen, leader$mpen, "pct", "mpen"),

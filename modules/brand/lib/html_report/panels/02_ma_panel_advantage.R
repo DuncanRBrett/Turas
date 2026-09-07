@@ -65,7 +65,10 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   }
   paste0(
     '<div class="ma-adv-intro">',
-    '<h3 class="ma-section-title">Mental Advantage</h3>',
+    # The section heading moved to the leaf head in 03_page_builder.R, which
+    # names every analysis on every destination the same way and adds the
+    # category. Two "Mental Advantage" headings one under the other said
+    # nothing the first did not.
     callout,
     '</div>'
   )
