@@ -1063,28 +1063,278 @@
     return out;
   }
 
+  // A workbook cell carries the figure its table cell displays, and nothing
+  // else. Everything below exists because it did not: a category average of
+  // 61% with a 51 to 72 range rail beneath it was written as 615172, because
+  // textContent runs the figure and the two bounds together; "1/9" was
+  // written as the number 1, because parseFloat reads a leading prefix and
+  // discards the rest; and rows the reader's brand filter had hidden were in
+  // the file anyway.
+
+  // Interface furniture. A sort control is not data and never was.
+  //
+  // The significance markers are here for a reason worth writing down. Four
+  // of the six classes draw an arrow, and the arrow strip at the foot of
+  // _brVisibleText has always taken those out along with the sort arrows, so
+  // a workbook has never carried them. The advantage tables draw an asterisk
+  // instead, which no glyph rule catches, and once a cell is a whole number
+  // or nothing at all, "+9.4 *" stops being a number while "+7.3" next to it
+  // stays one. A column that is numeric except on its significant rows sorts
+  // its own findings into a block at the bottom. So the marker is treated as
+  // what it is, a mark the page puts beside a figure, and the six classes are
+  // named together rather than four of them being dropped by accident of
+  // which character they happen to use. The reader turns the markers on to
+  // read them on screen; the workbook carries the figures.
+  var _BR_CHROME = "button, input, select, .ct-sort-indicator, " +
+                   ".cb-sort-ind, .pf-fp-sort-ind, .wom-sort-ind, " +
+                   ".ma-sort-btn, .fn-sort-btn, " +
+                   ".ma-sig, .ma-fv-sig, .ma-adv-sig, .ct-sig, " +
+                   ".fn-sig-avg, .fn-sig";
+
+  // The range rail: a bar and the two bounds under a figure. It is read as a
+  // range, not as part of the figure, so it is left out of the cell's text.
+  var _BR_RAIL = ".ma-ci-bar-wrap, .ma-ci-limits";
+
+  var _BR_ENDASH = "–";
+
+  // Is this node one the reader can see?
+  //
+  // The question asked is the node's OWN computed display, never an
+  // ancestor's, and that is deliberate. A category tab or a Category Buying
+  // sub-tab that is not the one on screen hides its whole subtree, and its
+  // tables are still inside the destination the toolbar exports; an
+  // ancestor-aware test (offsetParent, getClientRects) would drop them and
+  // the export would fall silent on eight analyses. A node's own computed
+  // display is unaffected by a hidden ancestor, so it catches exactly the
+  // three things that record a reader's choice: the brand filter's
+  // row.style.display, the portfolio footprint's hidden columns, and an
+  // in-cell count annotation the stylesheet hides until Show count is on.
+  function _brShown(el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (el.style && el.style.display === "none") return false;
+    if (typeof getComputedStyle !== "function") return true;
+    var cs = null;
+    try { cs = getComputedStyle(el); } catch (err) { return true; }
+    if (!cs) return true;
+    return cs.display !== "none" && cs.visibility !== "hidden";
+  }
+
+  // Does this element read as a separate piece of text?
+  //
+  // Anything but a plain inline run does. A block starts on its own line; an
+  // inline-block is a pill with a margin, which is how the FOCAL badge, the
+  // buyer badge and every other chip are drawn. Only a bare inline run flows
+  // into the text beside it, which is what "1" and "/9" do in the portfolio
+  // footprint's "1/9".
+  function _brBreaks(el) {
+    if (typeof getComputedStyle !== "function") return false;
+    var cs = null;
+    try { cs = getComputedStyle(el); } catch (err) { return false; }
+    var d = cs && cs.display;
+    return !!d && d !== "inline" && d !== "contents";
+  }
+
+  // The visible text of a node, with chrome and the rail left out.
+  //
+  // Two pieces of text are kept apart where the page keeps them apart, and
+  // run together where it runs them together. An option label and its role
+  // badge are two blocks, so "Prefer not to say" and "buyer" get a space; a
+  // FOCAL badge is an inline-block pill, so a brand name and its badge get
+  // one; a count is a block under its figure, so "10%" and "n=995 / 9,525"
+  // get one. The portfolio footprint's "1" and "/9" are two bare inline
+  // spans with nothing between them and read as one fraction, so they get
+  // none. Joining every pair with a space would have written "1 /9".
+  function _brVisibleText(node, skipRail) {
+    var parts = [];
+    (function walk(n) {
+      var kids = n.childNodes || [];
+      for (var i = 0; i < kids.length; i++) {
+        var k = kids[i];
+        if (k.nodeType === 3) {
+          var raw = String(k.nodeValue || "");
+          parts.push(raw.trim() ? raw : null);
+          continue;
+        }
+        if (k.nodeType !== 1) continue;
+        if (k.matches && k.matches(_BR_CHROME)) continue;
+        if (skipRail && k.matches && k.matches(_BR_RAIL)) continue;
+        if (!_brShown(k)) continue;
+        var brk = _brBreaks(k);
+        if (brk) parts.push(null);
+        walk(k);
+        if (brk) parts.push(null);
+      }
+    })(node);
+    var out = "", gap = false;
+    parts.forEach(function (p) {
+      if (p === null) { gap = true; return; }
+      var t = String(p).replace(/\s+/g, " ").trim();
+      if (!t) return;
+      if (out && gap) out += " ";
+      out += t;
+      gap = false;
+    });
+    // initTableSort appends an arrow to a header's own text; the panel sort
+    // buttons draw their own. Neither is content.
+    return out.replace(/[▲▼↑↓↕⇅]/g, "").trim();
+  }
+
+  // The rail under a figure, when the reader can see it: its two bounds and
+  // what the page itself calls the range. The MA and funnel tables title it
+  // "95% CI: 5% to 8%" and Category Buying titles it one standard deviation
+  // across brands, so the name is read from the title rather than assumed.
+  // Calling a standard deviation a confidence interval would be a fabricated
+  // statistic.
+  function _brCellRange(cell) {
+    if (!cell || !cell.querySelector) return null;
+    var lim = cell.querySelector(".ma-ci-limits");
+    if (!lim || !_brShown(lim)) return null;
+    var spans = lim.querySelectorAll("span");
+    if (spans.length < 2) return null;
+    var lo = _brVisibleText(spans[0]);
+    var hi = _brVisibleText(spans[1]);
+    if (!lo && !hi) return null;
+    var wrap = cell.querySelector(".ma-ci-bar-wrap");
+    var title = (wrap && wrap.getAttribute("title")) || "";
+    var label = title.split(":")[0].trim() || "range";
+    return { lo: lo, hi: hi, label: label };
+  }
+
+  function _brXmlEsc(s) {
+    return String(s).replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+  }
+
+  // A cell is a number only when the whole of it is one: sign, thousands
+  // separators and a trailing per cent included. parseFloat on its own reads
+  // "5 Roses" as 5 and "1/9" as 1.
+  var _BR_NUMERIC = /^[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?$/;
+
+  function _brDataCell(text) {
+    var t = String(text == null ? "" : text).trim();
+    if (t !== "" && _BR_NUMERIC.test(t)) {
+      var n = parseFloat(t.replace(/[%,]/g, ""));
+      if (isFinite(n)) {
+        return '<Cell><Data ss:Type="Number">' + n + "</Data></Cell>";
+      }
+    }
+    return '<Cell><Data ss:Type="String">' + _brXmlEsc(t) + "</Data></Cell>";
+  }
+
+  // One table, read as a grid of what a reader can see. Hidden rows and
+  // hidden columns are not in it. Column positions account for colspan so a
+  // banner row above the header does not shift the columns beneath it.
+  function _brReadTable(table) {
+    var grid = [];
+    table.querySelectorAll("tr").forEach(function (tr) {
+      if (!_brShown(tr)) return;
+      var cells = [], col = 0;
+      tr.querySelectorAll("th, td").forEach(function (cell) {
+        if (!_brShown(cell)) return;
+        var span = parseInt(cell.getAttribute("colspan"), 10);
+        if (!isFinite(span) || span < 1) span = 1;
+        cells.push({
+          col: col,
+          span: span,
+          header: cell.tagName === "TH",
+          text: _brVisibleText(cell, true),
+          range: _brCellRange(cell)
+        });
+        col += span;
+      });
+      grid.push(cells);
+    });
+    return grid;
+  }
+
+  // Where the ranges sit decides where their numbers go. On the MA matrix and
+  // the funnel relationship table the category average is a COLUMN, so two
+  // columns beside it read naturally. On the Metrics table it is a ROW with a
+  // rail in every metric column, and two columns per metric would leave every
+  // brand row carrying en dashes in most of them, so the bounds go in two
+  // rows underneath instead.
+  function _brRangePlan(grid) {
+    var rows = {}, cols = {}, colLabel = {}, nR = 0, nC = 0;
+    grid.forEach(function (cells, ri) {
+      cells.forEach(function (c) {
+        if (!c.range) return;
+        if (!rows[ri]) { rows[ri] = true; nR += 1; }
+        if (!cols[c.col]) {
+          cols[c.col] = true; nC += 1; colLabel[c.col] = c.range.label;
+        }
+      });
+    });
+    return { shape: nC === 0 ? "none" : (nC <= nR ? "cols" : "rows"),
+             cols: cols, colLabel: colLabel };
+  }
+
+  function _brRowXml(cells, plan) {
+    var xml = "<Row>";
+    cells.forEach(function (c) {
+      xml += _brDataCell(c.text);
+      if (plan.shape !== "cols") return;
+      for (var k = c.col; k < c.col + c.span; k++) {
+        if (!plan.cols[k]) continue;
+        if (k === c.col && c.header) {
+          var base = c.text ? c.text + " " : "";
+          xml += _brDataCell(base + "(" + plan.colLabel[k] + " low)");
+          xml += _brDataCell(base + "(" + plan.colLabel[k] + " high)");
+        } else if (k === c.col && c.range) {
+          xml += _brDataCell(c.range.lo || _BR_ENDASH);
+          xml += _brDataCell(c.range.hi || _BR_ENDASH);
+        } else {
+          xml += _brDataCell(_BR_ENDASH);
+          xml += _brDataCell(_BR_ENDASH);
+        }
+      }
+    });
+    return xml + "</Row>";
+  }
+
+  // The two bound rows under a row-shaped range. The first cell names them
+  // from the row they belong to, so "Category average" is followed by
+  // "Category average (95% CI low)".
+  function _brBoundRowXml(cells, which) {
+    var label = "range";
+    for (var i = 0; i < cells.length; i++) {
+      if (cells[i].range) { label = cells[i].range.label; break; }
+    }
+    var head = (cells[0] && cells[0].text ? cells[0].text + " " : "") +
+               "(" + label + " " + (which === "lo" ? "low" : "high") + ")";
+    var xml = "<Row>";
+    cells.forEach(function (c, i) {
+      if (i === 0 && !c.range) { xml += _brDataCell(head); return; }
+      xml += _brDataCell(c.range ? (c.range[which] || _BR_ENDASH) : _BR_ENDASH);
+    });
+    return xml + "</Row>";
+  }
+
   function _brTablesToWorkbook(tables, fallback) {
     var names = _brSheetNames(tables, fallback);
     var xml = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>';
     xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
-    tables.forEach(function(table, idx) {
+    tables.forEach(function (table, idx) {
+      var grid = _brReadTable(table);
+      var plan = _brRangePlan(grid);
       xml += '<Worksheet ss:Name="' + names[idx] + '"><Table>';
-      table.querySelectorAll("tr").forEach(function(tr) {
-        xml += "<Row>";
-        tr.querySelectorAll("th, td").forEach(function(cell) {
-          var val = cell.textContent.trim().replace(/[▲▼]/g, "").trim();
-          var num = parseFloat(val.replace(/[%,]/g, ""));
-          var type = !isNaN(num) && val !== "" ? "Number" : "String";
-          var clean = type === "Number" ? num : val.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-          xml += '<Cell><Data ss:Type="' + type + '">' + clean + "</Data></Cell>";
-        });
-        xml += "</Row>";
+      grid.forEach(function (cells) {
+        xml += _brRowXml(cells, plan);
+        if (plan.shape !== "rows") return;
+        if (!cells.some(function (c) { return !!c.range; })) return;
+        xml += _brBoundRowXml(cells, "lo");
+        xml += _brBoundRowXml(cells, "hi");
       });
       xml += "</Table></Worksheet>";
     });
     xml += "</Workbook>";
     return xml;
   }
+
+  // Exposed so modules/brand/tests/js/test_excel_export.js can drive the
+  // builder directly against a stub DOM. Nothing in the report calls it
+  // through window; the two entry points below call it in scope.
+  window._brTablesToWorkbook = _brTablesToWorkbook;
 
   function _brDownloadWorkbook(xml, filename) {
     var blob = new Blob([xml], { type: "application/vnd.ms-excel" });
@@ -1107,12 +1357,39 @@
   }
   window._brExportRoot = _brExportRoot;
 
+  // A section anchor names several elements, not one.
+  //
+  // data-section is on the pin button and the insight box as well as on the
+  // panel, because each of those is addressed by the same anchor name. Asking
+  // for the first match in document order gave the Portfolio sub-tabs their
+  // own pin button, which holds no table, so all four of their Excel buttons
+  // said "There is no table on this section to export" while the sub-tab
+  // beneath them held one. That was true at 33000b28 and is not a regression;
+  // the pf- clause below it was written for this and never ran, because the
+  // pin button had already satisfied the test.
+  //
+  // The candidates are gathered in order of how specific they are, and the
+  // first one that actually holds a table wins. A named element with no table
+  // still wins over nothing at all, so a genuinely empty section keeps its
+  // old message rather than exporting some neighbour's numbers.
   window._brExportPanel = function(panelId) {
-    var panel = document.getElementById("section-" + panelId);
-    if (!panel) panel = document.querySelector('[data-section="' + panelId + '"]');
-    if (!panel && /^pf-/.test(panelId)) {
-      var subId = panelId.replace(/^pf-/, "pf-subtab-");
-      panel = document.getElementById(subId);
+    var seen = [], panel = null;
+    function offer(el) {
+      if (!el || seen.indexOf(el) !== -1) return;
+      seen.push(el);
+      if (!panel) panel = el;
+    }
+    offer(document.getElementById("section-" + panelId));
+    if (/^pf-/.test(panelId)) {
+      offer(document.getElementById(panelId.replace(/^pf-/, "pf-subtab-")));
+    }
+    document.querySelectorAll('[data-section="' + panelId + '"]')
+            .forEach(offer);
+    for (var i = 0; i < seen.length; i++) {
+      if (seen[i].querySelector && seen[i].querySelector("table")) {
+        panel = seen[i];
+        break;
+      }
     }
     if (!panel) return;
     _brExportRoot(panel, panelId, "this section");
