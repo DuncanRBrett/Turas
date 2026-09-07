@@ -112,7 +112,17 @@ Read off the rendered reports, not the source.
 - title `Awareness to purchase`
 - base line `n=438, total respondents. Separate measures: each stage on its own survey response`
 - a note under the bars: `The questionnaire did not route these questions, so each figure is its own measure over all respondents rather than a stage a respondent had to reach. The Brand and Buying destination says what it found.`
-- Opportunities: `Read off the measures above` / `The largest fall is from Aware at 87% to Consider at 67%, a gap of 20 percentage points. These are separate measures, because the questionnaire did not route the questions, so the difference between two of them is a gap and not a conversion.`
+- Opportunities: `Read off the measures above` / `The largest fall is from Aware at 87% to Consider at 67%, a gap of 20 percentage points. These are separate measures, because the questionnaire did not route the questions, so the difference between two of them is a gap and not a conversion. The conversion ratios this data does support are on the Brand and Buying destination, with what each one computes.`
+
+That last clause is there because the funnel destination on the same report
+does carry two conversion ratios: "% of previous stage" and "% of those
+aware", which are honest intersections rather than routing claims, and
+Duncan's ruling keeps both on an ungated report. Without the pointer a
+skimming reader meets "not a conversion" on the Overview and "conversion
+ratios" on the page after it, which is the failure class this whole task is
+about. It points rather than paraphrases: what each ratio computes is on the
+buttons' own tooltips in `.fn_table_controls()`, and restating a formula in
+two places is how the two drift apart.
 
 ### Decisions taken, with reasons
 
@@ -205,9 +215,17 @@ and, where the key is blank,
 
     Client: X | Focal Brand: Y | Wave 1 | Generated September 2026
 
-The About tab repeats the same string under a Fieldwork heading and its own
-timestamp line now ends "That is when this file was written, not when the
-study was in field."
+The About tab repeats the same string under a Fieldwork heading, reading
+"Wave 1 fieldwork ran 19 to 26 May 2026.", and its own timestamp line now
+ends "That is when this file was written, not when the study was in field."
+
+The About line says only when the wave was in field. A first draft added
+"Every figure in this report is from that period", which is a claim about the
+data that nothing enforces: wave 2 and later enable tracker integration and
+the headline tiles carry a reserved slot for a wave comparison, so a later
+report could carry an earlier wave's figures under this wave's fieldwork
+string and the sentence would turn false on a client's page with nobody
+noticing. It was cut.
 
 ### Decisions taken, with reasons
 
@@ -329,7 +347,21 @@ untouched.
    Overview stub never carried one. `anchor_resolution.py` confirms it on
    all three reports, comparing the pre-change report's anchor set against
    the post-change one: 41, 69 and 69 of 41, 69 and 69 resolve to content.
-4. **`brSwitchCategoryFromControl()` was left alone.** It carries the active
+4. **A bug carried in the stub was fixed on the way past.** The stub built
+   its `onclick` as `brOpenSummaryFor('<cat_name>', ...)` with `.br_esc()`
+   alone, and `.br_esc()` escapes `&`, `<`, `>` and `"` but not an
+   apostrophe. A category called "Paarman's Rubs" would have ended the JS
+   string literal and killed the button, on every build up to this one. The
+   new control passes both arguments through `.br_js_str()` and then
+   `.br_esc()`, so they survive the HTML parser and the JS parser in turn.
+   Read off the rendered file:
+   `onclick="brOpenSummaryFor(&quot;dss&quot;, &quot;Dry Seasonings &amp;amp; Spices&quot;)"`.
+   No fixture has an apostrophe in a category name, so the failure itself was
+   read from the code rather than reproduced on a report;
+   `test_destination_nav.R` renders a category called "Paarman's Rubs" and
+   asserts the apostrophe survives inside a double-quoted literal and that no
+   single-quoted call is emitted.
+5. **`brSwitchCategoryFromControl()` was left alone.** It carries the active
    destination across when the reader changes category and does nothing when
    the target category has no such destination, which leaves the target on
    its own first destination. That is the right behaviour and it already
@@ -358,13 +390,13 @@ the same sheet set and no content change of its own.
 | Check | Result |
 |---|---|
 | Brand suite, before the first edit | FAIL 0, WARN 1, SKIP 2, PASS 3659 |
-| Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3713 |
+| Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3716 |
 | `node tests/js/test_summary_overview.js` | 147 passed, 0 failed (116 before) |
 | The new JS assertions against `git show HEAD:` of the panel JS | does not pass |
 | `drive_overview.py` on the pre-change ungated report | 64 checks, **5 failed**, naming the old sentence |
 | `drive_overview.py` on the pre-change gated report | 64 checks, 0 failed |
 | `testthat::test_file("test_report_dates.R")` | 39 assertions, 0 failed |
-| `testthat::test_file("test_destination_nav.R")` | 325 assertions, 0 failed |
+| `testthat::test_file("test_destination_nav.R")` | 328 assertions, 0 failed |
 | `drive_element_flags.R` | 81 checks, 0 failed, PASS |
 
 Every script under `modules/brand/tests/qa/`, on all three reports built by
@@ -426,10 +458,27 @@ Every script under `modules/brand/tests/qa/`, on all three reports built by
 - `study_date` on the Survey_Structure Settings sheet is declared and read by
   nothing. Either wire it up or drop it from the template.
 
+## The rebase onto the destination relabelling branch
+
+`/Users/duncan/Dev/Turas-mal`, on `fix/brand-destination-labelling`, is
+renaming and relabelling tables across the destinations and moving the Mental
+Availability Advanced contents. This branch will conflict with it in three
+known places, all small:
+
+- `.BR_DESTINATIONS` in `03_page_builder.R`: this branch removes an entry,
+  that branch changes labels.
+- the destination-count assertions in `test_destination_nav.R`.
+- `DEST_HOLDS` and the header comment in `tests/qa/drive_element_flags.R`.
+
+Whoever rebases must rerun `reachability_check.py`, `anchor_resolution.py`
+and `drive_destinations.py` on all three fixtures afterwards, because a label
+change and a registry change landing together is exactly the case those gates
+are for.
+
 ## Status
 
-Three commits on `fix/brand-overview-consistency`, on top of `36f97062`.
+Six commits on `fix/brand-overview-consistency`, on top of `36f97062`.
 **Not merged and not pushed.** Duncan owes a `launch_turas()` run on a real
-project and an eyeball of the Overview, the header and a category tab, and
-then a review briefed as independent of this session.
+project and an eyeball of the Overview on an ungated category, the header and
+a category tab, and then a review briefed as independent of this session.
 

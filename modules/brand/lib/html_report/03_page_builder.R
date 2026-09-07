@@ -954,13 +954,21 @@ build_br_category_controls <- function(cat_id, cat_name, config,
   # not carry the category across: brOpenSummaryFor() opens the tab and
   # selects this category in its picker. So the route comes here, beside the
   # other controls that decide what the reader is looking at.
+  #
+  # The two arguments go through .br_js_str() and then .br_esc(), because
+  # they sit in a JS string literal inside an HTML attribute and have to
+  # survive both parsers. The Overview stub they replace built the call with
+  # single quotes and .br_esc() alone, and .br_esc() does not escape an
+  # apostrophe, so a category called "Paarman's Rubs" would have ended the
+  # literal and killed the button. Corrected on the way past rather than
+  # carried over.
   parts <- c(parts, sprintf(paste0(
     '<div class="br-control-slot" data-slot="summary">',
     '<button type="button" class="br-cat-summary-link" data-group="%s" ',
-    'onclick="brOpenSummaryFor(\'%s\', \'%s\')" ',
+    'onclick="brOpenSummaryFor(%s, %s)" ',
     'title="Open this category on the Summary tab">',
     'Summary for this category</button></div>'),
-    cat_id, .br_esc(cat_id), .br_esc(cat_name)))
+    cat_id, .br_esc(.br_js_str(cat_id)), .br_esc(.br_js_str(cat_name))))
 
   parts <- c(parts, '</div>')
   paste(parts, collapse = "\n")
@@ -1880,7 +1888,7 @@ build_br_about_panel <- function(config) {
   fieldwork_html <- if (nzchar(fw)) sprintf(
     paste0('<h3 style="font-size:15px;color:%s;margin:20px 0 8px;">',
            'Fieldwork</h3><p data-br-about-fieldwork>Wave %s fieldwork ran ',
-           '%s. Every figure in this report is from that period.</p>'),
+           '%s.</p>'),
     config$colour_focal %||% "#1A5276",
     .br_esc(config$wave %||% 1), .br_esc(fw)) else ""
 

@@ -213,9 +213,27 @@ test_that("the route to this category on the Summary tab survived the drop", {
   # destination that used to hold it.
   out <- render_cat()
   expect_equal(n_dn(out, 'class="br-cat-summary-link"'), 1L)
-  expect_true(grepl("brOpenSummaryFor(&#39;dss&#39;", out, fixed = TRUE) ||
-              grepl('brOpenSummaryFor(\'dss\'', out, fixed = TRUE))
   expect_true(grepl('data-slot="summary"', out, fixed = TRUE))
+  # Both arguments are JS string literals inside an HTML attribute, so they
+  # go through .br_js_str() and then .br_esc() and the attribute carries the
+  # escaped double quotes.
+  expect_true(grepl('brOpenSummaryFor(&quot;dss&quot;, &quot;Dry Seasonings&quot;)',
+                    out, fixed = TRUE))
+})
+
+test_that("a category name with an apostrophe does not break the route", {
+  # The Overview stub this replaced built the call with single quotes and
+  # .br_esc() alone, and .br_esc() escapes & < > and " but not an apostrophe,
+  # so "Paarman's Rubs" ended the JS string literal and killed the button.
+  out <- build_br_category_panel(
+    "Dry Seasonings", fake_cat_results(), charts = list(), tables = list(),
+    config = list(focal_brand = "IPK", colour_focal = "#1A5276"),
+    panels = fake_panels(full_keys), cat_display_name = "Paarman's Rubs")
+  expect_true(grepl("&quot;Paarman", out, fixed = TRUE))
+  # The apostrophe survives as itself inside a double-quoted literal, and no
+  # bare single-quoted call is emitted for it.
+  expect_true(grepl("&quot;Paarman's Rubs&quot;)", out, fixed = TRUE))
+  expect_false(grepl("brOpenSummaryFor('", out, fixed = TRUE))
 })
 
 test_that("every configured leaf appears exactly once, under some destination", {

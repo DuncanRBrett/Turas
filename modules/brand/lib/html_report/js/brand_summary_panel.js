@@ -1153,7 +1153,9 @@
     }
     var tail = ' These are separate measures, because the questionnaire ' +
                'did not route the questions, so the difference between two ' +
-               'of them is a gap and not a conversion.';
+               'of them is a gap and not a conversion. The conversion ' +
+               'ratios this data does support are on the Brand and Buying ' +
+               'destination, with what each one computes.';
     var fall = biggestMeasureFall(cat, brandCode);
     if (!fall) {
       return {
