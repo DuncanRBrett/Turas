@@ -520,25 +520,71 @@
 #' `shares` tells the two apart exactly: a renamed function leaves no
 #' declaration behind under its old name.
 #'
+#' Declarations are collected from ANYWHERE in the source, not only from the
+#' start of a line. An earlier version anchored to the line start on the
+#' reasoning that an indented declaration must be inside something. Scope is
+#' syntactic, not typographic: a Python template that indents its page script
+#' by four spaces still declares at top level, and that version let such a
+#' page ship with every name intact (found in the independent review, 7
+#' September 2026). Dropping the anchor costs nothing on the other side,
+#' because the obfuscator renames every binding that is not global, so an
+#' inner declaration never survives verbatim into the output and can never
+#' match here. The name is quoted with \\Q...\\E because `$` is legal in a
+#' JavaScript identifier and a regex anchor otherwise.
+#'
 #' @param source_js The script body before hardening.
-#' @param output The hardened document.
+#' @param output The hardened script source, or the hardened document. Pass
+#'   the script source where you can: a declaration can only live in a script.
 #' @return Character vector of leaked names, empty when clean.
 #' @keywords internal
 .minify_leaked_top_level_names <- function(source_js, output) {
-  decl <- "(?:async\\s+)?(?:function|const|let|var|class)\\s+"
-  # Anchored to the start of a line: an indented declaration is already inside
-  # something, so it is one scope down and will be renamed.
-  m <- gregexpr(paste0("(?m)^", decl, "([A-Za-z_$][\\w$]*)"), source_js,
-                perl = TRUE)[[1]]
+  decl <- "(?<![\\w$])(?:async\\s+)?(?:function|const|let|var|class)\\s+"
+  m <- gregexpr(paste0(decl, "([A-Za-z_$][\\w$]*)"), source_js, perl = TRUE)[[1]]
   if (m[1] == -1L) return(character(0))
   starts <- attr(m, "capture.start")
   lens <- attr(m, "capture.length")
   names_found <- unique(substring(source_js, starts, starts + lens - 1L))
   if (length(names_found) == 0L) return(character(0))
   leaked <- vapply(names_found, function(nm) {
-    grepl(paste0(decl, nm, "\\b"), output, perl = TRUE)
+    grepl(paste0(decl, "\\Q", nm, "\\E(?![\\w$])"), output, perl = TRUE)
   }, logical(1))
   sort(names_found[leaked])
+}
+
+
+#' Names that only the obfuscator writes
+#'
+#' A leaked name shaped like `_0x1a2b` or `a0_0x5f3a` was not written by a page
+#' builder. It is the obfuscator's own top-level string-array machinery, which
+#' means the page had been hardened before it reached here. Hardening a hardened
+#' page refuses, correctly, but the refusal has to say what actually happened
+#' or the operator goes looking for a wrapper that is already there.
+#'
+#' @param nms Character vector of leaked names.
+#' @return TRUE when every name is obfuscator output.
+#' @keywords internal
+.minify_names_are_obfuscator_output <- function(nms) {
+  length(nms) > 0L && all(grepl("^\\w*_0x[0-9a-fA-F]+$", nms, perl = TRUE))
+}
+
+
+#' The JavaScript a document actually runs, as one string
+#'
+#' The script blocks that are not data: everything except application/json and
+#' text/plain, which is the same set step 6b hands to the obfuscator. Used on
+#' both sides of the leak gate. On the source side it keeps a JSON island's
+#' text (a verbatim comment saying "we let staff go") from being read as a
+#' declaration; on the output side it keeps markup out of the search.
+#'
+#' @param html The document.
+#' @return One string, empty when the document has no script.
+#' @keywords internal
+.minify_script_source <- function(html) {
+  blocks <- .minify_extract_blocks(html, "script")
+  js <- Filter(function(b) !b$type %in% c("application/json", "text/plain"),
+               blocks)
+  if (length(js) == 0L) return("")
+  paste(vapply(js, function(b) b$content, character(1)), collapse = "\n")
 }
 
 
@@ -656,9 +702,7 @@
           "Remove the attribute if it carries something else"))
     }
 
-    source_js <- paste(vapply(.minify_extract_blocks(inner, "script"),
-                              function(b) b$content, character(1)),
-                       collapse = "\n")
+    source_js <- .minify_script_source(inner)
 
     work <- tempfile(pattern = "turas_island_", fileext = ".html")
     out <- tempfile(pattern = "turas_island_min_", fileext = ".html")
@@ -683,37 +727,73 @@
         c("Extract that island's payload and run turas_minify() on it by hand",
           "Or clear the client deliverable checkbox to keep a development build."))
     }
+    # Same check as step 2b. PASS and PARTIAL both write the file; anything
+    # else, or a missing file, must not fall through to readLines() and fail
+    # with a message about a temp path nobody can act on.
+    if (!res$status %in% c("PASS", "PARTIAL") || !file.exists(out)) {
+      .minify_refuse_island_doc(
+        id, sprintf("the embedded page came back %s with no file written", res$status),
+        c("The messages above name the cause",
+          "Or clear the client deliverable checkbox to keep a development build."))
+    }
+    # The page's own warnings, so a PARTIAL one level down does not vanish
+    # into a PASS one level up. Step 2b does the same.
+    if (length(res$warnings)) {
+      for (w in res$warnings) {
+        cat(sprintf("  [note] embedded page '%s': %s\n", id, w))
+      }
+    }
 
     done <- paste(readLines(out, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
 
     # The gate. Only meaningful once obfuscation actually ran, so a build with
     # the obfuscator switched off is not failed for a thing it never attempted.
     if (isTRUE(opts$obfuscate_js) && res$js_blocks_obfuscated > 0L) {
-      leaked <- .minify_leaked_top_level_names(source_js, done)
+      leaked <- .minify_leaked_top_level_names(source_js,
+                                               .minify_script_source(done))
       if (length(leaked) > 0L) {
-        msg <- sprintf(
-          "Island '%s' still exposes %d top-level name(s) after hardening: %s",
-          id, length(leaked),
-          paste(utils::head(leaked, 8L), collapse = ", "))
-        fix <- c(
-          "The page's script is not wrapped, so the outermost scope is left alone",
-          "Wrap the page's script body in (function(){\"use strict\"; ... })()",
-          "The page builder does this, not the minifier: only it knows the page is self-contained")
+        if (.minify_names_are_obfuscator_output(leaked)) {
+          # Not a missing wrapper: the page was hardened before it got here.
+          code <- "CALC_MINIFY_ISLAND_ALREADY_HARDENED"
+          title <- "An embedded page had already been hardened"
+          msg <- sprintf(
+            "Island '%s' carries a page that was hardened before this run: its top-level names are obfuscator output (%s)",
+            id, paste(utils::head(leaked, 3L), collapse = ", "))
+          fix <- c(
+            "Hardening cannot be applied twice. Compose the report from the _dev copy, then harden once, last",
+            "See scripts/turas_harden_report.R and the composed-report notes in CLAUDE.md")
+          why <- paste(
+            "A second pass would obfuscate the obfuscator's own machinery, roughly",
+            "doubling the page again, and the names it leaves behind are not the",
+            "page builder's to fix.")
+        } else {
+          code <- "CALC_MINIFY_ISLAND_NAMES_LEAKED"
+          title <- "An embedded page shipped its function names"
+          msg <- sprintf(
+            "Island '%s' still exposes %d top-level name(s) after hardening: %s",
+            id, length(leaked),
+            paste(utils::head(leaked, 8L), collapse = ", "))
+          fix <- c(
+            "The page's script is not wrapped, so the outermost scope is left alone",
+            "Wrap the page's script body in (function(){\"use strict\"; ... })()",
+            "The page builder does this, not the minifier: only it knows the page is self-contained")
+          why <- paste(
+            "The file would look hardened, because its comments are gone and",
+            "its core is scrambled, while the embedded page still names every",
+            "function it defines. That is the state this step exists to end.")
+        }
         if (isTRUE(opts$deliverable)) {
           cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
           cat("| Context:    Minify, embedded document island\n")
-          cat("| Code:       CALC_MINIFY_ISLAND_NAMES_LEAKED\n")
+          cat("| Code:      ", code, "\n")
           cat("| Message:   ", msg, "\n")
           for (fx in fix) cat("| How to fix:", fx, "\n")
           cat("+-------------------------------------------------------------+\n\n")
           turas_refuse(
-            code = "CALC_MINIFY_ISLAND_NAMES_LEAKED",
-            title = "An embedded page shipped its function names",
+            code = code,
+            title = title,
             problem = msg,
-            why_it_matters = paste(
-              "The file would look hardened, because its comments are gone and",
-              "its core is scrambled, while the embedded page still names every",
-              "function it defines. That is the state this step exists to end."),
+            why_it_matters = why,
             how_to_fix = fix,
             module = "MINIFY"
           )

@@ -8,10 +8,12 @@
 # never saw them and step 6b skips application/json by design. They shipped
 # readable inside a file that was otherwise hardened.
 #
-# These tests cover three things:
+# These tests cover five things:
 #   1. a marked island is hardened, and its payload still decodes to the page
 #   2. a page whose script is NOT wrapped is caught rather than shipped
 #   3. a page that was never marked at all is caught rather than shipped
+#   4. hardening a report that was already hardened refuses, and says so
+#   5. the mask under the extractor keeps its positions (section 8)
 #
 # The last two are the ones that matter, and they cover the two ways this can
 # look like it worked when it did not. Hardening an unwrapped page strips its
@@ -48,7 +50,7 @@ if (file.exists(trs_path)) source(trs_path, local = FALSE)
 
 # The embedded page. Shaped like a real VAS section report: one script block
 # opening with a data constant, then the analytical functions.
-.island_page <- function(wrapped) {
+.island_page <- function(wrapped, indent = "") {
   body <- paste0(
     'const SECTIONDATA = {"section":"Bills","n":1100,"rows":[1,0,1]};\n',
     'function itemStatistics(d) { return d.rows.length; }\n',
@@ -58,6 +60,10 @@ if (file.exists(trs_path)) source(trs_path, local = FALSE)
     'function medianValueOf(a) { return a[Math.floor(a.length / 2)]; }\n',
     'renderTheSummary(SECTIONDATA);\n'
   )
+  # `indent` is what a Python template does to a page script it embeds inside
+  # an indented block: every line moves right, and the scope does not move at
+  # all.
+  if (nzchar(indent)) body <- gsub("(?m)^", indent, body, perl = TRUE)
   if (wrapped) body <- paste0('(function(){"use strict";\n', body, '\n})();')
   paste0(
     '<!DOCTYPE html>\n<html lang="en">\n<head>\n',
@@ -73,9 +79,10 @@ if (file.exists(trs_path)) source(trs_path, local = FALSE)
 
 # The composed report: a shell with its own script, plus the page as a marked
 # island. The `</` escape mirrors island() in build_vas_integrated_report.py.
-.composed_html <- function(wrapped = TRUE, marker = 'data-embed="document"') {
+.composed_html <- function(wrapped = TRUE, marker = 'data-embed="document"',
+                           indent = "") {
   payload <- gsub("</", "<\\\\/",
-                  as.character(jsonlite::toJSON(.island_page(wrapped),
+                  as.character(jsonlite::toJSON(.island_page(wrapped, indent),
                                                 auto_unbox = TRUE)),
                   fixed = TRUE)
   paste0(
@@ -158,11 +165,61 @@ test_that("a name that survives as markup or a data key is not a leak", {
     "shares")
 })
 
-test_that("the leak gate only reads declarations that start a line", {
-  # An indented declaration is inside something, so it is already one scope
-  # down and the obfuscator will rename it.
-  src <- "(function(){\n  function innerHelper(){}\n})();\n"
-  expect_length(.minify_leaked_top_level_names(src, "innerHelper"), 0L)
+test_that("the leak gate reads a declaration wherever it sits on the line", {
+  # Scope is syntactic, not typographic. A Python template that indents the
+  # page script it embeds still declares at top level, and the obfuscator
+  # leaves those names alone exactly as it would at column 0. An earlier
+  # version of the gate anchored to the line start and let such a page ship
+  # with every name intact (independent review, 7 September 2026).
+  src <- "    function itemStatistics(d){return 1}\n    const SECTIONDATA = {}\n"
+  expect_setequal(
+    .minify_leaked_top_level_names(
+      src, "    function itemStatistics(a){}\n    const SECTIONDATA={}"),
+    c("SECTIONDATA", "itemStatistics"))
+
+  # Minified source: declarations after a semicolon on one line.
+  src1 <- "const A={};function bOne(){};function cTwo(){}"
+  expect_setequal(
+    .minify_leaked_top_level_names(src1, "const A={};function bOne(){}"),
+    c("A", "bOne"))
+
+  # An inner declaration is renamed by the obfuscator and so never survives
+  # into the output as a declaration. Nothing to flag.
+  src2 <- "(function(){\n  function innerHelper(){}\n})();\n"
+  expect_length(.minify_leaked_top_level_names(src2, "var _0x1=function(){}"), 0L)
+
+  # `$` is legal in an identifier and an anchor in a regex. Quote it.
+  src3 <- "function $helper(d){return d}\n"
+  expect_identical(.minify_leaked_top_level_names(src3, "function $helper(d){}"),
+                   "$helper")
+  expect_length(.minify_leaked_top_level_names(src3, "function $helperX(d){}"), 0L)
+
+  # A keyword inside a longer word is not a declaration.
+  src4 <- "var count = 1;\n"
+  expect_length(.minify_leaked_top_level_names(src4, "myvar count = 1"), 0L)
+})
+
+test_that("script source excludes data islands, so verbatim text is not a declaration", {
+  # A JSON island quoting "we let staff go" looks like `let staff` to an
+  # unanchored regex. .minify_script_source() drops JSON and text/plain blocks,
+  # which is the same set step 6b never hands to the obfuscator.
+  html <- paste0(
+    '<html><body>',
+    '<script type="application/json" id="verbatim">',
+    '{"c":["we let staff go","the var count rose","function names"]}</script>',
+    '<script type="text/plain" id="hub">bGV0IHN0YWZm</script>',
+    '<script>(function(){"use strict";var a=1;})();</script>',
+    '</body></html>')
+  src <- .minify_script_source(html)
+  expect_false(grepl("staff", src, fixed = TRUE))
+  expect_true(grepl("var a=1", src, fixed = TRUE))
+  expect_identical(.minify_script_source("<html><body>no script</body></html>"), "")
+})
+
+test_that("obfuscator-shaped names are told apart from a page builder's", {
+  expect_true(.minify_names_are_obfuscator_output(c("_0x1a2b", "a0_0x5f3a")))
+  expect_false(.minify_names_are_obfuscator_output(c("_0x1a2b", "itemStats")))
+  expect_false(.minify_names_are_obfuscator_output(character(0)))
 })
 
 
@@ -234,6 +291,54 @@ test_that("an unwrapped page refuses the deliverable rather than shipping names"
                     fixed = TRUE))
   # It must name what leaked, or the operator cannot act on it.
   expect_true(grepl("itemStatistics", conditionMessage(err), fixed = TRUE))
+})
+
+test_that("an unwrapped page whose script is indented is refused just the same", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(.has_obf(), "javascript-obfuscator not available")
+
+  # The case the line-anchored gate missed: PARTIAL, one island hardened, and
+  # itemStatistics, renderTheSummary and SECTIONDATA all readable in the output.
+  input <- .write_tmp(.composed_html(wrapped = FALSE, indent = "    "))
+  out <- tempfile(pattern = "turas_composed_min_", fileext = ".html")
+
+  err <- tryCatch({
+    turas_minify(input, output_path = out, deliverable = TRUE, verbose = FALSE)
+    NULL
+  }, turas_refusal = function(e) e, error = function(e) e)
+
+  expect_false(is.null(err))
+  expect_true(grepl("CALC_MINIFY_ISLAND_NAMES_LEAKED", conditionMessage(err),
+                    fixed = TRUE))
+  expect_true(grepl("itemStatistics", conditionMessage(err), fixed = TRUE))
+  expect_false(file.exists(out))
+})
+
+test_that("hardening a hardened composed report refuses and says so", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(.has_obf(), "javascript-obfuscator not available")
+
+  # Compose first, harden last, once. A second pass finds the obfuscator's own
+  # top-level names in the page and must not send the operator looking for a
+  # wrapper that is already there.
+  input <- .write_tmp(.composed_html(wrapped = TRUE))
+  once <- tempfile(pattern = "turas_composed_once_", fileext = ".html")
+  res <- turas_minify(input, output_path = once, deliverable = TRUE,
+                      verbose = FALSE)
+  expect_equal(res$island_documents_hardened, 1L)
+
+  twice <- tempfile(pattern = "turas_composed_twice_", fileext = ".html")
+  err <- tryCatch({
+    turas_minify(once, output_path = twice, deliverable = TRUE, verbose = FALSE)
+    NULL
+  }, turas_refusal = function(e) e, error = function(e) e)
+
+  expect_false(is.null(err))
+  expect_true(grepl("CALC_MINIFY_ISLAND_ALREADY_HARDENED", conditionMessage(err),
+                    fixed = TRUE))
+  expect_false(grepl("CALC_MINIFY_ISLAND_NAMES_LEAKED", conditionMessage(err),
+                     fixed = TRUE))
+  expect_false(file.exists(twice))
 })
 
 test_that("a development build warns about the same page and still writes it", {
@@ -436,4 +541,107 @@ test_that("a development build is not refused for an unmarked island", {
                       verbose = FALSE)
   expect_equal(res$island_documents_hardened, 0L)
   expect_true(file.exists(out))
+})
+
+
+# -- 8. The mask under the extractor ------------------------------------------
+# .minify_mask_island_bodies() blanks every JSON island body before the
+# extractor matches, so a page carried inside an island cannot contribute a
+# stray opening tag. Every report goes through it, island or not. The premise
+# is that blanking preserves length so positions index the original. These
+# tests attack that premise directly, which the round-trip tests above only
+# exercise by accident.
+
+test_that("the mask preserves character positions through multi-byte text", {
+  page <- paste0("<!doctype html><html><head><style>.a{color:red}</style></head>",
+                 "<body>caf\u00e9 \u2014 \u00b7 \u4e2d\u6587 \U0001F600 ",
+                 "<script>function pageFn(){return \"\u00e9\"}</script></body></html>")
+  esc <- function(doc) gsub("</", "<\\\\/",
+                            as.character(jsonlite::toJSON(doc, auto_unbox = TRUE)),
+                            fixed = TRUE)
+  html <- paste0(
+    "<!DOCTYPE html><html><head><title>na\u00efve \u2014</title>",
+    "<style>body{margin:0} /* before */</style></head><body>\u00e9\u00e9\u00e9",
+    '<script type="application/json" id="p1" data-embed="document">', esc(page),
+    "</script>",
+    "<script>(function(){\"use strict\";var x=\"\u00e9\u4e2d\";})();</script>",
+    "<style>.after{color:blue} /* after island */</style>",
+    '<script type="application/json" id="rows">[1,2,3]</script>',
+    "<script>var tail=\"\u2014\";</script></body></html>")
+
+  masked <- .minify_mask_island_bodies(html)
+  expect_identical(nchar(masked), nchar(html))
+  # Idempotent: a masked copy has nothing left to mask.
+  expect_identical(.minify_mask_island_bodies(masked), masked)
+  # Outside the island bodies, byte for byte the same document.
+  expect_identical(substr(masked, 1L, regexpr('id="p1"', html, fixed = TRUE)),
+                   substr(html, 1L, regexpr('id="p1"', html, fixed = TRUE)))
+
+  # The style element AFTER the islands is found, with its own content and not
+  # a span that starts inside a page.
+  styles <- .minify_extract_blocks(html, "style")
+  expect_length(styles, 2L)
+  expect_identical(styles[[2]]$content, ".after{color:blue} /* after island */")
+
+  scripts <- .minify_extract_blocks(html, "script")
+  expect_length(scripts, 4L)
+  expect_identical(vapply(scripts, function(b) b$type, character(1)),
+                   c("application/json", "", "application/json", ""))
+  # The island's content is extracted from the ORIGINAL, not the blanks.
+  p1 <- scripts[[1]]
+  expect_identical(jsonlite::fromJSON(gsub("<\\/", "</", p1$content, fixed = TRUE)),
+                   page)
+  expect_identical(scripts[[4]]$content, "var tail=\"\u2014\";")
+})
+
+test_that("the mask is the identity on a report with no islands", {
+  plain <- paste0("<html><head><style>a{}</style></head><body>\u00e9",
+                  "<script>var a=1;</script></body></html>")
+  expect_identical(.minify_mask_island_bodies(plain), plain)
+})
+
+test_that("an island with no closing tag is left alone, at the same length", {
+  broken <- paste0('<html><body><script type="application/json" id="x">',
+                   '{"a":1}<div>')
+  masked <- .minify_mask_island_bodies(broken)
+  expect_identical(masked, broken)
+  expect_length(.minify_extract_blocks(broken, "script"), 0L)
+})
+
+test_that("an island open tag quoted inside a page or a JS string does no harm", {
+  # A page inside an island brings its own <script type="application/json">
+  # opening tag; the mask sees that tag too, and must not let it start a second
+  # mask that runs past the island's real close.
+  page <- paste0('<!doctype html><html><body>',
+                 '<script type="application/json" id="inner">{"k":"v"}</script>',
+                 '<script>function f(){}</script></body></html>')
+  esc <- gsub("</", "<\\\\/",
+              as.character(jsonlite::toJSON(page, auto_unbox = TRUE)),
+              fixed = TRUE)
+  html <- paste0('<html><head><style>q{}</style></head><body>',
+                 '<script type="application/json" id="outer">', esc, '</script>',
+                 '<style>.z{}</style><script>var end=1;</script></body></html>')
+  expect_identical(nchar(.minify_mask_island_bodies(html)), nchar(html))
+  styles <- .minify_extract_blocks(html, "style")
+  expect_identical(vapply(styles, function(b) b$content, character(1)),
+                   c("q{}", ".z{}"))
+  scripts <- .minify_extract_blocks(html, "script")
+  expect_length(scripts, 2L)
+  expect_identical(scripts[[2]]$content, "var end=1;")
+
+  # The same tag as text inside a real JS block. The mask blanks the tail of
+  # that block in the search copy, and the extractor still returns the block
+  # whole from the original.
+  js <- paste0('<html><head><style>h{}</style></head><body>',
+               '<script>var s="<script type=\\"application/json\\">";var t=1;</script>',
+               '<style>.after{}</style>',
+               '<script type="application/json" id="d">{"a":1}</script></body></html>')
+  scripts <- .minify_extract_blocks(js, "script")
+  expect_length(scripts, 2L)
+  expect_identical(scripts[[1]]$content,
+                   'var s="<script type=\\"application/json\\">";var t=1;')
+  expect_identical(scripts[[2]]$content, '{"a":1}')
+  expect_identical(vapply(.minify_extract_blocks(js, "style"),
+                          function(b) b$content, character(1)),
+                   c("h{}", ".after{}"))
 })
