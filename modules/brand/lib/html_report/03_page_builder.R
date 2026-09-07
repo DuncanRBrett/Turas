@@ -520,6 +520,60 @@ build_br_summary_panel <- function(results, config) {
 
 #' Destination registry
 #' @keywords internal
+#' Which of a category's elements have something renderable in them
+#'
+#' One place decides this, because two places used to and they disagreed.
+#' \code{build_br_category_panel()} tests all eight elements before it builds a
+#' leaf; the tab bar tested only Mental Availability and the funnel before it
+#' decided the category deserved a tab at all. A study configured with, say,
+#' Word of Mouth and Demographics and neither of those two therefore produced
+#' no category tab, and every analysis it had configured was silently absent
+#' from the report. Found by the Stage 6 element-flag matrix
+#' (\code{tests/qa/drive_element_flags.R}), which drives one flag at a time.
+#'
+#' The per-element conditions are unchanged; they have simply moved here.
+#'
+#' @param cat_results One category's entry in \code{results$results$categories}.
+#' @return Named list of eight logicals, one per element that owns a leaf.
+#' @keywords internal
+.br_cat_renderable <- function(cat_results) {
+  if (is.null(cat_results)) cat_results <- list()
+  list(
+    funnel = !is.null(cat_results$funnel) &&
+      !identical(cat_results$funnel$status, "REFUSED"),
+    ma = !is.null(cat_results$mental_availability) &&
+      !identical(cat_results$mental_availability$status, "REFUSED"),
+    repertoire = !is.null(cat_results$repertoire) &&
+      !identical(cat_results$repertoire$status, "REFUSED"),
+    wom = !is.null(cat_results$wom) &&
+      !identical(cat_results$wom$status, "REFUSED") &&
+      !is.null(cat_results$wom$wom_metrics),
+    branded_reach = !is.null(cat_results$branded_reach) &&
+      !identical(cat_results$branded_reach$status, "REFUSED") &&
+      length(cat_results$branded_reach$ads %||% list()) > 0,
+    demographics = !is.null(cat_results$demographics) &&
+      identical(cat_results$demographics$status, "PASS") &&
+      length(cat_results$demographics$questions %||% list()) > 0,
+    adhoc = !is.null(cat_results$adhoc) &&
+      identical(cat_results$adhoc$status, "PASS") &&
+      length(cat_results$adhoc$questions %||% list()) > 0,
+    audience_lens = !is.null(cat_results$audience_lens) &&
+      !identical(cat_results$audience_lens$status, "REFUSED") &&
+      length(cat_results$audience_lens$audiences %||% list()) > 0
+  )
+}
+
+#' Does this category deserve a tab of its own?
+#'
+#' True when any element has something renderable in it. See
+#' \code{.br_cat_renderable()} for why this is not the two-element test it
+#' used to be.
+#'
+#' @keywords internal
+.br_cat_has_content <- function(cat_results) {
+  any(vapply(.br_cat_renderable(cat_results), isTRUE, logical(1)))
+}
+
 .BR_DESTINATIONS <- list(
   list(id = "overview", label = "Overview"),
   list(id = "mental",   label = "Mental Availability"),
@@ -914,27 +968,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   parts <- c(parts, sprintf('<div class="br-panel" id="panel-%s">', panel_id))
 
   # Detect which elements have renderable data
-  has_funnel <- !is.null(cat_results$funnel) &&
-    !identical(cat_results$funnel$status, "REFUSED")
-  has_ma <- !is.null(cat_results$mental_availability) &&
-    !identical(cat_results$mental_availability$status, "REFUSED")
-  has_repertoire <- !is.null(cat_results$repertoire) &&
-    !identical(cat_results$repertoire$status, "REFUSED")
-  has_wom <- !is.null(cat_results$wom) &&
-    !identical(cat_results$wom$status, "REFUSED") &&
-    !is.null(cat_results$wom$wom_metrics)
-  has_branded_reach <- !is.null(cat_results$branded_reach) &&
-    !identical(cat_results$branded_reach$status, "REFUSED") &&
-    length(cat_results$branded_reach$ads %||% list()) > 0
-  has_demographics <- !is.null(cat_results$demographics) &&
-    identical(cat_results$demographics$status, "PASS") &&
-    length(cat_results$demographics$questions %||% list()) > 0
-  has_adhoc <- !is.null(cat_results$adhoc) &&
-    identical(cat_results$adhoc$status, "PASS") &&
-    length(cat_results$adhoc$questions %||% list()) > 0
-  has_audience_lens <- !is.null(cat_results$audience_lens) &&
-    !identical(cat_results$audience_lens$status, "REFUSED") &&
-    length(cat_results$audience_lens$audiences %||% list()) > 0
+  el <- .br_cat_renderable(cat_results)
+  has_funnel        <- el$funnel
+  has_ma            <- el$ma
+  has_repertoire    <- el$repertoire
+  has_wom           <- el$wom
+  has_branded_reach <- el$branded_reach
+  has_demographics  <- el$demographics
+  has_adhoc         <- el$adhoc
+  has_audience_lens <- el$audience_lens
   # Drivers & Barriers HTML tab is retired, the focal-brand view on the
   # Mental Advantage sub-tab carries the same diagnostic. The engine in
   # 06_drivers_barriers.R still runs; its Importance / IxP / Competitive
@@ -2216,8 +2258,7 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   deep_cats <- character(0)
   for (cn in category_names) {
     cr <- results$results$categories[[cn]]
-    has_content <- !is.null(cr$mental_availability) || !is.null(cr$funnel)
-    if (has_content) deep_cats <- c(deep_cats, cn)
+    if (.br_cat_has_content(cr)) deep_cats <- c(deep_cats, cn)
   }
 
   # panel_parts = accumulator of per-panel HTML fragments

@@ -621,3 +621,78 @@ test_that("a flagged insight still renders its box and its number-check marker",
   # Nothing authored and nothing flagged: no box at all.
   expect_equal(build_br_section_toolbar("ceps-dss", require_text = TRUE), "")
 })
+
+
+# --- the category tab bar agrees with the category panel ---------------------
+# Stage 6. The tab bar used to decide a category deserved a tab from Mental
+# Availability or the funnel alone, while the panel built leaves from all
+# eight elements. A study with Word of Mouth and Demographics and neither of
+# those two therefore produced no category tab, and every analysis it had
+# configured was absent from the report with no warning anywhere. Found by
+# tests/qa/drive_element_flags.R, which drives one element flag at a time
+# against the IPK fixture. Both now go through .br_cat_renderable().
+
+test_that("every element that owns a leaf can carry a category on its own", {
+  # One element at a time, nothing else configured.
+  singles <- list(
+    funnel        = fake_cat_results(TRUE,  FALSE, FALSE, FALSE, FALSE),
+    ma            = fake_cat_results(FALSE, TRUE,  FALSE, FALSE, FALSE),
+    repertoire    = fake_cat_results(FALSE, FALSE, TRUE,  FALSE, FALSE),
+    wom           = fake_cat_results(FALSE, FALSE, FALSE, TRUE,  FALSE),
+    demographics  = fake_cat_results(FALSE, FALSE, FALSE, FALSE, TRUE),
+    branded_reach = fake_cat_results(FALSE, FALSE, FALSE, FALSE, FALSE,
+                                     reach = TRUE),
+    adhoc         = fake_cat_results(FALSE, FALSE, FALSE, FALSE, FALSE,
+                                     adhoc = TRUE),
+    audience_lens = fake_cat_results(FALSE, FALSE, FALSE, FALSE, FALSE,
+                                     lens = TRUE))
+  for (nm in names(singles)) {
+    expect_true(.br_cat_has_content(singles[[nm]]),
+                info = paste(nm, "alone should earn the category a tab"))
+    expect_true(isTRUE(.br_cat_renderable(singles[[nm]])[[nm]]),
+                info = paste(nm, "should read as renderable"))
+  }
+})
+
+test_that("a category with nothing renderable earns no tab", {
+  expect_false(.br_cat_has_content(fake_cat_results(
+    FALSE, FALSE, FALSE, FALSE, FALSE)))
+  expect_false(.br_cat_has_content(list(cat_code = "AWO")))
+  expect_false(.br_cat_has_content(NULL))
+})
+
+test_that("a refused or empty element does not earn a tab on its own", {
+  # The per-element conditions moved into the helper unchanged, so the
+  # emptiness rules each one carries are asserted here rather than assumed.
+  expect_false(.br_cat_has_content(list(funnel = list(status = "REFUSED"))))
+  expect_false(.br_cat_has_content(list(mental_availability =
+                                          list(status = "REFUSED"))))
+  expect_false(.br_cat_has_content(list(repertoire = list(status = "REFUSED"))))
+  # Word of Mouth needs its metrics, not just a PASS.
+  expect_false(.br_cat_has_content(list(wom = list(status = "PASS"))))
+  # These three need a non-empty list, which is how a placeholder result is
+  # kept off the page.
+  expect_false(.br_cat_has_content(list(branded_reach =
+                                          list(status = "PASS", ads = list()))))
+  expect_false(.br_cat_has_content(list(adhoc =
+                                          list(status = "PASS", questions = list()))))
+  expect_false(.br_cat_has_content(list(audience_lens =
+                                          list(status = "PASS", audiences = list()))))
+  # Demographics must be PASS, not PARTIAL.
+  expect_false(.br_cat_has_content(list(demographics =
+                                          list(status = "PARTIAL", questions = list(1)))))
+  expect_true(.br_cat_has_content(list(demographics =
+                                         list(status = "PASS", questions = list(1)))))
+})
+
+test_that("a category carried by Word of Mouth alone still renders its destination", {
+  # The end of the bug: the panel had always been willing to build this.
+  out <- render_cat(cat_results = fake_cat_results(FALSE, FALSE, FALSE,
+                                                   TRUE, FALSE),
+                    panels = fake_panels("wom_dss"))
+  expect_equal(n_dest_buttons(out, "meaning"), 1L)
+  expect_equal(n_dest_buttons(out, "mental"),  0L)
+  expect_equal(n_dest_buttons(out, "buying"),  0L)
+  expect_equal(n_dest_buttons(out, "audience"), 0L)
+  expect_equal(n_dest_buttons(out, "overview"), 1L)
+})
