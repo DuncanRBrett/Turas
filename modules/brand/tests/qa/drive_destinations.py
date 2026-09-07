@@ -82,7 +82,26 @@ DRIVER = """
   // level and has no brand dimension at all. The Mental Advantage matrix
   // keys its columns by stimulus, not by brand code, so it is checked on
   // its visible column count instead: one label column plus one per brand.
-  var NO_BRAND_CODES = { 'cb-context': 'none', 'ma-advantage': 'columns' };
+  var NO_BRAND_CODES = { 'cb-context': 'none', 'ma-advantage': 'columns',
+                         'branded_reach': 'unwired', 'adhoc': 'unwired',
+                         'audience_lens': 'unwired' };
+
+  // 'unwired' pins a fact rather than passing or failing a design.
+  //
+  // Branded Reach, Ad Hoc and Audience Lens rendered for the first time in
+  // Stage 6, on the QA extras fixture. None of the three carries a brand-code
+  // attribute or subscribes to the category comparison set, so the brand
+  // filter does not reach them. That is not a simplification regression:
+  // these panels have never been inside the shell before, and nothing about
+  // them changed. It is also not obviously wrong for all three. Audience Lens
+  // is a focal-brand view whose two audiences are buyer and non-buyer of that
+  // one brand, so there is no brand list to narrow. Branded Reach and Ad Hoc
+  // do show brand-keyed content, and for them it is a real gap.
+  //
+  // Rather than mark them 'none' and quietly bless it, this asserts that they
+  // show NO brand code at all. The day one of them is wired up, this check
+  // fails and forces the classification to be revisited instead of drifting.
+  // The Stage 6 log records it as an open gap.
 
   // Views that cover the whole category whatever the comparison set is,
   // and say so in their own caption.
@@ -146,6 +165,15 @@ DRIVER = """
       var kind = NO_BRAND_CODES[leaf];
       var expect = WHOLE_CATEGORY[leaf] ? allBrands.slice().sort() : wantSorted;
       if (kind === 'none') return;
+      if (kind === 'unwired') {
+        var codes = visibleBrandCodes(host);
+        check(tab + '/' + stateName + '/' + leaf +
+              ': the brand filter does not reach it, recorded not blessed',
+              codes.length === 0,
+              'now shows ' + codes.join(',') +
+              ': wire it to the comparison set and reclassify it');
+        return;
+      }
       if (kind === 'columns') {
         var vc = visibleHeadCells(host);
         check(tab + '/' + stateName + '/' + leaf + ': one column per brand shown',

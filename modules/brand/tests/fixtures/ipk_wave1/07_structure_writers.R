@@ -17,7 +17,13 @@
 #'
 #' @param path Destination file path.
 #' @param data_path Relative path (from Survey_Structure) to the data file.
-ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx") {
+#' @param extras Logical. When TRUE, add the sheets the QA extras need:
+#'   QuestionMap (the only route into the shopper engine), MarketingReach and
+#'   ReachMedia (Branded Reach), AudienceLens, one Questions row and three
+#'   Options rows for the ad hoc question, and a PackSizes sheet carrying the
+#'   column names the shopper engine reads. See 08_qa_extras.R.
+ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx",
+                                       extras = FALSE) {
 
   wb <- openxlsx::createWorkbook()
 
@@ -37,12 +43,18 @@ ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx") 
   openxlsx::writeData(wb, "Project", project)
 
   # --- Questions sheet ---
+  questions <- .ipk_build_questions_df()
+  options_df <- .ipk_build_options_df()
+  if (isTRUE(extras)) {
+    questions  <- rbind(questions,  .ipk_extras_questions_df())
+    options_df <- rbind(options_df, .ipk_extras_options_df())
+  }
   openxlsx::addWorksheet(wb, "Questions")
-  openxlsx::writeData(wb, "Questions", .ipk_build_questions_df())
+  openxlsx::writeData(wb, "Questions", questions)
 
   # --- Options sheet ---
   openxlsx::addWorksheet(wb, "Options")
-  openxlsx::writeData(wb, "Options", .ipk_build_options_df())
+  openxlsx::writeData(wb, "Options", options_df)
 
   # --- Brand sheets ---
   openxlsx::addWorksheet(wb, "Brands")
@@ -58,7 +70,20 @@ ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx") 
   openxlsx::writeData(wb, "Channels", .ipk_build_channels_df())
 
   openxlsx::addWorksheet(wb, "PackSizes")
-  openxlsx::writeData(wb, "PackSizes", .ipk_build_packs_df())
+  openxlsx::writeData(wb, "PackSizes",
+                      if (isTRUE(extras)) .ipk_extras_packs_df()
+                      else .ipk_build_packs_df())
+
+  if (isTRUE(extras)) {
+    openxlsx::addWorksheet(wb, "QuestionMap")
+    openxlsx::writeData(wb, "QuestionMap", .ipk_extras_questionmap_df())
+    openxlsx::addWorksheet(wb, "MarketingReach")
+    openxlsx::writeData(wb, "MarketingReach", .ipk_extras_marketing_reach_df())
+    openxlsx::addWorksheet(wb, "ReachMedia")
+    openxlsx::writeData(wb, "ReachMedia", .ipk_extras_reach_media_df())
+    openxlsx::addWorksheet(wb, "AudienceLens")
+    openxlsx::writeData(wb, "AudienceLens", .ipk_extras_audience_lens_df())
+  }
 
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   invisible(path)
@@ -69,7 +94,7 @@ ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx") 
 # ------------------------------------------------------------------------------
 
 #' Write Brand_Config.xlsx for the IPK Wave 1 fixture
-ipk_write_brand_config <- function(path) {
+ipk_write_brand_config <- function(path, extras = FALSE) {
   wb <- openxlsx::createWorkbook()
 
   settings <- data.frame(
@@ -87,7 +112,7 @@ ipk_write_brand_config <- function(path) {
     Value = c(
       IPK_PROJECT_NAME, IPK_CLIENT_NAME, IPK_PROJECT_FOCAL_BRAND,
       IPK_DATA_FILE, IPK_STRUCTURE_FILE, IPK_OUTPUT_DIR,
-      "Y", "Y", "Y", "N", "N", "Y", "Y", "Y",
+      "Y", "Y", "Y", "N", if (isTRUE(extras)) "Y" else "N", "Y", "Y", "Y",
       as.character(IPK_WAVE), IPK_WOM_TIMEFRAME, "balanced", "30"
     ),
     stringsAsFactors = FALSE
@@ -108,6 +133,13 @@ ipk_write_brand_config <- function(path) {
       stringsAsFactors = FALSE
     )
   }))
+  if (isTRUE(extras)) {
+    # The per-category opt-in the audience lens parser looks for first
+    # (R/13a_al_audiences.R line 61). Without this column it returns an empty
+    # list and logs nothing, which is why the lens has been silently absent.
+    cats$AudienceLens_Use <- ifelse(cats$CategoryCode == CAT_DSS, "ALL",
+                                    NA_character_)
+  }
   openxlsx::addWorksheet(wb, "Categories")
   openxlsx::writeData(wb, "Categories", cats)
 

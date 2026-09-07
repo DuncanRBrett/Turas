@@ -140,3 +140,170 @@ written. `BRANDATT2_DSS_*` (rejection verbatims), the `Project` sheet's
 `project_name`. No number differs, and both files carry 1200 rows and 847
 columns. Recorded so the next session knows the on-disk fixture is one
 cosmetic commit behind its generator, and does not go looking for a data bug.
+
+## Item 2: the four elements that had never rendered
+
+Branded Reach, Ad Hoc, Audience Lens and Shopper Behaviour had never rendered
+through the five-destination shell with real panel fragments. Stage 2, Stage 4
+and Stage 5 all recorded it. Their toolbars and drawers were exercised on stub
+fragments only.
+
+**Chosen: extend the fixture generator, behind an opt-in flag, and write the
+extended bundle to a scratch directory only.** `ipk_generate_fixture()` gains
+`extras = FALSE`; `modules/brand/tests/fixtures/ipk_wave1/08_qa_extras.R`
+holds everything it does. The committed fixture and the 3560-assertion
+baseline are untouched, which was proved rather than assumed: regenerating
+with `extras = FALSE` and comparing every sheet of all three workbooks against
+a regeneration from before the change gives **no differing sheet in any of the
+three files**. Every extra column is appended after the last existing builder
+has run, and the two that need random numbers set their own seed there, so the
+stream that produces the committed fixture never moves.
+
+### Provenance, which is the part that had to be got right
+
+The brief said to extend the generator rather than stub, but only without
+inventing survey answers that misrepresent the study. The Wave 1 instrument
+(`IPK_Brand_Health_Wave_1-2.doc`, an Alchemer HTML export) was read to settle
+that, and it splits the four cleanly.
+
+**Two are faithful.** The instrument asked them, and the extras only re-shape
+answers the fixture already generates. Neither draws a random number.
+
+- **Shopper Behaviour.** Q63, where the respondent bought in the last three
+  months, and Q64, the pack sizes bought. The fixture already stores both as
+  slot-indexed code columns. The shopper engine wants one 0 or 1 column per
+  option, so the extras transpose the slots. The same answers in another
+  shape.
+- **Audience Lens.** Q66, the brands bought. The audience is focal-brand buyer
+  against non-buyer, a cut of an answer the instrument collected. 197 buyers
+  and 241 non-buyers, both well over the 50 suppression floor.
+
+**Two are not.** IPK Wave 1 asked no advertising or asset recognition question
+and no study-specific extra question, so there is nothing to re-shape.
+**Branded Reach and Ad Hoc are invented outright.** They are written only into
+the scratch QA fixture, never the committed one, and every label they carry
+says so on its face: the assets are "QA synthetic asset A (not asked in IPK
+Wave 1)" and B, and the ad hoc question text opens "QA synthetic question, not
+asked in IPK Wave 1". Read out of a report they cannot be mistaken for an IPK
+answer. That is the line this session drew: inventing data and calling it IPK
+would have been the failure; inventing data, labelling it, and keeping it out
+of the study's own fixture is render coverage.
+
+### What each one needed, and what was blocking it
+
+Each of the four was blocked by something different, and none of the four was
+blocked by the shell.
+
+| Element | What was missing |
+|---|---|
+| Audience Lens | The `AudienceLens_Use` column on the Categories sheet. Without it `parse_audience_lens_definitions()` returns an empty list and logs nothing, which is why the lens has been silently absent although `element_audience_lens = Y`. The `AudienceLens` sheet was also in the wrong workbook, `Brand_Config.xlsx`, which nothing reads it from, and carried a free-text `Definition` the engine has no parser for. |
+| Shopper Behaviour | A `QuestionMap` sheet. `resolve_shopper_role_columns()` reads `structure$questionmap` directly and never consults the inferred role map, so convention inference cannot reach it. Plus one 0 or 1 column per option, where the fixture had slots. |
+| Branded Reach | `element_branded_reach = N` in the fixture's own Settings, and no `MarketingReach` or `ReachMedia` sheet. |
+| Ad Hoc | No `ADHOC_*` row on the Questions sheet and no matching data column. The `AdHoc` sheet in `Brand_Config.xlsx` is read by nothing. |
+
+**A latent bug found on the way and worked around, not fixed in place.**
+`.shopper_code_list_spec()` keys the pack size list on `PackSizeCode` and
+`PackSizeLabel`; the fixture's `.ipk_build_packs_df()` writes `PackCode` and
+`PackLabel`, so pack size resolves to NULL even once a QuestionMap exists. The
+extras writer emits both pairs rather than renaming the committed fixture's
+columns, so nothing that already reads the old names breaks. **Owed:** decide
+whether the fixture or the engine has the right name. It is recorded here
+rather than changed, because changing it means regenerating the committed
+fixture, which is a separate decision.
+
+### Executed
+
+All four now render, with real payloads and real numbers, read out of the
+generated HTML:
+
+| Element | What is on the page |
+|---|---|
+| Branded Reach | 2 assets, n = 438. The misattribution table gives the focal brand 40 percent of those who recognised the asset, n = 76, with named rivals and a "Don't know" row at 11 percent. |
+| Ad Hoc | 1 question, n = 438, three options with their labels, with brand cuts. |
+| Audience Lens | The pair card: n = 197 bought the focal brand against n = 241 who did not, with aided awareness 100 against 86 and a +14pp chip. |
+| Shopper Behaviour | Shopping location by brand across all six channels (focal 19 percent Supermarket, n = 37) and the pack size table across all four sizes. |
+
+`data-leaf` values in the extras report: **all nineteen**, against fifteen in
+the committed fixture's report.
+
+**One artefact of the audience definition, stated so nobody reads it as a
+finding.** The Audience Lens pair shows "P3M usage 100 percent against 0
+percent, +100pp, DEFEND". That is a tautology: the audience is defined by
+buying the brand, so its usage is 100 and the other side's is 0 by
+construction. The engine is right, the audience is trivially separable, and a
+real study would pick a cut that is not the metric. Left as it is, because a
+tautological pair still exercises every render path and inventing a subtler
+audience would have meant inventing data.
+
+## The ungated funnel, both modes exercised
+
+Duncan's ruling of 7 September: Turas draws a nested funnel only when the
+questionnaire gated the questions. The fixture builds attitude and purchase
+answers only over brands the respondent named as known, so it reads as gated.
+The real IPK instrument did not gate.
+
+`ipk_generate_fixture(ungated = TRUE)` makes the second mode by the smallest
+change that flips `detect_instrument_gating()`: it clears the focal brand from
+the awareness slots of 25 respondents who hold an attitude towards it, leaving
+every other answer alone. That is exactly the row an ungated instrument
+produces and a gated one cannot.
+
+    gated report    data-fn-gating="gated"    gating-mode="nested"
+    ungated report  data-fn-gating="ungated"  gating-mode="separate"
+
+and the ungated report carries the reason on the page, naming the three stages
+that breached and saying the nested view is not offered because it would show
+an ordering the survey never enforced.
+
+## The QA suite on both reports
+
+Every script under `modules/brand/tests/qa/`, on the gated extras report and
+on the ungated one.
+
+| Script | Gated | Ungated |
+|---|---|---|
+| `drive_element_flags.R` | 89 checks, 0 failed | see below |
+| `drive_destinations.py` | 384 checks, 0 failed | 384 checks, 0 failed |
+| `drive_chrome.py` | 136 checks, 0 failed | 138 checks, 0 failed |
+| `drive_save_roundtrip.py` | 117 checks, 0 failed | 117 checks, 0 failed |
+| `drive_overview.py` | 60 checks, 0 failed | 58 checks, 0 failed |
+| `drive_funnel_base.py` | 99 checks, 0 failed | 79 checks, 0 failed |
+| `drive_two_categories.py` | 15 checks, 0 failed | 15 checks, 0 failed |
+
+`drive_funnel_base.py` and `drive_overview.py` run fewer checks on the ungated
+report because some of their checks are about the nested view, which an
+ungated report does not offer. They are mode-aware already: the ungated run
+asserts the notice, its reason and the separate-measures wording, and it was
+read to confirm it does that rather than skipping the funnel.
+
+The two-report gates, run on the pairs that make sense (a comparison across
+two different fixtures would differ by construction):
+
+- `reachability_check.py base.html ctl2.html`, the committed fixture before
+  and after this stage's page-builder change: **PASS**, every island's numeric
+  content identical.
+- `anchor_resolution.py` on the committed fixture pair: **41 of 41** anchors
+  and section ids resolve to content. On the extras report: **69 of 69**,
+  which includes the 14 anchors the four new elements bring. On the ungated
+  report: **69 of 69**.
+
+### The 15 failures the extras fixture found, and what was done with them
+
+`drive_destinations.py` failed 15 checks the first time it saw the extras
+report: the comparison-set brand filter does not reach Branded Reach, Ad Hoc
+or Audience Lens. None of the three carries a brand-code attribute or
+subscribes to the category store.
+
+This is not a simplification regression. Those panels have never been inside
+the shell before and nothing about them changed. It is also not wrong for all
+three: Audience Lens is a focal-brand view whose two audiences are buyer and
+non-buyer of that one brand, so it has no brand list to narrow. For Branded
+Reach and Ad Hoc, which do show brand-keyed content, it is a real gap.
+
+Rather than mark them "no brands here" and quietly bless it, the harness
+gained a third classification, `unwired`, which asserts they show **no** brand
+code at all. The day one of them is wired to the comparison set the check
+fails and forces the classification to be revisited. **Open gap, recorded:**
+wire Branded Reach and Ad Hoc to the comparison set, or rule that they are
+whole-category views. Not this stage's work: it is a feature, and Stage 6 adds
+none.

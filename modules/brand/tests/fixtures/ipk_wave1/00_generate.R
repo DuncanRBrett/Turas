@@ -17,8 +17,21 @@
 #' Generate the full IPK Wave 1 fixture bundle
 #'
 #' @param out_dir Destination directory (created if missing).
+#' @param extras Logical. When TRUE the bundle also carries the four analyses
+#'   the committed fixture has never rendered: Branded Reach, Ad Hoc, Audience
+#'   Lens and Shopper Behaviour. See 08_qa_extras.R for what each one is made
+#'   of and which two of the four the Wave 1 instrument actually asked. Off by
+#'   default, and the committed fixture is generated with it off: every extra
+#'   column is appended after the last existing builder has run, so the random
+#'   stream that produces the committed fixture is untouched.
+#' @param ungated Logical. When TRUE, remove the focal brand from the
+#'   awareness slots of a few respondents who consider or bought it, so
+#'   detect_instrument_gating() reads the instrument as ungated and the report
+#'   draws four separate measures with conversion ratios instead of a nested
+#'   funnel. A QA variant, never the committed fixture. See 08_qa_extras.R.
 #' @return Named list of file paths written.
-ipk_generate_fixture <- function(out_dir = NULL) {
+ipk_generate_fixture <- function(out_dir = NULL, extras = FALSE,
+                                 ungated = FALSE) {
   here <- ipk_fixture_dir()
   if (is.null(out_dir)) out_dir <- here
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
@@ -43,6 +56,19 @@ ipk_generate_fixture <- function(out_dir = NULL) {
   # Combine into one wide data frame
   full_data <- cbind(admin$data, aware, dss$data, demo)
 
+  # QA extras, last, so nothing above this line moves.
+  if (isTRUE(extras)) {
+    message("[IPK fixture] Building QA extras (branded reach, ad hoc, ",
+            "audience lens, shopper behaviour)")
+    full_data <- cbind(full_data, ipk_extras_data_columns(full_data))
+  }
+
+  if (isTRUE(ungated)) {
+    full_data <- ipk_extras_make_ungated(full_data)
+    message("[IPK fixture] Ungated variant: awareness cleared on ",
+            attr(full_data, "ungated_rows"), " rows")
+  }
+
   # Coerce numeric-coded columns from character to numeric so the fixture
   # matches AlchemerParser output exactly (parser produces numeric for radio
   # responses with numeric reporting values)
@@ -56,10 +82,10 @@ ipk_generate_fixture <- function(out_dir = NULL) {
   openxlsx::write.xlsx(full_data, data_path, overwrite = TRUE)
 
   message("[IPK fixture] Writing Survey_Structure: ", ss_path)
-  ipk_write_survey_structure(ss_path, basename(data_path))
+  ipk_write_survey_structure(ss_path, basename(data_path), extras = extras)
 
   message("[IPK fixture] Writing Brand_Config: ", bc_path)
-  ipk_write_brand_config(bc_path)
+  ipk_write_brand_config(bc_path, extras = extras)
 
   message(sprintf("[IPK fixture] Done. %d rows × %d cols.",
                   nrow(full_data), ncol(full_data)))
@@ -80,7 +106,8 @@ ipk_source_fixture_helpers <- function() {
               "04_cross_cat_aware.R",
               "05_dss_deep_dive.R",
               "06_demographics.R",
-              "07_structure_writers.R")) {
+              "07_structure_writers.R",
+              "08_qa_extras.R")) {
     source(file.path(here, f), local = FALSE)
   }
 }
