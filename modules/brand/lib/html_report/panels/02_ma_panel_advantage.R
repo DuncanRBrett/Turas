@@ -22,28 +22,47 @@
 #'
 #' @param pd Panel data list from \code{build_ma_panel_data()}.
 #' @param focal_colour Character. Hex colour for focal accents.
+#' @param part Character. \code{"main"} for the quadrant and the action list,
+#'   which the impact map puts in Mental Availability's main view, or
+#'   \code{"detail"} for the full matrix, the buyer-gap diagnostic and the
+#'   methodology, which it puts in the Advanced drawer.
 #' @return Character. HTML fragment, or empty string when no advantage data.
 #' @export
-build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
+build_ma_advantage_section <- function(pd, focal_colour = "#1A5276",
+                                       part = "main") {
   adv <- pd$advantage
   if (is.null(adv) || length(adv$available_stims) == 0) {
     return(.ma_adv_empty_state())
   }
 
-  # Layout: intro callout at top (explains the matrix below) -> controls ->
-  # matrix/chart -> focal-brand view (with its own callout placed just above
-  # its table) -> methodology drawer (formulas etc. at the bottom). Each
-  # callout sits next to the thing it explains until the destination's
-  # "How this works" drawer collects them at load.
+  # Two parts, because the impact map's destination summary puts the
+  # quadrant and the action list in Mental Availability's main view and the
+  # full matrix, the buyer-gap diagnostic and the MA methodology in its
+  # Advanced drawer. Each part is rendered into its own .ma-panel host, and
+  # brand_ma_advantage.js already guards every view it renders on the view
+  # being present, so a host renders exactly what it holds.
+  #
+  # Each part carries its own controls bar, because a control belongs beside
+  # the view it governs: Show chart governs the quadrant, Show counts and the
+  # Excel export govern the matrix, and the stimulus toggle governs both. The
+  # two stimulus toggles are kept in step by a document event, so the matrix
+  # in the drawer can never be showing attributes while the quadrant above it
+  # shows CEPs.
+  #
+  # Callouts sit next to the thing they explain until the destination's
+  # "How this works" drawer collects them at load, and there is one such
+  # drawer per tier, so the methodology follows the matrix into Advanced.
+  detail <- identical(part, "detail")
   paste0(
-    '<section class="ma-section ma-advantage-section" data-ma-stim="advantage">',
-    .ma_adv_intro(adv),
-    .ma_adv_controls_bar(pd, adv),
-    .ma_adv_views_layout(adv),
-    .ma_adv_focal_view_section(pd),
+    sprintf(paste0('<section class="ma-section ma-advantage-section" ',
+                   'data-ma-stim="advantage" data-ma-adv-part="%s">'), part),
+    if (detail) "" else .ma_adv_intro(adv),
+    .ma_adv_controls_bar(pd, adv, part = part),
+    .ma_adv_views_layout(adv, part = part),
+    if (detail) .ma_adv_focal_view_section(pd) else "",
     # Stage 5: the Mental Availability destination carries one commentary
     # box, and the headline box on the Metrics sub-tab is the panel's own.
-    .ma_adv_about(adv),
+    if (detail) .ma_adv_about(adv) else "",
     '</section>'
   )
 }
@@ -75,7 +94,8 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-.ma_adv_controls_bar <- function(pd, adv) {
+.ma_adv_controls_bar <- function(pd, adv, part = "main") {
+  detail <- identical(part, "detail")
   stims <- adv$available_stims
   stim_buttons <- if (length(stims) > 1) {
     paste0(
@@ -108,11 +128,20 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="ma-meta-row">',
     stim_buttons,
     base_notation,
-    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
-    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
+    # Show counts governs the matrix, which only the detail part holds, and
+    # Show chart governs the quadrant, which only the main part holds. A
+    # control over a view that is not on the page is a control that does
+    # nothing, which is what the Dirichlet Norms brand filter used to be.
+    if (detail)
+      '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>'
+    else
+      '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
-    '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
+    # The Excel export writes the matrix, so it goes where the matrix is.
+    if (detail)
+      '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>'
+    else "",
     '</div>',
     '</div>'
   )
@@ -137,13 +166,18 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 # INTERNAL: VIEW LAYOUT (THREE EMPTY CONTAINERS, JS POPULATES)
 # ==============================================================================
 
-.ma_adv_views_layout <- function(adv) {
+.ma_adv_views_layout <- function(adv, part = "main") {
+  detail <- identical(part, "detail")
+  # The legend explains the diverging palette, which colours the matrix cells
+  # and the quadrant bubbles alike, so both parts carry it. So does the
+  # tooltip: each part has hover targets of its own and tooltipEl() resolves
+  # it inside the host.
   paste0(
     '<div class="ma-adv-views">',
     .ma_adv_legend(adv),
-    .ma_adv_matrix_view(),
-    .ma_adv_quadrant_view(),
-    .ma_adv_action_list_view(),
+    if (detail) .ma_adv_matrix_view() else "",
+    if (detail) "" else .ma_adv_quadrant_view(),
+    if (detail) "" else .ma_adv_action_list_view(),
     '<div class="ma-adv-tooltip" role="status" aria-live="polite" hidden></div>',
     '</div>'
   )

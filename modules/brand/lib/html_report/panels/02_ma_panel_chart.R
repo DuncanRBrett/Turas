@@ -35,6 +35,10 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '<section class="ma-section ma-metrics-section" data-ma-stim="metrics">',
     .ma_metrics_hero(pd, focal_colour),
     controls_bar,
+    # The hero strip is the focal brand's and wears its name; the table below
+    # holds every brand. Without a heading of its own the table read as part
+    # of the focal strip, which is not what it shows.
+    '<h4 class="ma-subsection-title">Every brand, side by side</h4>',
     .ma_metrics_table(pd, focal_colour),
     .ma_metrics_charts(pd),
     # CEP penetration ranking ("any brand") removed for IPK wave 1.

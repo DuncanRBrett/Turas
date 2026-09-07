@@ -639,10 +639,17 @@ build_br_summary_panel <- function(results, config) {
 #' for Category Buying, \code{cb-} plus the \code{data-cb-tab} value. `tier`
 #' is "main" or "advanced"; `order` sorts within a tier.
 #'
-#' Nineteen leaves, each appearing exactly once. Brand Attributes sits with
+#' Twenty leaves, each appearing exactly once. Brand Attributes sits with
 #' Category Entry Points under Mental Availability: both are memory
 #' structures. Brand Meaning therefore holds Brand Attitude, Word of Mouth
 #' and Branded Reach, which is what people say and see.
+#'
+#' The twentieth is Mental Advantage's detail. The impact map's destination
+#' summary puts the quadrant and the action list in Mental Availability's
+#' main view and the full matrix, the buyer-gap diagnostic and the MA
+#' methodology in its Advanced drawer, and until this leaf existed the whole
+#' of Mental Advantage sat in the main view and the destination had no
+#' drawer at all.
 #'
 #' @keywords internal
 .BR_LEAF_HOMES <- list(
@@ -658,6 +665,8 @@ build_br_summary_panel <- function(results, config) {
   "ma-ceps"         = list(dest = "mental",   tier = "main",     order = 20),
   "ma-attributes"   = list(dest = "mental",   tier = "main",     order = 30),
   "ma-advantage"    = list(dest = "mental",   tier = "main",     order = 40),
+  "ma-advantage-detail" =
+                      list(dest = "mental",   tier = "advanced", order = 10),
   "fn-relationship" = list(dest = "meaning",  tier = "main",     order = 10),
   "wom"             = list(dest = "meaning",  tier = "main",     order = 20),
   "branded_reach"   = list(dest = "meaning",  tier = "advanced", order = 10),
@@ -680,6 +689,7 @@ build_br_summary_panel <- function(results, config) {
   "ma-ceps"         = "Category Entry Points",
   "ma-attributes"   = "Brand Attributes",
   "ma-advantage"    = "Mental Advantage",
+  "ma-advantage-detail" = "Mental Advantage in full",
   "cb-context"      = "Category Context",
   "cb-brands"       = "Brand Summary",
   "cb-norms"        = "Dirichlet Norms",
@@ -782,6 +792,9 @@ build_br_summary_panel <- function(results, config) {
     paste("Where the focal brand is stronger or weaker on an entry point or",
           "attribute than its size alone would predict, and what that says",
           "to defend, build or maintain."),
+  "ma-advantage-detail" =
+    paste("The same measure for every brand on every stimulus, and how the",
+          "focal brand's own buyers differ from everyone else."),
   "cb-norms" =
     paste("What the Dirichlet model expects each brand's penetration, buy",
           "rate and loyalty to be, beside what the survey observed."),
@@ -1208,6 +1221,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   # attribute and never drive one.
   # ---------------------------------------------------------------------
   has_ma_advantage <- !is.null(panels[[paste0("ma_", cat_id, "__advantage")]])
+  has_ma_advantage_detail <-
+    !is.null(panels[[paste0("ma_", cat_id, "__advantage_detail")]])
 
   cand <- list(
     list(key = "fn-funnel",       el = "funnel",     sp = "fn",   it = "funnel",
@@ -1228,6 +1243,17 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     list(key = "ma-advantage",    el = "ma",         sp = "ma",   it = "advantage",
          cb = "", pk = paste0("ma_", cat_id, "__advantage"),
          primary = FALSE, gate = has_ma && has_ma_advantage),
+    # The detail host. Its internal tab is "advantage" so activateHost()
+    # finds the panel's own hidden sub-tab button, and its anchor is empty on
+    # purpose: an "advantage_detail-<cat>" value would be a new data-section
+    # in a set that is a contract with the analysts who typed those names
+    # into Section_Insights sheets. The pin and PNG pickers reach it through
+    # the leaf fallback that Stage 5 built for the Category Buying analyses,
+    # which have no anchor either.
+    list(key = "ma-advantage-detail", el = "ma",      sp = "ma",   it = "advantage",
+         cb = "", pk = paste0("ma_", cat_id, "__advantage_detail"),
+         anch = "",
+         primary = FALSE, gate = has_ma && has_ma_advantage_detail),
     list(key = "cb-context",      el = "repertoire", sp = "rep",  it = "",
          cb = "context",   pk = paste0("cat_buying_", cat_id),
          primary = TRUE,  gate = has_repertoire),
@@ -1456,7 +1482,13 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   # toolbar already carried. This is also what lets the leaf's commentary box
   # render only when there is something to put in it (Stage 5, piece 3)
   # without the anchor leaving the page.
-  leaf_anchor <- if (identical(el, "ma") || identical(el, "funnel")) {
+  # A leaf may name its anchor explicitly, and an explicit empty string means
+  # it has none. That is how the Mental Advantage detail host shares the
+  # internal tab name "advantage" with the main host without deriving a
+  # second "advantage-<cat>" anchor, or inventing a new one.
+  leaf_anchor <- if (!is.null(lf$anch)) {
+    lf$anch
+  } else if (identical(el, "ma") || identical(el, "funnel")) {
     a_el <- if (identical(internal_tab, "relationship")) "attitude" else internal_tab
     if (nzchar(a_el)) paste0(a_el, "-", cat_id) else ""
   } else ""
@@ -1511,10 +1543,14 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         # Note that the attitude anchor does not match its internal tab
         # name, "relationship"; that mismatch is pre-existing and analysts'
         # Section_Insights sheets depend on it.
-        anchor_el <- if (identical(internal_tab, "relationship")) "attitude"
-                     else internal_tab
-        sub_anchor <- paste0(anchor_el, "-", cat_id)
-        parts <- c(parts, build_br_section_toolbar(
+        #
+        # A leaf that declares no anchor gets no toolbar either. The Mental
+        # Advantage detail host is that leaf: it shares the internal tab name
+        # with the main host, so deriving one here would put a second
+        # commentary box and a second insight container on advantage-<cat>,
+        # and brTogglePin takes the first match.
+        sub_anchor <- leaf_anchor
+        if (nzchar(sub_anchor)) parts <- c(parts, build_br_section_toolbar(
           section_id         = sub_anchor,
           prefill_text       = section_insight_for(config$section_insights,
                                                    sub_anchor),

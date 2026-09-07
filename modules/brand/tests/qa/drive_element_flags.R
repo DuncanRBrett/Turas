@@ -249,6 +249,7 @@ LEAF_FLAG <- list(
   "ma-metrics" = "element_mental_avail", "ma-ceps" = "element_mental_avail",
   "ma-attributes" = "element_mental_avail",
   "ma-advantage" = "element_mental_avail",
+  "ma-advantage-detail" = "element_mental_avail",
   "cb-context" = "element_repertoire", "cb-brands" = "element_repertoire",
   "cb-norms" = "element_repertoire", "cb-loyalty" = "element_repertoire",
   "cb-dist" = "element_repertoire", "cb-heaviness" = "element_repertoire",

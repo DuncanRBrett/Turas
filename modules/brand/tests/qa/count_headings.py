@@ -28,8 +28,9 @@ Usage:
     python3 count_headings.py REPORT.html [REPORT2.html ...] [--json OUT]
     python3 count_headings.py BEFORE.html AFTER.html --compare
 
-Exit status is 0 unless --require-named is given and some table is
-unnamed, or the harness itself failed to report.
+Exit status is 1 when any table is unnamed, or when the harness failed to
+report. Pass --allow-unnamed to measure a report without failing on it,
+which is how a before-and-after baseline is taken.
 """
 import json
 import os
@@ -319,11 +320,11 @@ def main(argv):
         with open(out, "w", encoding="utf-8") as fh:
             json.dump(results, fh, indent=2)
         print("\nwrote " + out)
-    if "--require-named" in argv:
-        bad = sum(p["unnamed"] for r in results for p in r["panes"])
-        print("\n%d unnamed table(s)" % bad)
-        return 0 if bad == 0 else 1
-    return 0
+    bad = sum(p["unnamed"] for r in results for p in r["panes"])
+    print("\n%d unnamed table(s)" % bad)
+    if "--allow-unnamed" in argv:
+        return 0
+    return 0 if bad == 0 else 1
 
 
 if __name__ == "__main__":

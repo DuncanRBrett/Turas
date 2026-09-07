@@ -26,6 +26,10 @@
   var COL_NEUTRAL = [241, 245, 249];
   var COL_BUILD   = [220, 38, 38];
 
+  // Keeps the stimulus toggle on the main advantage host and the one in the
+  // Advanced drawer showing the same thing.
+  var STIM_EVENT = 'turas:brand-ma-stim-change';
+
   function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
   function rgb(c) { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
 
@@ -923,8 +927,32 @@
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   }
+  // The category a host belongs to. Every .ma-panel carries it, and the two
+  // advantage hosts for one category carry the same value.
+  function advCategory(panel) {
+    return panel.getAttribute('data-category-key') || '';
+  }
+
+  function applyStim(panel, stim) {
+    getAdvState(panel).stim = stim;
+    syncSegmentedButtons(panel, 'adv-stim', stim, 'data-ma-adv-stim');
+    renderAdvantage(panel);
+  }
+
   function bindAdvantage(panel) {
     if (panel.__maAdvBound) return; panel.__maAdvBound = true;
+
+    // The other advantage host for this category follows this one's
+    // stimulus. The guard on the panel's own state stops the two bouncing
+    // the event back and forth.
+    panel.__maAdvStimListener = function (ev) {
+      var d = (ev && ev.detail) || {};
+      if (!d.stim || d.category !== advCategory(panel)) return;
+      if (getAdvState(panel).stim === d.stim) return;
+      if (!panel.querySelector('[data-ma-action="adv-stim"]')) return;
+      applyStim(panel, d.stim);
+    };
+    document.addEventListener(STIM_EVENT, panel.__maAdvStimListener);
 
     var subtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
 
@@ -944,9 +972,16 @@
       if (stimBtn && subtab.contains(stimBtn)) {
         var stim = stimBtn.getAttribute('data-ma-adv-stim');
         if (!stim) return;
-        getAdvState(panel).stim = stim;
-        syncSegmentedButtons(panel, 'adv-stim', stim, 'data-ma-adv-stim');
-        renderAdvantage(panel);
+        applyStim(panel, stim);
+        // Mental Advantage renders in two hosts: the quadrant and the action
+        // list in the destination's main view, the full matrix and the
+        // buyer-gap view in its Advanced drawer. Each carries its own
+        // stimulus toggle, because a control belongs beside the view it
+        // governs, and the two must never disagree. The event is how they
+        // stay in step, on the pattern of turas:brand-focal-change.
+        document.dispatchEvent(new CustomEvent(STIM_EVENT, {
+          detail: { category: advCategory(panel), stim: stim }
+        }));
         return;
       }
       var resetBtn = ev.target.closest('button[data-ma-action="adv-xrange-reset"]');

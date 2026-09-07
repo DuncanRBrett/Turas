@@ -135,6 +135,20 @@ DRIVER = r"""
     return el;
   }
 
+  // A PNG export makes no pinned card and, on a scope with one entry, opens
+  // no picker either: it goes straight to brExportPngFrom. Counting the
+  // calls is how the click can be seen to have acted at all. Mental
+  // Availability's Advanced drawer is the first single-entry scope in the
+  // report and it is what exposed the gap.
+  var pngCalls = 0;
+  if (typeof window.brExportPngFrom === 'function') {
+    var realPngFrom = window.brExportPngFrom;
+    window.brExportPngFrom = function () {
+      pngCalls++;
+      return realPngFrom.apply(this, arguments);
+    };
+  }
+
   function run() {
     var panels = document.querySelectorAll('.br-panel[id^="panel-cat-"]');
     check('at least one category panel', panels.length > 0,
@@ -230,15 +244,17 @@ DRIVER = r"""
               TurasPins.closePopover();
               var cards0 = document.querySelectorAll('.br-pinned-card').length;
               var errs0 = qa.errors.length;
+              var png0 = pngCalls;
               pair[1].click();
               var popped = document.querySelectorAll('.pin-mode-popover').length;
               var pinnedNow = document.querySelectorAll('.br-pinned-card').length;
               check(label + '/' + t.name + ': clicking ' + pair[0] +
                     ' opens the picker or acts',
-                    (popped > 0 || pinnedNow > cards0) &&
+                    (popped > 0 || pinnedNow > cards0 || pngCalls > png0) &&
                     qa.errors.length === errs0,
                     'popovers ' + popped + ', cards ' + cards0 + ' -> ' +
-                    pinnedNow + ' ' + qa.errors.slice(errs0).join(' | '));
+                    pinnedNow + ', png calls +' + (pngCalls - png0) + ' ' +
+                    qa.errors.slice(errs0).join(' | '));
               TurasPins.closePopover();
             });
           }
@@ -276,6 +292,42 @@ DRIVER = r"""
             if (got) { got.__tables = tables; got.__view = label + '/' + t.name; }
           }
         });
+
+        // ---- the two Mental Advantage hosts agree ---------------------
+        // The quadrant and the action list sit in the main view and the full
+        // matrix in the Advanced drawer, so the stimulus toggle exists twice.
+        // If the two ever drifted, the drawer would show attributes under a
+        // quadrant showing CEPs and nothing on the page would say so.
+        var advMain = dest.querySelector(
+          '.br-dest-main [data-ma-adv-part="main"]');
+        var advDetail = dest.querySelector('[data-ma-adv-part="detail"]');
+        if (advMain && advDetail) {
+          var pressed = function (root) {
+            var b = root.querySelector('[data-ma-action="adv-stim"][aria-pressed="true"]');
+            return b ? b.getAttribute('data-ma-adv-stim') : null;
+          };
+          check(label + ': the two Mental Advantage hosts start on the same stimulus',
+                pressed(advMain) === pressed(advDetail),
+                pressed(advMain) + ' vs ' + pressed(advDetail));
+          var other = advMain.querySelector(
+            '[data-ma-action="adv-stim"][aria-pressed="false"]');
+          if (other) {
+            var want = other.getAttribute('data-ma-adv-stim');
+            other.click();
+            check(label + ': switching the stimulus in the main view moves the drawer too',
+                  pressed(advDetail) === want,
+                  'wanted ' + want + ', drawer shows ' + pressed(advDetail));
+            var back = advDetail.querySelector(
+              '[data-ma-action="adv-stim"][aria-pressed="false"]');
+            if (back) {
+              var want2 = back.getAttribute('data-ma-adv-stim');
+              back.click();
+              check(label + ': switching it in the drawer moves the main view too',
+                    pressed(advMain) === want2,
+                    'wanted ' + want2 + ', main view shows ' + pressed(advMain));
+            }
+          }
+        }
 
         // ---- significance ---------------------------------------------
         var sigBtn = dest.querySelector('.br-dest-main > .br-dest-toolbar .br-sig-toggle');

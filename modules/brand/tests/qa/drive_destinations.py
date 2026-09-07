@@ -82,7 +82,14 @@ DRIVER = """
   // level and has no brand dimension at all. The Mental Advantage matrix
   // keys its columns by stimulus, not by brand code, so it is checked on
   // its visible column count instead: one label column plus one per brand.
-  var NO_BRAND_CODES = { 'cb-context': 'none', 'ma-advantage': 'columns',
+  // The matrix now sits in the ma-advantage-detail host, in Mental
+  // Availability's Advanced drawer, so the column check follows it there.
+  // What is left on ma-advantage is the strategic quadrant and the action
+  // list, both of which are focal-brand views: neither carries a
+  // brand-coded element, verified by running this script with the entry
+  // removed and finding none.
+  var NO_BRAND_CODES = { 'cb-context': 'none', 'ma-advantage': 'none',
+                         'ma-advantage-detail': 'columns',
                          'branded_reach': 'unwired', 'adhoc': 'unwired',
                          'audience_lens': 'unwired' };
 
@@ -190,15 +197,16 @@ DRIVER = """
   // Views that cannot narrow at all must carry no Chart brands control:
   // a control that does nothing is what made the old Dirichlet Norms filter
   // read "1 of 11" beside a table of eleven brands.
-  // ma-advantage is the one narrowing leaf that genuinely cannot have the
-  // control: its quadrant SVG plots one bubble per stimulus for the focal
-  // brand alone, so there is no brand-keyed chart to narrow, and
-  // __maAdvHiddenBrands governs matrix columns, which are a table.
+  // The two Mental Advantage leaves are the ones that genuinely cannot have
+  // the control: the quadrant SVG plots one bubble per stimulus for the
+  // focal brand alone, so there is no brand-keyed chart to narrow, and
+  // __maAdvHiddenBrands governs matrix columns, which are a table and now
+  // sit in the detail host.
   // Demographics shows a table OR a chart per card behind a view toggle, so
   // a chart is never beside its table. The other four do not narrow at all.
   var NO_CHART_FOCUS = { 'cb-context': 1, 'cb-norms': 1, 'cb-dop': 1,
                          'cb-shopper': 1, 'demographics': 1,
-                         'ma-advantage': 1 };
+                         'ma-advantage': 1, 'ma-advantage-detail': 1 };
 
   function chartFocusHandle(mount) {
     var el = mount.parentElement;

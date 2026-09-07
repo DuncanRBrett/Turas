@@ -5,7 +5,7 @@
 #
 # What is covered:
 #   - the destination registry: four destinations, ids independent of labels;
-#   - the leaf registry: nineteen leaves, each in exactly one destination;
+#   - the leaf registry: twenty leaves, each in exactly one destination;
 #   - a rendered category panel: four destination buttons, every configured
 #     leaf present exactly once under some destination, no orphan host;
 #   - a destination with nothing configured is hidden, not shown empty;
@@ -85,8 +85,8 @@ test_that("id and label are separate fields on every destination and leaf", {
   # test below renames every label and shows no identifier follows.
 })
 
-test_that("nineteen leaves, each with exactly one home and one label", {
-  expect_equal(length(.BR_LEAF_HOMES), 19L)
+test_that("twenty leaves, each with exactly one home and one label", {
+  expect_equal(length(.BR_LEAF_HOMES), 20L)
   expect_equal(sort(names(.BR_LEAF_HOMES)), sort(names(.BR_LEAF_LABELS)))
   expect_equal(anyDuplicated(names(.BR_LEAF_HOMES)), 0L)
 
@@ -99,7 +99,7 @@ test_that("nineteen leaves, each with exactly one home and one label", {
   }
 })
 
-test_that("the leaf set is exactly the nineteen the impact map counts", {
+test_that("the leaf set is the nineteen the impact map counts, plus the split", {
   expect_setequal(names(.BR_LEAF_HOMES), c(
     # the eleven leaves of the old flat sub-tab bar
     "fn-funnel", "fn-relationship", "ma-attributes", "ma-ceps",
@@ -107,7 +107,11 @@ test_that("the leaf set is exactly the nineteen the impact map counts", {
     "adhoc", "audience_lens",
     # the eight the Category Buying sub-tab opened
     "cb-context", "cb-brands", "cb-norms", "cb-loyalty", "cb-dist",
-    "cb-heaviness", "cb-dop", "cb-shopper"))
+    "cb-heaviness", "cb-dop", "cb-shopper",
+    # the twentieth: the impact map's destination summary splits Mental
+    # Advantage, quadrant and action list in the main view, full matrix and
+    # buyer-gap diagnostic in Advanced, and that needs a host each
+    "ma-advantage-detail"))
 })
 
 test_that("Duncan's ruling 2 holds: attributes with CEPs, meaning is what people say", {
@@ -116,6 +120,17 @@ test_that("Duncan's ruling 2 holds: attributes with CEPs, meaning is what people
   expect_equal(.BR_LEAF_HOMES[["fn-relationship"]]$dest, "meaning")
   expect_equal(.BR_LEAF_HOMES[["wom"]]$dest,             "meaning")
   expect_equal(.BR_LEAF_HOMES[["branded_reach"]]$dest,   "meaning")
+})
+
+test_that("Mental Availability's detail is the one leaf in its Advanced drawer", {
+  # The impact map's destination summary: MA Metrics, Category Entry Points
+  # and the Mental Advantage quadrant and action list in the main view; the
+  # full matrix, the buyer-gap diagnostic and the MA methodology in Advanced.
+  expect_equal(.BR_LEAF_HOMES[["ma-advantage-detail"]]$dest, "mental")
+  expect_equal(.BR_LEAF_HOMES[["ma-advantage-detail"]]$tier, "advanced")
+  for (k in c("ma-metrics", "ma-ceps", "ma-attributes", "ma-advantage")) {
+    expect_equal(.BR_LEAF_HOMES[[k]]$tier, "main", info = k)
+  }
 })
 
 test_that("the Category Buying KPI leaves stay in the main view, the models go to Advanced", {
@@ -169,6 +184,7 @@ fake_panels <- function(keys) {
 full_keys <- c(
   "funnel_dss", "funnel_dss__relationship",
   "ma_dss", "ma_dss__attributes", "ma_dss__ceps", "ma_dss__advantage",
+  "ma_dss__advantage_detail",
   "cat_buying_dss", "cat_buying_dss__brands", "cat_buying_dss__norms",
   "cat_buying_dss__loyalty", "cat_buying_dss__dist",
   "cat_buying_dss__heaviness", "cat_buying_dss__dop",
@@ -248,7 +264,8 @@ test_that("every configured leaf appears exactly once, under some destination", 
   expect_equal(anyDuplicated(keys), 0L)
   expect_setequal(keys, c(
     "fn-funnel", "fn-relationship", "ma-metrics", "ma-ceps", "ma-attributes",
-    "ma-advantage", "cb-context", "cb-brands", "cb-norms", "cb-loyalty",
+    "ma-advantage", "ma-advantage-detail",
+    "cb-context", "cb-brands", "cb-norms", "cb-loyalty",
     "cb-dist", "cb-heaviness", "cb-dop", "wom", "demographics"))
   # No orphan: every host key has a home in the registry.
   for (k in keys) expect_false(is.null(.BR_LEAF_HOMES[[k]]), info = k)
@@ -285,6 +302,44 @@ test_that("one category with only the funnel still gets a coherent shell", {
   expect_equal(n_dn(out, 'data-destination="audience"'), 0L)
   # No empty Advanced drawer is emitted where no leaf lands in one.
   expect_equal(n_dn(out, 'class="br-advanced"'), 0L)
+})
+
+test_that("Mental Availability's drawer is hidden when there is nothing in it", {
+  # An empty destination drawer must stay hidden. Mental Advantage is gated
+  # on the engine returning an advantage block, so a study with CEPs and
+  # attributes and no advantage produces neither the main leaf nor the
+  # detail leaf, and Mental Availability must then have no drawer at all.
+  out <- render_cat(panels = fake_panels(
+    full_keys[!full_keys %in% c("ma_dss__advantage",
+                                 "ma_dss__advantage_detail")]))
+  expect_equal(n_dn(out, 'data-leaf="ma-advantage"'), 0L)
+  expect_equal(n_dn(out, 'data-leaf="ma-advantage-detail"'), 0L)
+  # Brand and Buying still has its own, so this counts drawers rather than
+  # asserting there are none in the report.
+  expect_equal(n_dn(out, 'class="br-advanced" data-group="dss" data-destination="mental"'), 0L)
+  expect_equal(n_dn(out, 'class="br-advanced" data-group="dss" data-destination="buying"'), 1L)
+  # And Mental Availability still renders its other three leaves.
+  expect_equal(n_dn(out, 'data-subpanel="ma"'), 3L)
+})
+
+test_that("the detail host declares no anchor and takes no second toolbar", {
+  # The data-section set is a contract with the analysts who typed those
+  # names into Section_Insights sheets. The detail host shares the internal
+  # tab name "advantage" with the main host, so a derived anchor would have
+  # been a second advantage-dss, and a new advantage_detail-dss would have
+  # been a name nobody has ever been able to type.
+  out <- render_cat()
+  expect_equal(n_dn(out, 'data-section="advantage-dss"'), 1L)
+  anchors <- attr_vals_dn(out, "data-section")
+  expect_false(any(grepl("advantage_detail", anchors, fixed = TRUE)))
+  expect_equal(sum(anchors == "advantage-dss"), 1L)
+  ids <- attr_vals_dn(out, "id")
+  expect_false(any(grepl("advantage", ids, fixed = TRUE)))
+  # It is reachable all the same: the pin and PNG pickers fall back to a
+  # leaf host that holds no anchor, which is the route Stage 5 built for the
+  # five Category Buying analyses.
+  expect_match(out, 'data-leaf="ma-advantage-detail"', fixed = TRUE)
+  expect_match(out, 'data-leaf-label="Mental Advantage in full"', fixed = TRUE)
 })
 
 test_that("a destination whose only content is Advanced opens with the drawer open", {
@@ -482,8 +537,10 @@ test_that("each straddling panel gets one host per internal tab, and one wrapper
   # Funnel: two hosts, one section wrapper on the funnel host.
   expect_equal(n_dn(out, 'data-subpanel="fn"'), 2L)
   expect_equal(n_dn(out, 'id="section-funnel-dss"'), 1L)
-  # Mental Availability: four hosts, one section wrapper on the metrics host.
-  expect_equal(n_dn(out, 'data-subpanel="ma"'), 4L)
+  # Mental Availability: five hosts, one section wrapper on the metrics host.
+  # The fifth is the Mental Advantage detail, which holds the full matrix and
+  # the buyer-gap diagnostic in the destination's Advanced drawer.
+  expect_equal(n_dn(out, 'data-subpanel="ma"'), 5L)
   expect_equal(n_dn(out, 'id="section-ma-dss"'), 1L)
   # Category Buying: seven hosts here, one section wrapper on the context host.
   expect_equal(n_dn(out, 'data-subpanel="rep"'), 7L)
@@ -517,24 +574,24 @@ test_that("every per-sub-tab Section_Insights anchor still lands, once each", {
 
 test_that("every view has one export toolbar, and Advanced has its own", {
   out <- render_cat()
-  # Four main views plus the one Advanced drawer a full-depth category has.
-  # Every destination now holds an analysis, so every one gets a toolbar.
-  # The exception used to be the Overview, which held a route card: nothing
-  # to export, no marker for a significance toggle to govern, and a
-  # commentary box that competed with the one on the page it routed to. It
-  # is gone rather than exempted.
-  expect_equal(n_dn(out, 'class="br-dest-toolbar"'), 5L)
-  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-pin"'), 5L)
-  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-png"'), 5L)
-  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-excel"'), 5L)
+  # Four main views plus the two Advanced drawers a full-depth category has,
+  # on Mental Availability and on Brand and Buying. The Overview destination
+  # is gone: it held a route to the Summary tab, not an analysis, so there was
+  # nothing to export, no marker for a significance toggle to govern, and a
+  # commentary box that competed with the one on the page it routed to.
+  expect_equal(n_dn(out, 'class="br-dest-toolbar"'), 6L)
+  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-pin"'), 6L)
+  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-png"'), 6L)
+  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-excel"'), 6L)
   expect_equal(n_dn(out, 'data-destination="overview"'), 0L)
   # Significance and commentary are one per destination, not one per view,
   # so the Advanced drawer's toolbar carries neither.
   expect_equal(n_dn(out, "br-sig-toggle"), 4L)
   expect_equal(n_dn(out, "br-dest-note-text"), 4L)
-  # The Advanced toolbar carries its three buttons and its own drawer, and
-  # nothing else: five elements wearing the tier.
-  expect_equal(n_dn(out, 'data-tier="advanced"'), 5L)
+  # Each Advanced toolbar carries its three buttons and its own drawer, and
+  # nothing else: five elements wearing the tier, per drawer.
+  expect_equal(n_dn(out, 'class="br-advanced"'), 2L)
+  expect_equal(n_dn(out, 'data-tier="advanced"'), 10L)
 
   # One shared per-leaf toolbar survives, on the Category Buying host. Its
   # buttons are not generic: brand_cat_buying_panel.js unbinds the inline
@@ -558,12 +615,12 @@ test_that("significance is off until a reader asks for it", {
 
 test_that("every view carries a collapsed How this works drawer", {
   out <- render_cat()
-  # One per main view plus one in the Advanced drawer. Each ships hidden and
+  # One per main view plus one in each Advanced drawer. Each ships hidden and
   # is unhidden by brCollectHowTo() only when it found something to hold, so
   # a view with no methodology shows no drawer.
-  expect_equal(n_dn(out, 'class="br-howto"'), 5L)
-  expect_equal(n_dn(out, 'class="br-howto-body" hidden'), 5L)
-  expect_equal(n_dn(out, 'aria-expanded="false" onclick="brToggleHowTo(this)"'), 5L)
+  expect_equal(n_dn(out, 'class="br-howto"'), 6L)
+  expect_equal(n_dn(out, 'class="br-howto-body" hidden'), 6L)
+  expect_equal(n_dn(out, 'aria-expanded="false" onclick="brToggleHowTo(this)"'), 6L)
 })
 
 test_that("the header control area is a three-slot system with a reserved slot", {

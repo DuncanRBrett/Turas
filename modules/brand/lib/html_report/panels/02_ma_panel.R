@@ -37,7 +37,10 @@ BRAND_MA_PANEL_VERSION <- "1.0"
 #' @return Character. A single HTML fragment (string).
 #' @export
 #' @param only_tab Character or NULL. One of \code{"attributes"},
-#'   \code{"ceps"}, \code{"advantage"} or \code{"metrics"}. When set, only
+#'   \code{"ceps"}, \code{"advantage"}, \code{"advantage_detail"} or
+#'   \code{"metrics"}. \code{"advantage_detail"} is the advantage sub-tab
+#'   again, holding the full matrix, the buyer-gap diagnostic and the
+#'   methodology, for the Advanced drawer. When set, only
 #'   that internal sub-tab's content is emitted and it renders visible. The
 #'   hidden sub-nav is emitted in full either way, because
 #'   \code{switchCategorySubtab()} routes by clicking the button inside the
@@ -66,7 +69,20 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   is_primary <- is.null(only_tab) || identical(only_tab, "metrics")
   panel_id <- if (is_primary) paste0("ma-", category_code)
               else paste0("ma-", category_code, "-", only_tab)
-  wants <- function(tab) is.null(only_tab) || identical(only_tab, tab)
+  # Mental Advantage renders in two parts. "advantage" is the quadrant and
+  # the action list, which the impact map puts in Mental Availability's main
+  # view; "advantage_detail" is the full matrix, the buyer-gap diagnostic and
+  # the methodology, which it puts in the Advanced drawer. Both are the
+  # advantage sub-tab as far as the panel and its JS are concerned, so
+  # wants() answers for either and the sub-tab div keeps its own name. The
+  # host id differs, so the two never collide.
+  adv_part <- if (identical(only_tab, "advantage_detail")) "detail" else "main"
+  wants <- function(tab) {
+    if (is.null(only_tab)) return(TRUE)
+    if (identical(tab, "advantage"))
+      return(only_tab %in% c("advantage", "advantage_detail"))
+    identical(only_tab, tab)
+  }
 
   json_payload <- .ma_panel_json(panel_data, focal_colour)
   excel_attr <- if (!is.null(excel_filename) && nzchar(excel_filename))
@@ -82,7 +98,8 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   # Default tab: attributes first if present, else CEPs. A split host makes
   # its own sub-tab the default so the panel JS opens on the right one with
   # no click, which would otherwise race the DOMContentLoaded init.
-  default_tab <- if (!is.null(only_tab)) only_tab
+  default_tab <- if (identical(only_tab, "advantage_detail")) "advantage"
+                 else if (!is.null(only_tab)) only_tab
                  else if (has_attrs) "attributes" else "ceps"
   host_attr <- if (!is.null(island_host) && nzchar(island_host))
     sprintf(' data-island-host="%s"', .ma_esc(island_host)) else ""
@@ -134,8 +151,9 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 
     if (has_advantage && wants("advantage")) paste0(
       sprintf('<div class="ma-subtab" data-ma-subtab="advantage"%s>',
-              if (identical(only_tab, "advantage")) "" else " hidden"),
-      build_ma_advantage_section(panel_data, focal_colour = focal_colour),
+              if (identical(default_tab, "advantage")) "" else " hidden"),
+      build_ma_advantage_section(panel_data, focal_colour = focal_colour,
+                                 part = adv_part),
       '</div>'
     ) else "",
 

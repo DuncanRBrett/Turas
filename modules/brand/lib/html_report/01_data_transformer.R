@@ -472,9 +472,18 @@ transform_brand_panels <- function(results, config) {
       # A sub-tab that has no data emits no .ma-subtab div; the marker is
       # the only reliable presence test, because the gating lives in the
       # panel builder and is not duplicated here.
-      for (tab in c("attributes", "ceps", "advantage")) {
+      # advantage_detail is the advantage sub-tab again, holding the full
+      # matrix, the buyer-gap diagnostic and the methodology for Mental
+      # Availability's Advanced drawer. Its own div is still named
+      # data-ma-subtab="advantage", because the panel JS routes by that name,
+      # so the presence test is on data-ma-adv-part rather than on the
+      # sub-tab name, which both hosts share.
+      for (tab in c("attributes", "ceps", "advantage", "advantage_detail")) {
         html <- .ma_host(tab, FALSE)
-        if (grepl(sprintf('data-ma-subtab="%s"', tab), html, fixed = TRUE)) {
+        marker <- if (identical(tab, "advantage_detail"))
+          'data-ma-adv-part="detail"'
+        else sprintf('data-ma-subtab="%s"', tab)
+        if (grepl(marker, html, fixed = TRUE)) {
           panels[[paste0("ma_", cat_id, "__", tab)]] <- html
         }
       }

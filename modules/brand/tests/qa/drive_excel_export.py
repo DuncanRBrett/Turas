@@ -451,13 +451,22 @@ DRIVER = """
         if (!got) {
           check('brand filter: the filtered view exports', false);
         } else {
+          // A name is looked for anywhere in the workbook, not as a whole
+          // cell. The header cells that carry data-ma-brand read
+          // "FOCAL<name> <sort glyph>" on the page, and the exporter writes
+          // the cell's text as it stands, so a whole-cell match never found
+          // the focal brand in those. It used to pass on the Mental
+          // Advantage matrix, whose header row held the bare name, and that
+          // matrix moved to the destination's Advanced drawer with its own
+          // export. Loosening the match makes the hidden-brand check
+          // stricter, which is the half that matters.
           var leaked = offScreen.filter(function (nm) {
-            return got.xml.indexOf('>' + esc(nm) + '<') !== -1;
+            return got.xml.indexOf(esc(nm)) !== -1;
           });
           check('brand filter: a brand the reader hid is not in the workbook',
                 leaked.length === 0, 'leaked ' + leaked.join(', '));
           var lost = onScreen.filter(function (nm) {
-            return got.xml.indexOf('>' + esc(nm) + '<') === -1;
+            return got.xml.indexOf(esc(nm)) === -1;
           });
           check('brand filter: every brand still on screen is in the workbook',
                 lost.length === 0, 'missing ' + lost.join(', '));
