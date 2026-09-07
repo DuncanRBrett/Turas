@@ -503,6 +503,41 @@
   }
   window.brDestScope = destScope;
 
+  // Is this heading hidden by something INSIDE the capture root?
+  //
+  // Naming a card after the first heading in its root, visible or not, gave
+  // the Brand Funnel a card called "Summary": the funnel anchor wraps the
+  // whole leaf, and the first heading under it belongs to the Summary
+  // sub-tab that no nav routes to and that carries the hidden attribute.
+  // Skipping every invisible heading instead swung it the other way: a
+  // reader opens the pin picker with the Advanced drawer shut, so every
+  // heading under that drawer is invisible, and seven Branded Reach cards
+  // and six Audience Lens cards all came back with the same leaf name.
+  //
+  // The distinction is where the hiding lives. A drawer collapsed above the
+  // root, or an inactive sub-tab above it, hides the root and its heading
+  // together, and that heading is still the name of what is being captured.
+  // A pane hidden BETWEEN the root and the heading is a piece of the root
+  // the reader is not looking at, and its heading names that pane rather
+  // than the capture. So the walk stops at the root and never leaves it.
+  //
+  // captureFromRoot() in brand_pins.js calls this same function, because the
+  // picker's label and the card's title must agree.
+  function headingHiddenWithin(el, root) {
+    if (!el) return true;
+    // Fast path: laid out on screen, so nothing above it is hidden either.
+    if (el.offsetParent !== null) return false;
+    var n = el;
+    while (n && n !== root && n.nodeType === 1) {
+      if (n.hasAttribute("hidden")) return true;
+      var cs = window.getComputedStyle ? window.getComputedStyle(n) : null;
+      if (cs && (cs.display === "none" || cs.visibility === "hidden")) return true;
+      n = n.parentElement;
+    }
+    return false;
+  }
+  window.brHeadingHiddenWithin = headingHiddenWithin;
+
   // Does this root hold anything a capture would put on a card?
   function hasCapturable(el) {
     if (!el) return false;
@@ -534,17 +569,19 @@
       if (!key || seen[key]) return;
       if (!hasCapturable(el)) return;
       seen[key] = true;
-      // Only a heading a reader can see names an entry. The anchors sit on a
-      // wrapper around the whole leaf, so the first heading under one can
-      // belong to a hidden sub-tab: on the funnel it is the Summary sub-tab
-      // that no nav routes to and .fn-subnav hides by CSS, which had the
-      // picker offering "Summary" for the Brand Funnel. captureFromRoot() in
-      // brand_pins.js skips hidden headings for the same reason, and the two
-      // must agree or the picker names one thing and the card another.
+      // A heading hidden by a pane inside this root does not name the entry.
+      // The anchors sit on a wrapper around the whole leaf, so the first
+      // heading under one can belong to a sub-tab the reader is not on: on
+      // the funnel it is the Summary sub-tab that no nav routes to, which
+      // had the picker offering "Summary" for the Brand Funnel. A heading
+      // that is merely off screen because the whole root sits in a collapsed
+      // drawer is still the right name. captureFromRoot() in brand_pins.js
+      // applies the identical test, and the two must agree or the picker
+      // names one thing and the card another.
       var title = null;
       var heads = el.querySelectorAll(".br-element-title, h2, h3");
       for (var hi = 0; hi < heads.length; hi++) {
-        if (heads[hi].offsetParent !== null) { title = heads[hi]; break; }
+        if (!headingHiddenWithin(heads[hi], el)) { title = heads[hi]; break; }
       }
       var host  = el.closest("[data-leaf-label]");
       var label = (title && title.textContent.trim()) ||

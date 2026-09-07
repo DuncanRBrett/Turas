@@ -122,20 +122,29 @@
   function captureFromRoot(root, sectionKey) {
     if (!root) return null;
 
-    // The first heading in the root names the card, but only if a reader can
-    // see it. Stage 5 moved the funnel, MA and Category Buying anchors onto a
-    // wrapper around the whole leaf, so the capture root now contains the
-    // panel's own hidden sub-navs and their headings. On the IPK fixture the
-    // first heading inside [data-section="funnel-dss"] is "Summary", from the
-    // funnel panel's Summary sub-tab, which no nav routes to and which
-    // .fn-subnav hides by CSS (impact map section 4). Pinning the Brand
-    // Funnel therefore produced a card named after a tab the reader cannot
-    // open. A hidden heading is not the name of anything, so skip it.
+    // The first heading in the root names the card, unless a pane inside the
+    // root is hiding it. Stage 5 moved the funnel, MA and Category Buying
+    // anchors onto a wrapper around the whole leaf, so the capture root now
+    // contains the panel's own sub-tabs and their headings. On the IPK
+    // fixture the first heading inside [data-section="funnel-dss"] is
+    // "Summary", from the funnel panel's Summary sub-tab, which no nav routes
+    // to and which carries the hidden attribute (impact map section 4).
+    // Pinning the Brand Funnel therefore produced a card named after a tab
+    // the reader cannot open.
+    //
+    // Skipping every heading a reader cannot see at that instant is too
+    // strong: a reader opens the pin picker with the Advanced drawer shut,
+    // and then the drawer hides the root and its own heading together.
+    // brHeadingHiddenWithin() draws the line at the root, and sectionsIn()
+    // in brand_report.js calls the same function so the picker's label and
+    // the card's title cannot drift apart.
+    var hiddenWithin = window.brHeadingHiddenWithin ||
+      function (el) { return !el || el.offsetParent === null; };
     var title = null;
     var heads = root.querySelectorAll(
       ".br-element-title, h2, h3, .pfo-section-title");
     for (var hi = 0; hi < heads.length; hi++) {
-      if (heads[hi].offsetParent !== null) { title = heads[hi]; break; }
+      if (!hiddenWithin(heads[hi], root)) { title = heads[hi]; break; }
     }
     // With no visible heading, name the card after the analysis rather than
     // after its anchor id. data-leaf-label is the reader-facing name the
@@ -421,10 +430,18 @@
   // Category Buying analyses have no anchor at all: the anchored ones pass
   // the element their anchor resolves to, so a pin taken through here is the
   // same capture the anchor has always produced.
+  // The picker passes the name it showed the reader, and that name wins.
+  // It was previously applied only when captureFromRoot() had found nothing,
+  // which held while the leaf-label fallback did not exist. Once that
+  // fallback landed, content.title was always filled, so the category suffix
+  // the picker had put on a Category Buying entry ("Dirichlet Norms: Dry
+  // Seasonings and Spices") was dropped and four categories produced four
+  // cards all called "Dirichlet Norms". A reader who chose a name should get
+  // that name on the card.
   function pinnableContent(root, key, title) {
     var content = captureFromRoot(root, key);
     if (!content) return null;
-    if (title && (!content.title || content.title === key)) content.title = title;
+    if (title) content.title = title;
     return content;
   }
 
