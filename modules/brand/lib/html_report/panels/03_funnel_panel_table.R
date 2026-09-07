@@ -49,8 +49,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   # category-average row and the sort keys onto each stage's own figure, which
   # is also what the base toggle defaults to and what the reader sees before
   # any script runs. See detect_instrument_gating() in 03a_funnel_derive.R.
-  gated <- is.null(pd$meta$gating) || isTRUE(pd$meta$gating$gated)
-  chain_denom <- if (gated) n_weighted else NA_real_
+  chain_denom <- .fn_chain_denom(pd$meta, n_weighted)
   chain_avg  <- .fn_chain_stats_by_stage(table$cells, stage_keys, brand_codes,
                                          chain_denom)
 
@@ -70,6 +69,31 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     '</tbody></table></div>',
     '</section>'
   )
+}
+
+
+#' The denominator the funnel table's opening view is drawn at.
+#'
+#' The one place that decides whether this report opens on the nested chain
+#' or on each stage on its own. Withholding the denominator is what switches
+#' every cell, the category-average row and the sort keys onto each stage's
+#' own figure. Passing it back through \code{.fn_chain_pct()} yields NA on an
+#' ungated report, and every caller already falls back to the absolute
+#' figure, which is what the reader then sees.
+#'
+#' \code{.bin_funnel_pool()} in 03b_insight_number_check.R calls this too. It
+#' had re-derived the chain unconditionally, so on an ungated report the
+#' number check read a sentence against a series the page never shows: a
+#' correct sentence was flagged and a stale one passed. Two callers, one
+#' determination.
+#'
+#' @param meta List. The funnel panel meta, carrying \code{gating}.
+#' @param n_weighted Numeric. sum(weights) for the category.
+#' @return \code{n_weighted} when the instrument gated, NA_real_ otherwise.
+#' @keywords internal
+.fn_chain_denom <- function(meta, n_weighted) {
+  gated <- is.null(meta$gating) || isTRUE(meta$gating$gated)
+  if (gated) as.numeric(n_weighted) else NA_real_
 }
 
 

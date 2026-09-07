@@ -55,12 +55,15 @@
 # THE FUNNEL POOL IS THE VIEW THE REPORT OPENS ON, not every view the toggle
 # can reach. The funnel carries four views of the same counts, and matching
 # any of them would have passed the 59 in the case above, because 59 is a real
-# figure in the absolute view. It is a real figure the reader cannot see. The
-# nested chain is what the page opens on, so that is what the sentence above
-# it is read against. The values come from .fn_chain_pct() and
-# .fn_chain_stats_by_stage() in panels/03_funnel_panel_table.R, the same two
-# helpers the table itself is rendered with, so the check and the table can
-# never drift apart.
+# figure in the absolute view. It is a real figure the reader cannot see.
+#
+# Which view that is depends on the instrument. A gated one opens on the
+# nested chain. An ungated one has no chain to draw, so the panel withholds
+# the "Funnel, % of all" button and the page opens on each stage on its own.
+# The pool goes through .fn_chain_denom() in panels/03_funnel_panel_table.R,
+# the same single determination the table is drawn from, and then through
+# .fn_chain_pct() and .fn_chain_stats_by_stage(), the same two helpers, so
+# the check and the table cannot drift apart.
 #
 # NOT EVERY NUMBER IN A SENTENCE IS A CLAIM ABOUT THAT SECTION. A check that
 # fires constantly is ignored, so four kinds of number are left alone:
@@ -238,22 +241,34 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 #' The funnel's pool: the view the report opens on
 #'
 #' Built from the same panel data the funnel panel is rendered from, and
-#' through the same two helpers, so the pool holds exactly the figures on
-#' screen when the page loads. Carries, for every brand and stage: the nested
-#' chain percentage, its unweighted count (the n= under the cell), the stage's
-#' own unweighted base, and the category-average row's mean and its two range
-#' bar bounds. Plus the panel's weighted and unweighted respondent totals.
+#' through the same helpers, so the pool holds exactly the figures on screen
+#' when the page loads. Carries, for every brand and stage: the percentage
+#' the cell prints, the count printed under it, and the category-average
+#' row's figure with its two range bar bounds. Plus the panel's weighted and
+#' unweighted respondent totals.
+#'
+#' WHICH VIEW THE PAGE OPENS ON IS NOT A CONSTANT. A gated instrument opens
+#' on the nested chain; an ungated one has no chain to draw and opens on each
+#' stage on its own, with the "Funnel, % of all" button withheld. This read
+#' the chain unconditionally, so on an ungated report a sentence quoting the
+#' figures on screen was flagged and a sentence quoting figures the reader
+#' cannot reach passed. \code{.fn_chain_denom()} in
+#' panels/03_funnel_panel_table.R is the single determination both the table
+#' and this pool now go through.
 #'
 #' @param funnel List. cat_results$funnel from run_brand().
-#' @return Numeric vector, empty when the funnel cannot be read.
+#' @return List with \code{pool} (numeric, empty when the funnel cannot be
+#'   read) and \code{gated} (logical, the view the pool was built at).
 #' @keywords internal
 .bin_funnel_pool <- function(funnel) {
-  if (is.null(funnel) || identical(funnel$status, "REFUSED")) return(numeric(0))
-  if (is.null(funnel$stages) || nrow(funnel$stages) == 0) return(numeric(0))
+  none <- list(pool = numeric(0), gated = TRUE)
+  if (is.null(funnel) || identical(funnel$status, "REFUSED")) return(none)
+  if (is.null(funnel$stages) || nrow(funnel$stages) == 0) return(none)
   if (!exists(".panel_table", mode = "function") ||
       !exists(".fn_chain_pct", mode = "function") ||
+      !exists(".fn_chain_denom", mode = "function") ||
       !exists(".fn_chain_stats_by_stage", mode = "function")) {
-    return(numeric(0))
+    return(none)
   }
 
   # .panel_table() rather than the whole build_funnel_panel_data(): it is the
@@ -268,46 +283,73 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
                 unique(as.character(funnel$stages$stage_key))
   tbl <- tryCatch(.panel_table(funnel, brand_df, stage_keys, config = list()),
                   error = function(e) NULL)
-  if (is.null(tbl) || length(tbl$cells) == 0) return(numeric(0))
+  if (is.null(tbl) || length(tbl$cells) == 0) return(none)
   pd <- list(table = tbl, meta = funnel$meta)
 
   n_weighted <- suppressWarnings(as.numeric(pd$meta$n_weighted %||% NA_real_))
+  # The denominator the table itself is drawn at. NA on an ungated report,
+  # which is what makes every helper below fall back to the absolute figure,
+  # exactly as .fn_cell_html() and .fn_row_avg_all() do.
+  chain_denom <- .fn_chain_denom(pd$meta, n_weighted)
   vals <- numeric(0)
 
-  # base_chain_unweighted is the count the nested cell prints under its
-  # figure. base_unweighted, the stage's own raw count, is deliberately left
-  # out: it belongs to the absolute view and is not on screen here. The base
-  # row above the table prints the panel's n_unweighted, added below.
+  # .fn_cell_html() prints the chain percentage where there is one and the
+  # absolute figure where there is not, and prints base_chain_unweighted
+  # under it where that is finite and base_unweighted otherwise. The pool
+  # follows the cell, value for value.
   n_pct <- 0L
+  n_chain <- 0L
   for (cell in pd$table$cells) {
-    chain <- .fn_chain_pct(cell, n_weighted)
-    if (is.finite(chain)) {
-      vals <- c(vals, 100 * chain)
+    chain <- .fn_chain_pct(cell, chain_denom)
+    shown <- if (is.finite(chain)) chain else
+      suppressWarnings(as.numeric(cell$pct_absolute %||% NA_real_))
+    if (is.finite(chain)) n_chain <- n_chain + 1L
+    if (is.finite(shown)) {
+      vals <- c(vals, 100 * shown)
       n_pct <- n_pct + 1L
     }
-    vals <- c(vals,
-              suppressWarnings(as.numeric(cell$base_chain_unweighted %||% NA_real_)))
+    base_chain_u <- suppressWarnings(
+      as.numeric(cell$base_chain_unweighted %||% NA_real_))
+    vals <- c(vals, if (is.finite(base_chain_u)) base_chain_u else
+      suppressWarnings(as.numeric(cell$base_unweighted %||% NA_real_)))
   }
-  # No nested percentage means the view the page opens on could not be
+  # No percentage at all means the view the page opens on could not be
   # reconstructed. A pool of counts alone would flag every percentage in the
   # sentence, so the section is left unchecked instead.
-  if (n_pct == 0L) return(numeric(0))
+  if (n_pct == 0L) return(none)
+  # Whether the pool really stands on the chain, not merely whether the
+  # instrument gated. A gated report whose chain counts are missing falls
+  # back to the absolute figure cell by cell, and the reader is then looking
+  # at each stage on its own whatever the meta says. The view named in the
+  # marker has to describe what is on screen.
+  gated <- n_chain > 0L
 
+  # The category-average row, drawn the same way: the chain statistics when
+  # there is a chain, the row's own absolute figure and CI when there is not.
+  # .fn_row_avg_all() switches on exactly this test.
   stats_by_stage <- tryCatch(
     .fn_chain_stats_by_stage(pd$table$cells, pd$table$stage_keys,
-                             pd$table$brand_codes, n_weighted),
+                             pd$table$brand_codes, chain_denom),
     error = function(e) list())
   for (st in stats_by_stage) {
     vals <- c(vals, 100 * c(st$mean %||% NA_real_, st$ci_lo %||% NA_real_,
                             st$ci_hi %||% NA_real_, st$col_max %||% NA_real_))
+  }
+  if (!gated) {
+    for (r in pd$table$avg_all_brands %||% list()) {
+      vals <- c(vals, 100 * c(
+        suppressWarnings(as.numeric(r$pct_absolute %||% NA_real_)),
+        suppressWarnings(as.numeric(r$ci_lo %||% NA_real_)),
+        suppressWarnings(as.numeric(r$ci_hi %||% NA_real_))))
+    }
   }
 
   vals <- c(vals, n_weighted,
             suppressWarnings(as.numeric(pd$meta$n_unweighted %||% NA_real_)))
 
   v <- vals[is.finite(vals)]
-  if (length(v) == 0L) return(numeric(0))
-  unique(v)
+  if (length(v) == 0L) return(none)
+  list(pool = unique(v), gated = gated)
 }
 
 
@@ -392,10 +434,12 @@ brand_insight_pool_for <- function(anchor, results) {
   if (is.null(cr)) return(none)
 
   if (identical(el, "funnel")) {
-    pool <- .bin_funnel_pool(cr$funnel)
-    if (length(pool) == 0L) return(none)
-    return(list(pool = pool, view = "the nested funnel, the view this page opens on",
-                checked = TRUE))
+    got <- .bin_funnel_pool(cr$funnel)
+    if (length(got$pool) == 0L) return(none)
+    view <- if (isTRUE(got$gated))
+      "the nested funnel, the view this page opens on" else
+      "each stage on its own, the view this page opens on"
+    return(list(pool = got$pool, view = view, checked = TRUE))
   }
 
   # The Brand Attitude sub-tab renders the attitude decomposition, not the

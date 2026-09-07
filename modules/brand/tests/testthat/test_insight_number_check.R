@@ -163,7 +163,7 @@ test_that("the pool is the view the page opens on, not every view", {
   # percentage at the preference stage. It is not a figure the reader can
   # see, because the page opens on the nested chain. Matching any view would
   # have passed the sentence that started this.
-  pool <- .bin_funnel_pool(.inc_funnel())
+  pool <- .bin_funnel_pool(.inc_funnel())$pool
   expect_true(any(abs(pool - 42) < 0.6))   # nested aware
   expect_true(any(abs(pool - 35) < 0.6))   # nested preference
   expect_false(any(abs(pool - 59) < 0.6))  # absolute preference, not on screen
@@ -227,8 +227,14 @@ test_that("a broken results object is skipped, not thrown", {
 test_that("a funnel whose panel table cannot be built yields no pool", {
   broken <- .inc_funnel()
   broken$stages$base_chain_filtered <- NA_real_
+  # The absolute figures go too. Without them the cells fall back to nothing
+  # and no view can be reconstructed, which is the case this covers. Leaving
+  # them in reconstructs the absolute view, which is what the page would
+  # then show, and the pool is right to hold it.
+  broken$stages$pct_weighted <- NA_real_
+  broken$stages$pct_unweighted <- NA_real_
   broken$meta$n_weighted <- NA_real_
-  expect_length(.bin_funnel_pool(broken), 0L)
+  expect_length(.bin_funnel_pool(broken)$pool, 0L)
   chk <- check_brand_section_insights(c(`funnel-dss` = .INC_STALE),
                                       .inc_results(broken))
   expect_true("funnel-dss" %in% chk$skipped)
@@ -411,7 +417,7 @@ test_that("a section pool never carries a non-finite value", {
   # deterministic_number_check does any(abs(pool - n) < tol); one NA in the
   # pool makes that NA and the check throws. Same trap reader_ai_prose.R
   # filters for.
-  expect_true(all(is.finite(.bin_funnel_pool(.inc_funnel()))))
+  expect_true(all(is.finite(.bin_funnel_pool(.inc_funnel())$pool)))
   expect_true(all(is.finite(.bin_generic_pool(
     list(a = c(1, NA, 3), b = list(c = NaN, d = "7", e = "not a number"))))))
 })
@@ -627,4 +633,101 @@ test_that("the portfolio toolbar is unchanged when nothing was flagged", {
   on.exit(.pf_set_section_insights(NULL), add = TRUE)
   expect_false(grepl("br-insight-check", .pf_section_toolbar("pf-overview"),
                      fixed = TRUE))
+})
+
+# ==============================================================================
+# The view the page opens on is not always the nested chain
+# ==============================================================================
+# Review finding F1. The pool was built from the chain unconditionally, while
+# the panel withholds the chain on an instrument that did not route the funnel
+# questions and opens on each stage on its own. On such a report a sentence
+# quoting the figures on screen was flagged with a client-visible amber
+# marker, and a sentence quoting the chain, which the reader cannot reach,
+# passed. Duncan's real IPK study is ungated, so this is the report he gets.
+#
+# The fixture's focal brand reads 42 / 59 / 31 / 20 absolute and 42 / 35 / 22
+# / 16 on the chain, so the two views share only the first stage and every
+# assertion below discriminates.
+
+context("insight number check: the view the page opens on")
+
+.inc_funnel_ungated <- function(...) {
+  f <- .inc_funnel(...)
+  f$meta$gating <- list(gated = FALSE, mode = "separate",
+                        breach_stages = "consideration", statement = "x")
+  f
+}
+
+.INC_ON_SCREEN_UNGATED <- paste(
+  "IPK is known to 42% of the sample and holds 59% at preference,",
+  "31% at past 12 months and 20% at past 3 months.")
+
+.INC_CHAIN_SENTENCE <- paste(
+  "IPK is known to 42% of the sample and holds 35% at preference,",
+  "22% at past 12 months and 16% at past 3 months.")
+
+test_that("an ungated funnel pools the figures the page actually shows", {
+  pool <- .bin_funnel_pool(.inc_funnel_ungated())$pool
+  for (v in c(42, 59, 31, 20)) expect_true(any(abs(pool - v) < 0.6),
+                                           info = paste("absolute", v))
+  for (v in c(35, 22, 16)) expect_false(any(abs(pool - v) < 0.6),
+                                        info = paste("chain", v))
+})
+
+test_that("the gated funnel still pools the chain and not the absolute view", {
+  pool <- .bin_funnel_pool(.inc_funnel())$pool
+  for (v in c(42, 35, 22, 16)) expect_true(any(abs(pool - v) < 0.6),
+                                           info = paste("chain", v))
+  for (v in c(59, 31, 20)) expect_false(any(abs(pool - v) < 0.6),
+                                        info = paste("absolute", v))
+})
+
+test_that("on an ungated report the on-screen sentence is not flagged", {
+  chk <- check_brand_section_insights(
+    c(`funnel-dss` = .INC_ON_SCREEN_UNGATED),
+    .inc_results(.inc_funnel_ungated()))
+  expect_true("funnel-dss" %in% chk$checked)
+  expect_length(chk$findings, 0L)
+})
+
+test_that("on an ungated report the chain sentence is flagged", {
+  chk <- check_brand_section_insights(
+    c(`funnel-dss` = .INC_CHAIN_SENTENCE),
+    .inc_results(.inc_funnel_ungated()))
+  expect_length(chk$findings, 1L)
+  figs <- chk$findings[["funnel-dss"]]$figures
+  expect_true(all(c("35", "22", "16") %in% figs))
+  expect_false("42" %in% figs)
+})
+
+test_that("on a gated report the two sentences swap over", {
+  res <- .inc_results()
+  on_screen <- check_brand_section_insights(
+    c(`funnel-dss` = .INC_CHAIN_SENTENCE), res)
+  expect_length(on_screen$findings, 0L)
+  stale <- check_brand_section_insights(
+    c(`funnel-dss` = .INC_ON_SCREEN_UNGATED), res)
+  expect_length(stale$findings, 1L)
+  expect_true(all(c("59", "31", "20") %in%
+                    stale$findings[["funnel-dss"]]$figures))
+})
+
+test_that("the marker names the view it was read against, either way", {
+  ung <- check_brand_section_insights(c(`funnel-dss` = .INC_CHAIN_SENTENCE),
+                                      .inc_results(.inc_funnel_ungated()))
+  expect_match(ung$findings[["funnel-dss"]]$view, "each stage on its own")
+  expect_match(brand_insight_check_note(ung, "funnel-dss"),
+               "each stage on its own")
+  gat <- check_brand_section_insights(c(`funnel-dss` = .INC_STALE),
+                                      .inc_results())
+  expect_match(gat$findings[["funnel-dss"]]$view, "nested funnel")
+})
+
+test_that("the pool and the table read the same gating determination", {
+  # .fn_chain_denom() is the one place that decides. Both callers go through
+  # it, so a change to the rule cannot reach one and miss the other.
+  expect_true(is.finite(.fn_chain_denom(list(), 438)))
+  expect_true(is.finite(.fn_chain_denom(list(gating = list(gated = TRUE)), 438)))
+  expect_false(is.finite(
+    .fn_chain_denom(list(gating = list(gated = FALSE)), 438)))
 })
