@@ -151,11 +151,20 @@ Duncan.
    written into it.** Dropping the per-leaf boxes outright would have left an
    analyst's `ceps-pas` sentence with nowhere to render. So
    `build_br_section_toolbar()` gained `require_text`, and a leaf renders its
-   box when the Section_Insights sheet authored text for that anchor or when
-   the authored-insight number check has a marker for it. On the IPK fixture
-   four such boxes render, on `ceps-dss`, `funnel-dss`, `repertoire-dss` and
-   `wom-dss`, each with its check marker intact. On a report with no authored
-   insights there are none, and the reader writes in the destination's box.
+   box when the Section_Insights sheet authored text for that anchor **or**
+   when the authored-insight number check has a marker for it. On the IPK
+   fixture four such boxes render, on `ceps-dss`, `funnel-dss`,
+   `repertoire-dss` and `wom-dss`, with their authored text in them. On a
+   report with no authored insights there are none, and the reader writes in
+   the destination's box.
+
+   **The check marker was not seen on the fixture.** `class="br-insight-check"`
+   appears zero times in the before report and zero times in the after one:
+   this fixture's insights are not flagged, so no marker could be lost or
+   kept. The branch is driven directly instead, by a test that builds a
+   finding, asserts the marker renders inside the box under `require_text`,
+   asserts the marker alone is enough to render a box, and asserts that
+   nothing authored and nothing flagged renders no box at all.
 
 8. **The destination commentary box carries no `data-section`.** It could not:
    a new anchor fails the gate, and reusing an existing one would put two
@@ -199,8 +208,16 @@ Duncan.
 
 14. **The Portfolio tab is not a destination and was left alone.** It has no
     destination shell, so its four shared toolbars and its own significance
-    column keep working as they did. Its ★ column and its "significant after
-    BH correction" wording are outside this stage.
+    column keep working as they did. Its star column and its "significant
+    after BH correction" wording are outside this stage.
+
+15. **The toggle governs text markers, not chart encodings.** The Mental
+    Advantage quadrant draws a significant bubble with a thicker outline
+    (`ma-adv-q-bubble-sig`), and the funnel and MA heatmaps shade cells.
+    Those are part of how the chart reads, not a badge beside a number, and
+    taking them out would change the chart rather than quieten the page. They
+    stay in both states. The tooltip's clause, which is text, follows the
+    toggle.
 
 ## What was built
 
@@ -233,7 +250,7 @@ page, so neither offers an item that would pin an empty string.
 | Check | Result |
 |---|---|
 | Brand suite, before the first edit | FAIL 0, WARN 1, SKIP 2, PASS 3486 |
-| Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3553, 110.4 s |
+| Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3560, 121.7 s |
 | `reachability_check.py before after` | PASS. data-subpanel 5, data-section 29, section ids 13, island classes 8, all identical; every parseable island numerically identical |
 | `anchor_resolution.py before after` | PASS. 41 of 41 anchors and section ids resolve, and every one to a root holding a table, a chart or a textarea |
 | `drive_chrome.py after.html` | 115 checks, 0 failed, no console error |
@@ -242,7 +259,7 @@ page, so neither offers an item that would pin an empty string.
 | `drive_two_categories.py after.html` | 15 checks, 0 failed |
 | `drive_overview.py after.html` | 60 checks, 0 failed |
 | `drive_funnel_base.py after.html` | 99 checks, 0 failed |
-| IPK fixture report | PASS, 4,042,699 bytes against 4,024,208 before, 0.5 percent larger |
+| IPK fixture report | PASS, 4,044,194 bytes against 4,024,208 before, 0.5 percent larger |
 
 The five existing drive scripts were also run against the before report in
 this session and returned the same counts (353, 113, 15, 60, 99), so the
@@ -311,7 +328,11 @@ On the fixture:
 
 5. **The Mental Advantage significance clause could not be reached.** It was
    concatenated into a text node, where no stylesheet hides it and no capture
-   strips it. It is now a span.
+   strips it. It is now a span. Its tooltip is emitted inside the panel, not
+   at body level, so the destination-scoped rule does reach it; that was
+   checked rather than assumed (`.ma-adv-tooltip` comes from
+   `02_ma_panel_advantage.R` line 144 and `tooltipEl()` finds it with
+   `panel.querySelector`).
 
 6. **Two panel pin dialogs would have offered a dead menu item**, "Insights"
    pointing at a box this stage removed. Both filter their lists by what is
@@ -321,6 +342,15 @@ On the fixture:
    shared insight container because the panel had its own box; with that box
    gone, a prefilled `wom-<cat>` sentence would have been in the file and off
    the page. The hiding was removed.
+
+8. **Every category's Dirichlet Norms pin would have carried the same key and
+   the same title.** The five Category Buying analyses reached through the
+   leaf fallback have no anchor and no heading of their own, so a four
+   category report would have produced four cards all keyed `cb-norms` and
+   all titled `cb-norms`. The key is scoped to the category and the title is
+   the analysis name plus the category. `TurasPins.add` was read first: it
+   pushes and gives each pin its own id, so nothing was being overwritten;
+   the cards were merely indistinguishable.
 
 ## Known limits, stated rather than left to be discovered
 

@@ -542,17 +542,41 @@
     });
     scope.querySelectorAll("[data-leaf][data-leaf-label]").forEach(function (host) {
       if (host.querySelector("[data-section]")) return;
-      var key = host.getAttribute("data-leaf");
-      if (!key || seen[key]) return;
+      var leaf = host.getAttribute("data-leaf");
+      if (!leaf) return;
+      var group = host.getAttribute("data-group") || "";
+      // The key is scoped to the category. Five categories all offering
+      // "cb-norms" would put five identically keyed pins in the store, and
+      // the five Category Buying analyses are the only entries that reach
+      // this branch. It is not a data-section value and never was.
+      var key = group ? group + ":" + leaf : leaf;
+      if (seen[key]) return;
       if (!hasCapturable(host)) return;
       seen[key] = true;
-      out.push({ key: key,
-                 label: host.getAttribute("data-leaf-label") || key,
-                 el: host });
+      var label = host.getAttribute("data-leaf-label") || leaf;
+      // These sub-tabs carry no heading of their own, so a pin taken from
+      // one would be titled with its key. It gets the analysis name and the
+      // category, which is what tells two categories' cards apart.
+      var cat = catLabelFor(host);
+      out.push({ key: key, label: label, el: host,
+                 title: cat ? label + ": " + cat : label });
     });
     return out;
   }
   window.brSectionsIn = sectionsIn;
+
+  // The category a node sits in, by its tab button's own text.
+  function catLabelFor(el) {
+    var panel = el && el.closest ? el.closest(".br-panel") : null;
+    if (!panel || !panel.id) return "";
+    var tab = panel.id.replace(/^panel-/, "");
+    var btn = document.querySelector('.br-tab-btn[data-tab="' + tab + '"]');
+    if (!btn) return "";
+    var label = btn.textContent.trim();
+    var badge = btn.querySelector(".br-pin-badge");
+    if (badge) label = label.replace(badge.textContent.trim(), "").trim();
+    return label;
+  }
 
   function destLabel(btn) {
     var g = btn.getAttribute("data-group");
@@ -588,7 +612,7 @@
       function (items) {
         items.forEach(function (it) {
           if (typeof window.brPinFrom === "function") {
-            window.brPinFrom(it.el, it.key, it.label);
+            window.brPinFrom(it.el, it.key, it.title || it.label);
           }
         });
         btn.classList.add("pin-flash");
@@ -602,7 +626,7 @@
       function (items) {
         items.forEach(function (it) {
           if (typeof window.brExportPngFrom === "function") {
-            window.brExportPngFrom(it.el, it.key, it.label);
+            window.brExportPngFrom(it.el, it.key, it.title || it.label);
           }
         });
       });
@@ -628,6 +652,9 @@
     var opening = note.hidden;
     note.hidden = !opening;
     btn.setAttribute("aria-expanded", opening ? "true" : "false");
+    // The label names the state, the way the significance toggle's does. An
+    // open box still offering to add one is the same small lie.
+    btn.textContent = opening ? "Commentary" : "+ Add commentary";
     if (opening) {
       var ta = note.querySelector("textarea");
       if (ta) ta.focus();

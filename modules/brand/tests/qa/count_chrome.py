@@ -44,14 +44,10 @@ window.__count = function () {
     textarea: n('textarea'),
     sig_text: count(text),
     sig_attr: count(attrText),
-    sig_markers_visible: (function () {
-      var c = 0;
-      document.querySelectorAll('.ma-sig, .ma-fv-sig, .ma-adv-sig, .ct-sig, ' +
-                                '.fn-sig-avg, .fn-sig').forEach(function (e) {
-        if (e.offsetParent !== null) c++;
-      });
-      return c;
-    })(),
+    // How many markers exist. How many are ON SCREEN is a different number
+    // and a smaller one, because most sit inside a hidden sub-tab or a
+    // hidden matrix cell; drive_chrome.py measures that, per destination,
+    // with the destination open. Do not read this one as what a reader sees.
     sig_markers_dom: n('.ma-sig, .ma-fv-sig, .ma-adv-sig, .ct-sig, .fn-sig-avg, .fn-sig'),
     // What a reader actually meets. Every category tab and every destination
     // is opened in turn and the word is counted in the VISIBLE text of the

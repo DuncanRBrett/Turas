@@ -27,6 +27,11 @@ ROOT_DN <- .find_root_destnav()
 source(file.path(ROOT_DN, "modules", "brand", "R", "01b_section_insights.R"))
 source(file.path(ROOT_DN, "modules", "brand", "lib", "html_report",
                  "03_page_builder.R"))
+# The authored-insight number check: Stage 5 made the leaf commentary box
+# conditional, and a flagged insight is one of the two things that still
+# renders it, so the marker builder is sourced here rather than skipped.
+source(file.path(ROOT_DN, "modules", "brand", "lib", "html_report",
+                 "03b_insight_number_check.R"))
 
 pos_dn <- function(html, needle) regexpr(needle, html, fixed = TRUE)[[1]]
 n_dn <- function(html, needle) {
@@ -583,4 +588,36 @@ test_that("a destination whose analyses are all Advanced still has its toggle", 
   expect_match(adv, "br-dest-pin", fixed = TRUE)
   expect_match(adv, "br-dest-png", fixed = TRUE)
   expect_match(adv, "br-dest-excel", fixed = TRUE)
+})
+
+test_that("a flagged insight still renders its box and its number-check marker", {
+  # The authored-insight number check writes a marker into the insight box.
+  # Stage 5 made the leaf box conditional, so the marker has to be one of the
+  # reasons a box renders: an insight the check flagged is exactly the one a
+  # reader must not lose. The IPK fixture flags nothing, so this drives the
+  # branch directly rather than waiting for a report that does.
+  skip_if_not(exists("brand_insight_check_note", mode = "function"),
+              "03b_insight_number_check.R is not sourced here")
+  check <- list(findings = list(
+    "ceps-dss" = list(figures = c("59%"), view = "the nested funnel")))
+  note <- brand_insight_check_note(check, "ceps-dss")
+  expect_true(nzchar(note))
+  expect_match(note, "br-insight-check", fixed = TRUE)
+
+  # With text and a finding, the box renders and carries the marker.
+  html <- build_br_section_toolbar(
+    "ceps-dss", prefill_text = "Prefer runs at 59%.",
+    check_note = note, require_text = TRUE)
+  expect_match(html, "br-insight-editor", fixed = TRUE)
+  expect_match(html, "br-insight-check", fixed = TRUE)
+  expect_match(html, "Prefer runs at 59%.", fixed = TRUE)
+
+  # A finding with no authored text is not a case the check can produce, but
+  # the marker alone is still enough to render the box rather than swallow it.
+  only_note <- build_br_section_toolbar("ceps-dss", check_note = note,
+                                        require_text = TRUE)
+  expect_match(only_note, "br-insight-check", fixed = TRUE)
+
+  # Nothing authored and nothing flagged: no box at all.
+  expect_equal(build_br_section_toolbar("ceps-dss", require_text = TRUE), "")
 })
