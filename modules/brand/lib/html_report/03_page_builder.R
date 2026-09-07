@@ -644,6 +644,43 @@ build_br_summary_panel <- function(results, config) {
   "audience_lens"   = "Audience Lens"
 )
 
+#' Display labels that change with the shape of the analysis
+#'
+#' Review finding F5. On an instrument that did not route the funnel
+#' questions the panel withholds the nested view, explains on its face that
+#' there is no funnel here, and then the leaf was still called Brand Funnel.
+#' The acceptance criterion was that the word appears only on a genuinely
+#' nested view.
+#'
+#' A label, not an identifier. \code{data-leaf}, \code{data-subpanel},
+#' \code{data-internal-tab}, the \code{funnel-<cat_id>} anchor and the
+#' \code{section-funnel-<cat_id>} id are all unchanged, because analysts have
+#' typed those into config workbooks and saved pins against them. The two are
+#' deliberately separate here and \code{test_destination_nav.R} proves no
+#' identifier is derived from a label.
+#'
+#' @keywords internal
+.BR_LEAF_LABELS_UNGATED <- list(
+  "fn-funnel" = "Brand Stages"
+)
+
+
+#' The reader-facing name of one leaf in one category
+#'
+#' @param key Character. The leaf key, e.g. "fn-funnel".
+#' @param cat_results List. The category's results, read for the funnel's
+#'   gating verdict only.
+#' @return Character scalar.
+#' @keywords internal
+.br_leaf_label <- function(key, cat_results = NULL) {
+  base <- .BR_LEAF_LABELS[[key]] %||% key
+  alt <- .BR_LEAF_LABELS_UNGATED[[key]]
+  if (is.null(alt)) return(base)
+  g <- cat_results$funnel$meta$gating
+  if (is.null(g) || isTRUE(g$gated)) return(base)
+  alt
+}
+
 
 #' One export toolbar for one destination view
 #'
@@ -1177,7 +1214,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                                                       with_extras = FALSE))
       for (j in seq_along(adv)) {
         lf  <- adv[[j]]
-        lbl <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
+        lbl <- .br_leaf_label(lf$key, cat_results)
         # Compact accordion: one researcher-grade analysis expanded at a
         # time (Duncan's ruling 7).
         open <- single || (main_empty && j == 1L)
@@ -1281,7 +1318,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   # for each anchor; taking it from an attribute keeps the "no identifier is
   # derived from a label, and no label from an identifier" rule that
   # test_destination_nav.R proves.
-  leaf_label <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
+  leaf_label <- .br_leaf_label(lf$key, cat_results)
   parts <- c(parts, sprintf(
     '<div class="br-subpanel active" data-group="%s" data-subpanel="%s" data-internal-tab="%s" data-cb-tab="%s" data-leaf="%s" data-leaf-label="%s">',
     cat_id, lf$sp, internal_tab, lf$cb, lf$key, .br_esc(leaf_label)))

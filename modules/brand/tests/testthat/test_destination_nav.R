@@ -142,6 +142,17 @@ fake_cat_results <- function(funnel = TRUE, ma = TRUE, rep = TRUE,
   out
 }
 
+# The same category, with a funnel the instrument did not gate. Only the
+# gating verdict differs, so anything that changes between the two renders is
+# the relabel and nothing else.
+.dn_ungated_results <- function(...) {
+  out <- fake_cat_results(...)
+  out$funnel <- list(status = "PASS",
+                     meta = list(gating = list(gated = FALSE,
+                                               mode = "separate")))
+  out
+}
+
 fake_panels <- function(keys) {
   out <- list()
   for (k in keys) out[[k]] <- sprintf('<div class="stub-panel">%s</div>', k)
@@ -297,6 +308,35 @@ test_that("no display label is used as, or derived into, a data-* value", {
   for (lb in labels) {
     expect_false(lb %in% vals, info = paste("label used as a data value:", lb))
   }
+})
+
+test_that("an ungated report does not call the leaf a funnel", {
+  # Review finding F5. The panel withholds the nested view on an instrument
+  # that did not route the questions, and says so on its face, so the leaf
+  # must not still be called Brand Funnel. The label changes; nothing else.
+  gated   <- render_cat()
+  ungated <- render_cat(cat_results = .dn_ungated_results())
+  expect_match(gated, 'data-leaf-label="Brand Funnel"', fixed = TRUE)
+  expect_false(grepl('data-leaf-label="Brand Funnel"', ungated, fixed = TRUE))
+  expect_match(ungated, 'data-leaf-label="Brand Stages"', fixed = TRUE)
+  # Every other leaf keeps its name.
+  expect_match(ungated, 'data-leaf-label="Brand Attitude"', fixed = TRUE)
+  expect_match(ungated, 'data-leaf-label="Category Context"', fixed = TRUE)
+})
+
+test_that("the ungated relabel moves no identifier and no anchor", {
+  # The values analysts have typed into config workbooks and saved pins
+  # against. Not one of them may move because a label did.
+  data_attrs <- c("data-destination", "data-leaf", "data-subpanel",
+                  "data-internal-tab", "data-cb-tab", "data-section",
+                  "data-group", "data-slot")
+  snap <- function(html) lapply(data_attrs, function(a) attr_vals_dn(html, a))
+  expect_equal(snap(render_cat(cat_results = .dn_ungated_results())),
+               snap(render_cat()))
+  ungated <- render_cat(cat_results = .dn_ungated_results())
+  expect_match(ungated, 'id="section-funnel-dss"', fixed = TRUE)
+  expect_match(ungated, 'data-section="funnel-dss"', fixed = TRUE)
+  expect_match(ungated, 'data-leaf="fn-funnel"', fixed = TRUE)
 })
 
 test_that("renaming every display label moves no identifier", {
