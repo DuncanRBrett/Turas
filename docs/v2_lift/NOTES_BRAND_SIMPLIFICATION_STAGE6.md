@@ -554,3 +554,46 @@ because a reviewer comparing the two reports will see it.
 both scratch fixtures into one directory, so nothing in this log depends on a
 recipe that lives only in a scratchpad. It reproduced 4,044,916 / 4,154,885 /
 4,154,908 bytes, the three reports every gate above was run against.
+
+## Two housekeeping notes for whoever reads the commits
+
+1. **`capture_artifacts.py` first landed one commit early.** It was written in
+   a parallel track while item 2 was being committed, so an in-progress
+   revision of it is inside `b8aa0411`, whose message does not mention it, and
+   its finished form is in `3b790868`. Nothing else in either commit is
+   affected. Read the file at the tip.
+2. **This branch is behind main by six commits**, all of them another
+   programme's work on `modules/shared/`, `scripts/` and `docs/disclosure/`
+   (composed report hardening, merged at `c415245d`). None touches
+   `modules/brand`. `git diff main..HEAD` therefore shows them as apparent
+   deletions; diff `e94c2b30..HEAD` instead, which is exactly thirteen files,
+   all under `modules/brand/` and `docs/v2_lift/`.
+
+## Final numbers, all executed in this session
+
+- Brand suite from the repo root, at the tip:
+  **FAIL 0, WARN 1, SKIP 2, PASS 3593**, against a baseline of 3560 with the
+  same 0 failures, 1 warning and 2 skips.
+- `generate_qa_reports.R` builds all three reports: committed **4,044,916**
+  bytes, extras **4,154,885**, ungated **4,154,908**.
+- Every script under `modules/brand/tests/qa/` run against all three, with
+  0 failures everywhere. The final sweep, run against the reports the
+  committed generator produced rather than against hand-built ones:
+
+      drive_chrome          125 / 150 / 152
+      drive_destinations    353 / 384 / 384
+      drive_funnel_base      99 /  99 /  79
+      drive_overview         60 /  60 /  58
+      drive_save_roundtrip  113 / 117 / 117
+      drive_two_categories   15 /  15 /  15
+      drive_element_flags     81 /  89 /  89
+      anchor_resolution      41 of 41 / 69 of 69 / 69 of 69
+      capture_artifacts      all artefacts, 1 known defect each
+
+- `reachability_check.py` on the committed fixture's report before this
+  stage's first edit and after its last: **PASS**, every island numerically
+  identical.
+- No em dash in any file this branch touched, checked file by file.
+
+**Not merged and not pushed.** Branch `feature/brand-qa`, five commits on top
+of `e94c2b30`.
