@@ -228,8 +228,14 @@ test_that("An ungated instrument reports ungated and names the stages", {
   expect_equal(g$mode, "separate")
   expect_true("consideration" %in% g$breach_stages)
   expect_true(any(c("bought_long", "bought_target") %in% g$breach_stages))
-  expect_true(grepl("did not route these questions", g$statement,
+  # The statement reports what was observed. It must not claim the
+  # questionnaire asked every question about every brand: one impossible row
+  # is enough to reach this branch, and that is not evidence of an
+  # instrument. See .funnel_gating_sentence().
+  expect_true(grepl("which routing would have made impossible", g$statement,
                     fixed = TRUE))
+  expect_false(grepl("asked every one of them about every brand", g$statement,
+                     fixed = TRUE))
   expect_true(grepl("nested funnel view is not offered", g$statement,
                     fixed = TRUE))
 })
@@ -303,8 +309,10 @@ test_that("The statement is on the face of the report in both modes", {
 
   expect_true(grepl('data-fn-gating="ungated"', ungated_html, fixed = TRUE))
   expect_true(grepl("Separate measures", ungated_html, fixed = TRUE))
-  expect_true(grepl("did not route these questions", ungated_html,
+  expect_true(grepl("which routing would have made impossible", ungated_html,
                     fixed = TRUE))
+  expect_false(grepl("asked every one of them about every brand",
+                     ungated_html, fixed = TRUE))
 })
 
 
@@ -335,6 +343,46 @@ test_that("A lone awareness breach does not mention purchase windows", {
                    .gt_cfg())$meta$gating$statement
   expect_true(grepl("did not name as known", st, fixed = TRUE))
   expect_false(grepl("shorter window", st, fixed = TRUE))
+})
+
+
+test_that("One breaching pair says so, and does not indict the instrument", {
+  # Review finding F3. One cleared cell in twelve hundred reaches this
+  # branch. The reader is owed the scale of what was found, so the sentence
+  # says the other pairs nested and stops claiming anything about how the
+  # questionnaire was written.
+  data <- .gt_data("gated")
+  data$BRANDATT1_DSS_IPK[5] <- "1"
+  st <- run_funnel(data, .gt_role_map(), .gt_brands(),
+                   .gt_cfg())$meta$gating$statement
+  expect_true(grepl("Every other pair of stages nested cleanly", st,
+                    fixed = TRUE))
+  expect_false(grepl("asked every one of them about every brand", st,
+                     fixed = TRUE))
+  expect_false(grepl("[0-9]", st))
+})
+
+
+test_that("The clean-pairs clause counts pairs, and vanishes when none is clean", {
+  # The ungated fixture breaches three of the four checked pairs, so exactly
+  # one is left and the clause reads in the singular.
+  st <- .gt_run("ungated")$meta$gating$statement
+  expect_true(grepl("The other pair of stages nested cleanly", st,
+                    fixed = TRUE))
+  # With every checked pair breaching there is nothing clean to report.
+  none_clean <- list(
+    gated = FALSE,
+    checked = data.frame(stage_key = c("consideration", "bought_long"),
+                         against = c("aware", "aware"),
+                         stringsAsFactors = FALSE),
+    breaches = data.frame(stage_key = c("consideration", "bought_long"),
+                          against = c("aware", "aware"),
+                          brand_code = c("IPK", "IPK"),
+                          n_respondents = c(3L, 4L),
+                          stringsAsFactors = FALSE))
+  expect_identical(.funnel_clean_pairs_clause(none_clean), "")
+  expect_false(grepl("nested cleanly",
+                     .funnel_gating_sentence(none_clean), fixed = TRUE))
 })
 
 
@@ -414,6 +462,8 @@ test_that("The About methodology note states the mode rather than refusing", {
   for (mode in c("gated", "ungated")) {
     note <- .gt_panel(mode)$about$methodology_note
     expect_false(grepl("refuses to render", note, fixed = TRUE), info = mode)
-    expect_true(grepl("route", note, fixed = TRUE), info = mode)
+    # "routed" when gated, "routing" when not: the note explains the routing
+    # question in both modes rather than refusing to say anything.
+    expect_true(grepl("rout", note, fixed = TRUE), info = mode)
   }
 })

@@ -300,6 +300,15 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
 #' of every JSON island, and this sentence rides in the funnel payload. The
 #' counts behind it go to the console and to the meta the operator reads, not
 #' into the island.
+#'
+#' The ungated half reports the observation, not a conclusion about the
+#' instrument. detect_instrument_gating() turns separate on the first
+#' impossible respondent row, on one pair, for one brand, which is Duncan's
+#' ruling and is right for the drawing decision. It is not enough to tell a
+#' client the questionnaire asked every question about every brand, which is
+#' what this sentence used to assert from one cleared cell in twelve hundred.
+#' So the sentence names the breaches that were seen, says the other pairs
+#' nested, and stops there.
 #' @keywords internal
 .funnel_gating_sentence <- function(gating) {
   if (isTRUE(gating$gated)) {
@@ -318,13 +327,34 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
     paste0(paste(phrases[-length(phrases)], collapse = "; "),
            "; and ", phrases[length(phrases)])
   paste0(
-    "The questionnaire did not route these questions: it asked every one of ",
-    "them about every brand. Respondents gave ", listed,
-    ", which routing would have made impossible. So the stages are reported ",
-    "as separate measures, each on its own base, with the conversion ratios ",
-    "available through the base toggle above the table. The nested funnel ",
-    "view is not offered here, because a nested picture would show an ",
-    "ordering the survey never enforced.")
+    "Respondents gave ", listed, ", which routing would have made ",
+    "impossible. ", .funnel_clean_pairs_clause(gating),
+    "So the stages are reported as separate measures, each on its own base, ",
+    "with the conversion ratios available through the base toggle above the ",
+    "table. The nested funnel view is not offered here, because a nested ",
+    "picture would show an ordering the survey never enforced.")
+}
+
+
+#' The clause naming the pairs that nested cleanly, or "" when none did
+#'
+#' A single breaching row on one pair puts the whole category onto separate
+#' measures, so the reader is owed the scale of what was found. Digit free,
+#' like the sentence it sits in: it says every other pair nested, not how
+#' many.
+#' @keywords internal
+.funnel_clean_pairs_clause <- function(gating) {
+  checked <- gating$checked
+  if (is.null(checked) || !is.data.frame(checked) || nrow(checked) == 0)
+    return("")
+  b <- gating$breaches
+  breached <- if (is.null(b) || nrow(b) == 0) character(0) else
+    unique(paste(b$stage_key, b$against, sep = "\r"))
+  clean <- sum(!(paste(checked$stage_key, checked$against, sep = "\r") %in%
+                   breached))
+  if (clean == 0) return("")
+  if (clean == 1) return("The other pair of stages nested cleanly. ")
+  "Every other pair of stages nested cleanly. "
 }
 
 
@@ -375,8 +405,11 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
   if (isTRUE(gating$gated)) return(invisible(FALSE))
   cat("\n=== TURAS BRAND: FUNNEL NOT GATED ===\n")
   cat("Category:", cat_code %||% "(single category)", "\n")
-  cat("The questionnaire asked the funnel questions of everyone, so the",
-      "stages do not nest.\n")
+  cat("Respondents sit at a later stage without the earlier one, which",
+      "routing would have made impossible, so the stages cannot be nested.\n")
+  cat("Counts below. A small count on one pair may be a cleaning artefact",
+      "rather than an unrouted questionnaire, and is worth a look before",
+      "the report goes out.\n")
   cat("Respondents at a later stage without the earlier one:\n")
   b <- gating$breaches
   agg <- stats::aggregate(b$n_respondents,
