@@ -194,3 +194,231 @@ The `launch_turas()` run on the real four-category project, the Excel export rul
 ## 8. Reproducing this review
 
 Scratch scripts were written in the session scratchpad and are not committed: `probe_insight_ungated.R`, `probe_consideration.R`, `probe_gating_flip.R`, `probe_hidden_pin.py`. Each is described closely enough above to rewrite in a few minutes; the F2 probe needs headless Chrome, a copy of `extras.html`, and the harness boot pattern from `drive_chrome.py` (inject before the last `</body>`, wait for `load`, 1.5 s timer, 40 s virtual time budget, `--dump-dom`).
+
+---
+
+# Appendix: what was done about F1, F2, F3 and F5
+
+**Date:** 7 September 2026. **Branch:** `fix/brand-review-findings`, cut from
+main at `903907ef` in the worktree `/Users/duncan/Dev/Turas-review`. Five
+commits, `83380b05` to `5f5c873d`. Not merged, not pushed.
+
+Written by the session that fixed them, appended rather than woven into the
+reviewer's text, so the record shows what was found and then what was done.
+F4, F6 and F7 were left alone by instruction: F4 is Duncan's call, F6 is
+being handled on `fix/brand-excel-export`, F7 is a console note.
+
+Reports were regenerated into a session scratchpad only. The real IPK config
+was not touched, nothing was written into OneDrive or TurasProjects, and
+`preview_start` was not used.
+
+## Baseline, reproduced first
+
+`testthat::test_dir("modules/brand/tests/testthat")` from the repository root
+at `903907ef`: **FAIL 0, WARN 1, SKIP 2, PASS 3593**. The three reports built
+at 4,047,002 / 4,156,971 / 4,156,994 bytes, the same three figures the review
+and the handover record.
+
+## F1. The insight number check now reads the view the page opens on
+
+`.fn_chain_denom()` in `panels/03_funnel_panel_table.R` is the one place that
+decides whether a report opens on the nested chain or on each stage on its
+own. `build_funnel_table_section()` and `.bin_funnel_pool()` both go through
+it, so the rule cannot reach one and miss the other, which is what the review
+asked for. The pool then follows `.fn_cell_html()` and `.fn_row_avg_all()`
+value for value, including their fallback to the absolute figure, and returns
+the view it really stands on rather than the meta's verdict, so a gated report
+whose chain counts are missing is described correctly too.
+
+Proved by execution on the QA fixtures, not on the synthetic test data. The
+extras and ungated fixtures share a dataset but for twenty-five cleared
+awareness cells, so one pair of sentences discriminates on both.
+
+| Fixture | Sentence | Before | After |
+|---|---|---|---|
+| extras, gated. Opens on the nested chain 92 / 67 / 45 / 32 | "known to 92%, considered by 67%, past 12 months 45%, past 3 months 32%" | passes | **passes** |
+| extras, gated | "... 92%, 67%, **62%**, 45%", the absolute series | flagged 62 | **flagged 62** |
+| ungated. Opens on each stage on its own, 87 / 67 / 62 / 45 | "... 87%, 67%, 62%, 45%", what the page shows | **flagged 62** | **passes** |
+| ungated | "... 87%, **63%**, **41%**, 30%", the chain the panel withholds | passes | **flagged 63, 41** |
+
+The marker text follows: "each stage on its own, the view this page opens on"
+on an ungated report, "the nested funnel" on a gated one.
+
+Regression coverage in `test_insight_number_check.R`: six new tests, and with
+`.bin_funnel_pool()` reverted to reading `n_weighted` unconditionally, ten
+assertions fail. `.bin_funnel_pool()` now returns `pool` and `gated` rather
+than a bare vector, so three existing call sites in that file gained `$pool`.
+One existing fixture, the funnel "whose panel table cannot be built", had its
+percentage columns cleared as well as its chain counts: leaving the absolute
+figures in reconstructs the absolute view, which is what the page would then
+show, and the pool is right to hold it.
+
+## F2. Drawer pin titles
+
+Two faults, both fixed, and the distinction between them is where the hiding
+lives. `brHeadingHiddenWithin()` in `brand_report.js` asks whether a pane
+**inside the capture root** is hiding the heading, rather than whether the
+reader can see it at that instant. A drawer shut above the root hides the root
+and its heading together, and that heading is still the name of what is being
+captured; the funnel's Summary sub-tab carries `hidden` between the root and
+the heading, so it stays out. `captureFromRoot()` in `brand_pins.js` calls the
+same function, so the picker's label and the card's title cannot disagree.
+`pinnableContent()` now takes the picker's title whenever it has one, which
+puts the category back on a Category Buying card.
+
+Verified by driving the picker in headless Chrome with the drawers exactly as
+the page opens them, and reading the titles off `TurasPins.getAll()`.
+
+| Scope, drawers shut | Tip `903907ef` | This branch |
+|---|---|---|
+| Brand Meaning drawer, seven entries | seven cards all "Branded Reach" | "Branded Reach: Dry Seasonings & Spices", then asset A and asset B three times each. Three distinct names, which is base parity: the two assets carry one heading each across their overview, misattribution and media anchors |
+| Audience drawer, six entries | six cards all "Audience Lens" | "Audience Lens: Dry Seasonings & Spices", "Audience banner: Dry Seasonings & Spices", the two audience cards and the pair card, six distinct |
+| Category Buying drawer, five entries | no category on any card | every card carries "Dry Seasonings & Spices" |
+| Brand and Buying main | "Brand Summary" without its category | "Brand Summary: Dry Seasonings & Spices" |
+| The funnel card | "Brand Funnel" | "Brand Funnel" gated, "Brand Stages" ungated. Still no card named "Summary" anywhere |
+
+The review's base column said seven distinct names in the Brand Meaning
+drawer. The markup does not support that: `br-reach-dss-qaa1-overview` and
+`br-reach-dss-qaa1-misattribution` carry the identical `<h3>`, and the base
+took the first heading with no visibility test, so it produced three distinct
+names too. Three is the bar, and three is what came back.
+
+`modules/brand/tests/qa/drive_pin_titles.py` is the permanent gate. It reads
+the funnel card's expected name off the host's own `data-leaf-label` rather
+than hardcoding a string, so it passes on both the gated and the ungated
+report. On the pre-fix report it reports **15 failures**; on the three reports
+built from this branch, **0 of 60, 0 of 93 and 0 of 93**.
+
+## F3. The ungated statement
+
+The detection is untouched, as instructed. The sentence dropped "it asked
+every one of them about every brand" and now reports what was observed, names
+the pairs that nested cleanly, and stops. Still digit free, so the island gate
+stays exact. As rendered on the ungated report:
+
+> Respondents gave an answer at the Consider stage for a brand they did not
+> name as known; an answer at the Long Period stage for a brand they did not
+> name as known; and an answer at the Target Period stage for a brand they did
+> not name as known, which routing would have made impossible. The other pair
+> of stages nested cleanly. So the stages are reported as separate measures,
+> each on its own base, with the conversion ratios available through the base
+> toggle above the table. The nested funnel view is not offered here, because
+> a nested picture would show an ordering the survey never enforced.
+
+Three of the four checked pairs breach on that fixture, so the clause reads in
+the singular. Two new tests cover the one-breaching-pair case (the review's
+own single cleared cell, which now yields "Every other pair of stages nested
+cleanly") and the no-clean-pair case, where the clause vanishes. The console
+box dropped "of everyone" and gained a line saying a small count on one pair
+may be a cleaning artefact worth a look before the report goes out.
+
+## F5. The leaf on an ungated report
+
+`.BR_LEAF_LABELS_UNGATED` renames only `fn-funnel`, and only where the funnel
+result says the instrument did not gate. The leaf reads **"Brand Stages"**.
+"Aware to Purchase" was considered and rejected: the stage plan differs by
+`category.type`, so only a neutral name is right for transactional, durable
+and service alike.
+
+Nothing else moved. A test snapshots every `data-destination`, `data-leaf`,
+`data-subpanel`, `data-internal-tab`, `data-cb-tab`, `data-section`,
+`data-group` and `data-slot` value across the gated and the ungated render and
+asserts they are equal, and `anchor_resolution.py` still resolves 69 of 69 on
+the ungated report. The pin picker on the ungated report offers "Brand Stages
+| Category Context | Brand Summary" and the card that lands is "Brand Stages",
+read off the pinned-views screenshot.
+
+## The gates, rerun
+
+Every script under `modules/brand/tests/qa/` on all three reports, from the
+worktree root with `TURAS_ROOT` set to it.
+
+| Gate | committed | extras | ungated |
+|---|---|---|---|
+| `drive_element_flags.R` | 81, 0 failed | 89, 0 | 89, 0 |
+| `drive_destinations.py` | 353, 0 | 384, 0 | 384, 0 |
+| `drive_chrome.py` | 125, 0 | 150, 0 | 152, 0 |
+| `drive_save_roundtrip.py` | 113, 0 | 117, 0 | 117, 0 |
+| `drive_overview.py` | 60, 0 | 60, 0 | 58, 0 |
+| `drive_funnel_base.py` | 99, 0 | 99, 0 | 79, 0 |
+| `drive_two_categories.py` | 15, 0 | 15, 0 | 15, 0 |
+| `drive_pin_titles.py`, new | 60, 0 | 93, 0 | 93, 0 |
+| `anchor_resolution.py`, base to tip | 41 of 41 | 69 of 69 | 69 of 69 |
+| `reachability_check.py`, base to tip | PASS | PASS | PASS |
+
+Every count matches the handover's, so nothing that was passing stopped.
+
+`count_chrome.py`: committed 25 pin, 17 PNG, 16 Excel, 14 textareas, 5 visible
+significance strings, 5 toolbars, 5 drawers. Extras and ungated 38 / 30 / 18 /
+17 / 5 / 7 / 6, with 311 significance markers in the ungated DOM against 276.
+Identical to the tip.
+
+`capture_artifacts.py` on the committed report: picker offers Brand Funnel,
+Category Context, Brand Summary and the card reads "Brand Funnel"; on the
+ungated report, Brand Stages, Category Context, Brand Summary and the card
+reads "Brand Stages". One defect, unchanged and not this branch's: the PNG
+control writes JPEG bytes under a `.png` name, which is handover gap 2 and
+lives in `modules/shared/`.
+
+The brand suite from the repository root: **FAIL 0, WARN 1, SKIP 2, PASS
+3638**, against the 3593 baseline. The one warning and two skips are the
+pre-existing ones. Reports built at 4,049,963 / 4,159,932 / 4,159,847 bytes.
+
+## Choices made, rather than asked
+
+- **"Brand Stages"** for the ungated funnel leaf, over "Aware to Purchase",
+  for the category-type reason above.
+- **`test_funnel_gating.R`'s methodology-note assertion** was loosened from
+  `"route"` to `"rout"`. The gated statement says "routed", the new ungated one
+  says "routing"; the test's intent, that the note explains the routing
+  question rather than refusing to say anything, is unchanged.
+- **The console box gained a line** about a small count on one pair possibly
+  being a cleaning artefact. Beyond the literal brief, but the console is where
+  the operator would act on it and the page text has to stay digit free.
+- **`reachability_check.py` now drops `generated_at`** before counting
+  numbers. The Audience Lens island carries a timestamp, so two reports built a
+  minute apart failed the gate on a clock. It only ever passed because the
+  handover ran it on the committed report, which has no Audience Lens. Before
+  the change the extras and ungated pairs failed with `al-panel-data: NUMERIC
+  CONTENT DIFFERS`, and the two islands were byte-identical but for
+  `generated_at`.
+
+## Observations, not fixed
+
+- **A third copy of the gating expression.** `.fn_chain_denom()` unified the
+  table and the pool, which is what the brief scoped. `14_summary_panel.R` line
+  994 still writes `is.null(fn$meta$gating) || isTRUE(fn$meta$gating$gated)` for
+  the Overview's mini funnel. It is correct today and routing it through the
+  helper would put a new cross-file dependency into a file this branch has no
+  other reason to touch. Worth folding in when someone is next in there.
+- **The ungated cell prints a percentage and a count from different views.**
+  On the ungated report IPK's past-12-months cell reads 62%, which is
+  273 / 438, under `n=181`, which is the chained count.
+  `.fn_cell_html()` takes the count from `base_chain_unweighted` whenever it is
+  finite, without asking whether the chain is being drawn, while the percentage
+  falls back to the absolute figure. The pool mirrors the cell, so F1 is not
+  affected either way. Changing it changes a number on a client-facing page and
+  was out of scope here.
+- **"Funnel" survives elsewhere on the ungated page** after the leaf rename:
+  the "Mini Funnels" heading inside the funnel view, the glossary's "Brand
+  Funnel" section in the About tab, the "may differ from the Brand Funnel by
+  1 to 3pp" note on the Category Buying panel, the two chart `aria-label`
+  values, and the Audience Lens banner group label "Funnel & Equity". The
+  hidden `.fn-subnav` buttons and Summary cards the review listed are still
+  hidden. None of them names the leaf, which is what the brief scoped; a full
+  sweep is a separate decision.
+- **The fixture's own authored funnel insight is not flagged in either mode.**
+  It quotes 92 / 67 / 45 / 32 and passes on the gated and the ungated report
+  alike, because the section pool spans eighteen brands and covers most of the
+  range. So neither rendered report carries a `br-insight-check` marker, before
+  or after, and the F1 table above is the discriminating evidence rather than a
+  marker appearing or disappearing in the HTML.
+
+## Not done, and not verified
+
+- No `launch_turas()` run on a real project. That is still Duncan's, and it is
+  the one thing that would put the ungated wording, the "Brand Stages" leaf and
+  the pin titles in front of a human on a four-category study.
+- The intermediate suite baselines 2542, 2740, 3047, 3077, 3247, 3486 are still
+  unverified here, as in the review.
+- Nothing was run on weighted data.
