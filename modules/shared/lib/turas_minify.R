@@ -542,6 +542,57 @@
 }
 
 
+#' Catch a page that is carried as an island but was never marked
+#'
+#' The gate below (`.minify_leaked_top_level_names`) protects the careful case:
+#' someone marked the island, and the page inside it turns out not to be
+#' wrapped. This protects the forgetful one, which is the likelier failure on
+#' the next composed report and was how the VAS report shipped readable in the
+#' first place. Without this, a composing step that omits
+#' `data-embed="document"` produces a deliverable carrying whole pages with
+#' their comments and function names intact, and nothing anywhere says so.
+#'
+#' Confirmed by building exactly that on 7 September 2026: a deliverable came
+#' back PASS-with-one-unrelated-warning, zero islands hardened, and the embedded
+#' page's `computeTheThing` and `SECRETDATA` sitting in the output.
+#'
+#' Three conditions together, so this cannot fire on ordinary data. The body has
+#' to parse as a single JSON string, that string has to open as an HTML
+#' document, and it has to contain a script. A manifest, a table island or a
+#' user-state island fails the first test, because none of them is a bare
+#' string.
+#'
+#' @param html The HTML string.
+#' @param verbose Unused, kept for symmetry with its callers.
+#' @return Character vector of offending island ids, empty when clean.
+#' @keywords internal
+.minify_unmarked_document_islands <- function(html, verbose = FALSE) {
+  if (!requireNamespace("jsonlite", quietly = TRUE)) return(character(0))
+  blocks <- .minify_extract_blocks(html, "script")
+  hits <- character(0)
+  for (b in blocks) {
+    if (!identical(b$type, "application/json")) next
+    # Already marked, so step 2c handles it.
+    if (grepl("data-embed\\s*=\\s*[\"\']document[\"\']", b$open_tag, perl = TRUE)) next
+    # Already encoded by step 8c on an earlier pass: the body is base64 and
+    # cannot be read as a document without the key.
+    if (grepl("data-k\\s*=", b$open_tag, perl = TRUE)) next
+    body <- trimws(b$content)
+    if (!nzchar(body) || identical(body, "null")) next
+    # Cheap reject before the parse. A document island's body is a JSON string,
+    # so it starts with a quote; a manifest starts with { or [.
+    if (substr(body, 1L, 1L) != '"') next
+    inner <- tryCatch(jsonlite::fromJSON(body), error = function(e) NULL)
+    if (is.null(inner) || !is.character(inner) || length(inner) != 1L) next
+    if (!grepl("<!doctype", inner, ignore.case = TRUE) &&
+        !grepl("<html", inner, fixed = TRUE)) next
+    if (!grepl("<script", inner, fixed = TRUE)) next
+    hits <- c(hits, .minify_block_id(b$open_tag))
+  }
+  hits
+}
+
+
 #' Harden every embedded document carried as a marked island
 #'
 #' Recurses into turas_minify() exactly as .minify_harden_srcdoc() does, then
@@ -1722,6 +1773,38 @@ turas_minify <- function(input_path,
   island_docs_hardened <- 0L
   island_doc_obfuscated <- FALSE
   if (isTRUE(deliverable)) {
+    # First, the islands nobody marked. This runs before the marked ones and
+    # regardless of whether there are any, because the failure it catches is a
+    # composing step that marked NOTHING, where the marked path has nothing to
+    # do and would return silently. See .minify_unmarked_document_islands().
+    unmarked <- .minify_unmarked_document_islands(html)
+    if (length(unmarked) > 0L) {
+      msg <- sprintf(
+        "%d island(s) carry a whole HTML page but are not marked data-embed=\"document\": %s",
+        length(unmarked), paste(utils::head(unmarked, 8L), collapse = ", "))
+      fix <- c(
+        "Add data-embed=\"document\" to those islands in the step that composes the report",
+        "Without it the page inside ships readable: its comments, and every name it declares",
+        "If the island really is data and not a page, this is a bug worth reporting")
+      cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+      cat("| Context:    Minify, embedded document island\n")
+      cat("| Code:       CALC_MINIFY_ISLAND_DOC_UNMARKED\n")
+      cat("| Message:   ", msg, "\n")
+      for (fx in fix) cat("| How to fix:", fx, "\n")
+      cat("+-------------------------------------------------------------+\n\n")
+      turas_refuse(
+        code = "CALC_MINIFY_ISLAND_DOC_UNMARKED",
+        title = "A page is being shipped inside an island without being hardened",
+        problem = msg,
+        why_it_matters = paste(
+          "The deliverable would carry whole pages in plain sight inside a file",
+          "that is otherwise hardened. That is exactly how the VAS integrated",
+          "report shipped sixty-five readable references to its own internals."),
+        how_to_fix = fix,
+        module = "MINIFY"
+      )
+    }
+
     idoc <- .minify_harden_document_islands(
       html,
       opts = list(strip_meta = strip_meta, minify_js = minify_js,

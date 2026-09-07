@@ -433,3 +433,43 @@ Not verified, and left to Duncan's run:
   templates carry the wrapper now, so step 2 through step 6 will regenerate them
   wrapped on the next run. Until that run, a build would refuse, which is the
   gate doing its job.
+
+
+---
+
+## The gap that was closed afterwards, 7 September 2026
+
+The gate described in section 4 protects the careful case: an island was marked,
+and the page inside turns out not to be wrapped. It does nothing for the
+forgetful one. A composing step that marks NOTHING gives the marked path nothing
+to do, and it returns quietly.
+
+That is not hypothetical. I built exactly that case: a deliverable came back
+PASS with one unrelated warning, zero islands hardened, and the embedded page's
+`computeTheThing` and `SECRETDATA` sitting readable in the output. It is the
+same failure the whole job was about, and it would have come back on the next
+composed report that omitted one attribute.
+
+So step 2c now looks at unmarked islands too, before it hardens the marked ones,
+and refuses a deliverable that carries a page in an unmarked island. Three
+conditions have to hold together, which keeps it off ordinary data: the body
+parses as a single JSON string, that string opens as an HTML document, and it
+contains a script. A manifest, a table island and a user-state island all fail
+the first test, because none of them is a bare string. Islands already carrying
+`data-k` are skipped, so re-running a minify over a finished file cannot refuse.
+
+Checked against the real delivered report: nineteen marked, zero unmarked. The
+new refusal would not have blocked the build that shipped.
+
+That takes the four rules for a composed report from three enforced to four:
+
+| Rule | Enforced by |
+|---|---|
+| Compose from the `_dev` copy | the composing step refuses a hardened input |
+| Mark each embedded page | `CALC_MINIFY_ISLAND_DOC_UNMARKED` |
+| Wrap each page's script | `CALC_MINIFY_ISLAND_NAMES_LEAKED` |
+| Harden last, and refuse rather than write | the CLI's exit code |
+
+The first is VAS-specific today, because it lives in
+`build_vas_integrated_report.py`. The other three are generic and apply to any
+composed report without further work.

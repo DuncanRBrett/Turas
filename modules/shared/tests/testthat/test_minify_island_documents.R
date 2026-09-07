@@ -8,13 +8,17 @@
 # never saw them and step 6b skips application/json by design. They shipped
 # readable inside a file that was otherwise hardened.
 #
-# These tests cover the two halves of the fix:
+# These tests cover three things:
 #   1. a marked island is hardened, and its payload still decodes to the page
 #   2. a page whose script is NOT wrapped is caught rather than shipped
+#   3. a page that was never marked at all is caught rather than shipped
 #
-# The second is the one that matters. Hardening an unwrapped page LOOKS like it
-# worked (comments go, the core scrambles) while every function name survives,
-# because the obfuscator runs with renameGlobals false by design.
+# The last two are the ones that matter, and they cover the two ways this can
+# look like it worked when it did not. Hardening an unwrapped page strips its
+# comments and scrambles the core while leaving every function name, because the
+# obfuscator runs with renameGlobals false by design. And an unmarked island is
+# not hardened at all, silently, which is how the VAS report shipped in the
+# first place.
 # ==============================================================================
 
 library(testthat)
@@ -349,4 +353,87 @@ test_that("a report with no marked islands is untouched by step 2c", {
 
   expect_equal(res$island_documents_hardened, 0L)
   expect_true(grepl('"a"', .read(out), fixed = TRUE))
+})
+
+
+# -- 7. The island nobody marked ----------------------------------------------
+# The gate in section 4 protects the careful case: marked, but the page inside
+# is not wrapped. This protects the forgetful one, which is likelier on the next
+# composed report and is how VAS shipped readable in the first place.
+
+test_that("an unmarked island carrying a page refuses the deliverable", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(.has_obf(), "javascript-obfuscator not available")
+
+  input <- .write_tmp(.composed_html(wrapped = TRUE, marker = ""))
+  out <- tempfile(fileext = ".html")
+
+  err <- tryCatch({
+    turas_minify(input, output_path = out, deliverable = TRUE, verbose = FALSE)
+    NULL
+  }, turas_refusal = function(e) e, error = function(e) e)
+
+  expect_false(is.null(err))
+  expect_true(grepl("CALC_MINIFY_ISLAND_DOC_UNMARKED", conditionMessage(err),
+                    fixed = TRUE))
+  # It has to name the island, or nobody can act on it.
+  expect_true(grepl("page-bills", conditionMessage(err), fixed = TRUE))
+})
+
+test_that("the unmarked check does not fire on ordinary data islands", {
+  # A manifest, a table island and a user-state island are all objects or
+  # arrays, not bare strings, so none of them can be mistaken for a page.
+  html <- paste0(
+    '<!DOCTYPE html>\n<html><head><title>C</title></head><body>\n',
+    '<script type="application/json" id="manifest">',
+    '{"sections":[{"key":"a","html":"<html><script>x<\\/script><\\/html>"}]}',
+    '</script>\n',
+    '<script type="application/json" id="rows">[1,2,3]</script>\n',
+    '<script type="application/json" id="user-state">null</script>\n',
+    '<script type="application/json" id="empty"></script>\n',
+    '</body></html>\n')
+  expect_length(.minify_unmarked_document_islands(html), 0L)
+})
+
+test_that("the unmarked check does not fire on a string that is not a page", {
+  # A verbatim comment quoting markup is a JSON string, but it is not a
+  # document and carries no script.
+  html <- paste0(
+    '<!DOCTYPE html>\n<html><head><title>C</title></head><body>\n',
+    '<script type="application/json" id="verbatim">',
+    '"They said <b>the app<\\/b> was slow"</script>\n',
+    '</body></html>\n')
+  expect_length(.minify_unmarked_document_islands(html), 0L)
+})
+
+test_that("the unmarked check skips islands the other two mechanisms own", {
+  page <- .island_page(TRUE)
+  payload <- gsub("</", "<\\\\/",
+                  as.character(jsonlite::toJSON(page, auto_unbox = TRUE)),
+                  fixed = TRUE)
+  # Marked for step 2c: that path handles it, so this must stay quiet.
+  marked <- paste0('<!DOCTYPE html><html><head><title>C</title></head><body>',
+                   '<script type="application/json" id="m" data-embed="document">',
+                   payload, '</script></body></html>')
+  expect_length(.minify_unmarked_document_islands(marked), 0L)
+
+  # Already encoded by step 8c: the body is base64 and cannot be read as a
+  # document, so re-running a minify over a finished file must not refuse.
+  encoded <- paste0('<!DOCTYPE html><html><head><title>C</title></head><body>',
+                    '<script type="application/json" id="e" data-island="v2" data-k="42">',
+                    'd2hhdGV2ZXI=</script></body></html>')
+  expect_length(.minify_unmarked_document_islands(encoded), 0L)
+})
+
+test_that("a development build is not refused for an unmarked island", {
+  skip_if_not(.has_terser(), "terser not available")
+
+  # Step 2c does not run at all without deliverable = TRUE, and a dev copy is
+  # not a client file, so there is nothing here to protect.
+  input <- .write_tmp(.composed_html(wrapped = TRUE, marker = ""))
+  out <- tempfile(fileext = ".html")
+  res <- turas_minify(input, output_path = out, deliverable = FALSE,
+                      verbose = FALSE)
+  expect_equal(res$island_documents_hardened, 0L)
+  expect_true(file.exists(out))
 })
