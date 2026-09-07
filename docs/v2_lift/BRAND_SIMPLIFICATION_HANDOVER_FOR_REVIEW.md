@@ -4,7 +4,7 @@
 briefed as independent of the six sessions that built this.
 **Branch under review:** `feature/brand-qa`, in the worktree
 `/Users/duncan/Dev/Turas-brand-simplify`, cut from main at `e94c2b30`.
-Stages 1 to 5 are already merged into main; Stage 6 is the five commits on
+Stages 1 to 5 are already merged into main; Stage 6 is every commit on
 this branch. Nothing is merged and nothing is pushed.
 
 **The branch is behind main by six commits**, all of them another programme's

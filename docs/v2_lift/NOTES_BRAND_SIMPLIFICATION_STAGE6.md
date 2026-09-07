@@ -566,7 +566,7 @@ recipe that lives only in a scratchpad. It reproduced 4,044,916 / 4,154,885 /
    programme's work on `modules/shared/`, `scripts/` and `docs/disclosure/`
    (composed report hardening, merged at `c415245d`). None touches
    `modules/brand`. `git diff main..HEAD` therefore shows them as apparent
-   deletions; diff `e94c2b30..HEAD` instead, which is exactly thirteen files,
+   deletions; diff `e94c2b30..HEAD` instead, which is exactly the thirteen files listed by that command,
    all under `modules/brand/` and `docs/v2_lift/`.
 
 ## Final numbers, all executed in this session
@@ -595,5 +595,5 @@ recipe that lives only in a scratchpad. It reproduced 4,044,916 / 4,154,885 /
   identical.
 - No em dash in any file this branch touched, checked file by file.
 
-**Not merged and not pushed.** Branch `feature/brand-qa`, five commits on top
+**Not merged and not pushed.** Branch `feature/brand-qa`, six commits on top
 of `e94c2b30`.
