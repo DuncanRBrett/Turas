@@ -625,11 +625,22 @@ This is a Stage 5 side effect, and the trade it made was a good one: before
 decision 6 those anchors resolved onto a toolbar and captured **nothing**.
 Stage 5 fixed the capture and inherited the title.
 
-**Fixed, in two parts.** `captureFromRoot()` now skips headings a reader
-cannot see, because a hidden heading is not the name of anything; and with no
-visible heading it falls back to `data-leaf-label`, the reader-facing analysis
-name the Advanced accordion and the pin picker already show, before falling
-through to the anchor id.
+**Fixed, in three parts.** `captureFromRoot()` in `brand_pins.js` now skips
+headings a reader cannot see, because a hidden heading is not the name of
+anything; with no visible heading it falls back to `data-leaf-label`, the
+reader-facing analysis name the Advanced accordion already shows, before
+falling through to the anchor id; and `sectionsIn()` in `brand_report.js`, the
+picker's own label builder, had the identical bug and got the identical fix.
+
+**The third part was found by re-running the capture script rather than by
+reading the diff.** After the first two, the card was right and the picker
+still offered "Summary" followed by a circle, so a reader chose one name and
+got another. It now offers:
+
+    Brand Funnel | Category Context | Brand Summary
+
+and the card that lands is titled **Brand Funnel**, confirmed by opening the
+screenshot.
 
 Pinning five anchors after the fix, read out of the Pinned Views tab:
 
@@ -658,7 +669,7 @@ why the document listener never reached them.
 
 Everything above was run again against reports built from the tip.
 
-    committed 4,046,310 bytes   extras 4,156,279   ungated 4,156,302
+    committed 4,047,002 bytes   extras 4,156,971   ungated 4,156,994
 
     drive_chrome          125 / 150 / 152      0 failed
     drive_destinations    353 / 384 / 384      0 failed

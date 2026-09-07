@@ -534,7 +534,18 @@
       if (!key || seen[key]) return;
       if (!hasCapturable(el)) return;
       seen[key] = true;
-      var title = el.querySelector(".br-element-title, h2, h3");
+      // Only a heading a reader can see names an entry. The anchors sit on a
+      // wrapper around the whole leaf, so the first heading under one can
+      // belong to a hidden sub-tab: on the funnel it is the Summary sub-tab
+      // that no nav routes to and .fn-subnav hides by CSS, which had the
+      // picker offering "Summary" for the Brand Funnel. captureFromRoot() in
+      // brand_pins.js skips hidden headings for the same reason, and the two
+      // must agree or the picker names one thing and the card another.
+      var title = null;
+      var heads = el.querySelectorAll(".br-element-title, h2, h3");
+      for (var hi = 0; hi < heads.length; hi++) {
+        if (heads[hi].offsetParent !== null) { title = heads[hi]; break; }
+      }
       var host  = el.closest("[data-leaf-label]");
       var label = (title && title.textContent.trim()) ||
                   (host && host.getAttribute("data-leaf-label")) || key;

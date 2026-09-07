@@ -168,11 +168,14 @@ Summary sub-tab that no nav routes to and `.fn-subnav` hides by CSS, which
 impact map section 4 records as dead in the report as shipped. `repertoire-dss`,
 which has no heading at all, produced a card titled with its raw anchor id.
 
-Fixed: hidden headings are skipped, and with none visible the card takes
-`data-leaf-label`, the analysis name the picker and the Advanced accordion
-already show. Five anchors pinned after the fix give Brand Funnel, Category
-Context, Category Entry Points, Headline Metrics and Brand Attributes, all
-five carrying a table.
+Fixed in three places: hidden headings are skipped, with none visible the
+card takes `data-leaf-label`, and `sectionsIn()` in `brand_report.js`, which
+builds the picker's own labels, had the identical bug and got the identical
+fix. That third one was found by re-running the capture script, not by reading
+the diff: after the first two the card was right and the picker still offered
+"Summary", so a reader chose one name and got another. The picker now offers
+Brand Funnel, Category Context and Brand Summary, and the card that lands is
+titled Brand Funnel.
 
 **What a reviewer should check:** whether skipping invisible headings loses a
 title anywhere a heading is legitimately hidden at capture time, for instance
@@ -226,7 +229,7 @@ pre-existing and named in the run output.
 | before Stage 5 | 4,024,208 | main moved under it |
 | after Stage 5 | 4,044,194 | destination toolbars and drawers |
 | Stage 6, after the tab-bar fix | 4,044,194 | **unchanged**; only the timestamp line differs |
-| Stage 6, at the tip | 4,046,310 | +2,116 bytes, the popover and pin-title fixes and their comments |
+| Stage 6, at the tip | 4,047,002 | +2,808 bytes, the popover and pin-title fixes and their comments |
 
 **Nothing in Stage 6 changed a number in the report.**
 `reachability_check.py` on the pre-edit and post-edit reports of the committed
@@ -367,8 +370,8 @@ minutes.
 
     Rscript -e 'testthat::test_dir("modules/brand/tests/testthat")'
 
-**Build the three reports.** About 35 seconds. Expect 4,046,310 /
-4,156,279 / 4,156,302 bytes.
+**Build the three reports.** About 35 seconds. Expect 4,047,002 /
+4,156,971 / 4,156,994 bytes.
 
     Rscript modules/brand/tests/qa/generate_qa_reports.R --out $S
 
