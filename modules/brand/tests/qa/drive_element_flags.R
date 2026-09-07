@@ -32,15 +32,18 @@
 #            all flags are on. A destination that disappears once its
 #            neighbours are configured is a shell bug.
 #
-# Plus two whole-report checks: all flags off must not render any destination
-# except the designed exception, and the all-on run must render all five.
+# Plus two whole-report checks: all flags off must render no destination and
+# no category tab, and any run that renders a category tab must render at
+# least one destination in it.
 #
-# THE DESIGNED EXCEPTION
-# ----------------------
-# Overview always renders. 03_page_builder.R's dest_has_content() returns TRUE
-# for it unconditionally, because it holds the route to this category's entry
-# on the Summary tab (Stage 3) rather than any element's analysis. It is
-# reported as ALWAYS, not as a failure.
+# THE DESIGNED EXCEPTION IS GONE
+# ------------------------------
+# Overview used to render unconditionally, because it held the route to this
+# category's entry on the Summary tab rather than any element's analysis. It
+# was dropped on 7 September 2026: it was the first destination and so the
+# page a reader landed on when they clicked a category, and its only message
+# was that the headline picture was somewhere else. Every destination now
+# earns its place from a leaf, so nothing here is exempt.
 #
 # EMPTY FLAGS
 # -----------
@@ -115,14 +118,16 @@ ELEMENT_FLAGS <- c("element_funnel", "element_mental_avail", "element_cep_turf",
 #   meaning   fn-relationship, wom, branded_reach
 #   audience  demographics, adhoc, audience_lens, cb-shopper
 DEST_HOLDS <- list(
-  overview = character(0),                       # always renders, see header
   mental   = c("element_mental_avail"),
   buying   = c("element_funnel", "element_repertoire"),
   meaning  = c("element_funnel", "element_wom", "element_branded_reach"),
   audience = c("element_demographics", "element_adhoc", "element_audience_lens",
                "element_repertoire")
 )
-ALWAYS <- "overview"
+# No destination renders unconditionally any more. Kept as an empty vector
+# rather than deleted, because setdiff() against it is what every report
+# line below does and an empty exception set is the honest value.
+ALWAYS <- character(0)
 
 # --------------------------------------------------------------- the engine --
 suppressWarnings(suppressMessages({
@@ -356,22 +361,23 @@ if (on_all$ok) {
   }
 }
 
-# --- 6. the designed exception, stated as it actually behaves ---------------
-# Overview always renders WHEN THE CATEGORY RENDERS. With every element off
-# the category has nothing at all and its whole tab is absent, which is the
-# strongest form of hiding cleanly: the reader is not offered a tab that
-# opens on a route card and nothing else. Both halves are asserted.
+# --- 6. a category tab is never a destination nav with no destinations -----
+# With every element off the category has nothing at all and its whole tab is
+# absent, which is the strongest form of hiding cleanly. And whenever a tab IS
+# emitted at least one destination has to be live in it: that used to be
+# guaranteed by the Overview rendering unconditionally, and now has to come
+# from the gates, so it is asserted here on real generated reports.
 if (off_all$ok) {
   check(off_all$cat_panels == 0L,
         "with every element off a category tab was still emitted")
-  check(!isTRUE(off_all$present[[ALWAYS]]),
-        "with every element off the category tab was gone but Overview was still found")
+  check(!any(off_all$present),
+        "with every element off the category tab was gone but a destination was still found")
 }
 for (nm in c(list(all_on = on_all), single)) {
   if (!isTRUE(nm$ok)) next
   if (nm$cat_panels > 0L) {
-    check(isTRUE(nm$present[[ALWAYS]]),
-          sprintf("%s rendered a category tab without the Overview destination",
+    check(any(nm$present),
+          sprintf("%s rendered a category tab with no live destination in it",
                   nm$name))
   } else {
     check(!any(nm$present),

@@ -540,7 +540,7 @@ build_br_summary_panel <- function(results, config) {
 # ==============================================================================
 # DESTINATIONS
 # ==============================================================================
-# The five places a reader can be inside one category.
+# The four places a reader can be inside one category.
 #
 # `id` is the stable internal identifier. It appears in data-destination and
 # nowhere else, and it is deliberately not derivable from `label`: the display
@@ -551,8 +551,6 @@ build_br_summary_panel <- function(results, config) {
 #
 # Nothing in the report may derive a label from an id or an id from a label.
 
-#' Destination registry
-#' @keywords internal
 #' Which of a category's elements have something renderable in them
 #'
 #' One place decides this, because two places used to and they disagreed.
@@ -607,8 +605,28 @@ build_br_summary_panel <- function(results, config) {
   any(vapply(.br_cat_renderable(cat_results), isTRUE, logical(1)))
 }
 
+#' Destination registry
+#'
+#' Four destinations. There were five: an Overview came first and held a card
+#' saying the headline picture for this category was on the Summary tab.
+#' Stage 2 wrote it as a placeholder for a per-category Overview, Stage 3 then
+#' built the Overview on the Summary tab instead, and the placeholder stayed,
+#' first in the list and active on load. So clicking a category landed the
+#' reader on a page whose only message was to go somewhere else.
+#'
+#' It is dropped rather than filled in. The Summary tab already is the
+#' per-category compact overview, with its own category picker, its own
+#' commentary box and its own "How this works"; a second one per category
+#' would duplicate it, and building it would mean deriving figures the
+#' reachability gate is there to stop being added quietly. A reader who
+#' clicks a category now lands on the first destination that has analysis in
+#' it, which is Mental Availability wherever Mental Availability renders and
+#' the next one along where it does not. The route to this category's entry
+#' on the Summary tab moved to the controls bar, where the other
+#' cross-category controls live.
+#'
+#' @keywords internal
 .BR_DESTINATIONS <- list(
-  list(id = "overview", label = "Overview"),
   list(id = "mental",   label = "Mental Availability"),
   list(id = "buying",   label = "Brand and Buying"),
   list(id = "meaning",  label = "Brand Meaning"),
@@ -929,6 +947,21 @@ build_br_category_controls <- function(cat_id, cat_name, config,
     '<div class="br-control-slot br-control-slot-empty" data-slot="period" data-group="%s"></div>',
     cat_id))
 
+  # --- slot 4: the route to this category's entry on the Summary tab --------
+  # It used to be a button on the Overview destination, which was the page a
+  # reader landed on when they clicked a category. Dropping that destination
+  # would have taken the route with it, and the top-level Summary button does
+  # not carry the category across: brOpenSummaryFor() opens the tab and
+  # selects this category in its picker. So the route comes here, beside the
+  # other controls that decide what the reader is looking at.
+  parts <- c(parts, sprintf(paste0(
+    '<div class="br-control-slot" data-slot="summary">',
+    '<button type="button" class="br-cat-summary-link" data-group="%s" ',
+    'onclick="brOpenSummaryFor(\'%s\', \'%s\')" ',
+    'title="Open this category on the Summary tab">',
+    'Summary for this category</button></div>'),
+    cat_id, .br_esc(cat_id), .br_esc(cat_name)))
+
   parts <- c(parts, '</div>')
   paste(parts, collapse = "\n")
 }
@@ -1153,10 +1186,17 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     sel[order(ord)]
   }
 
-  # The Overview always renders: it holds the route to this category's
-  # entry on the Summary tab until Stage 3 builds it out.
+  # A destination renders when it holds a leaf. Nothing is exempt any more:
+  # the Overview used to return TRUE unconditionally and so guaranteed a
+  # non-empty nav, and with it gone that guarantee has to come from the
+  # gates instead. It does. This function is only reached for a category
+  # that passed .br_cat_has_content(), which is TRUE when at least one of
+  # the eight elements is renderable; every element owns exactly one leaf
+  # marked primary, and a primary leaf survives the filter above on its gate
+  # alone, without needing a panel fragment. So at least one leaf survives
+  # and at least one destination is live. test_destination_nav.R drives all
+  # eight elements one at a time and asserts it.
   dest_has_content <- function(dest_id) {
-    if (identical(dest_id, "overview")) return(TRUE)
     length(leaves_for(dest_id, "main")) > 0L ||
       length(leaves_for(dest_id, "advanced")) > 0L
   }
@@ -1192,21 +1232,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     # destination's commentary box lives, and captureFromRoot() reads the
     # first .br-insight-editor it finds inside the scope.
     #
-    # A view with no analysis in it gets none of this. The category Overview
-    # is that view today: Stage 3 built the Overview on the Summary tab and
-    # left a route card here, and the Summary tab has its own commentary box
-    # and its own "How this works". A toolbar over a route card would export
-    # nothing, a significance toggle would govern no marker, and a second
-    # commentary box would compete with the one on the page it routes to.
-    if (length(main_leaves) > 0L || length(leaves_for(d$id, "advanced")) > 0L) {
-      parts <- c(parts, build_br_destination_toolbar(
-        cat_id, d$id, "main",
-        with_extras = TRUE,
-        with_export = length(main_leaves) > 0L))
-    }
-    if (identical(d$id, "overview")) {
-      parts <- c(parts, .br_overview_placeholder(cat_id, cat_name))
-    }
+    # Every live destination holds a leaf, so every one gets a toolbar. The
+    # exception was the Overview, which held a route card rather than an
+    # analysis; it is gone. Export is still conditional, because a
+    # destination whose leaves all sit in the Advanced drawer has nothing to
+    # export from its main view and the drawer carries its own toolbar.
+    parts <- c(parts, build_br_destination_toolbar(
+      cat_id, d$id, "main",
+      with_extras = TRUE,
+      with_export = length(main_leaves) > 0L))
     for (lf in main_leaves) {
       parts <- c(parts, .br_leaf_host(lf, cat_id, cat_name, cat_results,
                                        charts, tables, config, panels,
@@ -1221,8 +1255,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     if (length(adv) > 0L) {
       # A destination whose only content sits in Advanced would otherwise
       # open on an empty main view, so its drawer starts open.
-      main_empty <- length(leaves_for(d$id, "main")) == 0L &&
-        !identical(d$id, "overview")
+      main_empty <- length(leaves_for(d$id, "main")) == 0L
       # A drawer that starts closed opens on its list of titles, so the
       # reader sees what is in there and picks. A drawer that starts open,
       # because the destination has nothing else, opens on its first item,
@@ -1280,26 +1313,6 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
 
   parts <- c(parts, '</div>')
   paste(parts, collapse = "\n")
-}
-
-
-#' Placeholder card for the Overview destination
-#'
-#' Stage 2 rehomes the existing analyses; the Overview itself is built in
-#' Stage 3. Until then the destination carries the route to this category's
-#' entry on the Summary tab, so the destination is never shown empty and no
-#' number or finding is manufactured to fill it.
-#'
-#' @keywords internal
-.br_overview_placeholder <- function(cat_id, cat_name) {
-  sprintf('
-<div class="br-overview-stub">
-  <h3 class="br-element-title">Overview: %s</h3>
-  <p>The headline picture for this category is on the Summary tab.</p>
-  <button type="button" class="br-overview-stub-btn"
-    onclick="brOpenSummaryFor(\'%s\', \'%s\')">Open the summary for %s</button>
-</div>',
-    .br_esc(cat_name), .br_esc(cat_id), .br_esc(cat_name), .br_esc(cat_name))
 }
 
 
@@ -2242,16 +2255,13 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 .br-adv-static::after { content: ""; }
 .br-adv-body { margin: 0 0 18px 15px; }
 
-.br-overview-stub {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
-  padding: 20px 24px; margin-bottom: 16px;
-}
-.br-overview-stub p { font-size: 13px; color: #64748b; margin: 4px 0 14px; }
-.br-overview-stub-btn {
-  font-size: 13px; font-weight: 600; padding: 8px 14px;
+/* The route to this category on the Summary tab, in the controls bar. */
+.br-cat-summary-link {
+  font-size: 12px; font-weight: 600; padding: 6px 12px;
   border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;
-  color: #334155; cursor: pointer;
+  color: #334155; cursor: pointer; font-family: inherit;
 }
+.br-cat-summary-link:hover { background: #eef2f6; color: #0f172a; }
 
 /* === One export toolbar per view ========================================= */
 .br-dest-toolbar { margin: 0 0 14px; }

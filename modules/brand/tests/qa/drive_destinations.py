@@ -581,8 +581,19 @@ DRIVER = """
       window.switchBrandTab(tab);
 
       var btns = panel.querySelectorAll('.br-destination-btn');
-      check(tab + ': five destination buttons', btns.length === 5,
+      // Four. There were five: an Overview came first and held a card
+      // telling the reader the headline picture was on the Summary tab, so
+      // clicking a category landed on a page whose message was to go
+      // somewhere else. It is dropped, and the reader lands on the first
+      // destination that has analysis in it.
+      check(tab + ': four destination buttons', btns.length === 4,
             String(btns.length));
+      check(tab + ': and the first one is active on load',
+            btns[0].classList.contains('active'),
+            btns[0].getAttribute('data-destination'));
+      check(tab + ': no Overview destination remains',
+            !panel.querySelector('[data-destination="overview"]') &&
+            !panel.querySelector('.br-overview-stub'));
 
       Array.prototype.forEach.call(btns, function (btn) {
         var id = btn.getAttribute('data-destination');
@@ -598,11 +609,10 @@ DRIVER = """
         // rendered height is non-zero.
         var main = cont ? cont.querySelector('.br-dest-main') : null;
         var hosts = main ? main.querySelectorAll('.br-subpanel').length : 0;
-        var stub = main ? main.querySelectorAll('.br-overview-stub').length : 0;
         var adv = cont ? cont.querySelectorAll('.br-adv-item').length : 0;
         check(tab + '/' + id + ': destination is not empty',
-              (hosts + stub + adv) > 0,
-              'hosts=' + hosts + ' stub=' + stub + ' advanced=' + adv);
+              (hosts + adv) > 0,
+              'hosts=' + hosts + ' advanced=' + adv);
         check(tab + '/' + id + ': destination has height',
               cont && cont.getBoundingClientRect().height > 0,
               cont ? String(Math.round(cont.getBoundingClientRect().height)) : 'none');
@@ -654,7 +664,7 @@ DRIVER = """
         }
 
         out.destinations.push({ tab: tab, id: id, hosts: hosts,
-                                stub: stub, advanced: adv });
+                                advanced: adv });
       });
 
       // --- one brand control per category, and it tells the truth ---
@@ -851,18 +861,25 @@ DRIVER = """
       // clears it.
       runChartFocus(panel, tab);
 
-      // --- the Overview route into the Summary tab ---
-      var stubBtn = panel.querySelector('.br-overview-stub-btn');
-      if (stubBtn) {
-        stubBtn.click();
+      // --- the route into the Summary tab, now in the controls bar ---
+      // It used to be the Overview destination's only content. The route
+      // itself had to survive the drop: the top-level Summary button does
+      // not carry the category across, and brOpenSummaryFor() does.
+      var sumBtn = panel.querySelector('.br-cat-summary-link');
+      check(tab + ': the controls bar carries a route to the Summary tab',
+            !!sumBtn);
+      if (sumBtn) {
+        var catLabel = panel.querySelector('.br-cat-select');
+        var want = catLabel
+          ? catLabel.options[catLabel.selectedIndex].textContent.trim()
+          : (panel.querySelector('.br-control-static') || {}).textContent;
+        sumBtn.click();
         var summary = document.getElementById('panel-summary');
-        check(tab + ': overview route opens the Summary tab',
+        check(tab + ': the route opens the Summary tab',
               summary && summary.classList.contains('active'));
         var catSel = document.querySelector('[data-brsum-cat]');
-        var label = panel.querySelector('.br-overview-stub h3');
-        var want = label ? label.textContent.replace(/^Overview:\s*/, '') : '';
-        check(tab + ': overview route selects this category',
-              catSel && catSel.value === want,
+        check(tab + ': the route selects this category',
+              catSel && catSel.value === String(want || '').trim(),
               catSel ? (catSel.value + ' vs ' + want) : 'no select');
         window.switchBrandTab(tab);
       }
@@ -946,8 +963,8 @@ def main(argv):
                  cf["behindShowChart"]))
     print("\nDestinations reached: %d" % len(res["destinations"]))
     for d in res["destinations"]:
-        print("  %s / %-9s hosts=%d stub=%d advanced=%d"
-              % (d["tab"], d["id"], d["hosts"], d["stub"], d["advanced"]))
+        print("  %s / %-9s hosts=%d advanced=%d"
+              % (d["tab"], d["id"], d["hosts"], d["advanced"]))
     if res["errors"]:
         print("\nConsole errors and exceptions (%d):" % len(res["errors"]))
         for e in res["errors"][:20]:

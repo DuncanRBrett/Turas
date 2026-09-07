@@ -4,9 +4,9 @@
 # rescue/review-brand-report-v2-upgrade-2026-06.
 #
 # What is covered:
-#   - the destination registry: five destinations, ids independent of labels;
+#   - the destination registry: four destinations, ids independent of labels;
 #   - the leaf registry: nineteen leaves, each in exactly one destination;
-#   - a rendered category panel: five destination buttons, every configured
+#   - a rendered category panel: four destination buttons, every configured
 #     leaf present exactly once under some destination, no orphan host;
 #   - a destination with nothing configured is hidden, not shown empty;
 #   - display labels never appear in a data-* attribute, so a rename cannot
@@ -59,13 +59,19 @@ attr_vals_dn <- function(html, attr) {
 
 # --- the registries are the documented single source of truth ---------------
 
-test_that("there are five destinations, in the agreed order", {
-  expect_equal(length(.BR_DESTINATIONS), 5L)
+test_that("there are four destinations, in the agreed order", {
+  expect_equal(length(.BR_DESTINATIONS), 4L)
   expect_equal(vapply(.BR_DESTINATIONS, function(d) d$id, character(1)),
-               c("overview", "mental", "buying", "meaning", "audience"))
+               c("mental", "buying", "meaning", "audience"))
   expect_equal(vapply(.BR_DESTINATIONS, function(d) d$label, character(1)),
-               c("Overview", "Mental Availability", "Brand and Buying",
+               c("Mental Availability", "Brand and Buying",
                  "Brand Meaning", "Audience"))
+  # There were five. The Overview came first and held a card telling the
+  # reader the headline picture was on the Summary tab, so clicking a
+  # category landed on a page whose message was to go somewhere else. The
+  # Summary tab is that overview and has a category picker of its own.
+  expect_false("overview" %in% vapply(.BR_DESTINATIONS,
+                                      function(d) d$id, character(1)))
 })
 
 test_that("id and label are separate fields on every destination and leaf", {
@@ -74,8 +80,8 @@ test_that("id and label are separate fields on every destination and leaf", {
     expect_true(is.character(d$label) && nzchar(d$label))
     expect_false(identical(d$id, d$label))
   }
-  # Two destination ids read like their labels today ("overview",
-  # "audience"). That is a coincidence of wording, not a derivation: the
+  # One destination id reads like its label today ("audience"). That is a
+  # coincidence of wording, not a derivation: the
   # test below renames every label and shows no identifier follows.
 })
 
@@ -178,9 +184,9 @@ render_cat <- function(cat_results = fake_cat_results(),
                           cat_display_name = "Dry Seasonings", ...)
 }
 
-test_that("a full-depth category renders five destination buttons", {
+test_that("a full-depth category renders four destination buttons", {
   out <- render_cat()
-  expect_equal(n_dn(out, 'class="br-destination-btn'), 5L)
+  expect_equal(n_dn(out, 'class="br-destination-btn'), 4L)
   for (d in .BR_DESTINATIONS) {
     # One button, one container, and for a destination that has an Advanced
     # drawer the drawer carries the attribute too.
@@ -189,10 +195,27 @@ test_that("a full-depth category renders five destination buttons", {
     expect_equal(n_dest_buttons(out, d$id), 1L,
                  info = paste(d$id, "needs exactly one nav button"))
   }
-  # Exactly one destination is active on load, and it is the first.
+  # Exactly one destination is active on load, and it is the first, which
+  # is now a destination with analysis in it rather than a route card.
   expect_equal(n_dn(out, 'class="br-destination-btn active"'), 1L)
-  expect_true(pos_dn(out, 'data-destination="overview"') <
-              pos_dn(out, 'data-destination="mental"'))
+  expect_true(grepl(paste0('<button class="br-destination-btn active" ',
+                           'data-group="dss" data-destination="mental"'),
+                    out, fixed = TRUE))
+  expect_true(pos_dn(out, 'data-destination="mental"') <
+              pos_dn(out, 'data-destination="buying"'))
+  expect_equal(n_dn(out, 'br-overview-stub'), 0L)
+})
+
+test_that("the route to this category on the Summary tab survived the drop", {
+  # It was a button on the Overview destination. The top-level Summary tab
+  # button does not carry the category across; brOpenSummaryFor() does, so
+  # the route moved to the controls bar rather than being lost with the
+  # destination that used to hold it.
+  out <- render_cat()
+  expect_equal(n_dn(out, 'class="br-cat-summary-link"'), 1L)
+  expect_true(grepl("brOpenSummaryFor(&#39;dss&#39;", out, fixed = TRUE) ||
+              grepl('brOpenSummaryFor(\'dss\'', out, fixed = TRUE))
+  expect_true(grepl('data-slot="summary"', out, fixed = TRUE))
 })
 
 test_that("every configured leaf appears exactly once, under some destination", {
@@ -227,9 +250,10 @@ test_that("a destination with nothing configured is hidden, never shown empty", 
   expect_equal(n_dest_containers(out, "buying"), 2L)
   expect_equal(n_dest_buttons(out, "buying"), 1L)
   expect_equal(n_dest_containers(out, "audience"), 1L)
-  # The Overview always renders, so the shell never collapses to nothing.
-  expect_equal(n_dest_containers(out, "overview"), 1L)
-  expect_equal(n_dn(out, 'class="br-destination-btn'), 3L)
+  # Nothing renders unconditionally any more, so the shell has to stay
+  # non-empty on the gates alone. Two destinations here, not three.
+  expect_equal(n_dn(out, 'data-destination="overview"'), 0L)
+  expect_equal(n_dn(out, 'class="br-destination-btn'), 2L)
 })
 
 test_that("one category with only the funnel still gets a coherent shell", {
@@ -237,7 +261,7 @@ test_that("one category with only the funnel still gets a coherent shell", {
     cat_results = fake_cat_results(ma = FALSE, rep = FALSE, wom = FALSE,
                                     demo = FALSE),
     panels = fake_panels(c("funnel_dss", "funnel_dss__relationship")))
-  expect_equal(n_dn(out, 'class="br-destination-btn'), 3L)
+  expect_equal(n_dn(out, 'class="br-destination-btn'), 2L)
   expect_equal(n_dest_containers(out, "buying"), 1L)
   expect_equal(n_dest_containers(out, "meaning"), 1L)
   expect_equal(n_dn(out, 'data-destination="audience"'), 0L)
@@ -410,16 +434,16 @@ test_that("every per-sub-tab Section_Insights anchor still lands, once each", {
 test_that("every view has one export toolbar, and Advanced has its own", {
   out <- render_cat()
   # Four main views plus the one Advanced drawer a full-depth category has.
-  # The Overview is the fifth destination and gets none: it holds a route to
-  # the Summary tab, not an analysis, so there is nothing to export, no
-  # marker for a significance toggle to govern, and a commentary box there
-  # would compete with the one on the page it routes to.
+  # Every destination now holds an analysis, so every one gets a toolbar.
+  # The exception used to be the Overview, which held a route card: nothing
+  # to export, no marker for a significance toggle to govern, and a
+  # commentary box that competed with the one on the page it routed to. It
+  # is gone rather than exempted.
   expect_equal(n_dn(out, 'class="br-dest-toolbar"'), 5L)
   expect_equal(n_dn(out, 'class="br-dest-btn br-dest-pin"'), 5L)
   expect_equal(n_dn(out, 'class="br-dest-btn br-dest-png"'), 5L)
   expect_equal(n_dn(out, 'class="br-dest-btn br-dest-excel"'), 5L)
-  expect_false(grepl('data-destination="overview" data-tier="main">', out,
-                     fixed = TRUE))
+  expect_equal(n_dn(out, 'data-destination="overview"'), 0L)
   # Significance and commentary are one per destination, not one per view,
   # so the Advanced drawer's toolbar carries neither.
   expect_equal(n_dn(out, "br-sig-toggle"), 4L)
@@ -734,5 +758,28 @@ test_that("a category carried by Word of Mouth alone still renders its destinati
   expect_equal(n_dest_buttons(out, "mental"),  0L)
   expect_equal(n_dest_buttons(out, "buying"),  0L)
   expect_equal(n_dest_buttons(out, "audience"), 0L)
-  expect_equal(n_dest_buttons(out, "overview"), 1L)
+})
+
+
+test_that("every element on its own leaves the shell with a live nav", {
+  # Dropping the Overview took away the destination that rendered whatever
+  # else was true, so the guarantee that a category tab is never a nav with
+  # no buttons has to come from the gates. Each of the eight elements owns
+  # one leaf marked primary, and a primary leaf survives on its gate alone.
+  # Driven one element at a time.
+  flags <- c("funnel", "ma", "rep", "wom", "demo", "lens", "reach", "adhoc")
+  keys  <- list(funnel = "funnel_dss", ma = "ma_dss",
+                rep = "cat_buying_dss", wom = "wom_dss",
+                demo = "demographics_dss", lens = "audience_lens_dss",
+                reach = "branded_reach_dss", adhoc = "adhoc_dss")
+  for (on in flags) {
+    args <- as.list(stats::setNames(rep(FALSE, length(flags)), flags))
+    args[[on]] <- TRUE
+    cr  <- do.call(fake_cat_results, args)
+    out <- render_cat(cat_results = cr, panels = fake_panels(keys[[on]]))
+    n <- n_dn(out, 'class="br-destination-btn')
+    expect_gte(n, 1L)
+    expect_equal(n_dn(out, 'class="br-destination-btn active"'), 1L,
+                 info = paste(on, "must open on exactly one destination"))
+  }
 })
