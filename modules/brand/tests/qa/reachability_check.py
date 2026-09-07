@@ -116,6 +116,22 @@ def islands(html):
     return out, skipped
 
 
+# Keys whose value is when the report was written, not what it says. The
+# Audience Lens island carries generated_at, so two runs a minute apart read
+# as a numeric change and the gate fails on a clock rather than on a figure.
+# Dropped before the numbers are counted, at any depth.
+_STAMP_KEYS = ("generated_at",)
+
+
+def _drop_stamps(obj):
+    if isinstance(obj, dict):
+        return {k: _drop_stamps(v) for k, v in obj.items()
+                if k not in _STAMP_KEYS}
+    if isinstance(obj, list):
+        return [_drop_stamps(v) for v in obj]
+    return obj
+
+
 def _numbers(body):
     """Numeric content of one island, or None when the body is not JSON."""
     body = body.replace("\\u003c", "<")
@@ -123,7 +139,7 @@ def _numbers(body):
         parsed = json.loads(body)
     except Exception:
         return None
-    return tuple(NUM.findall(json.dumps(parsed, sort_keys=True)))
+    return tuple(NUM.findall(json.dumps(_drop_stamps(parsed), sort_keys=True)))
 
 
 def _grew_only(old_payloads, new_payloads):
