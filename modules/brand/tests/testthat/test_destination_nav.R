@@ -482,3 +482,105 @@ test_that("the three panel sub-navs stay in the DOM and stay hidden by CSS", {
   expect_true(grepl(".fn-subnav, .ma-subnav, .cb-subnav { display: none !important; }",
                     css, fixed = TRUE))
 })
+
+
+# --- Stage 5: the chrome ------------------------------------------------------
+# These read the source files rather than a rendered page, because the rules
+# they check are stylesheet and capture behaviour that a fragment cannot show.
+
+.read_stage5 <- function(...) {
+  paste(readLines(file.path(ROOT_DN, "modules", "brand", "lib", "html_report",
+                            ...), warn = FALSE), collapse = "\n")
+}
+
+test_that("the significance rules hide, and hide only, the markers", {
+  pb <- .read_stage5("03_page_builder.R")
+  block <- sub(".*=== Significance, off until a reader asks for it", "", pb)
+  block <- sub("=== \"How this works\".*", "", block)
+  for (sel in c(".ma-sig", ".ma-fv-sig", ".ma-adv-sig", ".ct-sig",
+                ".fn-sig-avg", ".fn-sig")) {
+    expect_match(block, sprintf(':not([data-br-sig="on"]) %s', sel),
+                 fixed = TRUE, info = sel)
+  }
+  # Off is the state with no attribute, so a report that has never been
+  # touched, and a saved copy of one, both open with the markers hidden.
+  expect_false(grepl('[data-br-sig="off"]', block, fixed = TRUE))
+})
+
+test_that("a capture taken with significance off has the markers stripped", {
+  pins <- .read_stage5("js", "brand_pins.js")
+  # One wrapper, at init, around the shared capture helper. Editing the
+  # fourteen capture sites across five panel files instead would leave the
+  # next one to be added uncovered.
+  expect_match(pins, "TurasPins.capturePortableHtml = wrapped", fixed = TRUE)
+  expect_match(pins, "wrapped.__brSigWrapped = true", fixed = TRUE)
+  expect_match(pins, "window.brStripSigMarkers", fixed = TRUE)
+  for (sel in c(".ma-sig", ".ma-fv-sig", ".ma-adv-sig", ".ct-sig",
+                ".fn-sig-avg", ".fn-sig")) {
+    expect_match(pins, sprintf('"%s"', sel), fixed = TRUE, info = sel)
+  }
+  # The page decides, and the page is the destination the root sits in.
+  rpt <- .read_stage5("js", "brand_report.js")
+  expect_match(rpt, "window.brSigOnFor = function(el)", fixed = TRUE)
+  expect_match(rpt, 'dest.getAttribute("data-br-sig") === "on"', fixed = TRUE)
+})
+
+test_that("the print block keeps the drawers and drops the buttons", {
+  pb <- .read_stage5("03_page_builder.R")
+  pr <- sub(".*@media print \\{", "", pb)
+  pr <- sub("\\n\\}.*", "", pr)
+  # A printed page cannot be opened, so the methodology and the commentary
+  # print. The buttons that open them do not.
+  expect_match(pr, ".br-howto-body[hidden]", fixed = TRUE)
+  expect_match(pr, ".br-dest-note[hidden] { display: block !important; }",
+               fixed = TRUE)
+  expect_match(pr, ".br-dest-tools { display: none !important; }", fixed = TRUE)
+  # A drawer that found nothing stays hidden rather than printing a heading
+  # over nothing.
+  expect_false(grepl(".br-howto[hidden]", pr, fixed = TRUE))
+})
+
+test_that("the destination toolbar never reads or writes a section anchor", {
+  rpt <- .read_stage5("js", "brand_report.js")
+  block <- sub(".*Destination toolbars: one per main view", "", rpt)
+  block <- sub("// --- Insight editor ---.*", "", block)
+  # It resolves by destination. The data-section set is a contract with the
+  # analysts who typed those names into Section_Insights sheets, and the
+  # reachability gate holds it fixed, so nothing here may add to it.
+  expect_match(block, 'data-destination="', fixed = TRUE)
+  expect_match(block, 'data-tier"', fixed = TRUE)
+  expect_false(grepl("setAttribute(\"data-section\"", block, fixed = TRUE))
+  # And the markup carries no data-section on any destination control.
+  out <- render_cat()
+  bar <- regmatches(out, gregexpr('<div class="br-dest-toolbar"[^>]*>', out))[[1]]
+  expect_gt(length(bar), 0L)
+  for (b in bar) expect_false(grepl("data-section", b, fixed = TRUE), info = b)
+})
+
+test_that("a destination whose analyses are all Advanced still has its toggle", {
+  # Audience with Audience Lens configured and neither Demographics nor Ad
+  # Hoc is the real case, and Stage 2 already opens its drawer for it. The
+  # main view has nothing to export, so it carries no pin, PNG or Excel; the
+  # significance toggle and the commentary box are one per destination and
+  # stay above the drawer, and the drawer's own toolbar carries the export.
+  out <- render_cat(
+    cat_results = fake_cat_results(demo = FALSE, lens = TRUE),
+    panels = fake_panels(c(full_keys[!grepl("demographics", full_keys)],
+                           "audience_lens_dss")))
+  # Slice the audience container out by its opening tag. A greedy sub() would
+  # match the Advanced drawer's copy of the attribute instead.
+  open_tag <- '<div class="br-destination" data-group="dss" data-destination="audience">'
+  i <- regexpr(open_tag, out, fixed = TRUE)[[1]]
+  expect_gt(i, 0L)
+  aud <- substring(out, i + nchar(open_tag))
+  expect_match(aud, "br-sig-toggle", fixed = TRUE)
+  expect_match(aud, "br-dest-note-text", fixed = TRUE)
+  main <- sub('<div class="br-advanced".*', "", aud)
+  expect_false(grepl("br-dest-pin", main, fixed = TRUE))
+  expect_false(grepl("br-dest-excel", main, fixed = TRUE))
+  # The drawer keeps its own three.
+  adv <- sub('.*<div class="br-advanced"', "", aud)
+  expect_match(adv, "br-dest-pin", fixed = TRUE)
+  expect_match(adv, "br-dest-png", fixed = TRUE)
+  expect_match(adv, "br-dest-excel", fixed = TRUE)
+})

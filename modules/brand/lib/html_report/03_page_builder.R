@@ -619,7 +619,8 @@ build_br_summary_panel <- function(results, config) {
 #'   box. TRUE on a main view, FALSE inside an Advanced drawer.
 #' @keywords internal
 build_br_destination_toolbar <- function(cat_id, dest_id, tier = "main",
-                                          with_extras = TRUE) {
+                                          with_extras = TRUE,
+                                          with_export = TRUE) {
   attrs <- sprintf('data-group="%s" data-destination="%s" data-tier="%s"',
                    .br_esc(cat_id), .br_esc(dest_id), .br_esc(tier))
   btn <- function(cls, handler, title, label) {
@@ -627,14 +628,18 @@ build_br_destination_toolbar <- function(cat_id, dest_id, tier = "main",
                    'onclick="%s(this)" title="%s">%s</button>'),
             cls, attrs, handler, .br_esc(title), label)
   }
-  tools <- c(
+  # A destination whose analyses all sit in its Advanced drawer has nothing
+  # in its main view to export, and the drawer's own toolbar covers them. The
+  # main toolbar is still emitted there, because the significance toggle and
+  # the commentary box are one per destination and belong above the drawer.
+  tools <- if (isTRUE(with_export)) c(
     btn("br-dest-pin",   "brDestPin",
         "Pin something from this view to Pinned Views", "&#x1F4CC; Pin"),
     btn("br-dest-png",   "brDestPng",
         "Export something from this view as a PNG", "&#x1F5BC; PNG"),
     btn("br-dest-excel", "brDestExcel",
         "Export every table in this view to Excel", "&#x1F4E5; Excel")
-  )
+  ) else character(0)
   extras <- character(0)
   if (isTRUE(with_extras)) {
     # Off is the default, and the label says which state it is in rather than
@@ -1081,9 +1086,11 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     # and its own "How this works". A toolbar over a route card would export
     # nothing, a significance toggle would govern no marker, and a second
     # commentary box would compete with the one on the page it routes to.
-    if (length(main_leaves) > 0L) {
-      parts <- c(parts, build_br_destination_toolbar(cat_id, d$id, "main",
-                                                      with_extras = TRUE))
+    if (length(main_leaves) > 0L || length(leaves_for(d$id, "advanced")) > 0L) {
+      parts <- c(parts, build_br_destination_toolbar(
+        cat_id, d$id, "main",
+        with_extras = TRUE,
+        with_export = length(main_leaves) > 0L))
     }
     if (identical(d$id, "overview")) {
       parts <- c(parts, .br_overview_placeholder(cat_id, cat_name))
@@ -1964,8 +1971,10 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   }
   /* The methodology drawer and the destination commentary are collapsed on
      screen. A printed page cannot be opened, and the drawer holds the bases
-     and the definitions, so both print. The toolbar buttons do not. */
-  .br-howto[hidden], .br-howto-body[hidden] {
+     and the definitions, so both print. The toolbar buttons do not.
+     A .br-howto that is still hidden found nothing to hold, so it stays
+     hidden rather than printing a heading over nothing. */
+  .br-howto-body[hidden] {
     display: block !important; visibility: visible !important;
   }
   .br-dest-tools { display: none !important; }
