@@ -384,9 +384,14 @@ test_that("every capture path that pairs a chart with its table is covered", {
     expect_match(js, "brTitleWithChartDeviation", fixed = TRUE, info = f)
   }
   pins <- read_cf(REPORT_CF, "js", "brand_pins.js")
-  # Once in brExecutePin and twice in the two PNG export paths. The
-  # definition itself does not match: it reads "= function(title, ...".
-  expect_equal(n_cf(pins, "window.brTitleWithChartDeviation("), 3L)
+  # Once in brExecutePin, twice in the two anchor PNG export paths, and once
+  # each in the two button-free paths Stage 5 added for the destination
+  # toolbars. The definition itself does not match: it reads
+  # "= function(title, ...".
+  expect_equal(n_cf(pins, "window.brTitleWithChartDeviation("), 5L)
+  expect_match(pins, "window.brPinFrom = function(root, key, title)", fixed = TRUE)
+  expect_match(pins, "window.brExportPngFrom = function(root, key, title)",
+               fixed = TRUE)
 })
 
 test_that("the note names both counts and what is missing", {
@@ -403,13 +408,23 @@ test_that("the note names both counts and what is missing", {
 # --- the Excel export is coherent by construction, not by a new rule ---------
 
 test_that("the Excel exporters walk tables, so a chart cannot reach them", {
-  # _brExportPanel and the panel-local .xls writers all iterate table rows.
+  # _brExportRoot and the panel-local .xls writers all iterate table rows.
   # The table never deviates, so an exported sheet always matches the header
   # set and needs no note of its own. This test is here so the claim breaks
   # loudly if an exporter ever starts reading chart DOM.
+  #
+  # Stage 5 moved the walk out of _brExportPanel into _brExportRoot, which is
+  # the one workbook builder both the section anchors and the destination
+  # toolbars now use. The claim is checked where the walk actually lives.
   js <- read_cf(REPORT_CF, "js", "brand_report.js")
-  export_fn <- sub(".*window._brExportPanel = function\\(panelId\\) \\{", "", js)
-  export_fn <- sub("\\n  \\};.*", "", export_fn)
-  expect_match(export_fn, 'panel.querySelectorAll("table")', fixed = TRUE)
+  export_fn <- sub(".*function _brExportRoot\\(root, filename, whatItIs\\) \\{",
+                   "", js)
+  export_fn <- sub("\\n  \\}\\n.*", "", export_fn)
+  expect_match(export_fn, 'root.querySelectorAll("table")', fixed = TRUE)
   expect_false(grepl("chart", export_fn, fixed = TRUE))
+
+  # And both entry points reach it, so neither can grow a walk of its own.
+  expect_match(js, "window._brExportPanel = function(panelId) {", fixed = TRUE)
+  expect_match(js, '_brExportRoot(panel, panelId, "this section")', fixed = TRUE)
+  expect_match(js, "window.brDestExcel = function(btn) {", fixed = TRUE)
 })

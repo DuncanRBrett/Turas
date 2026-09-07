@@ -207,10 +207,23 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
                                       internal_tab = NULL,
                                       initial_visible = TRUE,
                                       omit_chart_buttons = FALSE,
-                                      check_note = "") {
+                                      check_note = "",
+                                      require_text = FALSE) {
   has_text <- !is.null(prefill_text) && !is.na(prefill_text) &&
               nzchar(trimws(as.character(prefill_text)))
   prefill_text <- if (has_text) as.character(prefill_text) else ""
+
+  check_note_chr <- if (is.null(check_note) || length(check_note) == 0L ||
+                        is.na(check_note[1L])) "" else as.character(check_note)
+
+  # Stage 5, piece 3. Inside a category the commentary box is one per
+  # destination, not one per table, and the destination's own box lives on
+  # the destination toolbar. A leaf still renders its own box when the
+  # Section_Insights sheet has authored text for it, or when the authored
+  # insight number check has something to say about that text, because that
+  # text was written against that anchor and has nowhere else to land. On a
+  # report with no authored insights the leaf boxes are simply not there.
+  if (isTRUE(require_text) && !has_text && !nzchar(check_note_chr)) return("")
 
   # When pre-filled, the container is open by default and the rendered view
   # is shown (textarea hidden) so the analyst sees the insight as published.
@@ -313,8 +326,7 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
       toggle_handler, section_id, toggle_label)
   }
 
-  check_note <- if (is.null(check_note) || is.na(check_note)) "" else
-    as.character(check_note)
+  check_note <- check_note_chr
 
   container_html <- sprintf('
 <div class="br-insight-container" data-section="%s" data-prefilled="%s" style="%s">
@@ -579,6 +591,99 @@ build_br_summary_panel <- function(results, config) {
 )
 
 
+#' One export toolbar for one destination view
+#'
+#' Stage 5. Before this the report carried a pin, a PNG and an Excel button
+#' beside almost every table, and on a four-category study that ran to dozens
+#' of each. They are replaced by one toolbar on each destination's main view
+#' and one inside each Advanced drawer.
+#'
+#' The toolbar resolves its scope by \code{data-group}, \code{data-destination}
+#' and \code{data-tier}, never by \code{data-section}. That is deliberate: the
+#' set of \code{data-section} values in the report is a contract with the
+#' analysts who typed those names into Section_Insights sheets and saved pins
+#' against them, and a destination is not a section. Pin and PNG offer the
+#' anchors inside the scope so a reader still chooses what to capture; Excel
+#' takes every table in the scope, which is what restores the reach that
+#' \code{section-repertoire-<cat>} lost when Stage 2 split the Category Buying
+#' panel into one host per sub-tab.
+#'
+#' The main-view toolbar also carries the two controls that belong once per
+#' destination rather than once per table: the significance toggle, which is
+#' off until a reader asks for it, and the destination's commentary box.
+#'
+#' @param cat_id Character. The category group id.
+#' @param dest_id Character. The destination id.
+#' @param tier Character. "main" or "advanced".
+#' @param with_extras Logical. Emit the significance toggle and the commentary
+#'   box. TRUE on a main view, FALSE inside an Advanced drawer.
+#' @keywords internal
+build_br_destination_toolbar <- function(cat_id, dest_id, tier = "main",
+                                          with_extras = TRUE) {
+  attrs <- sprintf('data-group="%s" data-destination="%s" data-tier="%s"',
+                   .br_esc(cat_id), .br_esc(dest_id), .br_esc(tier))
+  btn <- function(cls, handler, title, label) {
+    sprintf(paste0('<button type="button" class="br-dest-btn %s" %s ',
+                   'onclick="%s(this)" title="%s">%s</button>'),
+            cls, attrs, handler, .br_esc(title), label)
+  }
+  tools <- c(
+    btn("br-dest-pin",   "brDestPin",
+        "Pin something from this view to Pinned Views", "&#x1F4CC; Pin"),
+    btn("br-dest-png",   "brDestPng",
+        "Export something from this view as a PNG", "&#x1F5BC; PNG"),
+    btn("br-dest-excel", "brDestExcel",
+        "Export every table in this view to Excel", "&#x1F4E5; Excel")
+  )
+  extras <- character(0)
+  if (isTRUE(with_extras)) {
+    # Off is the default, and the label says which state it is in rather than
+    # what a click would do, so a reader never has to guess whether the
+    # markers on screen are the ones the button is describing.
+    extras <- c(extras, sprintf(paste0(
+      '<button type="button" class="br-dest-btn br-sig-toggle" %s ',
+      'aria-pressed="false" onclick="brToggleDestSig(this)" ',
+      'title="Show or hide the significance markers on this view">',
+      'Significance: off</button>'), attrs))
+    extras <- c(extras, sprintf(paste0(
+      '<button type="button" class="br-dest-btn br-dest-note-toggle" %s ',
+      'aria-expanded="false" onclick="brToggleDestNote(this)">',
+      '+ Add commentary</button>'), attrs))
+  }
+  note <- if (isTRUE(with_extras)) sprintf(paste0(
+    '<div class="br-dest-note" %s hidden>',
+    '<textarea class="br-insight-editor br-dest-note-text" ',
+    'data-dest-note="%s:%s" ',
+    'placeholder="Commentary for this view. It is saved with the report."',
+    '></textarea></div>'),
+    attrs, .br_esc(cat_id), .br_esc(dest_id)) else ""
+
+  sprintf('<div class="br-dest-toolbar" %s><div class="br-dest-tools">%s</div>%s</div>',
+          attrs, paste(c(tools, extras), collapse = ""), note)
+}
+
+
+#' The collapsed "How this works" drawer for one destination view
+#'
+#' Emitted empty. \code{brCollectHowTo()} in \code{js/brand_report.js} moves
+#' every explanatory block inside the destination into it at load and unhides
+#' the drawer when it found any, so a destination whose panels carry no
+#' methodology shows no drawer rather than an empty one. Nothing is deleted
+#' and no wording changes: the blocks are moved, not rewritten.
+#'
+#' @keywords internal
+build_br_howto_drawer <- function(cat_id, dest_id, tier = "main") {
+  sprintf(paste0(
+    '<section class="br-howto" data-group="%s" data-destination="%s" ',
+    'data-tier="%s" hidden>',
+    '<button type="button" class="br-howto-toggle" aria-expanded="false" ',
+    'onclick="brToggleHowTo(this)">How this works',
+    '<span class="br-howto-arrow" aria-hidden="true"></span></button>',
+    '<div class="br-howto-body" hidden></div></section>'),
+    .br_esc(cat_id), .br_esc(dest_id), .br_esc(tier))
+}
+
+
 #' Build the header control area for one category
 #'
 #' A slot system, not two controls side by side. Slot three is reserved and
@@ -784,11 +889,20 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   # Local helper: looks up the optional pre-filled insight text from the
   # config and forwards it to the toolbar builder. Keeps every call site
   # below to a single line.
+  # Stage 5: no pin, PNG or Excel button of its own. Every category leaf is
+  # inside a destination, and its destination's toolbar offers this leaf's
+  # anchor in its pin and PNG picker and covers its tables in its Excel
+  # export. omit_chart_buttons = TRUE is the existing switch for exactly that
+  # (the funnel and MA hosts have used it since their panels grew their own
+  # controls); require_text = TRUE is Stage 5's, and drops the commentary box
+  # unless the Section_Insights sheet put something in it.
   toolbar_for <- function(sid) {
     build_br_section_toolbar(
       sid,
-      prefill_text = section_insight_for(config$section_insights, sid),
-      check_note   = .br_insight_check_note(config, sid))
+      prefill_text       = section_insight_for(config$section_insights, sid),
+      check_note         = .br_insight_check_note(config, sid),
+      omit_chart_buttons = TRUE,
+      require_text       = TRUE)
   }
 
   parts <- character(0)
@@ -955,14 +1069,32 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       '<div class="br-destination%s" data-group="%s" data-destination="%s">',
       if (i == 1L) " active" else "", cat_id, d$id))
 
+    main_leaves <- leaves_for(d$id, "main")
     parts <- c(parts, '<div class="br-dest-main">')
+    # One toolbar for the view, ahead of the content: it is also where the
+    # destination's commentary box lives, and captureFromRoot() reads the
+    # first .br-insight-editor it finds inside the scope.
+    #
+    # A view with no analysis in it gets none of this. The category Overview
+    # is that view today: Stage 3 built the Overview on the Summary tab and
+    # left a route card here, and the Summary tab has its own commentary box
+    # and its own "How this works". A toolbar over a route card would export
+    # nothing, a significance toggle would govern no marker, and a second
+    # commentary box would compete with the one on the page it routes to.
+    if (length(main_leaves) > 0L) {
+      parts <- c(parts, build_br_destination_toolbar(cat_id, d$id, "main",
+                                                      with_extras = TRUE))
+    }
     if (identical(d$id, "overview")) {
       parts <- c(parts, .br_overview_placeholder(cat_id, cat_name))
     }
-    for (lf in leaves_for(d$id, "main")) {
+    for (lf in main_leaves) {
       parts <- c(parts, .br_leaf_host(lf, cat_id, cat_name, cat_results,
                                        charts, tables, config, panels,
                                        toolbar_for))
+    }
+    if (length(main_leaves) > 0L) {
+      parts <- c(parts, build_br_howto_drawer(cat_id, d$id, "main"))
     }
     parts <- c(parts, '</div>')
 
@@ -988,6 +1120,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         if (main_empty) "true" else "false",
         length(adv),
         if (main_empty) "" else " hidden"))
+      # The drawer's own export toolbar. Without it the analyses in here have
+      # no pin, PNG or Excel control of their own: that is the reach Stage 2
+      # took off section-repertoire-<cat> when it split the Category Buying
+      # panel, and this is where it comes back.
+      parts <- c(parts, build_br_destination_toolbar(cat_id, d$id, "advanced",
+                                                      with_extras = FALSE))
       for (j in seq_along(adv)) {
         lf  <- adv[[j]]
         lbl <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
@@ -1011,6 +1149,10 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                                          toolbar_for))
         parts <- c(parts, '</div></div>')
       }
+      # The drawer gets its own methodology drawer rather than sending its
+      # callouts up to the main view's: an explanation belongs in the tier
+      # that holds the analysis it explains.
+      parts <- c(parts, build_br_howto_drawer(cat_id, d$id, "advanced"))
       parts <- c(parts, '</div></div>')
     }
 
@@ -1066,11 +1208,36 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     '<div class="br-element-section" id="section-%s" data-section="%s">',
     section_id, section_id) else '<div class="br-element-section">'
 
+  # The funnel and Mental Availability sub-anchors (funnel, attitude, metrics,
+  # ceps, attributes, advantage) used to live only on the insight toolbar and
+  # its container, so brCaptureContent() and _brExportPanel() resolved them
+  # onto a textarea with no table in it. Stage 5 puts each one on a wrapper
+  # around the whole leaf, ahead of the toolbar in document order, so the
+  # anchor an analyst typed into Section_Insights now resolves to the analysis
+  # it names. No anchor is renamed and none is added: the value is the one the
+  # toolbar already carried. This is also what lets the leaf's commentary box
+  # render only when there is something to put in it (Stage 5, piece 3)
+  # without the anchor leaving the page.
+  leaf_anchor <- if (identical(el, "ma") || identical(el, "funnel")) {
+    a_el <- if (identical(internal_tab, "relationship")) "attitude" else internal_tab
+    if (nzchar(a_el)) paste0(a_el, "-", cat_id) else ""
+  } else ""
+  anchor_open  <- if (nzchar(leaf_anchor) && !identical(leaf_anchor, section_id))
+    sprintf('<div class="br-leaf-anchor" data-section="%s">', leaf_anchor) else ""
+  anchor_close <- if (nzchar(anchor_open)) "</div>" else ""
+
   parts <- character(0)
+  # data-leaf-label is the reader-facing name of this analysis. The
+  # destination pin and PNG pickers list what is in scope and need a label
+  # for each anchor; taking it from an attribute keeps the "no identifier is
+  # derived from a label, and no label from an identifier" rule that
+  # test_destination_nav.R proves.
+  leaf_label <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
   parts <- c(parts, sprintf(
-    '<div class="br-subpanel active" data-group="%s" data-subpanel="%s" data-internal-tab="%s" data-cb-tab="%s" data-leaf="%s">',
-    cat_id, lf$sp, internal_tab, lf$cb, lf$key))
+    '<div class="br-subpanel active" data-group="%s" data-subpanel="%s" data-internal-tab="%s" data-cb-tab="%s" data-leaf="%s" data-leaf-label="%s">',
+    cat_id, lf$sp, internal_tab, lf$cb, lf$key, .br_esc(leaf_label)))
   parts <- c(parts, wrapper)
+  if (nzchar(anchor_open)) parts <- c(parts, anchor_open)
 
     if (!is.null(panels[[chart_key]])) {
       # WOM, branded-reach, repertoire/cat-buying, funnel, and MA panels
@@ -1134,7 +1301,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           internal_tab       = internal_tab,
           initial_visible    = TRUE,
           omit_chart_buttons = TRUE,
-          check_note         = .br_insight_check_note(config, sub_anchor)))
+          check_note         = .br_insight_check_note(config, sub_anchor),
+          require_text       = TRUE))
       }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
@@ -1315,6 +1483,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       }
     }
 
+  if (nzchar(anchor_close)) parts <- c(parts, anchor_close)
   parts <- c(parts, '</div></div>')
   paste(parts, collapse = "\n")
 }
@@ -1793,6 +1962,14 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   .br-advanced-body[hidden], .br-adv-body[hidden] {
     display: block !important; visibility: visible !important;
   }
+  /* The methodology drawer and the destination commentary are collapsed on
+     screen. A printed page cannot be opened, and the drawer holds the bases
+     and the definitions, so both print. The toolbar buttons do not. */
+  .br-howto[hidden], .br-howto-body[hidden] {
+    display: block !important; visibility: visible !important;
+  }
+  .br-dest-tools { display: none !important; }
+  .br-dest-note[hidden] { display: block !important; }
 }
 
   ', brand_colour, accent_colour, brand_colour,
@@ -1941,6 +2118,56 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;
   color: #334155; cursor: pointer;
 }
+
+/* === One export toolbar per view ========================================= */
+.br-dest-toolbar { margin: 0 0 14px; }
+.br-dest-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.br-dest-btn {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  cursor: pointer; font-family: inherit; font-size: 12px; padding: 5px 10px;
+  color: #64748b; transition: background-color .12s, border-color .12s, color .12s;
+}
+.br-dest-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #0f172a; }
+.br-sig-toggle[aria-pressed="true"] {
+  background: var(--br-brand); border-color: var(--br-brand); color: #fff;
+}
+.br-dest-note { margin-top: 10px; }
+.br-dest-note-text {
+  width: 100%; min-height: 120px; box-sizing: border-box;
+  border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;
+  font-family: inherit; font-size: 13px; line-height: 1.55; resize: vertical;
+}
+.br-advanced-body > .br-dest-toolbar { margin: 6px 0 14px 15px; }
+
+/* === Significance, off until a reader asks for it ======================== */
+/* The markers are hidden, never deleted from the page: the engine computed
+   them and the toggle brings them straight back. A capture taken while they
+   are hidden has them stripped out of the captured HTML by brand_pins.js,
+   because an inliner that skips default-looking values would otherwise put
+   them back on a pinned card. */
+.br-destination:not([data-br-sig="on"]) .ma-sig,
+.br-destination:not([data-br-sig="on"]) .ma-fv-sig,
+.br-destination:not([data-br-sig="on"]) .ma-adv-sig,
+.br-destination:not([data-br-sig="on"]) .ct-sig,
+.br-destination:not([data-br-sig="on"]) .fn-sig-avg,
+.br-destination:not([data-br-sig="on"]) .fn-sig {
+  display: none;
+}
+
+/* === "How this works", one per view, collapsed ========================== */
+.br-howto { margin: 34px 0 0; border-top: 1px solid #e2e8f0; padding-top: 14px; }
+.br-howto-toggle {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 0;
+}
+.br-howto-arrow { display: inline-block; transition: transform 0.15s;
+  font-size: 10px; color: #94a3b8; }
+.br-howto-arrow::before { content: "\\25BE"; }
+.br-howto-toggle[aria-expanded="true"] .br-howto-arrow { transform: rotate(180deg); }
+.br-howto-body { margin-top: 10px; }
+.br-howto-body > * { margin-bottom: 12px; }
 
 ')
 

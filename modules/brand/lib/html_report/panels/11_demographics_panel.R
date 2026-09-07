@@ -460,17 +460,24 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 
 
+#' The per-question card's own controls
+#'
+#' Table and chart, and nothing else. Stage 5 took the pin, the PNG and the
+#' Excel button off every card: seven questions meant twenty-one buttons on
+#' one view. Each card still carries its `section-demo-panel-<cat>-q<n>`
+#' anchor on its own `<article>`, so the Audience toolbar's pin and PNG
+#' pickers list the questions by name and a reader still captures one
+#' question at a time. Nothing here is reachable only through the toolbar
+#' that went.
+#'
+#' @keywords internal
 .demo_panel_card_toolbar <- function(section_id) {
   sprintf(
     '<div class="demo-card-toolbar" data-section="%s">
        <button type="button" class="demo-card-tool demo-view-table active" data-demo-view="table" title="Table view">&#x2261;</button>
        <button type="button" class="demo-card-tool demo-view-chart" data-demo-view="chart" title="Chart view">&#x1F4CA;</button>
-       <button type="button" class="br-pin-btn demo-card-tool" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin this card">&#x1F4CC;</button>
-       <button type="button" class="br-png-btn demo-card-tool" onclick="brExportPng(\'%s\',this)" title="Export PNG">&#x1F5BC;</button>
-       <button type="button" class="demo-card-tool" onclick="_brExportPanel(\'%s\')" title="Export Excel">&#x1F4E5;</button>
      </div>',
-    .demo_esc(section_id), .demo_esc(section_id),
-    .demo_esc(section_id), .demo_esc(section_id), .demo_esc(section_id))
+    .demo_esc(section_id))
 }
 
 

@@ -470,6 +470,286 @@
     }
   }, true);
 
+  // ==========================================================================
+  // Destination toolbars: one per main view, one per Advanced drawer
+  // ==========================================================================
+  // Stage 5. Every scope here is resolved from data-group, data-destination
+  // and data-tier. None of it reads or writes data-section, because the set
+  // of section anchors is a contract with the analysts who typed those names
+  // into Section_Insights sheets, and a destination is not a section.
+  //
+  // Pin and PNG offer the anchors that are inside the scope, so consolidating
+  // the toolbars does not take away the reader's choice of what to capture;
+  // it takes away having to hunt for the right button. Excel takes every
+  // table in the scope, which is what gives the six Category Buying analyses
+  // an export again after Stage 2 narrowed section-repertoire-<cat> to the
+  // Category Context host.
+
+  function destOf(btn) {
+    var g = btn.getAttribute("data-group");
+    var d = btn.getAttribute("data-destination");
+    if (!g || !d) return null;
+    return document.querySelector('.br-destination[data-group="' + g +
+                                  '"][data-destination="' + d + '"]');
+  }
+
+  function destScope(btn) {
+    var dest = destOf(btn);
+    if (!dest) return null;
+    var tier = btn.getAttribute("data-tier") || "main";
+    return tier === "advanced"
+      ? dest.querySelector(".br-advanced-body")
+      : dest.querySelector(".br-dest-main");
+  }
+  window.brDestScope = destScope;
+
+  // Does this root hold anything a capture would put on a card?
+  function hasCapturable(el) {
+    if (!el) return false;
+    if (el.querySelector("table")) return true;
+    if (el.querySelector("[data-pin-as-table],[data-pin-as-chart],[data-fn-rel-chart-area]")) return true;
+    var svgs = el.querySelectorAll("svg");
+    for (var i = 0; i < svgs.length; i++) {
+      if (!svgs[i].closest("button")) return true;
+    }
+    return false;
+  }
+
+  // What a scope offers to pin or export, in document order, each with a
+  // label a reader will recognise and the root a capture is taken from.
+  //
+  // Anchors first, because an anchor is a name an analyst may have saved a
+  // pin against and capturing from it keeps that pin meaning the same thing.
+  // Then any leaf host that holds no anchor at all: the five Category Buying
+  // analyses in the Brand and Buying drawer are exactly that case, and
+  // before Stage 5 they had no pin or PNG control of any kind. An entry with
+  // nothing capturable under it is left out rather than offered and then
+  // producing an empty card.
+  function sectionsIn(scope) {
+    if (!scope) return [];
+    var seen = {}, out = [];
+    scope.querySelectorAll("[data-section]").forEach(function (el) {
+      if (el.tagName === "BUTTON") return;
+      var key = el.getAttribute("data-section");
+      if (!key || seen[key]) return;
+      if (!hasCapturable(el)) return;
+      seen[key] = true;
+      var title = el.querySelector(".br-element-title, h2, h3");
+      var host  = el.closest("[data-leaf-label]");
+      var label = (title && title.textContent.trim()) ||
+                  (host && host.getAttribute("data-leaf-label")) || key;
+      out.push({ key: key, label: label, el: el });
+    });
+    scope.querySelectorAll("[data-leaf][data-leaf-label]").forEach(function (host) {
+      if (host.querySelector("[data-section]")) return;
+      var key = host.getAttribute("data-leaf");
+      if (!key || seen[key]) return;
+      if (!hasCapturable(host)) return;
+      seen[key] = true;
+      out.push({ key: key,
+                 label: host.getAttribute("data-leaf-label") || key,
+                 el: host });
+    });
+    return out;
+  }
+  window.brSectionsIn = sectionsIn;
+
+  function destLabel(btn) {
+    var g = btn.getAttribute("data-group");
+    var d = btn.getAttribute("data-destination");
+    var b = document.querySelector('.br-destination-btn[data-group="' + g +
+                                   '"][data-destination="' + d + '"]');
+    return b ? b.textContent.trim() : d;
+  }
+
+  // Pin and PNG share one picker. Nothing is captured until the reader picks,
+  // and a scope with exactly one anchor skips the dialog rather than asking a
+  // question with one answer.
+  function destPicker(btn, opts, run) {
+    var scope = destScope(btn);
+    var items = sectionsIn(scope);
+    if (!items.length) {
+      alert("There is nothing on this view to " + opts.verb + ".");
+      return;
+    }
+    if (items.length === 1) { run(items); return; }
+    if (typeof TurasPins === "undefined") { run([items[0]]); return; }
+    var boxes = items.map(function (it) {
+      return { key: it.key, label: it.label, available: true, checked: true };
+    });
+    TurasPins.showCheckboxPopover(btn, boxes, function (flags) {
+      run(items.filter(function (it) { return flags[it.key]; }));
+    }, btn.closest(".br-dest-tools") || btn.parentElement,
+       { title: opts.title, actionLabel: opts.actionLabel });
+  }
+
+  window.brDestPin = function(btn) {
+    destPicker(btn, { verb: "pin", title: "PIN TO VIEWS", actionLabel: "Pin" },
+      function (items) {
+        items.forEach(function (it) {
+          if (typeof window.brPinFrom === "function") {
+            window.brPinFrom(it.el, it.key, it.label);
+          }
+        });
+        btn.classList.add("pin-flash");
+        setTimeout(function () { btn.classList.remove("pin-flash"); }, 600);
+      });
+  };
+
+  window.brDestPng = function(btn) {
+    destPicker(btn, { verb: "export", title: "EXPORT AS PNG",
+                      actionLabel: "Export" },
+      function (items) {
+        items.forEach(function (it) {
+          if (typeof window.brExportPngFrom === "function") {
+            window.brExportPngFrom(it.el, it.key, it.label);
+          }
+        });
+      });
+  };
+
+  window.brDestExcel = function(btn) {
+    var scope = destScope(btn);
+    if (!scope) return;
+    var g = btn.getAttribute("data-group");
+    var d = btn.getAttribute("data-destination");
+    var t = btn.getAttribute("data-tier") || "main";
+    _brExportRoot(scope, g + "-" + d + (t === "advanced" ? "-advanced" : ""),
+                  destLabel(btn));
+  };
+
+  // --- Destination commentary ---
+  // One box per destination, hidden until asked for, and mirrored into the
+  // saved file by the same textarea mirror every other commentary box uses.
+  window.brToggleDestNote = function(btn) {
+    var wrap = btn.closest(".br-dest-toolbar");
+    var note = wrap ? wrap.querySelector(".br-dest-note") : null;
+    if (!note) return;
+    var opening = note.hidden;
+    note.hidden = !opening;
+    btn.setAttribute("aria-expanded", opening ? "true" : "false");
+    if (opening) {
+      var ta = note.querySelector("textarea");
+      if (ta) ta.focus();
+    }
+  };
+
+  // A saved report reopens with its commentary in the textarea's text
+  // content, so a box that was written in must open again on load. Without
+  // this the text is in the file and behind a click nobody knows to make.
+  function openWrittenDestNotes() {
+    document.querySelectorAll(".br-dest-note").forEach(function (note) {
+      var ta = note.querySelector("textarea");
+      if (!ta || !ta.value.trim()) return;
+      note.hidden = false;
+      var wrap = note.closest(".br-dest-toolbar");
+      var btn = wrap ? wrap.querySelector(".br-dest-note-toggle") : null;
+      if (btn) {
+        btn.setAttribute("aria-expanded", "true");
+        btn.textContent = "Commentary";
+      }
+    });
+  }
+
+  // ==========================================================================
+  // Significance as a toggle, off by default, one control per destination
+  // ==========================================================================
+  // The idea is the tabs v2 sigMode: a reader asks for significance rather
+  // than being given it. None of that code is reused; this is a class on the
+  // destination and a stylesheet rule.
+  //
+  // CSS rather than DOM surgery, because the MA table, the funnel table and
+  // the Mental Advantage focal view all re-render themselves on a focal
+  // switch, a base toggle or a brand filter, and a DOM pass would have to be
+  // chased after every one of them. An attribute on the destination survives
+  // all of it, and survives Save, because it is a content attribute.
+  //
+  // The capture path is the part CSS cannot do on its own. TurasPins' inliner
+  // skips values it reads as defaults, display:none among them, so a marker
+  // hidden by CSS would come back on a pinned card or a PNG. brand_pins.js
+  // wraps TurasPins.capturePortableHtml once and strips the markers out of
+  // any capture taken from a destination whose toggle is off, so the card a
+  // reader gets matches the page they were looking at.
+  //
+  // The funnel's nested view is a separate matter and the two agree by
+  // construction: Stage 4 leaves those markers out of the markup because they
+  // were computed on a different base, so turning significance on cannot make
+  // them appear. The funnel's own "How this works" says so.
+  window.brToggleDestSig = function(btn) {
+    var dest = destOf(btn);
+    if (!dest) return;
+    var on = dest.getAttribute("data-br-sig") !== "on";
+    dest.setAttribute("data-br-sig", on ? "on" : "off");
+    dest.querySelectorAll(".br-sig-toggle").forEach(function (b) {
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.textContent = on ? "Significance: on" : "Significance: off";
+    });
+  };
+
+  // Is the destination containing this element showing significance?
+  // Anything outside a destination (the Portfolio tab, the Summary tab) is
+  // left as it was: those are not destinations and have no toggle.
+  window.brSigOnFor = function(el) {
+    if (!el || !el.closest) return true;
+    var dest = el.closest(".br-destination");
+    if (!dest) return true;
+    return dest.getAttribute("data-br-sig") === "on";
+  };
+
+  // ==========================================================================
+  // "How this works": every explanatory block, collapsed, one per view
+  // ==========================================================================
+  // The blocks are moved, not rewritten and not deleted. Each one keeps its
+  // own markup, its own text and its own bases; all that changes is that they
+  // sit together at the foot of the view instead of between the analyses.
+  //
+  // Collected in the browser rather than assembled in R because the panels
+  // emit them from fifteen different builders, several of them nested inside
+  // fragments this file never sees as anything but a string. Nothing moved
+  // here carries a data-section anchor, an id or a payload, so no anchor and
+  // no island moves with them.
+  var HOWTO_SELECTOR = [
+    ".t-callout",                 // the shared callout registry's block
+    "details.ma-chart-callout",   // MA chart notes
+    "details.ma-adv-intro-callout",
+    "details.cb-info-callout"     // Category Buying notes
+  ].join(",");
+
+  function brCollectHowTo() {
+    document.querySelectorAll(".br-howto").forEach(function (drawer) {
+      var body = drawer.querySelector(".br-howto-body");
+      var scope = drawer.parentNode;
+      if (!body || !scope) return;
+      var found = 0;
+      scope.querySelectorAll(HOWTO_SELECTOR).forEach(function (block) {
+        if (block.closest(".br-howto")) return;
+        // A callout that shipped collapsed had a disclosure of its own. The
+        // drawer is now the disclosure, so opening it must show everything
+        // rather than present a second thing to click. Stage 3 took the same
+        // decision for the Overview's methodology callout.
+        block.classList.remove("collapsed");
+        if (block.tagName === "DETAILS") block.setAttribute("open", "");
+        body.appendChild(block);
+        found += 1;
+      });
+      if (found > 0) {
+        drawer.hidden = false;
+        var t = drawer.querySelector(".br-howto-count");
+        if (t) t.textContent = String(found);
+      }
+    });
+  }
+  window.brCollectHowTo = brCollectHowTo;
+
+  window.brToggleHowTo = function(btn) {
+    var wrap = btn.closest(".br-howto");
+    var body = wrap ? wrap.querySelector(".br-howto-body") : null;
+    if (!body) return;
+    var opening = body.hidden;
+    body.hidden = !opening;
+    btn.setAttribute("aria-expanded", opening ? "true" : "false");
+  };
+
   // --- Insight editor ---
   window._brToggleInsight = function(sectionId) {
     var container = document.querySelector('.br-insight-container[data-section="' + sectionId + '"]');
@@ -676,28 +956,44 @@
     if (overlay) overlay.classList.toggle("open");
   };
 
-  // --- Excel export per section ---
-  window._brExportPanel = function(panelId) {
-    var panel = document.getElementById("section-" + panelId);
-    if (!panel) panel = document.querySelector('[data-section="' + panelId + '"]');
-    if (!panel && /^pf-/.test(panelId)) {
-      var subId = panelId.replace(/^pf-/, "pf-subtab-");
-      panel = document.getElementById(subId);
-    }
-    if (!panel) return;
+  // --- Excel export ---
+  // One workbook builder, two entry points. _brExportPanel takes a section
+  // anchor and is what every existing button and every saved habit calls;
+  // _brExportRoot takes an element and is what a destination toolbar uses,
+  // because a destination has no anchor of its own by design. Neither reads
+  // the other's scope, and the XML is written once.
+  //
+  // Sheet names come from the nearest enclosing anchor or leaf label rather
+  // than a bare index, so a workbook of eleven tables says which analysis
+  // each sheet came from. Excel caps a sheet name at 31 characters and
+  // rejects : \ / ? * [ ], so the name is cleaned and de-duplicated.
+  function _brSheetNames(tables, fallback) {
+    var used = {}, out = [];
+    tables.forEach(function (table, idx) {
+      var host = table.closest("[data-section]") ||
+                 table.closest("[data-leaf-label]");
+      var raw = "";
+      if (host) {
+        raw = host.getAttribute("data-section") ||
+              host.getAttribute("data-leaf-label") || "";
+      }
+      if (!raw) raw = fallback + (idx > 0 ? "_" + idx : "");
+      raw = String(raw).replace(/[:\\\/?*\[\]]/g, " ").trim().substring(0, 28);
+      if (!raw) raw = "Sheet";
+      var name = raw, n = 1;
+      while (used[name]) { n += 1; name = raw.substring(0, 26) + "_" + n; }
+      used[name] = true;
+      out.push(name);
+    });
+    return out;
+  }
 
-    var tables = panel.querySelectorAll("table.br-table");
-    if (tables.length === 0) tables = panel.querySelectorAll("table");
-    if (tables.length === 0) {
-      alert("No table available on this section to export.");
-      return;
-    }
-
+  function _brTablesToWorkbook(tables, fallback) {
+    var names = _brSheetNames(tables, fallback);
     var xml = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>';
     xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
-
     tables.forEach(function(table, idx) {
-      xml += '<Worksheet ss:Name="' + (panelId.substring(0,25) + (idx > 0 ? "_" + idx : "")) + '"><Table>';
+      xml += '<Worksheet ss:Name="' + names[idx] + '"><Table>';
       table.querySelectorAll("tr").forEach(function(tr) {
         xml += "<Row>";
         tr.querySelectorAll("th, td").forEach(function(cell) {
@@ -712,13 +1008,39 @@
       xml += "</Table></Worksheet>";
     });
     xml += "</Workbook>";
+    return xml;
+  }
 
+  function _brDownloadWorkbook(xml, filename) {
     var blob = new Blob([xml], { type: "application/vnd.ms-excel" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = panelId + ".xls";
+    a.download = filename + ".xls";
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function _brExportRoot(root, filename, whatItIs) {
+    if (!root) return;
+    var tables = root.querySelectorAll("table.br-table");
+    if (tables.length === 0) tables = root.querySelectorAll("table");
+    if (tables.length === 0) {
+      alert("There is no table on " + (whatItIs || "this view") + " to export.");
+      return;
+    }
+    _brDownloadWorkbook(_brTablesToWorkbook(tables, filename), filename);
+  }
+  window._brExportRoot = _brExportRoot;
+
+  window._brExportPanel = function(panelId) {
+    var panel = document.getElementById("section-" + panelId);
+    if (!panel) panel = document.querySelector('[data-section="' + panelId + '"]');
+    if (!panel && /^pf-/.test(panelId)) {
+      var subId = panelId.replace(/^pf-/, "pf-subtab-");
+      panel = document.getElementById(subId);
+    }
+    if (!panel) return;
+    _brExportRoot(panel, panelId, "this section");
   };
 
   // Publish every category's opening state once, so the header and the
@@ -746,6 +1068,9 @@
         typeof window.BrandChartFocus.restoreAll === "function") {
       window.BrandChartFocus.restoreAll();
     }
+    // After every panel has painted, so a callout a panel builds at run time
+    // is collected with the ones R wrote into the file.
+    brCollectHowTo();
   }
   window.brApplyAllComparisonSets = brApplyAllComparisonSets;
 
@@ -753,6 +1078,7 @@
   function init() {
     initTableSort();
     initCommentaryPersistence();
+    openWrittenDestNotes();
   }
 
   if (document.readyState === "loading") {

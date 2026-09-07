@@ -33,6 +33,17 @@ n_dn <- function(html, needle) {
   m <- gregexpr(needle, html, fixed = TRUE)[[1]]
   if (length(m) == 1L && m[1L] == -1L) 0L else length(m)
 }
+# How many CONTAINERS a destination has: the destination div itself, plus its
+# Advanced drawer where it has one. Stage 5 put a toolbar and a "How this
+# works" drawer inside every view and both carry data-destination, so a raw
+# count of the attribute no longer measures the shell. These two count the
+# structure instead, and the toolbars are asserted on their own below.
+n_dest_containers <- function(html, id) {
+  n_dn(html, sprintf('data-destination="%s">', id))
+}
+n_dest_buttons <- function(html, id) {
+  n_dn(html, sprintf('data-destination="%s" onclick=', id))
+}
 attr_vals_dn <- function(html, attr) {
   m <- gregexpr(sprintf('%s="[^"]*"', attr), html)[[1]]
   if (length(m) == 1L && m[1L] == -1L) return(character(0))
@@ -157,9 +168,9 @@ test_that("a full-depth category renders five destination buttons", {
   for (d in .BR_DESTINATIONS) {
     # One button, one container, and for a destination that has an Advanced
     # drawer the drawer carries the attribute too.
-    expect_true(n_dn(out, sprintf('data-destination="%s"', d$id)) %in% c(2L, 3L),
-                info = paste(d$id, "needs a button and a container"))
-    expect_equal(n_dn(out, sprintf('data-destination="%s" onclick=', d$id)), 1L,
+    expect_true(n_dest_containers(out, d$id) %in% c(1L, 2L),
+                info = paste(d$id, "needs a container, and a drawer or not"))
+    expect_equal(n_dest_buttons(out, d$id), 1L,
                  info = paste(d$id, "needs exactly one nav button"))
   }
   # Exactly one destination is active on load, and it is the first.
@@ -196,11 +207,12 @@ test_that("a destination with nothing configured is hidden, never shown empty", 
   expect_equal(n_dn(out, 'data-destination="mental"'), 0L)
   expect_equal(n_dn(out, 'data-destination="meaning"'), 0L)
   # Brand and Buying keeps its Advanced drawer, which carries the attribute
-  # as well as the button and the container.
-  expect_equal(n_dn(out, 'data-destination="buying"'), 3L)
-  expect_equal(n_dn(out, 'data-destination="audience"'), 2L)
+  # as well as the container.
+  expect_equal(n_dest_containers(out, "buying"), 2L)
+  expect_equal(n_dest_buttons(out, "buying"), 1L)
+  expect_equal(n_dest_containers(out, "audience"), 1L)
   # The Overview always renders, so the shell never collapses to nothing.
-  expect_equal(n_dn(out, 'data-destination="overview"'), 2L)
+  expect_equal(n_dest_containers(out, "overview"), 1L)
   expect_equal(n_dn(out, 'class="br-destination-btn'), 3L)
 })
 
@@ -210,8 +222,8 @@ test_that("one category with only the funnel still gets a coherent shell", {
                                     demo = FALSE),
     panels = fake_panels(c("funnel_dss", "funnel_dss__relationship")))
   expect_equal(n_dn(out, 'class="br-destination-btn'), 3L)
-  expect_equal(n_dn(out, 'data-destination="buying"'), 2L)
-  expect_equal(n_dn(out, 'data-destination="meaning"'), 2L)
+  expect_equal(n_dest_containers(out, "buying"), 1L)
+  expect_equal(n_dest_containers(out, "meaning"), 1L)
   expect_equal(n_dn(out, 'data-destination="audience"'), 0L)
   # No empty Advanced drawer is emitted where no leaf lands in one.
   expect_equal(n_dn(out, 'class="br-advanced"'), 0L)
@@ -332,8 +344,73 @@ test_that("every per-sub-tab Section_Insights anchor still lands, once each", {
     expect_true(grepl(sprintf('data-section="%s"', a), out, fixed = TRUE),
                 info = paste("missing anchor", a))
   }
-  # Six insight wraps per category, one per host that has an internal tab.
-  expect_equal(n_dn(out, "br-insight-wrap"), 6L)
+  # Stage 5: the anchors are on the leaf wrappers now, so they stay on the
+  # page whether or not a commentary box is rendered for them. With no
+  # Section_Insights text in this config there is no insight wrap at all: the
+  # commentary a reader writes goes in the destination's own box.
+  expect_equal(n_dn(out, "br-insight-wrap"), 0L)
+  expect_equal(n_dn(out, 'class="br-leaf-anchor"'), 5L)
+
+  # With authored text the leaf's own box comes back, on its own anchor and
+  # inside its own wrap, so the sentence sits beside the analysis it was
+  # written against.
+  with_text <- render_cat(config = list(
+    focal_brand = "IPK", colour_focal = "#1A5276",
+    section_insights = list("ceps-dss" = "CEP coverage is broad.")))
+  expect_true(grepl('data-insight-internal-tab="ceps"', with_text, fixed = TRUE))
+  expect_true(grepl("CEP coverage is broad.", with_text, fixed = TRUE))
+  expect_equal(n_dn(with_text, "br-insight-wrap"), 1L)
+})
+
+test_that("every view has one export toolbar, and Advanced has its own", {
+  out <- render_cat()
+  # Four main views plus the one Advanced drawer a full-depth category has.
+  # The Overview is the fifth destination and gets none: it holds a route to
+  # the Summary tab, not an analysis, so there is nothing to export, no
+  # marker for a significance toggle to govern, and a commentary box there
+  # would compete with the one on the page it routes to.
+  expect_equal(n_dn(out, 'class="br-dest-toolbar"'), 5L)
+  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-pin"'), 5L)
+  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-png"'), 5L)
+  expect_equal(n_dn(out, 'class="br-dest-btn br-dest-excel"'), 5L)
+  expect_false(grepl('data-destination="overview" data-tier="main">', out,
+                     fixed = TRUE))
+  # Significance and commentary are one per destination, not one per view,
+  # so the Advanced drawer's toolbar carries neither.
+  expect_equal(n_dn(out, "br-sig-toggle"), 4L)
+  expect_equal(n_dn(out, "br-dest-note-text"), 4L)
+  # The Advanced toolbar carries its three buttons and its own drawer, and
+  # nothing else: five elements wearing the tier.
+  expect_equal(n_dn(out, 'data-tier="advanced"'), 5L)
+
+  # One shared per-leaf toolbar survives, on the Category Buying host. Its
+  # buttons are not generic: brand_cat_buying_panel.js unbinds the inline
+  # handler and rebinds a dialog that pins whichever of the eight sub-tabs is
+  # on screen, which is finer than an anchor-level picker can be. Every other
+  # per-leaf pin, PNG and Excel button in the category is gone.
+  expect_equal(n_dn(out, 'class="br-pin-btn"'), 1L)
+  expect_equal(n_dn(out, 'class="br-png-btn"'), 1L)
+  expect_equal(n_dn(out, 'class="br-export-btn"'), 1L)
+  expect_equal(n_dn(out, "cb-toolbar-top"), 1L)
+})
+
+test_that("significance is off until a reader asks for it", {
+  out <- render_cat()
+  # The markup never ships a destination in the on state, and the label says
+  # which state it is in rather than what a click would do.
+  expect_equal(n_dn(out, 'data-br-sig="on"'), 0L)
+  expect_equal(n_dn(out, 'aria-pressed="false"'), 4L)
+  expect_equal(n_dn(out, "Significance: off"), 4L)
+})
+
+test_that("every view carries a collapsed How this works drawer", {
+  out <- render_cat()
+  # One per main view plus one in the Advanced drawer. Each ships hidden and
+  # is unhidden by brCollectHowTo() only when it found something to hold, so
+  # a view with no methodology shows no drawer.
+  expect_equal(n_dn(out, 'class="br-howto"'), 5L)
+  expect_equal(n_dn(out, 'class="br-howto-body" hidden'), 5L)
+  expect_equal(n_dn(out, 'aria-expanded="false" onclick="brToggleHowTo(this)"'), 5L)
 })
 
 test_that("the header control area is a three-slot system with a reserved slot", {

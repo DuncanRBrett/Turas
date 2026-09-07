@@ -36,6 +36,38 @@
     '[onclick]', '[ondblclick]'
   ].join(',');
 
+  // --- Significance markers, and why they are stripped rather than hidden ---
+  // The toggle in each destination toolbar hides these with CSS, which is the
+  // only thing that survives the MA and funnel panels re-rendering themselves
+  // on every focal switch and base toggle. CSS is not enough for a capture:
+  // TurasPins' inliner skips values it reads as defaults, and display:none is
+  // one of them, so a marker hidden on screen would come back on a pinned
+  // card or a PNG. That is the failure mode the project CLAUDE.md warns about
+  // and Stage 4 avoided by leaving the funnel's triangle out of the markup.
+  //
+  // So every capture taken from a destination whose toggle is off has the
+  // markers taken out of the captured HTML. One wrapper around
+  // TurasPins.capturePortableHtml covers all of it, rather than an edit at
+  // each of the fourteen capture sites across five panel files: the funnel,
+  // MA, Mental Advantage, Category Buying and portfolio pin paths all go
+  // through that one function.
+  var SIG_MARKER_SELECTORS = [
+    ".ma-sig",        // MA table z-test arrows
+    ".ma-fv-sig",     // Mental Advantage focal view stars
+    ".ma-adv-sig",    // the significance clause on a Mental Advantage tooltip
+    ".ct-sig",        // funnel triangle, the engine's test on its own base
+    ".fn-sig-avg",    // funnel arrows against the spread of brands
+    ".fn-sig"         // funnel card arrows
+  ].join(",");
+
+  window.brStripSigMarkers = function(html) {
+    if (!html) return html;
+    var d = document.createElement("div");
+    d.innerHTML = html;
+    d.querySelectorAll(SIG_MARKER_SELECTORS).forEach(function(el) { el.remove(); });
+    return d.innerHTML;
+  };
+
   window.brStripInteractive = function(html) {
     if (!html) return html;
     var d = document.createElement('div');
@@ -351,6 +383,81 @@
     }
   }
 
+  // --- Pin and PNG with no button of their own ---
+  // brTogglePin() needs a .br-pin-btn on the page to hang its popover from,
+  // and Stage 5 removed most of those when the export controls moved to one
+  // toolbar per destination. These are the button-free entry points: the
+  // destination toolbar has already asked the reader what to capture, so
+  // there is no second question to ask and everything in the chosen root is
+  // captured.
+  //
+  // They take a root element rather than an anchor because five of the
+  // Category Buying analyses have no anchor at all: the anchored ones pass
+  // the element their anchor resolves to, so a pin taken through here is the
+  // same capture the anchor has always produced.
+  function pinnableContent(root, key, title) {
+    var content = captureFromRoot(root, key);
+    if (!content) return null;
+    if (title && (!content.title || content.title === key)) content.title = title;
+    return content;
+  }
+
+  window.brPinFrom = function(root, key, title) {
+    if (typeof TurasPins === "undefined" || !root) return false;
+    var content = pinnableContent(root, key, title);
+    if (!content) return false;
+    var hasChart = !!(content.chartSvg || content.chartHtml);
+    var hasTable = !!content.tableHtml;
+    if (!hasChart && !hasTable && !content.insightText) return false;
+    content.pinFlags = { chart: hasChart, table: hasTable,
+                         insight: !!content.insightText };
+    content.pinMode = "custom";
+    content.title = window.brTitleWithChartDeviation(
+      content.title, content.chartDeviation, hasChart);
+    TurasPins.add(content);
+    return true;
+  };
+
+  window.brExportPngFrom = function(root, key, title) {
+    if (typeof TurasPins === "undefined" || !root) return false;
+    var content = pinnableContent(root, key, title);
+    if (!content) return false;
+    var hasChart = !!content.chartSvg;
+    // An HTML chart is rendered by prepending it to the table fragment, the
+    // same way brExportPngFromEl does it.
+    var tableHtml = content.tableHtml || "";
+    if (!hasChart && content.chartHtml) tableHtml = content.chartHtml + tableHtml;
+    if (!hasChart && !tableHtml && !content.insightText) return false;
+    TurasPins.exportContentAsPNG({
+      title:       window.brTitleWithChartDeviation(
+                     content.title, content.chartDeviation,
+                     hasChart || !!content.chartHtml),
+      subtitle:    content.subtitle || "",
+      baseText:    content.baseText || "",
+      chartSvg:    content.chartSvg || "",
+      tableHtml:   tableHtml,
+      insightText: content.insightText || "",
+      pinFlags:    { chart: hasChart || !!content.chartHtml,
+                     table: !!content.tableHtml,
+                     insight: !!content.insightText },
+      pinMode:     "custom"
+    });
+    return true;
+  };
+
+  // Kept as the anchor-shaped entry point, for a caller that has a name
+  // rather than an element.
+  window.brPinSection = function(sectionId) {
+    var section = document.getElementById("section-" + sectionId);
+    if (!section) {
+      var c = document.querySelectorAll('[data-section="' + sectionId + '"]');
+      for (var i = 0; i < c.length; i++) {
+        if (c[i].tagName !== "BUTTON") { section = c[i]; break; }
+      }
+    }
+    return window.brPinFrom(section, sectionId, null);
+  };
+
   // --- Pin individual chart ---
   window.brPinChart = function(btnEl, chartTitle) {
     if (typeof TurasPins === "undefined") return;
@@ -534,8 +641,27 @@
   };
 
   // --- Init TurasPins ---
+  // Wrap the shared capture helper once, so no capture site has to know
+  // about the significance toggle. The wrapper is idempotent: a second call
+  // finds the flag and leaves the chain alone.
+  function wrapCaptureForSigMode() {
+    if (typeof TurasPins === "undefined") return;
+    if (typeof TurasPins.capturePortableHtml !== "function") return;
+    if (TurasPins.capturePortableHtml.__brSigWrapped) return;
+    var inner = TurasPins.capturePortableHtml;
+    var wrapped = function(el) {
+      var html = inner.apply(this, arguments);
+      var sigOn = (typeof window.brSigOnFor === "function")
+        ? window.brSigOnFor(el) : true;
+      return sigOn ? html : window.brStripSigMarkers(html);
+    };
+    wrapped.__brSigWrapped = true;
+    TurasPins.capturePortableHtml = wrapped;
+  }
+
   function initPins() {
     if (typeof TurasPins === "undefined") return;
+    wrapCaptureForSigMode();
 
     TurasPins.init({
       storeId: "br-pinned-views-data",
