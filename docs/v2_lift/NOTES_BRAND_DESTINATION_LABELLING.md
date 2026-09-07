@@ -246,7 +246,7 @@ Before and after, side by side, on the committed fixture:
 
 Mental Availability's main view went from five tables to three, because the
 full matrix and the buyer-gap diagnostic moved into the Advanced drawer it
-did not have before. Report sizes: 4,067,629 / 4,183,579 / 4,183,494 bytes,
+did not have before. Report sizes: 4,067,665 / 4,183,615 / 4,183,530 bytes,
 against 4,056,423 / 4,172,037 / 4,171,952 before, 0.3 percent larger.
 
 ## Executed, with the numbers

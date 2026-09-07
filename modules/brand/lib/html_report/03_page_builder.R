@@ -797,7 +797,8 @@ build_br_summary_panel <- function(results, config) {
           "focal brand's own buyers differ from everyone else."),
   "cb-norms" =
     paste("What the Dirichlet model expects each brand's penetration, buy",
-          "rate and loyalty to be, beside what the survey observed."),
+          "rate, share of category requirement and sole loyalty to be,",
+          "beside what the survey observed."),
   "cb-loyalty" =
     paste("Of all the category's buyers, the share who buy each brand solely,",
           "mostly, occasionally or not at all."),
