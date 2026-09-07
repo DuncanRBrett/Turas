@@ -230,9 +230,12 @@ value for value, including their fallback to the absolute figure, and returns
 the view it really stands on rather than the meta's verdict, so a gated report
 whose chain counts are missing is described correctly too.
 
-Proved by execution on the QA fixtures, not on the synthetic test data. The
-extras and ungated fixtures share a dataset but for twenty-five cleared
-awareness cells, so one pair of sentences discriminates on both.
+Proved by execution on the QA fixtures, not on the synthetic test data. Both
+columns below were run in this session: the "Before" column by checking the
+two changed files out at `903907ef`, rerunning the probe against the same
+fixtures, and restoring them. The extras and ungated fixtures share a dataset
+but for twenty-five cleared awareness cells, so one pair of sentences
+discriminates on both.
 
 | Fixture | Sentence | Before | After |
 |---|---|---|---|
@@ -278,10 +281,13 @@ the page opens them, and reading the titles off `TurasPins.getAll()`.
 | The funnel card | "Brand Funnel" | "Brand Funnel" gated, "Brand Stages" ungated. Still no card named "Summary" anywhere |
 
 The review's base column said seven distinct names in the Brand Meaning
-drawer. The markup does not support that: `br-reach-dss-qaa1-overview` and
-`br-reach-dss-qaa1-misattribution` carry the identical `<h3>`, and the base
-took the first heading with no visibility test, so it produced three distinct
-names too. Three is the bar, and three is what came back.
+drawer. The markup does not support that, by reading rather than by running:
+`br-reach-dss-qaa1-overview`, `-misattribution` and `-media` carry the
+identical `<h3>` "QA synthetic asset A (not asked in IPK Wave 1)", and
+`sectionsIn()` at `e94c2b30` took the first heading in the root with no
+visibility test, so it can only have produced three distinct names too. That
+inference was not executed at the base commit. Three is the bar, and three is
+what came back.
 
 `modules/brand/tests/qa/drive_pin_titles.py` is the permanent gate. It reads
 the funnel card's expected name off the host's own `data-leaf-label` rather
@@ -407,6 +413,18 @@ pre-existing ones. Reports built at 4,049,963 / 4,159,932 / 4,159,847 bytes.
   hidden `.fn-subnav` buttons and Summary cards the review listed are still
   hidden. None of them names the leaf, which is what the brief scoped; a full
   sweep is a separate decision.
+- **`brHeadingHiddenWithin()` accepts one case `offsetParent` rejected.** It
+  walks the `hidden` attribute and computed `display` and `visibility`, so a
+  heading inside a closed `<details>` sitting between the capture root and the
+  heading would now name the card, where the old test rejected it. No such
+  heading is reached on these fixtures: the three `drive_pin_titles.py` runs
+  and both `capture_artifacts.py` runs produce the expected title every time.
+  Covered empirically, not by construction.
+- **The panel-native pin path is not driven with the drawers shut.**
+  `brTogglePin()` passes a null title, so it goes through the new heading rule
+  with no picker name to fall back on. It is only ever clicked from a card the
+  reader is looking at, where the new rule and the old one agree, and no gate
+  exercises it from a collapsed drawer.
 - **The fixture's own authored funnel insight is not flagged in either mode.**
   It quotes 92 / 67 / 45 / 32 and passes on the gated and the ungated report
   alike, because the section pool spans eighteen brands and covers most of the
