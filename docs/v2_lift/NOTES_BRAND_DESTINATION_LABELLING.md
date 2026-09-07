@@ -100,7 +100,17 @@ The four unlabelled tables the harness names:
    none at all. Audience was the destination Duncan said reads properly, and
    it read properly because its leaves already had these headings.
 
-2. **The heading keeps `br-element-title` and the "<name>: <category>" shape.**
+2. **The heading comes before the toolbar, not after it.** The five elements
+   that had a hand-written title emitted the toolbar first and the title
+   second. A leaf whose Section_Insights sheet authored a sentence renders
+   that sentence in its toolbar, so a reader would have met an analyst's
+   comment before the name of the thing it is about. The head is now first
+   inside the anchor wrapper on every branch, which also makes it
+   unambiguously the first `.br-element-title, h2, h3` the pin picker finds.
+   A test renders a category with an authored `ceps-dss` sentence and asserts
+   the heading precedes it.
+
+3. **The heading keeps `br-element-title` and the "<name>: <category>" shape.**
    `captureFromRoot()` in `js/brand_pins.js` and `sectionsIn()` in
    `js/brand_report.js` both name a pinned card from the first visible
    `.br-element-title, h2, h3` inside the anchor, and `sectionsIn()` builds
@@ -110,7 +120,7 @@ The four unlabelled tables the harness names:
    each analysis in a pane, which is noisier than a bare name and is the price
    of a pinned card that says which category it came from.
 
-3. **The lede registry is sparse.** A leaf gets a line only where its name
+4. **The lede registry is sparse.** A leaf gets a line only where its name
    does not already say what the table holds **and** the panel prints no intro
    of its own. Category Context, Brand Summary, Duplication of Purchase,
    Branded Reach and Shopper Behaviour all print their own opening paragraph
@@ -124,7 +134,7 @@ The four unlabelled tables the harness names:
    because on an ungated report the leaf is called Brand Stages and shows four
    separate measures (review finding F5).
 
-4. **Panel-native titles that duplicated a leaf head were removed, not kept.**
+5. **Panel-native titles that duplicated a leaf head were removed, not kept.**
    Category Buying printed its own name for four sub-tabs and Shopper
    Behaviour for a fifth; Mental Advantage printed a second "Mental
    Advantage". Those go. Mental Availability's headline `h3` drops to `h4` and
@@ -132,7 +142,7 @@ The four unlabelled tables the harness names:
    section name, and the all-brand table below it gained its own `h4`, because
    without one it read as part of the focal strip.
 
-5. **The sub-headings that stay became real headings.** `.cb-section-title`,
+6. **The sub-headings that stay became real headings.** `.cb-section-title`,
    `.cb-ctx-subtitle` and `.cb-norms-chart-title` were `div` elements that
    render as headings. They keep their class, so every rule in
    `08_cat_buying_panel_styling.R` still reaches them and nothing moves on
@@ -140,32 +150,32 @@ The four unlabelled tables the harness names:
    markup. All three rules set font size, weight and margin explicitly, so
    the browser defaults for `h4` change nothing.
 
-6. **"Ad Hoc" became "Ad Hoc Questions".** The label now writes the heading
+7. **"Ad Hoc" became "Ad Hoc Questions".** The label now writes the heading
    that replaced a hand-written "Ad Hoc Questions", and "Ad Hoc" alone does
    not say what the reader is looking at. A display label, so `data-leaf` and
    every anchor are untouched.
 
-7. **Mental Advantage renders in two parts, one host each.** A sub-panel
+8. **Mental Advantage renders in two parts, one host each.** A sub-panel
    cannot be in two tiers at once, so the impact map's split needed a second
    host: `build_ma_advantage_section(part =)`, a new `only_tab` value
    `"advantage_detail"` in `build_ma_panel_html()`, and a twentieth leaf.
    `brand_ma_advantage.js` guards every view it renders on that view being
    present, so each host renders exactly what it holds and nothing more.
 
-8. **Each part carries the controls that govern what it holds.** Show chart
+9. **Each part carries the controls that govern what it holds.** Show chart
    governs the quadrant and stays in the main view; Show counts and the Excel
    export govern the matrix and go to the drawer. A control over a view that
    is not on the page is a control that does nothing, which is what the
    Dirichlet Norms brand filter used to be.
 
-9. **The two stimulus toggles are kept in step by a document event.** Both
+10. **The two stimulus toggles are kept in step by a document event.** Both
    parts need the CEPs and Attributes toggle, and two independent ones would
    let the drawer show attributes under a quadrant showing CEPs with nothing
    on the page saying so. `turas:brand-ma-stim-change` carries the category,
    on the pattern of `turas:brand-focal-change`, and `drive_chrome.py` drives
    the switch in both directions.
 
-10. **The detail leaf declares no anchor.** Its internal tab is `"advantage"`
+11. **The detail leaf declares no anchor.** Its internal tab is `"advantage"`
     so `activateHost()` finds the panel's own hidden sub-tab button, and an
     explicit empty `anch` field stops the anchor being derived from it. A
     derived anchor would have been a second `advantage-<cat>`; a new
@@ -175,14 +185,14 @@ The four unlabelled tables the harness names:
     the fallback Stage 5 built for the five Category Buying analyses, and its
     Advanced toolbar gives it a pin, a PNG and an Excel of its own.
 
-11. **The Advanced accordion toggle and the leaf head both name the item.**
+12. **The Advanced accordion toggle and the leaf head both name the item.**
     Opening "Dirichlet Norms" shows "Dirichlet Norms: Dry Seasonings &
     Spices" under it. Branded Reach already read that way. The alternative
     was to drop the heading in the Advanced tier, which would have sent every
     anchored drawer pin back to a bare leaf label with no category, or to
     hide it with CSS, which is the anti-pattern this whole exercise is about.
 
-12. **The empty drawer stays hidden.** Both Mental Advantage leaves are gated
+13. **The empty drawer stays hidden.** Both Mental Advantage leaves are gated
     on the engine returning an advantage block, so a study with CEPs and
     attributes and no advantage produces neither leaf and Mental Availability
     gets no drawer. A test renders that mix and counts the drawers per
@@ -254,8 +264,9 @@ against 4,056,423 / 4,172,037 / 4,171,952 before, 0.3 percent larger.
 | Check | Result |
 |---|---|
 | Brand suite, at the branch point | FAIL 0, WARN 1, SKIP 2, PASS 3659, 107.8 s |
-| Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3736, 121.0 s |
+| Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3789, 108.7 s |
 | `count_headings.py`, all three reports | 0 unnamed tables, exit 0; exit 1 on the before report |
+| `test_ma_advantage_split.R` | 49 pass, 0 fail. The two parts at fragment level, which the browser drives sit above |
 | `drive_chrome.py` | 142 / 167 / 169 checks, 0 failed |
 | `drive_destinations.py` | 357 / 388 / 388 checks, 0 failed |
 | `drive_pin_titles.py` | 63 / 96 / 96 checks, 0 failed |
@@ -325,7 +336,7 @@ recorded as gap 2 in the Stage 6 handover and unchanged by this work.
    buyer-gap view; the stimulus toggle in that drawer moves with the one above
    it; and the category is repeated on each heading in a pane, which is
    decision 2 and is the one piece of this he may want changed.
-2. **A ruling on decision 11**, whether the Advanced accordion toggle and the
+2. **A ruling on decision 12**, whether the Advanced accordion toggle and the
    leaf head under it should both name the item.
 
 **Not merged and not pushed.** Branch `fix/brand-destination-labelling`, on

@@ -415,6 +415,20 @@ test_that("every leaf host carries a heading naming it and the category", {
   expect_equal(n_dn(out, 'class="br-leaf-head"'), length(keys))
 })
 
+test_that("the name of the analysis comes before any commentary on it", {
+  # A leaf whose Section_Insights sheet authored a sentence renders that
+  # sentence in its own toolbar. The heading has to come first, or a reader
+  # meets an analyst's comment before the name of the thing it is about.
+  cfg <- list(focal_brand = "IPK", colour_focal = "#1A5276",
+              section_insights = list("ceps-dss" = "An authored sentence."))
+  out <- render_cat(config = cfg)
+  head_at <- pos_dn(out, '<h3 class="br-element-title br-leaf-title">Category Entry Points')
+  note_at <- pos_dn(out, "An authored sentence.")
+  expect_gt(head_at, 0)
+  expect_gt(note_at, 0)
+  expect_lt(head_at, note_at)
+})
+
 test_that("the leaf heading follows the label, including the ungated rename", {
   ungated <- render_cat(cat_results = .dn_ungated_results())
   expect_true(grepl(

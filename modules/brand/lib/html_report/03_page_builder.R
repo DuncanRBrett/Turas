@@ -1511,6 +1511,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   if (nzchar(anchor_open)) parts <- c(parts, anchor_open)
 
     if (!is.null(panels[[chart_key]])) {
+      # One naming pattern for every leaf, and it comes first: its own name,
+      # the category, and where the name does not say what the table holds,
+      # one line that does. Ahead of the toolbar, because on a leaf whose
+      # Section_Insights sheet authored a sentence the toolbar renders that
+      # sentence, and a reader should meet the name of the analysis before
+      # somebody's comment on it. The heading is still the first
+      # .br-element-title, h2, h3 inside the anchor, which is what
+      # captureFromRoot() and sectionsIn() read when they name a pin.
+      parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
       # WOM, branded-reach, repertoire/cat-buying, funnel, and MA panels
       # all get the shared section toolbar prepended. Funnel and MA also
       # render their own internal pin/PNG controls (different position).
@@ -1561,12 +1570,6 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           check_note         = .br_insight_check_note(config, sub_anchor),
           require_text       = TRUE))
       }
-      # One naming pattern for every leaf: its own name, the category, and
-      # where the name does not say what the table holds, one line that
-      # does. The heading sits inside the anchor wrapper and ahead of the
-      # panel, so the pin picker and the pinned card both take their title
-      # from it (`sectionsIn()` and `captureFromRoot()`).
-      parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
       parts <- c(parts,
@@ -1581,12 +1584,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       # tables otherwise.
       wom_key <- paste0("wom_", cat_id)
       if (!is.null(panels[[wom_key]])) {
-        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, panels[[wom_key]])
       } else {
-        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
           'Percentage of category buyers who received or shared word-of-mouth about each brand ',
           'in the study\'s recall timeframe.</p>')
@@ -1607,6 +1610,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       # cb_panel_key is the host's own fragment, set by .br_leaf_host().
 
       if (!is.null(panels[[cb_panel_key]])) {
+        parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
         # New Dirichlet panel: self-contained HTML fragment.
         # Layout overrides (per design request):
         #   - Pin + Export emitted at top with class cb-toolbar-top so JS can
@@ -1634,7 +1638,6 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   </button>
 </div>',
           section_id, section_id, section_id, section_id, section_id))
-        parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
         parts <- c(parts, panels[[cb_panel_key]])
         # Cat-Buying insight footer. Supports Section_Insights prefill via
         # the standard config$section_insights lookup. When pre-filled the
@@ -1687,8 +1690,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           section_id))
       } else {
         # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
-        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, .br_leaf_head(lf, cat_name, cat_results))
+        parts <- c(parts, toolbar_for(section_id))
 
         cbf <- cat_results$cat_buying_frequency
         if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
