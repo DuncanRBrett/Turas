@@ -211,9 +211,18 @@ DRIVER_TEMPLATE = r"""
   }
 
   function finish() {
-    var active = document.querySelector(".br-tab-btn.active");
     setTimeout(function () {
-      if (active) out.metrics.activeTabColour = getComputedStyle(active).color;
+      // The tab strip keeps its old paint even once the style engine has
+      // caught up, so it is taken out of the layout and put back, which
+      // forces the strip to be painted again from the current style.
+      var nav = document.querySelector(".br-tab-nav");
+      if (nav) { nav.style.display = "none"; void nav.offsetHeight; nav.style.display = ""; }
+      void document.body.offsetHeight;
+      var active = document.querySelector(".br-tab-btn.active");
+      if (active) {
+        out.metrics.activeTab = active.getAttribute("data-tab");
+        out.metrics.activeTabColour = getComputedStyle(active).color;
+      }
       setTimeout(emit, 400);
     }, 1500);
   }

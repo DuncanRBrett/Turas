@@ -307,3 +307,85 @@ fails and forces the classification to be revisited. **Open gap, recorded:**
 wire Branded Reach and Ad Hoc to the comparison set, or rule that they are
 whole-category views. Not this stage's work: it is a feature, and Stage 6 adds
 none.
+
+## Item 5: the two rulings Stage 5 left open, decided
+
+Both are decided against changing anything, and both for the same underlying
+reason: this is the QA stage before an independent review, and the two things
+a reviewer most needs are that the scope Duncan signed off at Stage 1 held,
+and that the "nothing changed" gates mean what they say. Neither ruling is
+closed forever; both are written up as post-merge work with what it would
+take.
+
+### Ruling A. The Mental Availability and funnel panel-native controls stay.
+
+The conflict: the impact map section 7 lists them under "What must not change"
+and says in terms that "Stage 5 consolidates the shared toolbars, not the
+panel-native ones". The Stage 5 brief's "one toolbar per destination, not one
+per table" reads as though they should go. Stage 5 kept them and asked.
+
+**Decision: keep them.** Three reasons, the first two checked in the code
+rather than repeated from the Stage 5 log.
+
+1. **They are strictly finer than what would replace them.** Read out of
+   `js/brand_ma_panel.js` around line 2175, the MA pin dropdown offers up to
+   seven named pieces: Matrix table, Bar chart, Insight note, Headline metric
+   cards, Brand metric table, Mental Space scatter, MMS vs SOM chart. Read out
+   of `js/brand_funnel_panel.js` around line 2579, the funnel's offers up to
+   seven: Relationship table, Relationship chart, Insights, Table, Chart, Mini
+   funnels, and AI insights where present. The destination toolbar's picker
+   offers whole leaves and anchors: five on Mental Availability's main view.
+   Removing the panel controls would not remove capability from the report, it
+   would coarsen it, and a reader who wants the Mental Space scatter alone
+   would have to pin the whole leaf.
+2. **The scope was reviewed.** The impact map was the Stage 1 deliverable
+   Duncan approved before any shell code was written, and it drew this line
+   explicitly. Redrawing it at the QA stage, after five stages have been built
+   on top, is the wrong moment. If the line is wrong it should be moved
+   deliberately, not as a side effect of a sweep.
+3. **It is feature work, and this stage adds none.** In the extras report the
+   panel-native controls number 5 funnel pin dropdowns, 4 funnel PNG, 3 funnel
+   Excel, 2 funnel relationship Excel, 8 MA pin dropdowns, 7 MA PNG and 7 MA
+   Excel. Taking those out means editing two panel files and their JS, and
+   then re-driving every capture path in Chrome, immediately before the review
+   that is supposed to look at a settled branch.
+
+**If Duncan wants them gone**, it is one change in two panel files plus the
+two JS pin-menu builders, and `drive_chrome.py` and `drive_destinations.py`
+both need re-running because both count controls per view. Budget it as its
+own stage, not as a patch to this one.
+
+### Ruling B. Section_Insights does not pre-fill a destination commentary box.
+
+The cost Stage 5 stated: a destination box carries `data-dest-note`, not
+`data-section`, so a Section_Insights sheet cannot pre-fill it. Giving it one
+needs a new anchor name and a rebaselined reachability comparison.
+
+**Decision: no, not in this merge.** Four reasons.
+
+1. **It would weaken the one gate the reviewer most needs.**
+   `reachability_check.py` passes today with the `data-section` set unchanged,
+   which is what lets the branch claim that no analyst's saved pin and no
+   Section_Insights anchor moved. Adding an anchor makes that gate a
+   rebaselined comparison, and a rebaselined gate proves less. The proof that
+   nothing moved is worth more right now than the convenience.
+2. **Authored text is not lost today, and that was checked, not assumed.** The
+   fixture's Section_Insights sheet authors three DSS anchors: Brand Funnel,
+   Category Entry Points and Word of Mouth. In the generated report each one
+   renders a leaf commentary box carrying its text, on `funnel-dss`,
+   `ceps-dss` and `wom-dss`. So a sheet written before the refactor still
+   lands, on the leaf where it was written. Nothing is stranded; the gap is
+   only that an analyst cannot address the destination as such.
+3. **It is a config contract change, and the contract is Duncan's.** The
+   anchor names are typed into Section_Insights sheets by analysts. A new
+   family of names, one per destination per category, is a decision about what
+   analysts have to learn, not a decision a QA session should take.
+4. **It is purely additive later.** A new anchor on a box that exists can be
+   added without touching anything this merge changes, on a branch of its own
+   with its own rebaselined gate.
+
+**If Duncan wants it**, the shape is a `dest-<cat>-<destination>` anchor
+alongside the existing `data-dest-note`, one row per destination in the
+Section_Insights anchor map in `R/01b_section_insights.R`, and a reachability
+baseline regenerated on purpose with the additions listed and justified rather
+than silently absorbed.
