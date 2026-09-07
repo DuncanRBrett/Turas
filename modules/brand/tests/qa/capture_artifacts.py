@@ -12,16 +12,19 @@ checkout: the report is copied, a harness is injected into the copy, and
 Chrome renders the copy once per mode), and it writes four files a person can
 open:
 
-    view.png          a screenshot of the destination view itself
-    export.png        the PNG the report's own PNG control produced
-    pinned.png        a screenshot of the Pinned Views tab after a pin
-    <download name>   the workbook the Excel control produced, under the
-                      exact filename the report gave it
+    view.png            a screenshot of the destination view itself
+    popover.png         a screenshot of the pin picker
+    pinned.png          a screenshot of the Pinned Views tab after a pin
+    export_<slug>.png   the image the PNG control produced, under the exact
+                        name the report gave the download
+    <download name>     the workbook the Excel control produced, likewise
+                        under the report's own name
 
-Everything is driven through the real controls: brDestPin, brDestPng and
-brDestExcel, each of them through TurasPins' checkbox popover the way a
-reader meets it, rather than through the button-free entry points the
-existing harness calls.
+Each control is driven by clicking it, not by calling its handler. The pin
+and PNG controls lose their picker to a document-level click handler, so
+when a click comes back with no picker the same handler is called directly,
+that is recorded as a defect, and the picker is then driven for real. The
+Excel control has no picker and its click works.
 
 Usage:
     python3 capture_artifacts.py REPORT.html --out DIR [--dest buying]
@@ -254,8 +257,8 @@ DRIVER_TEMPLATE = r"""
       out.metrics.pinnedCards = after;
       var card = document.querySelectorAll(".br-pinned-card")[after - 1];
       if (card) {
-        var t = card.querySelector(".pin-card-title, .br-pin-card-title, h3, h4");
-        out.metrics.pinnedTitle = txt(t) || txt(card).substring(0, 120);
+        var t = card.querySelector(".br-pinned-card-title");
+        out.metrics.pinnedTitle = t ? txt(t) : "(no .br-pinned-card-title)";
         out.metrics.pinnedCardHasTable = !!card.querySelector("table");
         out.metrics.pinnedCardHasSvg = !!card.querySelector("svg");
       }
@@ -523,7 +526,11 @@ def main(argv=None):
         for p in problems:
             print("  " + p)
         return 1
-    print("\nEvery artefact landed and parsed.")
+    if defects:
+        print("\nEvery artefact landed and parsed, with %d defect(s) above."
+              % len(defects))
+    else:
+        print("\nEvery artefact landed and parsed.")
     return 0
 
 

@@ -127,7 +127,8 @@ Four `testthat` blocks in `test_destination_nav.R` covering the same ground at
 unit speed: every element carries a category on its own; a category with
 nothing renderable earns no tab; a refused or empty element does not earn one;
 and a category carried by Word of Mouth alone renders the Brand Meaning
-destination and no other. That file goes from 253 to 301 assertions.
+destination and no other. That file goes from 268 to 301 assertions, verified by running the
+pre-change version of the file in place.
 
 ## Fixture drift, found by a control and left alone
 
@@ -389,3 +390,167 @@ alongside the existing `data-dest-note`, one row per destination in the
 Section_Insights anchor map in `R/01b_section_insights.R`, and a reachability
 baseline regenerated on purpose with the additions listed and justified rather
 than silently absorbed.
+
+## Item 3: the capture paths opened in a viewer, and the regression that found
+
+Stage 5's log recorded: "No pinned card, PNG or workbook was opened."
+`drive_chrome.py` intercepted them and inspected the bytes; nobody had looked.
+`modules/brand/tests/qa/capture_artifacts.py` drives Brand and Buying, the
+destination with the most tables, produces all three for real and saves them,
+and this session opened each one.
+
+### The regression looking found
+
+**Clicking Pin or PNG on a destination toolbar did nothing at all.** Not an
+error, not a wrong result: nothing.
+
+`brand_pins.js` registers a document-level click listener that closes any open
+popover unless the click is inside `.br-pin-btn`, `.br-png-btn`, `.ma-png-btn`
+or `.fn-png-btn`. Stage 5's controls are `.br-dest-pin` and `.br-dest-png`,
+neither of them on that list. The inline `onclick` opened the picker and the
+same click, still bubbling, removed it.
+
+Reproduced independently before the fix was written, in headless Chrome on the
+committed fixture's report:
+
+    {"found_pin":true,
+     "popovers_after_CLICK":0,  "popovers_after_DIRECT":1,
+     "png_after_CLICK":0,       "png_after_DIRECT":1}
+
+**Why Stage 5's own harness passed 115 of 115 over it.** `drive_chrome.py`
+called `brPinFrom()` and `brExportPngFrom()` directly, because that is what
+the picker calls once the reader has chosen, and the only control it clicked
+was Excel, which has no picker. Driving the handler is not driving the
+control. That is the general lesson of this item and it is worth more than the
+bug.
+
+**Fixed** in `js/brand_pins.js`: one `POPOVER_OPENERS` selector list, in one
+place, now including the two destination controls. After the fix, on the same
+probe: pin and PNG each open one popover on a click, and a click on the body
+still closes it, so the close behaviour is intact.
+
+**The harness hole is closed too.** `drive_chrome.py` now clicks the pin and
+PNG controls, before driving their handlers, and asserts that a click either
+opens the picker or pins. It goes from 115 checks to 125 on the committed
+fixture, 150 on the extras report and 152 on the ungated one.
+
+### What the three artefacts actually are, having been opened
+
+- **The pinned card**, screenshotted on the Pinned Views tab. The tab is
+  active, its badge reads 1, and the card is complete: title "Summary" with
+  the mode dot, "Base: Funnel, % of all", the authored insight, the funnel
+  chart with the focal line at 92, 67, 45, 32 against a dashed category
+  average and a min-max band, and the table beneath with base n=438, the focal
+  row and the category average at 61, 24, 10, 6 with its min-max rails. No
+  significance marker, which is right with the toggle off.
+- **The exported image**, opened. Complete, well composed, and identical to
+  the pinned card row for row. **But it is JPEG bytes under a `.png` name.**
+  `TurasPins.EXPORT_QUALITY` defaults to "standard", whose preset is
+  `image/jpeg` at 0.85, while `exportContentAsPNG` hardcodes the `.png`
+  suffix. That is in `modules/shared/`, which this branch must not touch, and
+  it is not Stage 5's doing. Recorded, not fixed.
+- **The workbook**, converted to PDF with LibreOffice headless and the first
+  page opened. Four sheets for the four tables, none empty, and the focal row
+  is right: 92, 67, 45, 32.
+
+### Three things wrong with the workbook, all older than this programme
+
+Read off the rendered page, not inferred.
+
+1. **The category average row is garbled.** It reads **615172, 241731, 10515,
+   629**. The page shows 61% with a 51% to 72% rail beneath it, and
+   `cell.textContent` swallows the rail spans, so "61%51%72%" loses its
+   percent signs and parses as one number.
+2. **Category labels are coerced to numbers.** The purchase bands 1x, 2x,
+   3-5x and 6+x arrive as 1, 2, 3 and 6. "3-5x" silently becomes 3.
+3. **The workbook carries rows the reader cannot see.** All 18 brands are in
+   `funnel-dss` while the page, with the chip reading "Brands: focal only",
+   shows 4. The image export and the pinned card carry the 4. So the two
+   capture paths disagree about what the view is.
+
+Smaller: sheets are named from anchor ids (`funnel-dss`) rather than the
+labels the picker showed the reader, and header cells carry the sort glyph.
+
+**Not fixed, deliberately.** `_brTablesToWorkbook()` and its
+`cell.textContent` reader date from `fa0d9713`, 16 April 2026, the commit that
+first built the HTML report. Stage 5 only split `_brExportPanel()` so that
+`_brExportRoot()` is the one workbook builder; it did not touch the
+extraction. Fixing it changes numbers in a file a client may open, on a path
+five stages of work did not disturb, and it needs its own verification. This
+stage adds no features and changes no numbers. **It is the first thing the
+reviewer should look at**, and the diagnosis above is the whole of it.
+
+## Item 4: the sweep proper
+
+Every script under `modules/brand/tests/qa/`, on three reports: the committed
+fixture (gated, 15 leaves), the extras fixture (gated, all 19 leaves) and the
+ungated variant (all 19 leaves, separate measures).
+
+| Script | committed | extras, gated | ungated |
+|---|---|---|---|
+| `drive_element_flags.R` | 81 checks, 0 failed | 89 checks, 0 failed | 89 checks, 0 failed |
+| `drive_destinations.py` | 353, 0 | 384, 0 | 384, 0 |
+| `drive_chrome.py` | 125, 0 | 150, 0 | 152, 0 |
+| `drive_save_roundtrip.py` | 113, 0 | 117, 0 | 117, 0 |
+| `drive_overview.py` | 60, 0 | 60, 0 | 58, 0 |
+| `drive_funnel_base.py` | 99, 0 | 99, 0 | 79, 0 |
+| `drive_two_categories.py` | 15, 0 | 15, 0 | 15, 0 |
+| `capture_artifacts.py` | all artefacts, 1 known defect | same | same |
+| `count_chrome.py` | control counts, below | | |
+
+**The ungated runs are shorter because two checks do not apply, and that was
+read rather than assumed.** Diffing the two `drive_overview.py` runs, the
+ungated one drops exactly "the card says on its face that it is nested" and
+"the nested series really differs from the absolute one". `drive_funnel_base.py`
+drops the nested-view checks and asserts the ungated notice, its reason and
+the separate-measures wording in their place.
+
+**The two-report gates**, on the pairs that mean something:
+
+- `reachability_check.py base.html base2.html`, the committed fixture before
+  this stage's first edit and after its last: **PASS**. Every `data-subpanel`,
+  every `data-section`, every section id and every island's numeric content
+  identical. So neither the tab-bar fix nor the popover fix moved a number.
+- `anchor_resolution.py`: 41 of 41 on the committed fixture, **69 of 69** on
+  the extras report, which includes the 14 anchors the four new elements
+  bring, and 69 of 69 on the ungated one.
+- There is no ungated report from before this stage, so there is no ungated
+  before-and-after pair. Said rather than faked: the numeric-identity gate is
+  the committed-fixture pair above.
+
+### Control counts, from `count_chrome.py` in a browser
+
+| Measure | committed | extras | ungated |
+|---|---|---|---|
+| Pin controls | 29 | 38 | 38 |
+| PNG controls | 21 | 30 | 30 |
+| Excel controls | 15 | 18 | 18 |
+| Commentary textareas | 14 | 17 | 17 |
+| Destination toolbars | 5 | 7 | 7 |
+| Significance toggles | 4 | 4 | 4 |
+| "How this works" drawers | 5 | 6 | 6 |
+| Destination buttons | 5 | 5 | 5 |
+| Significance markers in the DOM | 276 | 276 | 311 |
+| "significan" visible across the destinations | 5 | 5 | 5 |
+
+The extras report carries more of everything because it renders four more
+leaves in two more views, and the ungated one has 311 markers rather than 276
+because the separate-measures funnel marks stages the nested view leaves
+unmarked.
+
+### One consequence of the extras fixture, recorded
+
+On the committed fixture, Category Context draws a buying-location bar chart:
+`compute_buying_location()` is the fallback that runs when the shopper engine
+has nothing, and it renders **6 bars**. On the extras fixture the shopper
+engine succeeds, so the fallback does not run and Category Context draws
+**0**. Nothing is lost: the same information is on the Shopper Behaviour leaf,
+per brand and with bases, instead of as a category-level bar chart. Recorded
+because a reviewer comparing the two reports will see it.
+
+## Reproducing all of it
+
+`modules/brand/tests/qa/generate_qa_reports.R` builds all three reports and
+both scratch fixtures into one directory, so nothing in this log depends on a
+recipe that lives only in a scratchpad. It reproduced 4,044,916 / 4,154,885 /
+4,154,908 bytes, the three reports every gate above was run against.

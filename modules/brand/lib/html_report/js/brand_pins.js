@@ -675,13 +675,24 @@
 
     if (TurasPins._initDragDrop) TurasPins._initDragDrop();
 
-    // Close any open popover when clicking outside, but not when clicking
-    // the brand pin/PNG buttons themselves (they open their own popovers).
+    // Close any open popover when clicking outside, but not when clicking a
+    // button that opens one. Those buttons run their inline onclick first and
+    // the SAME click then bubbles to here, so closing on it would shut the
+    // popover the click had just opened.
+    //
+    // Stage 5's destination controls were missing from this list, so a reader
+    // clicking Pin or PNG on a destination toolbar got nothing at all: the
+    // picker opened and was removed before it could paint. Found in Stage 6
+    // by clicking the controls in a browser instead of calling their
+    // handlers. drive_chrome.py had passed 115 of 115 because it called
+    // brPinFrom and brExportPngFrom directly and only ever clicked Excel,
+    // which has no popover. It now clicks all three.
+    //
+    // One list, so the next control to open a popover is added in one place.
+    var POPOVER_OPENERS = ".br-pin-btn, .br-png-btn, .ma-png-btn, " +
+                          ".fn-png-btn, .br-dest-pin, .br-dest-png";
     document.addEventListener("click", function(e) {
-      if (!e.target.closest(".br-pin-btn") &&
-          !e.target.closest(".br-png-btn") &&
-          !e.target.closest(".ma-png-btn") &&
-          !e.target.closest(".fn-png-btn")) {
+      if (!e.target.closest(POPOVER_OPENERS)) {
         TurasPins.closePopover();
       }
     });

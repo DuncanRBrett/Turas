@@ -207,6 +207,42 @@ DRIVER = r"""
           out.views.push({ view: label + '/' + t.name,
                            anchors: items.length, tables: tables });
 
+          // Stage 6. CLICK the pin and PNG controls, before driving their
+          // handlers, and assert the picker actually opens.
+          //
+          // This is the check that was missing. Calling brPinFrom and
+          // brExportPngFrom directly, as the block below does, passed 115 of
+          // 115 while a reader clicking Pin or PNG on a destination toolbar
+          // got nothing: brand_pins.js registered a document-level listener
+          // that closed any open popover unless the click was inside one of
+          // four named classes, and Stage 5's .br-dest-pin and .br-dest-png
+          // were not among them, so the same click that opened the picker
+          // removed it again. Excel was unaffected because it has no picker,
+          // and Excel was the only one this harness clicked.
+          //
+          // A scope with one anchor pins straight through with no picker, so
+          // the assertion is that a click either opens a picker or pins.
+          if (items.length) {
+            var pinBtn = bar.querySelector('.br-dest-pin');
+            var pngBtn = bar.querySelector('.br-dest-png');
+            [['pin', pinBtn], ['PNG', pngBtn]].forEach(function (pair) {
+              if (!pair[1]) return;
+              TurasPins.closePopover();
+              var cards0 = document.querySelectorAll('.br-pinned-card').length;
+              var errs0 = qa.errors.length;
+              pair[1].click();
+              var popped = document.querySelectorAll('.pin-mode-popover').length;
+              var pinnedNow = document.querySelectorAll('.br-pinned-card').length;
+              check(label + '/' + t.name + ': clicking ' + pair[0] +
+                    ' opens the picker or acts',
+                    (popped > 0 || pinnedNow > cards0) &&
+                    qa.errors.length === errs0,
+                    'popovers ' + popped + ', cards ' + cards0 + ' -> ' +
+                    pinnedNow + ' ' + qa.errors.slice(errs0).join(' | '));
+              TurasPins.closePopover();
+            });
+          }
+
           // Pin, for real, one anchor at a time. A scope with one anchor
           // pins straight through; more than one opens the picker, so the
           // pin is driven through brPinSection instead, which is what the
