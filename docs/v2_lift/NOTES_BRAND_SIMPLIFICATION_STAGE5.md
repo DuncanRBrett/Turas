@@ -42,8 +42,9 @@ the rendered DOM by the session's `count_chrome.py` and by
 | "significan" in the VISIBLE text of the five destinations | 14 | 5 |
 | "significan" in title and aria attributes | 0 | 4 |
 | Significance markers in the DOM | 276 | 276 |
-| Significance markers rendered on Mental Availability | 229 | 0, and 33 with the toggle on |
-| Significance markers rendered on Brand Meaning | 47 | 0, and 4 with the toggle on |
+| Markers **rendered on screen** on Mental Availability | 33 | 0, and 33 with the toggle on |
+| Markers **rendered on screen** on Brand Meaning | 4 | 0, and 4 with the toggle on |
+| Markers in the DOM of those two destinations | 229 and 47 | unchanged |
 | Destination export toolbars | 0 | 5 |
 | Significance toggles | 0 | 4 |
 | "How this works" drawers holding something | 0 | 5 |
@@ -52,10 +53,21 @@ Read those rows together, because two of them move the wrong way on their own.
 The word count for the whole document **rises by four**, and those four are
 the toggle's own label. The count in attributes rises by the same four, the
 toggle's tooltip. What actually changed for a reader is the row below them:
-opening every destination in turn, the word went from **14 to 5**, and the
-229 markers on Mental Availability and the 47 on Brand Meaning are off until
-asked for. The markers are still in the DOM, unchanged, because the engine
-still computes them and the toggle brings them straight back.
+opening every destination in turn, the word went from **14 to 5**.
+
+The marker rows need reading carefully too, and the first draft of this log
+had them wrong. **276 markers are in the DOM and 37 are on screen**, because
+most of them sit inside a hidden Mental Availability sub-tab or a hidden
+matrix cell. So the honest before figure is 33 on Mental Availability and 4
+on Brand Meaning, measured in a browser with every destination opened and
+every drawer expanded, not 229 and 47. Those 37 go to zero and come back on a
+click. Nothing is deleted: the engine still computes every one of the 276 and
+the toggle brings them straight back.
+
+Brand and Buying carries no marker at all, before or after. Its funnel opens
+on the nested view, which Stage 4 leaves unmarked because the marks were
+computed on a different base, and the Category Buying panel has never carried
+one.
 
 The 72 to 60 needs the same care. Twenty-seven per-table controls went, and
 fifteen destination-toolbar controls arrived, which is the six-toolbar shape
@@ -262,10 +274,10 @@ then:
 
 On the fixture:
 
-    dss/mental/main      anchors=5 tables=5   229 markers in the DOM, 33 shown when on
+    dss/mental/main      anchors=5 tables=5   229 in the DOM, 0 shown off, 33 shown on
     dss/buying/main      anchors=3 tables=4
     dss/buying/advanced  anchors=5 tables=6
-    dss/meaning/main     anchors=2 tables=2    47 markers in the DOM,  4 shown when on
+    dss/meaning/main     anchors=2 tables=2    47 in the DOM, 0 shown off,  4 shown on
     dss/audience/main    anchors=8 tables=7
 
     Brand and Buying reaches 10 tables across its two toolbars,
@@ -328,9 +340,10 @@ On the fixture:
   viewer or the workbook in Excel.
 - **The significance toggle was not driven on a report where the engine
   returns a significant funnel cell.** Every `data-fn-sig-avg` on the fixture
-  reads `na`, the same limit Stage 4 recorded. The 229 Mental Availability
-  markers and the 47 on Brand Meaning are real and are what the toggle was
-  driven against.
+  reads `na`, the same limit Stage 4 recorded, so Brand and Buying has no
+  marker for the toggle to govern on this data. The 33 markers on screen on
+  Mental Availability and the 4 on Brand Meaning are real and are what the
+  toggle was driven against.
 - **Nothing was run on weighted data**, and nothing here reads a weight.
 - **The Portfolio tab's significance column is untouched** (decision 14).
 - **The 60 export controls that remain** are counted and named, not reduced
