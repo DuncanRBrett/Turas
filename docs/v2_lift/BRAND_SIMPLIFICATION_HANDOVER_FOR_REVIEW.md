@@ -90,7 +90,7 @@ never by `data-section`, which is why the anchor set could stay frozen.
 had not (the element flag matrix), rendered the four elements that had never
 rendered, opened the capture files for the first time, ran every gate on a
 gated and an ungated report, and decided the two rulings Stage 5 left open.
-It found and fixed two bugs, described in section 3.
+It found and fixed three bugs, described in section 3.
 
 ---
 
@@ -149,10 +149,37 @@ Fixed, and the harness now clicks all three. **But the question generalises:**
 look for other controls in this branch that are only ever exercised through
 their handler. The significance toggle, the "How this works" toggles, the
 Advanced accordion and the category switcher are all clicked by the harness;
-the destination commentary box is typed into. Check that list against the DOM
-yourself rather than taking it from here.
+the destination commentary box is typed into; and the Mental Availability and
+funnel pin dropdowns were clicked in Stage 6 and do open. Check that list
+against the DOM yourself rather than taking it from here.
 
-### 3.4 Then the acceptance criteria
+### 3.4 A pinned card named after a tab the reader cannot open
+
+The third bug, and the one that shows why looking beats asserting. The pinned
+card's own screenshot was titled **"Summary"** followed by a filled circle.
+There is no Summary view a reader can reach.
+
+`captureFromRoot()` in `js/brand_pins.js` named a card from the first
+`.br-element-title`, `h2` or `h3` in the capture root, **visible or not**.
+Stage 5 decision 6 moved the `funnel-` anchor onto a wrapper around the whole
+leaf, which was right and fixed a real problem, and that root then contained
+the funnel panel's hidden sub-navs. The first heading in it belongs to the
+Summary sub-tab that no nav routes to and `.fn-subnav` hides by CSS, which
+impact map section 4 records as dead in the report as shipped. `repertoire-dss`,
+which has no heading at all, produced a card titled with its raw anchor id.
+
+Fixed: hidden headings are skipped, and with none visible the card takes
+`data-leaf-label`, the analysis name the picker and the Advanced accordion
+already show. Five anchors pinned after the fix give Brand Funnel, Category
+Context, Category Entry Points, Headline Metrics and Brand Attributes, all
+five carrying a table.
+
+**What a reviewer should check:** whether skipping invisible headings loses a
+title anywhere a heading is legitimately hidden at capture time, for instance
+inside a collapsed Advanced accordion item. `drive_chrome.py` expands the
+drawers before it captures, so the harness would not see it.
+
+### 3.5 Then the acceptance criteria
 
 `HANDOVER_BRAND_SIMPLIFICATION_FOR_OPUS.md` section 8, against a report you
 generated yourself. In particular: no metric relabelled in a way that
@@ -199,7 +226,7 @@ pre-existing and named in the run output.
 | before Stage 5 | 4,024,208 | main moved under it |
 | after Stage 5 | 4,044,194 | destination toolbars and drawers |
 | Stage 6, after the tab-bar fix | 4,044,194 | **unchanged**; only the timestamp line differs |
-| Stage 6, at the tip | 4,044,916 | +722 bytes, the popover fix and its comment |
+| Stage 6, at the tip | 4,046,310 | +2,116 bytes, the popover and pin-title fixes and their comments |
 
 **Nothing in Stage 6 changed a number in the report.**
 `reachability_check.py` on the pre-edit and post-edit reports of the committed
@@ -272,49 +299,56 @@ Nothing here is hidden in a log. This is the whole list.
    store. Audience Lens is the same but for a good reason: it is a focal-brand
    view with no brand list to narrow. `drive_destinations.py` pins this as
    `unwired` and fails the day one of them is wired, so it cannot drift.
-4. **The Mental Availability and funnel panel-native pin, PNG and Excel
+4. **An anchored pin's title carries no category.** On the real
+   four-category IPK report, pinning the funnel from each category gives four
+   cards all called "Brand Funnel". Stage 5's adversarial item 8 solved
+   exactly this for leaf pins, by scoping the key to the category and putting
+   the category in the title, and left anchored pins alone. It cannot be
+   demonstrated on the fixture, which has one full-depth category, and fixing
+   it changes how every existing pin is named. Duncan's call.
+5. **The Mental Availability and funnel panel-native pin, PNG and Excel
    controls stay**, roughly twenty per category. Ruled on in Stage 6: they are
    strictly finer than the destination toolbar (up to seven named pieces each,
    against whole leaves), the impact map scoped them out at Stage 1, and
    removing them is feature work. Reversible: Stage 6 log, ruling A.
-5. **Section_Insights cannot pre-fill a destination commentary box.** Ruled on
+6. **Section_Insights cannot pre-fill a destination commentary box.** Ruled on
    in Stage 6: it needs a new anchor and a rebaselined reachability gate,
    which proves less than the one that passes today. Authored text is not
    stranded meanwhile: the fixture's three authored anchors each render a leaf
    box carrying their text, checked in the generated report. Stage 6 log,
    ruling B.
-6. **The three synthetic example projects still cannot run.** `examples/1brand`,
+7. **The three synthetic example projects still cannot run.** `examples/1brand`,
    `3cat` and `9cat` all call `.build_questions_columns()`, which exists
    nowhere in the repository. Broken on main, untouched by this programme, and
    the reason the element flag matrix drives the IPK fixture instead. A
    separate task is raised.
-7. **The funnel Summary cards are unreachable**, and were before this
+8. **The funnel Summary cards are unreachable**, and were before this
    programme. `.fn_cards_section()` renders them, no leaf routes to them, and
    `.fn-subnav` is hidden by CSS. Impact map section 9 item 1. Left dead
    deliberately rather than switched on as a side effect.
-8. **The comparison set does not survive Save.** A checkbox's `checked` is a
+9. **The comparison set does not survive Save.** A checkbox's `checked` is a
    property, not an attribute, and Save serialises `outerHTML`. Stage 2
    recorded it; no commentary or pin is affected.
-9. **A latent fixture bug.** `.shopper_code_list_spec()` keys the pack size
+10. **A latent fixture bug.** `.shopper_code_list_spec()` keys the pack size
    list on `PackSizeCode` and `PackSizeLabel`; the fixture's
    `.ipk_build_packs_df()` writes `PackCode` and `PackLabel`. The QA extras
    writer emits both pairs rather than renaming the committed fixture's
    columns. Somebody should decide which name is right.
-10. **The committed fixture workbooks are one cosmetic commit behind their
+11. **The committed fixture workbooks are one cosmetic commit behind their
     generator.** Regenerating changes 15 `BRANDATT2_DSS_*` verbatim columns
     and the `Project` sheet's `project_name`, every difference an em dash
     replaced by a colon. No number differs.
-11. **Nothing has been run on weighted data**, and nothing in the report layer
+12. **Nothing has been run on weighted data**, and nothing in the report layer
     reads a weight.
-12. **The Portfolio tab is not a destination and was left alone**, including
+13. **The Portfolio tab is not a destination and was left alone**, including
     its own significance column and its "significant after BH correction"
     wording.
-13. **Two of the four QA extras are invented.** Branded Reach and Ad Hoc have
+14. **Two of the four QA extras are invented.** Branded Reach and Ad Hoc have
     no basis in the Wave 1 instrument, which asked nothing about advertising
     and nothing study-specific. They are written only into the scratch QA
     fixture and every label says so. Shopper Behaviour and Audience Lens are
     faithful re-shapes of answers the instrument did collect.
-14. **Duncan has not yet regenerated a real report through `launch_turas()`.**
+15. **Duncan has not yet regenerated a real report through `launch_turas()`.**
     Every stage owes this and none of the sessions did it: they generate the
     IPK fixture into a scratchpad and never touch OneDrive or TurasProjects.
 
@@ -333,8 +367,8 @@ minutes.
 
     Rscript -e 'testthat::test_dir("modules/brand/tests/testthat")'
 
-**Build the three reports.** About 35 seconds. Expect 4,044,916 /
-4,154,885 / 4,154,908 bytes.
+**Build the three reports.** About 35 seconds. Expect 4,046,310 /
+4,156,279 / 4,156,302 bytes.
 
     Rscript modules/brand/tests/qa/generate_qa_reports.R --out $S
 

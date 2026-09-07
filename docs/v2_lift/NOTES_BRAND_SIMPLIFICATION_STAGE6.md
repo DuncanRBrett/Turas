@@ -437,8 +437,10 @@ fixture, 150 on the extras report and 152 on the ungated one.
 ### What the three artefacts actually are, having been opened
 
 - **The pinned card**, screenshotted on the Pinned Views tab. The tab is
-  active, its badge reads 1, and the card is complete: title "Summary" with
-  the mode dot, "Base: Funnel, % of all", the authored insight, the funnel
+  active, its badge reads 1, and the card is complete: at the time of the
+  screenshot it was titled "Summary" followed by a filled circle, which is a
+  defect in its own right and is the subject of the section below;
+  "Base: Funnel, % of all", the authored insight, the funnel
   chart with the focal line at 92, 67, 45, 32 against a dashed category
   average and a min-max band, and the table beneath with base n=438, the focal
   row and the category average at 61, 24, 10, 6 with its min-max rails. No
@@ -496,7 +498,7 @@ ungated variant (all 19 leaves, separate measures).
 | `drive_funnel_base.py` | 99, 0 | 99, 0 | 79, 0 |
 | `drive_two_categories.py` | 15, 0 | 15, 0 | 15, 0 |
 | `capture_artifacts.py` | all artefacts, 1 known defect | same | same |
-| `count_chrome.py` | control counts, below | | |
+| `count_chrome.py` | control counts, below | control counts, below | control counts, below |
 
 **The ungated runs are shorter because two checks do not apply, and that was
 read rather than assumed.** Diffing the two `drive_overview.py` runs, the
@@ -595,5 +597,77 @@ recipe that lives only in a scratchpad. It reproduced 4,044,916 / 4,154,885 /
   identical.
 - No em dash in any file this branch touched, checked file by file.
 
-**Not merged and not pushed.** Branch `feature/brand-qa`, six commits on top
-of `e94c2b30`.
+**Not merged and not pushed.** Branch `feature/brand-qa`, on top of
+`e94c2b30`.
+
+## A third bug, found by looking at the pinned card's own title
+
+The screenshot showed the card titled **"Summary"** followed by a filled
+circle. The funnel view is not called Summary and there is no Summary sub-tab
+a reader can reach. Probed in the browser rather than reasoned about:
+
+    root_tag             DIV.br-element-section
+    first_heading        "Summary <circle>"
+    first_heading_visible false
+    pinned_titles        ["Summary <circle>", "repertoire-dss"]
+
+`captureFromRoot()` in `js/brand_pins.js` named the card from the **first**
+`.br-element-title`, `h2` or `h3` in the capture root, visible or not. Stage 5
+decision 6 moved the `funnel-` anchor onto a wrapper around the whole leaf, so
+that root now contains the funnel panel's own hidden sub-navs, and the first
+heading in it belongs to the **Summary sub-tab that no nav routes to and that
+`.fn-subnav` hides by CSS**. Impact map section 4 records that sub-tab as dead
+in the report as shipped. So pinning the Brand Funnel produced a card named
+after a tab the reader cannot open. And `repertoire-dss`, which has no heading
+at all, produced a card titled with its raw anchor id.
+
+This is a Stage 5 side effect, and the trade it made was a good one: before
+decision 6 those anchors resolved onto a toolbar and captured **nothing**.
+Stage 5 fixed the capture and inherited the title.
+
+**Fixed, in two parts.** `captureFromRoot()` now skips headings a reader
+cannot see, because a hidden heading is not the name of anything; and with no
+visible heading it falls back to `data-leaf-label`, the reader-facing analysis
+name the Advanced accordion and the pin picker already show, before falling
+through to the anchor id.
+
+Pinning five anchors after the fix, read out of the Pinned Views tab:
+
+    Brand Funnel | Category Context | Category Entry Points |
+    Headline Metrics | Brand Attributes
+
+five cards, all five carrying a table.
+
+**Still open, and in the gap list:** an anchored pin's title carries no
+category. On the real four-category IPK report, pinning the funnel from each
+category gives four cards all called "Brand Funnel". Stage 5's adversarial
+item 8 solved exactly this for leaf pins, by scoping the key to the category
+and putting the category in the title, and left anchored pins alone. It cannot
+be demonstrated on this fixture, which has one full-depth category, and fixing
+it is a change to how every existing pin is named. Recorded for Duncan.
+
+### The panel-native dropdowns were probed too, and they work
+
+Ruling A keeps roughly twenty controls per category, so they had to be shown
+to survive the same bug class. Clicking `.ma-pin-dropdown-btn` opens one
+`.ma-pin-dropdown`, and clicking `.fn-pin-dropdown-btn` opens one funnel
+dropdown. They build their own menus rather than a TurasPins popover, which is
+why the document listener never reached them.
+
+## Re-run after the third fix
+
+Everything above was run again against reports built from the tip.
+
+    committed 4,046,310 bytes   extras 4,156,279   ungated 4,156,302
+
+    drive_chrome          125 / 150 / 152      0 failed
+    drive_destinations    353 / 384 / 384      0 failed
+    drive_funnel_base      99 /  99 /  79      0 failed
+    drive_overview         60 /  60 /  58      0 failed
+    drive_save_roundtrip  113 / 117 / 117      0 failed
+    drive_two_categories   15 /  15 /  15      0 failed
+    anchor_resolution      41 of 41 / 69 of 69 / 69 of 69
+    drive_element_flags    81 checks, 0 failed
+    reachability_check     PASS, against the pre-edit committed report
+
+Brand suite: **FAIL 0, WARN 1, SKIP 2, PASS 3593**, run twice.

@@ -122,8 +122,34 @@
   function captureFromRoot(root, sectionKey) {
     if (!root) return null;
 
-    var title = root.querySelector(".br-element-title, h2, h3, .pfo-section-title");
-    var titleText = title ? title.textContent.trim() : (sectionKey || "");
+    // The first heading in the root names the card, but only if a reader can
+    // see it. Stage 5 moved the funnel, MA and Category Buying anchors onto a
+    // wrapper around the whole leaf, so the capture root now contains the
+    // panel's own hidden sub-navs and their headings. On the IPK fixture the
+    // first heading inside [data-section="funnel-dss"] is "Summary", from the
+    // funnel panel's Summary sub-tab, which no nav routes to and which
+    // .fn-subnav hides by CSS (impact map section 4). Pinning the Brand
+    // Funnel therefore produced a card named after a tab the reader cannot
+    // open. A hidden heading is not the name of anything, so skip it.
+    var title = null;
+    var heads = root.querySelectorAll(
+      ".br-element-title, h2, h3, .pfo-section-title");
+    for (var hi = 0; hi < heads.length; hi++) {
+      if (heads[hi].offsetParent !== null) { title = heads[hi]; break; }
+    }
+    // With no visible heading, name the card after the analysis rather than
+    // after its anchor id. data-leaf-label is the reader-facing name the
+    // Advanced accordion and the pin picker already show, and it sits on the
+    // .br-subpanel that holds the anchor. Falling through to sectionKey
+    // produced cards called "funnel-dss".
+    var titleText = "";
+    if (title) {
+      titleText = title.textContent.trim();
+    } else {
+      var leaf = root.closest ? root.closest("[data-leaf-label]") : null;
+      titleText = (leaf && leaf.getAttribute("data-leaf-label")) ||
+                  (sectionKey || "");
+    }
 
     // Pick the first *visible* SVG in the subtree, skip SVGs inside <button>
     // elements (toolbar download icons) AND SVGs inside [data-pin-as-table]
