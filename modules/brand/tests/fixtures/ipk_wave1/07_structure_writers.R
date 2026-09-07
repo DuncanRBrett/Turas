@@ -117,6 +117,17 @@ ipk_write_brand_config <- function(path, extras = FALSE) {
     ),
     stringsAsFactors = FALSE
   )
+  if (isTRUE(extras)) {
+    # When the study was in field, which the header prints beside the wave
+    # and the About tab repeats. Only the extras fixture sets it, so the two
+    # QA reports built from this generator prove the filled case while the
+    # committed fixture goes on proving the blank one. This is a fixture
+    # value, invented for the fixture; it is not the real IPK wave 1 field
+    # period and no figure in this fixture came from a real field period.
+    settings <- rbind(settings, data.frame(
+      Setting = "fieldwork_dates", Value = "1 to 8 April 2026",
+      stringsAsFactors = FALSE))
+  }
   openxlsx::addWorksheet(wb, "Settings")
   openxlsx::writeData(wb, "Settings", settings)
 
