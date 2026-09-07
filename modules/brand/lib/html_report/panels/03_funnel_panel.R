@@ -116,7 +116,9 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
           .fn_chart_section(panel_data, focal_colour),
         '</div>',
       '</div>',
-      .fn_add_insight_strip(),
+      # Stage 5: no commentary box of its own. Brand and Buying carries one
+      # box for the whole destination, and a Section_Insights anchor still
+      # renders its own box beside the analysis it was written against.
       # Funnel-page callout lives INSIDE the funnel sub-tab so it doesn't
       # leak onto the Summary or Relationship sub-tabs (each has its own
       # callout / explanation).

@@ -104,7 +104,9 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       .ma_matrix_section(panel_data, stim = "attributes",
                          focal_colour = focal_colour),
       .ma_chart_placeholder(stim = "attributes", pd = panel_data),
-      .ma_insight_box(stim = "attributes"),
+      # Stage 5: Mental Availability keeps ONE commentary box, the headline
+      # one on the Metrics sub-tab, plus the destination's own. A box per
+      # stimulus was three more places to look for the same sentence.
       # Per-sub-tab callout: explains what an attribute is and how to
       # read this specific page. Edit via the Callout Editor under
       # brand / mental_availability_attributes.
@@ -121,7 +123,6 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       .ma_matrix_section(panel_data, stim = "ceps",
                          focal_colour = focal_colour),
       .ma_chart_placeholder(stim = "ceps", pd = panel_data),
-      .ma_insight_box(stim = "ceps"),
       # Per-sub-tab callout: explains what a CEP is and how to read
       # this specific page. Edit via the Callout Editor under
       # brand / mental_availability_ceps.

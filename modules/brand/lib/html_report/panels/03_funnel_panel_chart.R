@@ -138,7 +138,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '</div>',
     '<div class="fn-rel-chart" data-fn-rel-chart></div>',
     '</div>',
-    .fn_add_insight_strip(),
+    # Stage 5: the destination's commentary box replaces this one.
     rel_callout,
     '</section>'
   )

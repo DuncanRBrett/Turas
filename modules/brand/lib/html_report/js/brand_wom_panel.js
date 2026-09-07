@@ -387,19 +387,20 @@
     });
   }
 
-  // Move the section toolbar (pin/png/excel) into the WOM meta-row so it
-  // sits alongside the Show chart controls. Hides the +Add Insight toggle
-  // since the WOM panel has its own inline insight box below the table.
+  // Move the section toolbar into the WOM meta-row so it sits alongside the
+  // Show chart controls.
+  //
+  // Stage 5 changed what that toolbar is. The panel's own inline insight box
+  // is gone, and the shared toolbar now renders only when the
+  // Section_Insights sheet authored something against wom-<cat>. So the
+  // toggle and its container are no longer hidden here: they are the only
+  // place that text can appear, and hiding them would have taken an
+  // analyst's own sentence off the page while leaving it in the file.
   function relocateWomToolbar(panel) {
     var section = panel.closest(".br-element-section") || panel.parentNode;
     if (!section) return;
     var toolbar = section.querySelector(".br-section-toolbar");
     if (!toolbar) return;
-
-    var insightToggle = toolbar.querySelector(".br-insight-toggle");
-    if (insightToggle) insightToggle.style.display = "none";
-    var insightContainer = section.querySelector(".br-insight-container");
-    if (insightContainer) insightContainer.style.display = "none";
 
     var metaRow = panel.querySelector(".wom-meta-row");
     if (metaRow) {

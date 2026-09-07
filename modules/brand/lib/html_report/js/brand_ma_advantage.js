@@ -108,20 +108,27 @@
     // case where the threshold isn't on the panel payload.
     var penLabel = p.penLabel || '% buyers linking this CEP to multiple brands';
     var rows = [
-      ['MA',                   fmtScore(p.ma) + 'pp' + (p.isSig ? ' •' : '')],
+      ['MA',                   fmtScore(p.ma) + 'pp', p.isSig ? ' •' : ''],
       [penLabel,               p.pen.toFixed(1) + '%'],
       ['Linkage (' + (base === 'aware' ? '% aware' : '% total') + ')',
         p.size != null ? p.size.toFixed(1) + '%' : '–']
     ];
+    // The significance clause rides in its own span rather than inside the
+    // value string, so the destination's significance toggle can take it out
+    // the way it takes out every other marker. A clause welded into a text
+    // node cannot be hidden by a stylesheet or stripped from a capture.
     var rowHtml = rows.map(function (r) {
+      var mark = r[2] ? '<span class="ma-adv-sig">' + escHtml(r[2]) + '</span>' : '';
       return '<div class="ma-adv-tooltip-row"><span class="ma-adv-tooltip-key">' +
              escHtml(r[0]) + '</span><span class="ma-adv-tooltip-val">' +
-             escHtml(r[1]) + '</span></div>';
+             escHtml(r[1]) + mark + '</span></div>';
     }).join('');
     var dec = p.decision || 'maintain';
+    var decSig = p.isSig
+      ? '<span class="ma-adv-sig"> &#8226; significant (p&lt;0.05)</span>' : '';
     return '<strong>' + escHtml(p.label) + '</strong>' + rowHtml +
            '<div class="ma-adv-tooltip-decision ma-adv-tooltip-' + dec + '">' +
-           decisionLabel(dec) + (p.isSig ? ' • significant (p&lt;0.05)' : '') + '</div>';
+           decisionLabel(dec) + decSig + '</div>';
   }
 
 

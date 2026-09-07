@@ -2594,6 +2594,15 @@
       }
       if (hasAI) items.push({ label: "AI insights", sel: ".fn-ai-insights" });
 
+      /* A menu item for something that is not on the page is a promise the
+         dialog cannot keep. Stage 5 removed the funnel's own insight strip,
+         so the list is filtered by what the panel actually holds rather than
+         being edited to match. */
+      items = items.filter(function(item) {
+        return !!panel.querySelector(item.sel);
+      });
+      if (!items.length) return;
+
       var html = '<div class="fn-pin-dropdown" role="dialog" aria-label="Pin sections">' +
         '<div class="fn-pin-header">Pin sections</div>';
       items.forEach(function(item) {

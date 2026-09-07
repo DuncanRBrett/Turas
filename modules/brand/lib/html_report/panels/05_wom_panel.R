@@ -61,7 +61,7 @@ build_wom_panel_html <- function(panel_data,
     .wom_controls_bar(panel_data, category_code, focal_colour),
     .wom_table_section(panel_data, focal_colour),
     .wom_chart_section(panel_data, category_code, focal_colour),
-    .wom_insight_box(),
+    # Stage 5: Brand Meaning carries one commentary box for the destination.
     callout_html,
     '</div>'
   )

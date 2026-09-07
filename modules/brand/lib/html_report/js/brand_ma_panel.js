@@ -2190,6 +2190,18 @@
       opts.push({ key: 'insight',  label: 'Insight note' });
     }
 
+    /* Stage 5 left Mental Availability one commentary box, the headline one
+       on the Metrics sub-tab, plus whatever the Section_Insights sheet
+       authored against this anchor. The Insight note item is offered only
+       where there is a box to read, rather than listing an option that would
+       pin an empty string. */
+    opts = opts.filter(function (o) {
+      if (o.key !== 'insight') return true;
+      var section = panel.closest('.br-element-section');
+      return !!panel.querySelector('.ma-insight-box-text[data-ma-stim="' + activeKey + '"]')
+          || !!(section && section.querySelector('.br-insight-editor'));
+    });
+
     var dd = document.createElement('div');
     dd.className = 'ma-pin-dropdown';
     dd.style.cssText = 'position:absolute;z-index:400;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);padding:8px;min-width:220px;font-size:12px;';
