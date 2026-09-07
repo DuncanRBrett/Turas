@@ -317,6 +317,47 @@ DRIVER = """
         check('the nested series really differs from the absolute one',
               JSON.stringify(series) !== JSON.stringify(absSeries));
       }
+
+      // --- the words on the page, mode by mode ---------------------------
+      // Duncan's ruling of 7 September 2026: a nested funnel only where the
+      // questionnaire gated the questions. Stage 3 built the Overview when
+      // the funnel was nested for everyone, so on an ungated report the card
+      // was still titled "Buying funnel" and Opportunities still said the
+      // largest step down was a share "of the stage before it". These checks
+      // fail on that behaviour.
+      var fCard = $('[data-brsum-card="funnel"]', root);
+      var fTitle = fCard ? txt($('.brsum-card-title', fCard)) : null;
+      var oppBody = $('[data-brsum-card-body="opportunities"]', root);
+      var oppTxt = oppBody ? txt(oppBody) : '';
+      var note = $('[data-brsum-funnel-note]', root);
+      out.funnelWords = { title: fTitle, gated: fnGated,
+                          note: note ? txt(note) : null,
+                          section: fCard ? fCard.getAttribute('data-section') : null };
+      check('the buying card keeps its anchor whatever it is titled',
+            out.funnelWords.section === 'brsum-funnel', out.funnelWords.section);
+      if (fnGated) {
+        check('routed: the card is titled as a funnel',
+              fTitle === 'Buying funnel', String(fTitle));
+        check('routed: no separate-measures note under the bars', !note);
+        check('routed: Opportunities reports the conversion',
+              /of the stage before it/.test(oppTxt),
+              oppTxt.slice(-160));
+      } else {
+        check('not routed: the card is not titled as a funnel',
+              !!fTitle && !/funnel/i.test(fTitle), String(fTitle));
+        check('not routed: the base line says separate measures',
+              /Separate measures/.test(txt(fMeta)), txt(fMeta));
+        check('not routed: a note under the bars says why', !!note,
+              note ? txt(note) : 'no note');
+        check('not routed: Opportunities claims no nesting',
+              !/of the stage before it/.test(oppTxt) &&
+              !/step down/.test(oppTxt),
+              oppTxt.slice(-200));
+        check('not routed: and says what the figures are instead',
+              /separate measures/.test(oppTxt) &&
+              /not a conversion/.test(oppTxt),
+              oppTxt.slice(-200));
+      }
     }
 
     check('no console error or uncaught exception', qa.errors.length === 0,
@@ -391,6 +432,14 @@ def main(argv):
         print("\nBuying funnel card")
         print("  nested=%s  shown=%s" % (f["nested"], " ".join(f["shown"])))
         print("  base: %s" % f["meta"])
+
+    if res.get("funnelWords"):
+        w = res["funnelWords"]
+        print("\nWhat the buying card is called")
+        print("  routed=%s  title=%r  anchor=%s" %
+              (w["gated"], w["title"], w["section"]))
+        if w["note"]:
+            print("  note: %s" % w["note"])
 
     if res.get("opportunities"):
         print("\nOpportunities to examine")

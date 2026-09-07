@@ -243,6 +243,18 @@
   function cardMeta(root, key) {
     return root.querySelector('[data-brsum-card-meta="' + key + '"]');
   }
+  /* A card's own h3. brand_pins.js reads it for the pin title, so a card
+     whose title changes with the category picker keeps its pins named
+     correctly. The data-section anchor is the identifier and never moves;
+     this is the label. */
+  function cardTitle(root, key) {
+    var card = root.querySelector('[data-brsum-card="' + key + '"]');
+    return card ? card.querySelector('.brsum-card-title') : null;
+  }
+  function setCardTitle(root, key, text) {
+    var el = cardTitle(root, key);
+    if (el) el.textContent = text;
+  }
 
   function renderPlaceholder(root, key, msg) {
     var body = cardBody(root, key);
@@ -685,14 +697,60 @@
     box.hidden = false;
   }
 
-  /* The card draws the same view the funnel destination opens on: the
-     nested chain, where each stage counts the respondents who passed that
-     stage and every earlier one. A payload without the chain figures keeps
-     the absolute series, and either way the card's base line under the
-     title says which of the two it is showing. See nestedFunnelBlock(). */
+  /* Did the questionnaire route this category's funnel questions?
+   *
+   * detect_instrument_gating() in R/03a_funnel_derive.R decides, and
+   * .brsum_funnel_minif() writes the answer onto the block as `gated`. The
+   * funnel destination shows a nested funnel or four separate measures on
+   * the strength of the same flag, so reading it here is what keeps the two
+   * pages saying the same thing about one dataset.
+   *
+   * A payload written before this build carries no `gated` field. For that
+   * case `nested` stands in, because R only ever wrote the chain series
+   * after deciding the instrument was gated. Neither field present, or a
+   * block with no funnel in it, reads as not routed, which is the reading
+   * that claims least. */
+  function funnelIsGated(block) {
+    if (!block || !block.available) return false;
+    if (typeof block.gated === 'boolean') return block.gated;
+    return !!block.nested;
+  }
+
+  /* The two card titles. The identifier stays `funnel` and the anchor stays
+     data-section="brsum-funnel" in both cases: the key is an identifier and
+     the title is a label, and nothing derives one from the other. */
+  var FUNNEL_TITLE_ROUTED  = 'Buying funnel';
+  var FUNNEL_TITLE_SEPARATE = 'Awareness to purchase';
+
+  /* The card draws the same view the funnel destination opens on.
+   *
+   * Where the questionnaire routed the questions that is the nested chain,
+   * each stage counting the respondents who passed that stage and every
+   * earlier one, and the card is called a funnel. Where it did not, the
+   * payload carries no chain, the card draws each stage on its own survey
+   * response, it is titled as a range rather than as a mechanism, and a note
+   * under the bars says why. Either way the base line under the title names
+   * the series. See nestedFunnelBlock() and funnelIsGated().
+   *
+   * Both branches set the title and the note, never one of them: the
+   * category picker can move from a category that routed its questions to
+   * one that did not, and a title set only in the ungated branch would stick
+   * on the next category. */
   function renderFunnelCard(root, funnelBlock, brandCode, snap) {
+    var gated = funnelIsGated(funnelBlock);
+    var available = !!(funnelBlock && funnelBlock.available);
+    setCardTitle(root, 'funnel',
+      (available && !gated) ? FUNNEL_TITLE_SEPARATE : FUNNEL_TITLE_ROUTED);
     renderMiniFunnelCard(root, 'funnel', nestedFunnelBlock(funnelBlock),
-      brandCode, snap, { emptyMessage: 'Funnel data not available.' });
+      brandCode, snap, { emptyMessage: 'Buying stage data not available.' });
+    var body = cardBody(root, 'funnel');
+    if (body && available && !gated) {
+      body.insertAdjacentHTML('beforeend',
+        '<p class="brsum-mf-note" data-brsum-funnel-note>The questionnaire ' +
+        'did not route these questions, so each figure is its own measure ' +
+        'over all respondents rather than a stage a respondent had to reach. ' +
+        'The Brand and Buying destination says what it found.</p>');
+    }
   }
 
   /* Swap the block's series for the nested ones when the payload carries
@@ -921,14 +979,10 @@
       }
     }
 
-    var drop = biggestFunnelDrop(cat, brandCode);
-    if (drop) {
-      parts.push('<ul class="brsum-opp-list">' + oppItem('observed',
-        'Read off the funnel above',
-        'The largest step down is from ' + drop.from + ' at ' +
-        pctText(drop.fromValue) + ' to ' + drop.to + ' at ' +
-        pctText(drop.toValue) + ', which is ' + Math.round(drop.ratio * 100) +
-        '% of the stage before it.') + '</ul>');
+    var step = funnelStepItem(cat, brandCode);
+    if (step) {
+      parts.push('<ul class="brsum-opp-list">' +
+        oppItem(step.kind, step.tag, step.text) + '</ul>');
     }
     body.innerHTML = parts.join('');
   }
@@ -1027,6 +1081,96 @@
       }
     }
     return worst;
+  }
+
+  /* The largest fall between two consecutive measures, in percentage points.
+   *
+   * This is the ungated report's reading. The figures there are four
+   * independent survey responses over the same base, so dividing one by the
+   * one before it produces a number that looks like a conversion and is not
+   * one. The difference between two proportions on the same base is a fact
+   * about the two measures and claims nothing about who moved between them.
+   *
+   * Both the choice of pair and the figure quoted use the rounded
+   * percentages the card itself prints, so a reader can subtract the two
+   * numbers in front of them and get the third. A pair that rounds to less
+   * than a point apart is not reported as a fall.
+   *
+   * The series read here is the block's own, never the chain: an ungated
+   * payload carries no chain, and this function is only ever called for one.
+   */
+  function biggestMeasureFall(cat, brandCode) {
+    var f = cat && cat.funnel;
+    if (!f || !f.available) return null;
+    var vals = f.brands && f.brands[brandCode];
+    var keys = f.stage_keys || [];
+    var labs = f.stage_labels || keys;
+    if (!vals || vals.length < 2) return null;
+    var worst = null;
+    for (var i = 1; i < vals.length; i++) {
+      var prev = vals[i - 1], cur = vals[i];
+      if (prev == null || cur == null || isNaN(prev) || isNaN(cur)) continue;
+      var gap = Math.round(prev * 100) - Math.round(cur * 100);
+      if (gap < 1) continue;
+      if (!worst || gap > worst.gap) {
+        worst = { from: labs[i - 1] || keys[i - 1], to: labs[i] || keys[i],
+                  fromValue: prev, toValue: cur, gap: gap };
+      }
+    }
+    return worst;
+  }
+
+  /* The Opportunities item that reads the buying card above it.
+   *
+   * Two reports, two sentences, decided by the same flag the card title and
+   * the funnel destination read.
+   *
+   * Routed: the card draws the nested chain, the successive ratio is the
+   * engine's pct_nested_filtered, and "of the stage before it" describes a
+   * real conversion between two stages of one funnel. That sentence is
+   * unchanged and test_summary_funnel_step.R holds it against the engine.
+   *
+   * Not routed: nothing nests. Naming a "step down" and calling it a share
+   * "of the stage before it" would assert an ordering the survey never
+   * enforced, on the same report whose funnel destination says in so many
+   * words that it did not. The sentence reports the largest fall in
+   * percentage points instead and says what these figures are.
+   */
+  function funnelStepItem(cat, brandCode) {
+    var block = cat && cat.funnel;
+    if (!block || !block.available) return null;
+    if (funnelIsGated(block)) {
+      var drop = biggestFunnelDrop(cat, brandCode);
+      if (!drop) return null;
+      return {
+        kind: 'observed',
+        tag: 'Read off the funnel above',
+        text: 'The largest step down is from ' + drop.from + ' at ' +
+              pctText(drop.fromValue) + ' to ' + drop.to + ' at ' +
+              pctText(drop.toValue) + ', which is ' +
+              Math.round(drop.ratio * 100) + '% of the stage before it.'
+      };
+    }
+    var tail = ' These are separate measures, because the questionnaire ' +
+               'did not route the questions, so the difference between two ' +
+               'of them is a gap and not a conversion.';
+    var fall = biggestMeasureFall(cat, brandCode);
+    if (!fall) {
+      return {
+        kind: 'observed',
+        tag: 'Read off the measures above',
+        text: 'No measure here reads more than a percentage point below the ' +
+              'one before it, so there is no fall to name.' + tail
+      };
+    }
+    return {
+      kind: 'observed',
+      tag: 'Read off the measures above',
+      text: 'The largest fall is from ' + fall.from + ' at ' +
+            pctText(fall.fromValue) + ' to ' + fall.to + ' at ' +
+            pctText(fall.toValue) + ', a gap of ' + fall.gap +
+            ' percentage points.' + tail
+    };
   }
 
   /* ---------------------------------------------------------------------
@@ -1310,6 +1454,13 @@
     boughtWindowLabel: boughtWindowLabel,
     advantageDecisions: advantageDecisions,
     biggestFunnelDrop: biggestFunnelDrop,
+    biggestMeasureFall: biggestMeasureFall,
+    funnelStepItem: funnelStepItem,
+    funnelIsGated: funnelIsGated,
+    funnelCardTitle: function (block) {
+      return (block && block.available && !funnelIsGated(block))
+        ? FUNNEL_TITLE_SEPARATE : FUNNEL_TITLE_ROUTED;
+    },
     nestedFunnelBlock: nestedFunnelBlock
   };
 

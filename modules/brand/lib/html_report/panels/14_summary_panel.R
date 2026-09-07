@@ -14,7 +14,9 @@
 #   1. Hero: auto-generated verdict + 4 anchor numbers (MMS /
 #                    MPen / % bought / SCR) + MMS rank badge
 #   2. Mental availability, MMS / SoM / Network Size vs leader
-#   3. Physical conversion, collapsed Aware -> Prefer -> Bought funnel
+#   3. The buying stages, Aware -> Consider -> Bought. Drawn as a funnel
+#      only where the questionnaire routed the questions; where it did not,
+#      the same stages are drawn and reported as separate measures
 #   4. What's working, top-3 CEPs + top-3 attributes (over-index)
 #   5. Where weakest, bottom-3 CEPs + bottom-3 attributes
 #   6. Conversation & DoP, WOM (heard / said) + top-2 partners + rivals
@@ -532,6 +534,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   padding: 10px 12px;
 }
 .brsum-mf-avg { font-style: italic; }
+/* The separate-measures note under the buying card, on a category whose
+   questionnaire did not route its questions. It says why the card is not
+   called a funnel, next to the bars it qualifies. */
+.brsum-mf-note {
+  margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: #64748b;
+}
 .brsum-mf-title {
   font-size: 11px; font-weight: 700; color: #1e293b; text-align: center;
   margin-bottom: 8px; white-space: nowrap; overflow: hidden;
@@ -967,6 +975,24 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   base_label <- .brsum_base_text(n_total, "total_respondents") %||%
     "% of total respondents"
 
+  # Did the questionnaire route these questions? detect_instrument_gating()
+  # in R/03a_funnel_derive.R decides, and the funnel destination shows either
+  # a nested funnel or four separate measures on the strength of it. The
+  # Overview has to agree with that page, in its card title, in its base line
+  # and in the sentence Opportunities reads off the card. A payload with no
+  # gating block at all predates the check and is read as gated, which is the
+  # same convention .fn_table_controls() and .fn_base_howto() use.
+  #
+  # The flag is a boolean, so it adds no digit to the island and
+  # reachability_check.py sees no numeric change. The clause appended to the
+  # base label below is digit free for the same reason.
+  gated <- is.null(fn$meta$gating) || isTRUE(fn$meta$gating$gated)
+  if (!gated) {
+    base_label <- paste0(
+      base_label,
+      ". Separate measures: each stage on its own survey response")
+  }
+
   # ---------------------------------------------------------------------
   # The nested chain, which is what the funnel destination now shows by
   # default. Without it the Overview card would draw one shape and the
@@ -990,8 +1016,8 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   # Overview has to drop the mini funnel's nested series with it, or the two
   # pages contradict each other on the same data. The absolute series and its
   # own base line are what remain. See detect_instrument_gating() in
-  # R/03a_funnel_derive.R.
-  gated <- is.null(fn$meta$gating) || isTRUE(fn$meta$gating$gated)
+  # R/03a_funnel_derive.R. `gated` is resolved above, next to the base label
+  # it also decides.
   n_w <- suppressWarnings(as.numeric(fn$meta$n_weighted %||% NA_real_))
   has_chain <- gated && "base_chain_filtered" %in% names(st) &&
                is.finite(n_w) && n_w > 0
@@ -1036,6 +1062,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     base_label     = base_label,
     cat_avg        = unname(cat_avg),
     brands         = brands_map,
+    gated          = isTRUE(gated),
     nested         = isTRUE(has_chain),
     base_label_nested = base_label_nested,
     cat_avg_nested = if (is.null(cat_avg_nested)) NULL
@@ -2262,7 +2289,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   #                      pin anchor, and Stage 5 gives every destination one
   #                      export toolbar instead.
   #   5. Mental: MMS / SoM / Network Size vs leader.
-  #   6. Funnel: Aware -> Prefer -> Bought.
+  #   6. Funnel: Aware -> Consider -> Bought.
   #   7. Conversation: Word of mouth (heard + said).
   #   8. Repertoire: Top 2 DoP partners + top 2 rivals.
   #
@@ -2308,6 +2335,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       card("opportunities", "Opportunities to examine",      wide = TRUE,
            pinnable = FALSE),
       card("mental",       "Mental availability"),
+      # "Buying funnel" is the title of the routed case, and the routed case
+      # is what a brand study normally programmes, so it is what R writes
+      # into the skeleton. Whether a category routed its questions is decided
+      # per category and the picker moves between categories, so
+      # renderFunnelCard() sets this title on every render, in both branches.
+      # A reader with scripts off sees an empty card under this title, the
+      # same as every other card on this page: nothing here is filled by R.
       card("funnel",       "Buying funnel"),
       card("conversation", "Word of mouth"),
       card("repertoire",   "Repertoire ties, who focal buyers also buy"),
@@ -2436,7 +2470,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # It renders even when the penetration block has nothing to say, because the
 # methodology callout is always worth having; when both are empty it renders
 # nothing at all rather than an empty drawer.
-#' Why the funnel card and the purchase tile do not match.
+#' Why the buying card and the purchase tile do not match.
 #'
 #' Stage 4 moved the funnel to the nested chain, and the Overview's card
 #' followed it. The headline purchase tile did not: it is a penetration
@@ -2445,23 +2479,27 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 #' number nobody asked to change. Two figures for the same window then sit
 #' on one page, so the page says why.
 #'
-#' Worded so it stays true on a payload where the card falls back to the
-#' unnested series: the card's own base line is what states which of the two
-#' it drew.
+#' This drawer renders once for the whole Summary tab, while whether the
+#' questionnaire routed its questions is decided per category. So the note
+#' describes both cases and points at what the card itself says. The card's
+#' title and its base line are what name the series in front of the reader,
+#' and both change with the category picker.
 #' @keywords internal
 .brsum_funnel_base_note <- function() {
   paste0(
     '<p class="brsum-howto-note">',
-    '<strong>The buying funnel card and the purchase tile sit on different ',
-    'bases.</strong> The card draws the nested funnel wherever the data ',
-    'supports it: each stage counts only the respondents who passed every ',
-    'earlier stage, and the base line under the card title says which of ',
-    'the two series it drew. The headline purchase tile is that same stage ',
-    'on its own survey response, over all respondents, which is the figure ',
-    'the rest of the report calls penetration. Both are right and they ',
-    'answer different questions, so they are not expected to agree. The ',
-    'Brand and Buying destination carries a base toggle that shows the ',
-    'funnel either way.</p>')
+    '<strong>The buying card and the purchase tile sit on different ',
+    'bases.</strong> Where the questionnaire routed its questions, the card ',
+    'draws the nested funnel: each stage counts only the respondents who ',
+    'passed every earlier stage. Where it did not, chaining the answers ',
+    'would draw an ordering the survey never enforced, so the card draws ',
+    'each stage on its own survey response and reports them as separate ',
+    'measures. The card title and the base line under it say which of the ',
+    'two this category gives you, and the Brand and Buying destination ',
+    'states why. The headline purchase tile is that same stage on its own ',
+    'survey response, over all respondents, which is the figure the rest of ',
+    'the report calls penetration. Both are right and they answer different ',
+    'questions, so they are not expected to agree.</p>')
 }
 
 

@@ -501,5 +501,125 @@ assert('the two series give different answers, which is why it must read one',
        stepNested.to !== stepAbs.to);
 
 // ---------------------------------------------------------------------------
+section('a report whose questionnaire did not route its questions');
+// ---------------------------------------------------------------------------
+// Duncan ruled on 7 September 2026 that Turas draws a nested funnel only where
+// the questionnaire gated the questions. detect_instrument_gating() decides,
+// and the funnel destination then shows four separate measures with the
+// conversion ratios beside them and says on the page why there is no funnel.
+//
+// The Overview was built in Stage 3, when the funnel was nested for everyone,
+// and it went on asserting both. On the ungated QA fixture it titled its card
+// "Buying funnel" and its Opportunities block said, of two independently
+// measured groups:
+//
+//   "The largest step down is from Past 12 months at 62% to Past 3 months at
+//    45%, which is 72% of the stage before it."
+//
+// "of the stage before it" is a nesting claim, on the same report whose funnel
+// page says in so many words that nothing nests. These assertions fail on that
+// behaviour.
+
+const FUNNEL_UNGATED = Object.assign({}, FUNNEL_ABS, {
+  gated: false, nested: false,
+  base_label: 'n=438, total respondents. Separate measures: each stage on ' +
+              'its own survey response'
+});
+const FUNNEL_GATED = Object.assign({}, FUNNEL_NESTED, { gated: true });
+
+console.log('the gating flag, and what stands in for it on an older payload');
+assertEqual('an explicit false is read as not routed',
+  D.funnelIsGated(FUNNEL_UNGATED), false);
+assertEqual('an explicit true is read as routed',
+  D.funnelIsGated(FUNNEL_GATED), true);
+assertEqual('no flag, but a chain: R only wrote the chain after deciding routed',
+  D.funnelIsGated(FUNNEL_NESTED), true);
+assertEqual('no flag and no chain reads as not routed, the claim-least reading',
+  D.funnelIsGated(FUNNEL_ABS), false);
+assertEqual('no funnel at all is not routed', D.funnelIsGated(null), false);
+assertEqual('an unavailable block is not routed',
+  D.funnelIsGated({ available: false, gated: true }), false);
+
+console.log('the card title is a label, and it follows the questionnaire');
+assertEqual('routed: the card is a funnel',
+  D.funnelCardTitle(FUNNEL_GATED), 'Buying funnel');
+assertEqual('not routed: the card is a range, not a mechanism',
+  D.funnelCardTitle(FUNNEL_UNGATED), 'Awareness to purchase');
+assertEqual('a card with no data keeps the skeleton title',
+  D.funnelCardTitle({ available: false }), 'Buying funnel');
+assertEqual('and so does a missing block, so the picker always resets it',
+  D.funnelCardTitle(null), 'Buying funnel');
+
+console.log('the routed sentence is unchanged');
+const itemGated = D.funnelStepItem({ funnel: FUNNEL_GATED }, 'FOC');
+assertEqual('routed: the tag names the funnel', itemGated.tag,
+  'Read off the funnel above');
+assertEqual('routed: the sentence is the Stage 4 one, verbatim', itemGated.text,
+  'The largest step down is from Prefer at 67% to Past 12 months at 45%, ' +
+  'which is 67% of the stage before it.');
+
+console.log('the ungated sentence claims no nesting and no conversion');
+const itemUngated = D.funnelStepItem({ funnel: FUNNEL_UNGATED }, 'FOC');
+assertEqual('not routed: the tag does not say funnel', itemUngated.tag,
+  'Read off the measures above');
+assert('not routed: no "stage before it"',
+  itemUngated.text.indexOf('stage before it') < 0);
+assert('not routed: no "step down"',
+  itemUngated.text.indexOf('step down') < 0);
+assert('not routed: the word funnel is not in it',
+  itemUngated.text.toLowerCase().indexOf('funnel') < 0);
+assert('not routed: it says what the figures are',
+  itemUngated.text.indexOf('separate measures') > 0);
+assert('not routed: and that the gap is not a conversion',
+  itemUngated.text.indexOf('not a conversion') > 0);
+
+// The exact sentence the old code produced from this payload. Asserting the
+// new one differs is what makes this a regression test rather than a
+// description of the code that is here now.
+const oldDrop = D.biggestFunnelDrop({ funnel: FUNNEL_UNGATED }, 'FOC');
+const oldText = 'The largest step down is from ' + oldDrop.from + ' at 62% to ' +
+                oldDrop.to + ' at 45%, which is 72% of the stage before it.';
+assert('the old sentence is reproducible from this payload, so the test bites',
+  oldText.indexOf('72% of the stage before it') > 0);
+assert('and the new sentence is not it', itemUngated.text !== oldText);
+
+console.log('the ungated fall is the arithmetic the card lets you check');
+const fall = D.biggestMeasureFall({ funnel: FUNNEL_UNGATED }, 'FOC');
+assertEqual('it names the largest gap, not the smallest ratio',
+  fall.from, 'Aware');
+assertEqual('to the measure after it', fall.to, 'Prefer');
+assertEqual('and the gap is the difference of the two printed figures',
+  fall.gap, 25);
+assert('the sentence quotes both figures and the gap',
+  itemUngated.text.indexOf('Aware at 92%') > 0 &&
+  itemUngated.text.indexOf('Prefer at 67%') > 0 &&
+  itemUngated.text.indexOf('25 percentage points') > 0);
+assert('largest gap and smallest ratio are different pairs here, so it matters',
+  fall.to !== oldDrop.to);
+
+console.log('nothing falls, and nothing is invented to say it did');
+const RISING = Object.assign({}, FUNNEL_ABS, {
+  gated: false, brands: { FOC: [0.10, 0.20, 0.30, 0.40] }
+});
+assertEqual('a series that only rises has no fall',
+  D.biggestMeasureFall({ funnel: RISING }, 'FOC'), null);
+const itemRising = D.funnelStepItem({ funnel: RISING }, 'FOC');
+assert('and the block says so rather than going silent',
+  itemRising.text.indexOf('no fall to name') > 0);
+assert('and still says what the figures are',
+  itemRising.text.indexOf('separate measures') > 0);
+
+const FLAT = Object.assign({}, FUNNEL_ABS, {
+  gated: false, brands: { FOC: [0.4470, 0.4480, 0.4475, 0.4460] }
+});
+assertEqual('a gap that rounds to under a point is not called a fall',
+  D.biggestMeasureFall({ funnel: FLAT }, 'FOC'), null);
+
+assertEqual('no funnel means no item at all',
+  D.funnelStepItem({}, 'FOC'), null);
+assertEqual('an unavailable funnel means the same',
+  D.funnelStepItem({ funnel: { available: false } }, 'FOC'), null);
+
+// ---------------------------------------------------------------------------
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed === 0 ? 0 : 1);
