@@ -455,7 +455,15 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # the v2 report (e.g. substitution rules, replaced clusters, low response).
     # The generated design wording covers the textbook design; this carries the
     # honest asterisk where fieldwork reality deviated from it.
-    sampling_note = get_config_value(config, "sampling_note", NULL),
+    # A workbook cell holding the literal text "NA" is the field's placeholder
+    # for empty, but readxl keeps it as text rather than a missing value, so the
+    # writer's is.na() guard never saw it and the report's "About this survey"
+    # sentence shipped ending in "NA." is_blank_setting() is the module's
+    # existing rule for that placeholder (population_size, cube_order).
+    sampling_note = {
+      raw <- get_config_value(config, "sampling_note", NULL)
+      if (is_blank_setting(raw)) NULL else raw
+    },
 
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
