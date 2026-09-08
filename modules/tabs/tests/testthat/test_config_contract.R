@@ -725,3 +725,24 @@ test_that("heatmap_colour stays whitelisted. It is wired now, not dead", {
   expect_true("heatmap_colour" %in% TABS_KNOWN_SETTINGS)
   expect_false("heatmap_colour" %in% names(TABS_RETIRED_SETTINGS))
 })
+
+test_that("sampling_note treats the literal 'NA' placeholder as blank", {
+  # Config workbooks in the field use "NA" as the empty placeholder on optional
+  # settings. readxl keeps that as ordinary text, not a missing value, so the
+  # writer's is.na() guard never fired and the v2 "About this survey" sentence
+  # shipped ending in "NA." (ASSA 2026). is_blank_setting() is the module's
+  # existing convention for that placeholder; sampling_note now uses it too.
+  expect_null(build_config_object(list(sampling_note = "NA"))$sampling_note)
+  expect_null(build_config_object(list(sampling_note = "na"))$sampling_note)
+  expect_null(build_config_object(list(sampling_note = "  NA  "))$sampling_note)
+  expect_null(build_config_object(list(sampling_note = ""))$sampling_note)
+  expect_null(build_config_object(list(structure_file = "x.xlsx"))$sampling_note)
+
+  # A real caveat is untouched, including one that merely contains "NA".
+  expect_identical(
+    build_config_object(list(sampling_note = "Substitution was allowed."))$sampling_note,
+    "Substitution was allowed.")
+  expect_identical(
+    build_config_object(list(sampling_note = "NATSAL quotas were used."))$sampling_note,
+    "NATSAL quotas were used.")
+})
