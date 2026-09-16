@@ -881,10 +881,21 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
   successful <- 0L
   for (i in seq_len(iterations)) {
     idx <- sample.int(n_c, n_c, replace = TRUE)
+    # Under flag_only the package warns "Some respondents have inconsistent
+    # price structures" on every call, so a 1000-iteration bootstrap put a
+    # thousand identical lines on the GUI console (review F9). The headline
+    # call keeps the warning; this loop muffles that one and nothing else.
     fit <- tryCatch(
-      fit_vw_psm(too_cheap_c[idx], cheap_c[idx], expensive_c[idx], too_expensive_c[idx],
-                 weights = if (!is.null(weights_c)) weights_c[idx] else NULL,
-                 validate = validate, interpolate = TRUE),
+      withCallingHandlers(
+        fit_vw_psm(too_cheap_c[idx], cheap_c[idx], expensive_c[idx], too_expensive_c[idx],
+                   weights = if (!is.null(weights_c)) weights_c[idx] else NULL,
+                   validate = validate, interpolate = TRUE),
+        warning = function(w) {
+          if (grepl("inconsistent price structures", conditionMessage(w), fixed = TRUE)) {
+            invokeRestart("muffleWarning")
+          }
+        }
+      ),
       error = function(e) NULL
     )
     if (is.null(fit)) next

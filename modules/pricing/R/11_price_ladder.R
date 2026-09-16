@@ -114,7 +114,7 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
     # Guard against inverted range (PMC > PME indicates noisy data)
     if (!is.null(pmc_val) && !is.null(pme_val) && pmc_val > pme_val) {
       pricing_console_warning(
-        sprintf("VW range inverted (PMC=%.2f > PME=%.2f) — using +/-40%% fallback for ladder bounds", pmc_val, pme_val),
+        sprintf("VW range inverted (PMC=%.2f > PME=%.2f): using +/-40%% fallback for ladder bounds", pmc_val, pme_val),
         context = "Price Ladder"
       )
       reference_prices$PMC <- NULL
@@ -263,7 +263,8 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
     tier_table = tier_table,
     gap_analysis = gap_analysis,
     reference_prices = reference_prices,
-    anchor_tier_idx = anchor_tier_idx
+    anchor_tier_idx = anchor_tier_idx,
+    currency = config$currency_symbol %||% "$"
   )
 
   # ============================================================================
@@ -416,17 +417,21 @@ estimate_tier_demand <- function(tier_prices, gg_results) {
 #' @param gap_analysis Gap analysis results
 #' @param reference_prices Reference prices from analyses
 #' @param anchor_tier_idx Index of anchor tier
+#' @param currency The study's currency symbol. A hard-coded dollar put
+#'   "($100.99)" on the Price_Ladder sheet of a rand study (review F7).
 #' @return Character vector of notes
 #' @keywords internal
 generate_ladder_notes <- function(tier_table, gap_analysis,
-                                  reference_prices, anchor_tier_idx) {
+                                  reference_prices, anchor_tier_idx,
+                                  currency = "$") {
 
   notes <- character(0)
 
   # Note the anchor
   notes <- c(notes, sprintf(
-    "%s tier anchored to optimal price point ($%.2f).",
+    "%s tier anchored to optimal price point (%s%.2f).",
     tier_table$tier[anchor_tier_idx],
+    currency,
     tier_table$price[anchor_tier_idx]
   ))
 
@@ -450,8 +455,8 @@ generate_ladder_notes <- function(tier_table, gap_analysis,
     lowest_tier <- tier_table$price[1]
     if (lowest_tier < reference_prices$PMC * 1.05) {
       notes <- c(notes, sprintf(
-        "Value tier ($%.2f) near quality concern threshold ($%.2f) - consider raising.",
-        lowest_tier, reference_prices$PMC
+        "Value tier (%s%.2f) near quality concern threshold (%s%.2f) - consider raising.",
+        currency, lowest_tier, currency, reference_prices$PMC
       ))
     }
   }
@@ -460,8 +465,8 @@ generate_ladder_notes <- function(tier_table, gap_analysis,
     highest_tier <- tier_table$price[nrow(tier_table)]
     if (highest_tier > reference_prices$PME * 0.95) {
       notes <- c(notes, sprintf(
-        "Premium tier ($%.2f) near 'too expensive' threshold ($%.2f) - limited headroom.",
-        highest_tier, reference_prices$PME
+        "Premium tier (%s%.2f) near 'too expensive' threshold (%s%.2f) - limited headroom.",
+        currency, highest_tier, currency, reference_prices$PME
       ))
     }
   }

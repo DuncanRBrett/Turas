@@ -273,7 +273,14 @@ validate_pricing_data <- function(data, config) {
     # Coerce to numeric
     data[[config$weight_var]] <- suppressWarnings(as.numeric(data[[config$weight_var]]))
 
-    # Flag invalid weights
+    # Flag invalid weights. A zero weight is excluded here too (review F8):
+    # it used to survive validation and then get four different treatments,
+    # dropped by the monadic engine's valid mask, kept at zero contribution by
+    # Gabor-Granger, and refused outright by Van Westendorp. A respondent who
+    # contributes nothing is out of the sample, once, in one place.
+    zero_weight <- !is.na(data[[config$weight_var]]) &
+                   is.finite(data[[config$weight_var]]) &
+                   data[[config$weight_var]] == 0
     invalid_weight <- is.na(data[[config$weight_var]]) |
                       !is.finite(data[[config$weight_var]]) |
                       data[[config$weight_var]] < 0
@@ -291,7 +298,21 @@ validate_pricing_data <- function(data, config) {
       )
     }
 
-    # Calculate weight summary for diagnostics
+    if (any(zero_weight)) {
+      exclusions[zero_weight] <- TRUE
+      exclusion_reasons[zero_weight] <- paste0(
+        exclusion_reasons[zero_weight],
+        ifelse(exclusion_reasons[zero_weight] == "", "", "; "),
+        "zero_weight"
+      )
+      warnings_list[[length(warnings_list) + 1]] <- sprintf(
+        "Weight variable has %d zero values - cases excluded (they contribute nothing to any estimate)",
+        sum(zero_weight)
+      )
+    }
+
+    # Calculate weight summary for diagnostics. n_zero counts what arrived,
+    # so the exclusion above is visible rather than erased by it.
     valid_weights <- data[[config$weight_var]][!invalid_weight]
     weight_summary <- list(
       n_total = length(data[[config$weight_var]]),
@@ -512,6 +533,32 @@ validate_pricing_data <- function(data, config) {
     weight_summary = weight_summary,
     monotonicity_violations = if (exists("monotonicity_violations", inherits = FALSE)) monotonicity_violations else NULL
   )
+}
+
+
+#' Every Data Column A Pricing Config Names
+#'
+#' Pricing has no question list, so the stats pack's "questions in config"
+#' figure was hard-coded to zero and read as an empty config (review F11).
+#' What a pricing config names is columns; this counts them.
+#'
+#' @param config The loaded configuration.
+#' @return A character vector of unique column names, possibly empty.
+#' @keywords internal
+.pricing_configured_columns <- function(config) {
+  vw <- config$van_westendorp
+  gg <- config$gabor_granger
+  mon <- config$monadic
+  cols <- c(
+    vw$col_too_cheap, vw$col_cheap, vw$col_expensive, vw$col_too_expensive,
+    vw$col_pi_cheap, vw$col_pi_expensive,
+    gg$response_columns, gg$price_column, gg$response_column, gg$respondent_column,
+    mon$price_column, mon$intent_column,
+    config$weight_var, config$id_var, config$segment_vars
+  )
+  cols <- as.character(unlist(cols))
+  cols <- cols[!is.na(cols) & nzchar(trimws(cols))]
+  unique(cols)
 }
 
 

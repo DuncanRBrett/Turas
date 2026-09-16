@@ -820,14 +820,18 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     file_name           = basename(config$data_file %||% "unknown"),
     n_rows              = nrow(raw_data),
     n_cols              = ncol(raw_data),
-    questions_in_config = 0L  # pricing does not use a question list
+    # Pricing has no question list; what a pricing config names is columns.
+    # A hard 0 read as "the config is empty" (review F11).
+    questions_in_config = length(.pricing_configured_columns(config))
   )
 
-  # Price points tested (from config ladder/grid)
-  n_price_points <- length(config$price_points %||%
-                           config$gabor_granger$price_points %||%
-                           config$van_westendorp$price_range %||%
-                           list())
+  # Price points tested. The three keys this read do not exist on a pricing
+  # config, so the row said "not applicable" on a five-rung ladder (review
+  # F11). The Gabor-Granger rungs live in price_sequence, and the monadic
+  # design's cells in the config's own list.
+  # A monadic design has no declared grid: its cells are whatever prices the
+  # data carries, so the row stays "not applicable" there, honestly.
+  n_price_points <- length(config$gabor_granger$price_sequence %||% list())
 
   # Segmentation status
   seg_enabled <- !is.null(config$segmentation$segment_column) &&

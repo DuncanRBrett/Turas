@@ -84,11 +84,18 @@ run_gabor_granger <- function(data, config) {
   if (identical(imputation, "NO_AFTER_STOP")) {
     if (gg$data_format != "wide" && !.gg_order_derivable(gg_data)) {
       pricing_refuse(
-        code = "CFG_GG_IMPUTATION_ORDER",
-        title = "Stop-Early Imputation Needs A Known Presentation Order",
-        problem = "GG_Stop_Early_Imputation = NO_AFTER_STOP is set on long-format data whose rung order cannot be derived.",
-        why_it_matters = "Imputing No after the first No depends on which rung came first.",
-        how_to_fix = "Supply the data in wide format with Price_Sequence in ascending presentation order, or remove the setting."
+        code = "DATA_GG_PRICE_NOT_NUMERIC",
+        title = "Stop-Early Imputation Needs Prices It Can Order",
+        problem = paste0(
+          "GG_Stop_Early_Imputation = NO_AFTER_STOP is set, and the long-format Price_Column ",
+          "holds values that did not read as numbers."),
+        why_it_matters = paste0(
+          "Imputing No after the first No depends on which rung came first, and the ladder's ",
+          "order is ascending price. A price that did not parse has no place in that order."),
+        how_to_fix = c(
+          "Check the Price_Column for currency symbols, thousands separators or text such as 'R60'.",
+          "Supply the data in wide format with Price_Sequence in ascending presentation order, or remove the setting."
+        )
       )
     }
     # Gaps the staircase does not explain are not the ladder stopping, so
@@ -176,6 +183,14 @@ run_gabor_granger <- function(data, config) {
       level = gg$confidence_level %||% 0.95,
       smoothing = smoothing
     )
+  }
+
+  # The interval table brackets the published curve, so it carries it: without
+  # that column a reader could not check from the sheet that it does
+  # (review F11).
+  if (!is.null(confidence_intervals) && "price" %in% names(confidence_intervals)) {
+    confidence_intervals$published <- demand_curve$purchase_intent[
+      match(confidence_intervals$price, demand_curve$price)]
   }
 
   weighted <- !is.na(config$weight_var %||% NA) && any(gg_data$weight != 1)
@@ -349,10 +364,15 @@ check_gg_rung_bases <- function(rung_bases, tolerance = 0.02) {
 
 
 #' Can A Rung Order Be Derived From Long-Format Data?
+#'
+#' `prepare_gg_long_data()` has already coerced the price column with
+#' `as.numeric()`, so this is FALSE exactly when a price failed to parse. The
+#' refusal it guards used to describe a missing order column, which nothing
+#' tested and which therefore could never fire as written (review F10); it now
+#' says what this actually checks.
+#'
 #' @keywords internal
 .gg_order_derivable <- function(gg_data) {
-  # Prices are numeric, so ascending price is a presentation order; the
-  # refusal above is for the case where prices are not comparable.
   is.numeric(gg_data$price) && !any(is.na(gg_data$price))
 }
 

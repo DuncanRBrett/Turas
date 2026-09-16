@@ -360,7 +360,9 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       openxlsx::addWorksheet(wb, "GG_Confidence_Intervals")
       openxlsx::writeData(wb, "GG_Confidence_Intervals",
                           pricing_escape_df(gg_results$confidence_intervals), headerStyle = header_style)
-      openxlsx::setColWidths(wb, "GG_Confidence_Intervals", cols = 1:5, widths = "auto")
+      openxlsx::setColWidths(wb, "GG_Confidence_Intervals",
+                             cols = seq_len(ncol(gg_results$confidence_intervals)),
+                             widths = "auto")
     }
   }
 
@@ -446,8 +448,16 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       ),
       stringsAsFactors = FALSE
     )
+    # The caveat reached the console and the stats pack but not the sheet a
+    # client reads, which showed "p-value 0.000000" with nothing beside it
+    # (review F11).
+    if (!is.null(ms$p_value_caveat) && nzchar(ms$p_value_caveat)) {
+      model_df <- rbind(model_df, data.frame(
+        Metric = "p-value caveat", Value = as.character(ms$p_value_caveat),
+        stringsAsFactors = FALSE))
+    }
     openxlsx::writeData(wb, "Mon_Model_Summary", pricing_escape_df(model_df), headerStyle = header_style)
-    openxlsx::setColWidths(wb, "Mon_Model_Summary", cols = 1:2, widths = c(25, 20))
+    openxlsx::setColWidths(wb, "Mon_Model_Summary", cols = 1:2, widths = c(25, 60))
 
     # Elasticity
     if (!is.null(results$elasticity) && nrow(results$elasticity) > 0) {
