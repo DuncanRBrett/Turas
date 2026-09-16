@@ -354,3 +354,93 @@ test_that("grossing weights refuse and mean-1 weights are used as given (H4)", {
   expect_true(is.finite(r$model_summary$coefficients[2, 1]))
   expect_lt(r$model_summary$coefficients[2, 1], 0)
 })
+
+# ------------------------------------------------------------------------------
+# F1: the binary domain check reaches long-format ladders, and the coder
+# refuses what it cannot read instead of quietly dropping it
+# ------------------------------------------------------------------------------
+
+gg_cfg_long <- function(weight_var = NA_character_, binary_coding = "ZERO_ONE",
+                        response_type = "binary", imputation = "NONE",
+                        behavior = "diagnostic_only") {
+  list(
+    analysis_method = "gabor_granger", weight_var = weight_var, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    gg_monotonicity_behavior = behavior, gg_stop_early_imputation = imputation,
+    gabor_granger = list(data_format = "long", price_column = "price",
+                         response_column = "buy", respondent_column = "respondent_id",
+                         response_type = response_type, binary_coding = binary_coding,
+                         smoothing_method = "isotonic", check_monotonicity = FALSE,
+                         calculate_elasticity = TRUE, revenue_optimization = TRUE,
+                         confidence_intervals = FALSE, bootstrap_iterations = 80,
+                         confidence_level = 0.95),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000)
+  )
+}
+
+# Four respondents, three rungs, coded 1 = would buy / 2 = would not. The same
+# answers as the wide ONE_TWO test above, so the demand curve is 0.75 / 0.5 / 0.25.
+long_ladder_one_two <- function() {
+  data.frame(
+    respondent_id = rep(1:4, times = 3),
+    price = rep(c(10, 20, 30), each = 4),
+    buy = c(1, 1, 1, 2,
+            1, 2, 1, 2,
+            2, 2, 1, 2),
+    w = 1
+  )
+}
+
+test_that("a long-format 1/2 ladder declared 0/1 refuses at validation (F1)", {
+  d <- long_ladder_one_two()
+  err <- tryCatch(validate_pricing_data(d, gg_cfg_long()), error = function(e) conditionMessage(e))
+  expect_match(err, "DATA_GG_NOT_BINARY")
+  expect_match(err, "ONE_TWO")
+})
+
+test_that("the wrong path the refusal used to open is closed (F1)", {
+  # Before the fix: validation passed, the run refused DATA_GG_UNEQUAL_BASES,
+  # its first fix line said to set NO_AFTER_STOP, and with that set every rung
+  # reported 100% intent. Validation now stops it before any of that.
+  d <- long_ladder_one_two()
+  err <- tryCatch(validate_pricing_data(d, gg_cfg_long(imputation = "NO_AFTER_STOP")),
+                  error = function(e) conditionMessage(e))
+  expect_match(err, "DATA_GG_NOT_BINARY")
+})
+
+test_that("a long-format 1/2 ladder declared ONE_TWO gives the hand-computed curve (F1)", {
+  d <- long_ladder_one_two()
+  cfg <- gg_cfg_long(binary_coding = "ONE_TWO")
+  v <- validate_pricing_data(d, cfg)
+  r <- quiet(run_gabor_granger(v$clean_data, cfg))
+  expect_equal(r$demand_curve$purchase_intent, c(0.75, 0.5, 0.25))
+  expect_match(r$diagnostics$response_coding, "ONE_TWO")
+})
+
+test_that("the coder refuses an out-of-domain numeric rather than dropping it (F1)", {
+  expect_error(code_gg_response(c(0, 1, 3), list(response_type = "binary")),
+               "DATA_GG_NOT_BINARY")
+  # 1/2 data under the default coding names the setting that fixes it.
+  err <- tryCatch(code_gg_response(c(1, 2, 1), list(response_type = "binary")),
+                  error = function(e) conditionMessage(e))
+  expect_match(err, "ONE_TWO")
+  # The declared domain still codes cleanly, and NA stays NA.
+  expect_equal(code_gg_response(c(1, 2, NA), list(response_type = "binary",
+                                                  binary_coding = "ONE_TWO")),
+               c(1, 0, NA))
+})
+
+test_that("the coder refuses an unrecognised spelling rather than dropping it (F1)", {
+  expect_error(code_gg_response(c("Yes", "Definitely", "Nope"), list(response_type = "binary")),
+               "DATA_GG_NOT_BINARY")
+  # The recognised spellings still code, and blanks are missing, not unknown.
+  expect_equal(code_gg_response(c("Yes", "no", "", NA), list(response_type = "binary")),
+               c(1, 0, NA, NA))
+})
+
+test_that("an unrecognised spelling in long format refuses at validation (F1)", {
+  d <- long_ladder_one_two()
+  d$buy <- ifelse(d$buy == 1, "Definitely", "Nope")
+  err <- tryCatch(validate_pricing_data(d, gg_cfg_long()), error = function(e) conditionMessage(e))
+  expect_match(err, "DATA_GG_NOT_BINARY")
+})

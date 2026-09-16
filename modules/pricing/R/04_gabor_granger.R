@@ -392,9 +392,31 @@ code_gg_response <- function(response, config) {
 
     if (is.numeric(response)) {
       # Exact values only. "any positive number is a purchase" read 1 = Yes /
-      # 2 = No as 100% intent everywhere (review H5); the domain check in
-      # validation refuses anything outside the declared coding, so what
-      # arrives here is 0/1 (or 1/2 under ONE_TWO) and NA.
+      # 2 = No as 100% intent everywhere (review H5). Validation refuses
+      # out-of-domain values before this point, but it only reached wide data
+      # until review F1, so the coder refuses here too rather than mapping the
+      # unknown value to NA and letting the ladder lose a base it cannot
+      # explain.
+      allowed <- if (coding == "ONE_TWO") c(1, 2) else c(0, 1)
+      off <- unique(response[!is.na(response) & !response %in% allowed])
+      if (length(off) > 0) {
+        seen <- unique(response[!is.na(response)])
+        is_one_two <- all(seen %in% c(1, 2)) && coding != "ONE_TWO"
+        pricing_refuse(
+          code = "DATA_GG_NOT_BINARY",
+          title = "A Gabor-Granger Response Is Not Coded 0/1",
+          problem = sprintf("Responses are declared binary but include %s.",
+                            paste(head(sort(off), 6), collapse = ", ")),
+          why_it_matters = paste0(
+            "Any value that is not the declared Yes or No would be dropped as missing, ",
+            "which computes demand among whoever is left and pushes the revenue optimum ",
+            "towards the top price."),
+          how_to_fix = c(
+            if (is_one_two) "The values are 1 and 2: set Binary_Coding = ONE_TWO on the GaborGranger sheet (1 = would buy, 2 = would not).",
+            "Otherwise recode the responses to 0/1, or declare Response_Type = scale with a Scale_Threshold."
+          )
+        )
+      }
       if (coding == "ONE_TWO") {
         out <- rep(NA_real_, length(response))
         out[!is.na(response) & response == 1] <- 1
@@ -407,12 +429,27 @@ code_gg_response <- function(response, config) {
       return(out)
     }
 
-    # Text: yes/no in the usual spellings; anything else stays missing rather
-    # than silently becoming No.
+    # Text: yes/no in the usual spellings. An unrecognised spelling used to
+    # stay missing, which gave a long-format ladder n = 0 and NA demand at
+    # every rung with nothing said (review F1). It refuses instead, on the
+    # same terms as the wide-format domain check.
     txt <- tolower(trimws(as.character(response)))
+    yes <- c("1", "yes", "y", "true")
+    no <- c("0", "no", "n", "false")
+    unknown <- unique(txt[!is.na(txt) & nzchar(txt) & !txt %in% c(yes, no)])
+    if (length(unknown) > 0) {
+      pricing_refuse(
+        code = "DATA_GG_NOT_BINARY",
+        title = "A Gabor-Granger Response Is Not Yes/No",
+        problem = sprintf("Responses are declared binary but include text other than yes/no: %s.",
+                          paste(head(sort(unknown), 6), collapse = ", ")),
+        why_it_matters = "Every unrecognised answer would be dropped as missing, so the rung it belongs to loses part of its base.",
+        how_to_fix = "Recode the responses to 0/1, or set Response_Type = scale with a Scale_Threshold."
+      )
+    }
     out <- rep(NA_real_, length(txt))
-    out[txt %in% c("1", "yes", "y", "true")] <- 1
-    out[txt %in% c("0", "no", "n", "false")] <- 0
+    out[!is.na(txt) & txt %in% yes] <- 1
+    out[!is.na(txt) & txt %in% no] <- 0
     return(out)
 
   } else if (response_type == "scale") {

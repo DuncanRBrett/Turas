@@ -431,22 +431,23 @@ validate_pricing_data <- function(data, config) {
   if (analysis_method %in% c("gabor_granger", "both")) {
     gg <- config$gabor_granger
 
-    if (gg$data_format == "wide") {
-      for (col in gg$response_columns) {
-        # Check for missing values
-        n_missing <- sum(is.na(data[[col]]))
-        if (n_missing > 0) {
-          warnings_list[[length(warnings_list) + 1]] <- sprintf(
-            "Column '%s' has %d missing values (%.1f%%)",
-            col, n_missing, 100 * n_missing / nrow(data)
-          )
-        }
+    for (col in .gg_response_cols(gg)) {
+      # Check for missing values
+      n_missing <- sum(is.na(data[[col]]))
+      if (n_missing > 0) {
+        warnings_list[[length(warnings_list) + 1]] <- sprintf(
+          "Column '%s' has %d missing values (%.1f%%)",
+          col, n_missing, 100 * n_missing / nrow(data)
+        )
       }
-      # A declared-binary column must be 0/1 (or 1/2 under Binary_Coding =
-      # ONE_TWO). Any positive number used to count as a purchase, so 1 = Yes
-      # / 2 = No data read as 100% intent at every rung (review H5).
-      validate_gg_binary_domain(data, gg)
     }
+    # A declared-binary column must be 0/1 (or 1/2 under Binary_Coding =
+    # ONE_TWO). Any positive number used to count as a purchase, so 1 = Yes
+    # / 2 = No data read as 100% intent at every rung (review H5). The check
+    # ran on wide data only, so a long-format ladder kept the whole defect and
+    # the unequal-bases refusal steered the analyst straight into it
+    # (review F1).
+    validate_gg_binary_domain(data, gg)
   }
 
   # --------------------------------------------------------------------------
@@ -507,12 +508,33 @@ validate_pricing_data <- function(data, config) {
 }
 
 
+#' The Gabor-Granger Response Columns, Whichever Layout The Config Declares
+#'
+#' Wide data names one column per rung in `Response_Columns`; long data names
+#' a single `Response_Column`. Callers that check the responses themselves
+#' need the same list either way.
+#'
+#' @param gg The Gabor-Granger config list.
+#' @return A character vector, possibly empty.
+#' @keywords internal
+.gg_response_cols <- function(gg) {
+  cols <- if (identical(tolower(gg$data_format %||% "wide"), "wide")) {
+    gg$response_columns
+  } else {
+    gg$response_column
+  }
+  cols <- as.character(cols)
+  cols[!is.na(cols) & nzchar(cols)]
+}
+
+
 #' Validate The Domain Of Declared-Binary Gabor-Granger Columns
 #'
 #' Refuses when a column declared `Response_Type = binary` holds values
 #' outside {0, 1}, unless `Binary_Coding = ONE_TWO` and the values are within
 #' {1, 2}. Missing values are allowed here; the ladder's own base check deals
-#' with them. Logical and Yes/No text columns pass.
+#' with them. Logical and Yes/No text columns pass. Runs on both layouts: the
+#' rung columns of wide data and the single response column of long data.
 #'
 #' @param data The data frame.
 #' @param gg The Gabor-Granger config list.
@@ -524,7 +546,7 @@ validate_gg_binary_domain <- function(data, gg) {
   coding <- toupper(gg$binary_coding %||% "ZERO_ONE")
   allowed <- if (identical(coding, "ONE_TWO")) c(1, 2) else c(0, 1)
 
-  for (col in gg$response_columns) {
+  for (col in .gg_response_cols(gg)) {
     x <- data[[col]]
     if (is.logical(x)) next
     if (is.character(x) || is.factor(x)) {
