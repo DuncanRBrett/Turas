@@ -444,3 +444,114 @@ test_that("an unrecognised spelling in long format refuses at validation (F1)", 
   err <- tryCatch(validate_pricing_data(d, gg_cfg_long()), error = function(e) conditionMessage(e))
   expect_match(err, "DATA_GG_NOT_BINARY")
 })
+
+# ------------------------------------------------------------------------------
+# F4 + F6: the shape of the missingness decides between refusing the run and
+# excluding the respondent, and the exclusion is disclosed
+# ------------------------------------------------------------------------------
+
+# A full-presentation ladder: everybody was asked every rung, then independent
+# item non-response knocked cells out at random.
+scattered_data <- function(n = 300, prices = c(20, 40, 60, 80, 100), rate = 0.03, seed = 21) {
+  set.seed(seed)
+  ceiling <- runif(n, 15, 105)
+  m <- sapply(prices, function(p) as.integer(p <= ceiling))
+  m[matrix(runif(n * length(prices)) < rate, nrow = n)] <- NA_integer_
+  d <- as.data.frame(m)
+  names(d) <- paste0("p", prices)
+  d$respondent_id <- seq_len(n)
+  d$w <- 1
+  d
+}
+
+test_that("the missingness shape tells a staircase from scattered blanks (F4)", {
+  prices <- c(20, 40, 60, 80, 100)
+  cfg <- gg_cfg(paste0("stop_", prices), prices)
+  stop_long <- prepare_gg_wide_data(ladder_data(), cfg$gabor_granger, cfg)
+  s1 <- gg_missingness_shape(stop_long)
+  expect_gt(s1$n_incomplete, 0)
+  expect_equal(s1$stop_early_share, 1)
+
+  cfg2 <- gg_cfg(paste0("p", prices), prices)
+  scattered_long <- prepare_gg_wide_data(scattered_data(), cfg2$gabor_granger, cfg2)
+  s2 <- gg_missingness_shape(scattered_long)
+  expect_gt(s2$n_incomplete, 0)
+  expect_lt(s2$stop_early_share, 0.9)
+  # No missing rungs at all is complete for everyone and no share to compute.
+  clean <- scattered_long[!is.na(scattered_long$response), , drop = FALSE]
+  s3 <- gg_missingness_shape(clean[clean$respondent_id %in% s2$ids[s2$status == "complete"], ])
+  expect_equal(s3$n_incomplete, 0)
+  expect_true(is.na(s3$stop_early_share))
+})
+
+test_that("scattered item non-response excludes and discloses instead of refusing (F4)", {
+  prices <- c(20, 40, 60, 80, 100)
+  d <- scattered_data()
+  cfg <- gg_cfg(paste0("p", prices), prices)
+  r <- quiet(run_gabor_granger(d, cfg))
+  cmp <- r$diagnostics$completeness
+  expect_gt(cmp$n_excluded, 0)
+  expect_equal(cmp$rule, "incomplete ladder")
+  expect_equal(cmp$exclusion_rate, cmp$n_excluded / nrow(d))
+  # Every rung now has the same base, and the reported base is the analysed one.
+  expect_equal(length(unique(r$rung_bases$n_answered)), 1)
+  expect_equal(r$diagnostics$n_respondents, nrow(d) - cmp$n_excluded)
+  expect_equal(r$rung_bases$n_answered[1], r$diagnostics$n_respondents)
+})
+
+test_that("a stop-early ladder still refuses (C2 survives F4)", {
+  prices <- c(20, 40, 60, 80, 100)
+  cfg <- gg_cfg(paste0("stop_", prices), prices)
+  err <- tryCatch(quiet(run_gabor_granger(ladder_data(), cfg)), error = function(e) conditionMessage(e))
+  expect_match(err, "DATA_GG_UNEQUAL_BASES")
+})
+
+test_that("gaps the staircase does not explain are excluded before imputation (F6)", {
+  prices <- c(20, 40, 60, 80)
+  n <- 100
+  set.seed(9)
+  ceiling <- runif(n, 15, 85)
+  m <- sapply(prices, function(p) as.integer(p <= ceiling))
+  for (i in seq_len(n)) {
+    fn <- which(m[i, ] == 0L)
+    if (length(fn) && fn[1] < length(prices)) m[i, (fn[1] + 1):length(prices)] <- NA
+  }
+  # Thirty respondents also skipped the first rung, which no staircase explains.
+  m[1:30, 1] <- NA
+  d <- as.data.frame(m)
+  names(d) <- paste0("s", prices)
+  d$respondent_id <- seq_len(n)
+  d$w <- 1
+
+  cfg <- gg_cfg(paste0("s", prices), prices, imputation = "NO_AFTER_STOP")
+  r <- quiet(run_gabor_granger(d, cfg))
+  cmp <- r$diagnostics$completeness
+  expect_equal(cmp$n_excluded, 30)
+  expect_match(cmp$rule, "beyond the stop-early pattern")
+  # The base check now runs after imputation, and every rung has the same base.
+  expect_equal(length(unique(r$rung_bases$n_answered)), 1)
+  expect_equal(r$rung_bases$n_answered[1], 70)
+  expect_equal(r$diagnostics$n_respondents, 70)
+})
+
+test_that("a completeness exclusion answers to the study's own Min_Sample (F4)", {
+  prices <- c(20, 40, 60, 80, 100)
+  d <- scattered_data(n = 60, rate = 0.2, seed = 4)
+  cfg <- gg_cfg(paste0("p", prices), prices, min_sample = 55)
+  err <- tryCatch(quiet(run_gabor_granger(d, cfg)), error = function(e) conditionMessage(e))
+  expect_match(err, "DATA_GG_MIN_SAMPLE")
+  # The same data passes when the study declares a floor it clears.
+  expect_silent(invisible(quiet(run_gabor_granger(d, gg_cfg(paste0("p", prices), prices, min_sample = 1)))))
+})
+
+test_that("a complete ladder is untouched and says so (F4)", {
+  prices <- c(10, 20, 30)
+  d <- data.frame(respondent_id = 1:4, w = 1,
+                  p10 = c(1, 1, 1, 0), p20 = c(1, 0, 1, 0), p30 = c(0, 0, 1, 0))
+  r <- quiet(run_gabor_granger(d, gg_cfg(paste0("p", prices), prices, behavior = "diagnostic_only")))
+  cmp <- r$diagnostics$completeness
+  expect_equal(cmp$n_incomplete, 0)
+  expect_equal(cmp$n_excluded, 0L)
+  expect_equal(cmp$rule, "none")
+  expect_equal(r$demand_curve$purchase_intent, c(0.75, 0.5, 0.25))
+})

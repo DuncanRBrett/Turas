@@ -891,6 +891,15 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     method_results[["GG: response_coding"]] <- gg_results$diagnostics$response_coding %||% "unknown"
     method_results[["GG: stop_early_imputation"]] <- gg_results$diagnostics$imputation %||% "none"
     method_results[["GG: smoothing"]] <- gg_results$diagnostics$smoothing %||% "none"
+    # Completeness (review F4 and F6). An exclusion that never reaches a
+    # deliverable is the same problem as no exclusion at all.
+    cmp <- gg_results$diagnostics$completeness
+    if (!is.null(cmp)) {
+      method_results[["GG: incomplete_ladders"]] <- as.character(cmp$n_incomplete %||% 0)
+      method_results[["GG: completeness_excluded"]] <- sprintf(
+        "%d (%.1f%%)", as.integer(cmp$n_excluded %||% 0), (cmp$exclusion_rate %||% 0) * 100)
+      method_results[["GG: completeness_rule"]] <- cmp$rule %||% "none"
+    }
     if (!is.null(gg_results$optimal_price_profit)) {
       method_results[["GG: profit_optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price_profit$price)
     }

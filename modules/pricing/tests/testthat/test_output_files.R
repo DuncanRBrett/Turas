@@ -96,3 +96,54 @@ test_that("the flag is neutralised, so nothing downstream believes a report exis
                                      generate_html_report = "TRUE"))
   expect_false(isTRUE(cfg$generate_html_report))
 })
+
+# ------------------------------------------------------------------------------
+# F4 + F6: the completeness exclusion reaches the workbook a client receives
+# ------------------------------------------------------------------------------
+
+test_that("the Validation sheet reports the Gabor-Granger completeness exclusion (F4)", {
+  skip_if(!requireNamespace("openxlsx", quietly = TRUE), "openxlsx not available")
+  skip_if(!exists("write_pricing_output", mode = "function"), "writer not available")
+
+  prices <- c(20, 40, 60, 80, 100)
+  cols <- paste0("p", prices)
+  config <- list(
+    analysis_method = "gabor_granger", weight_var = NA_character_, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    gg_monotonicity_behavior = "diagnostic_only", gg_stop_early_imputation = "NONE",
+    gabor_granger = list(data_format = "wide", price_sequence = prices, response_columns = cols,
+                         response_type = "binary", binary_coding = "ZERO_ONE",
+                         smoothing_method = "isotonic", check_monotonicity = FALSE,
+                         calculate_elasticity = FALSE, revenue_optimization = TRUE,
+                         confidence_intervals = FALSE, bootstrap_iterations = 10,
+                         confidence_level = 0.95),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000),
+    output = list(), project_name = "F4 completeness")
+
+  set.seed(21)
+  n <- 300
+  ceiling <- runif(n, 15, 105)
+  m <- sapply(prices, function(p) as.integer(p <= ceiling))
+  m[matrix(runif(n * length(prices)) < 0.03, nrow = n)] <- NA_integer_
+  d <- as.data.frame(m)
+  names(d) <- cols
+  d$respondent_id <- seq_len(n)
+
+  invisible(capture.output(v <- validate_pricing_data(d, config)))
+  invisible(capture.output(r <- run_gabor_granger(v$clean_data, config)))
+  cmp <- r$diagnostics$completeness
+  expect_gt(cmp$n_excluded, 0)
+
+  out <- file.path(tempdir(), "pricing_f4_completeness.xlsx")
+  unlink(out)
+  on.exit(unlink(out), add = TRUE)
+  invisible(capture.output(write_pricing_output(r, list(), v, config, out)))
+  expect_true(file.exists(out))
+  expect_true("Validation" %in% openxlsx::getSheetNames(out))
+
+  val <- openxlsx::read.xlsx(out, sheet = "Validation", skipEmptyRows = FALSE, colNames = FALSE)
+  text <- apply(val, 1, function(x) paste(x[!is.na(x)], collapse = " | "))
+  expect_true(any(grepl("GABOR-GRANGER COMPLETENESS", text, fixed = TRUE)))
+  expect_true(any(grepl(paste("Respondents Excluded", cmp$n_excluded, sep = " | "), text, fixed = TRUE)))
+  expect_true(any(grepl("Rule Applied | incomplete ladder", text, fixed = TRUE)))
+})
