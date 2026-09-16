@@ -307,7 +307,7 @@ run_pricing_analysis_from_config <- function(config) {
 
   if (analysis_method == "van_westendorp") {
     cat("\n3. Running Van Westendorp PSM analysis...\n")
-    vw_results <- run_van_westendorp(validation$clean_data, config)
+    vw_results <- run_van_westendorp(validation$clean_data, config, validation = validation)
     analysis_results <- vw_results
     cat("   Price points calculated:\n")
     cat(sprintf("     PMC (Point of Marginal Cheapness): %s%.2f\n",
@@ -384,7 +384,7 @@ run_pricing_analysis_from_config <- function(config) {
     cat("\n3. Running both Van Westendorp and Gabor-Granger analyses...\n")
 
     cat("   a) Van Westendorp PSM...\n")
-    vw_results <- run_van_westendorp(validation$clean_data, config)
+    vw_results <- run_van_westendorp(validation$clean_data, config, validation = validation)
     cat(sprintf("      Acceptable range: %s%.2f - %s%.2f\n",
                 config$currency_symbol %||% "$", vw_results$price_points$PMC,
                 config$currency_symbol %||% "$", vw_results$price_points$PME))
@@ -868,6 +868,15 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
                                                           vw_results$diagnostics$n_valid)
     method_results[["VW: n_complete"]] <- as.character(vw_results$diagnostics$n_valid)
     method_results[["VW: violation_rate"]] <- sprintf("%.1f%%", vw_results$diagnostics$violation_rate * 100)
+    # Under "drop" and "fix" the rate above is 0 by construction, because the
+    # violators were handled before the engine saw them (review F5).
+    n_before <- vw_results$diagnostics$n_violations_before_handling
+    rate_before <- vw_results$diagnostics$violation_rate_before_handling
+    method_results[["VW: violations_before_handling"]] <- if (is.null(n_before) || is.na(n_before)) {
+      "not recorded"
+    } else {
+      sprintf("%d (%.1f%%)", as.integer(n_before), rate_before * 100)
+    }
     method_results[["VW: intransitive_handling"]] <- vw_results$diagnostics$monotonicity_behavior %||% "unknown"
     method_results[["VW: estimator"]] <- vw_results$diagnostics$estimator %||% "psm_analysis (unweighted)"
     if (!is.null(vw_results$nms_results)) {

@@ -295,11 +295,13 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
     optimalUpper = .pricing_scalar(vw$optimal_range$upper),
     nAnalysed = .pricing_scalar(d$n_analysed %||% d$n_valid),
     nComplete = .pricing_scalar(d$n_valid),
-    # The engine's own violation count is recomputed on data the `drop`
-    # behaviour has already cleaned, so it reads 0 on a run that excluded
-    # respondents for exactly that reason (the Session A review's F5). It
-    # stays out of the island until that fix lands; the Excel Validation
-    # sheet carries the real figure.
+    # The count taken before the handling, which is the one that describes the
+    # sample: the engine's own recompute runs on data `drop` has already
+    # cleaned and reads 0 on a run that excluded respondents for exactly that
+    # reason (review F5). NULL when the run did not record it, rather than a
+    # zero that would read as "none".
+    violations = .pricing_scalar(d$n_violations_before_handling),
+    violationRate = .pricing_scalar(d$violation_rate_before_handling),
     monotonicityBehavior = as.character(d$monotonicity_behavior %||% NA_character_),
     curves = curve_block
   ))
@@ -531,6 +533,13 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
              "(%s) on %s respondents; %s."),
       as.character(d$estimator %||% "psm_analysis (unweighted)"),
       format(d$n_analysed %||% d$n_valid %||% NA_integer_), handling)
+    # How many that was, when the run recorded it (review F5).
+    n_before <- d$n_violations_before_handling
+    if (!is.null(n_before) && length(n_before) == 1 && !is.na(n_before)) {
+      notes$vw <- paste(notes$vw, sprintf(
+        "That was %d of them (%.1f%%).",
+        as.integer(n_before), (d$violation_rate_before_handling %||% 0) * 100))
+    }
   }
   if (has_gg) {
     d <- gg$diagnostics %||% list()
@@ -626,7 +635,7 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
   scalars <- list(
     vw = c("ciLevel", "ciIterations", "ciPolicy", "acceptableLower", "acceptableUpper",
            "optimalLower", "optimalUpper", "nAnalysed", "nComplete",
-           "monotonicityBehavior", "curves"),
+           "violations", "violationRate", "monotonicityBehavior", "curves"),
     gg = c("smoothing", "ciLevel", "optimalRevenuePrice", "optimalRevenueIntentPct",
            "optimalProfitPrice"),
     monadic = c("fitted", "modelType", "pseudoR2", "pValue", "pValueCaveat",

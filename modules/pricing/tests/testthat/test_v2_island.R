@@ -196,12 +196,23 @@ test_that("a short curve is not downsampled and says nothing about it", {
   expect_false("downsampledFrom" %in% names(isl$vw$curves))
 })
 
-test_that("the violation count stays out until the F5 fix lands", {
+test_that("the violation count reaches the island, and only when it is real (F5)", {
   # The engine recomputes violations on data `drop` has already cleaned, so
-  # the number reads 0 on a run that excluded respondents for violating.
-  isl <- quiet_island(list(van_westendorp = fake_vw(), validation = fake_validation()),
-                      fake_config())
-  expect_false("violations" %in% names(isl$vw))
+  # that number reads 0 on a run that excluded respondents for violating. The
+  # island carries the count taken before the handling instead.
+  vw <- fake_vw()
+  vw$diagnostics$n_violations_before_handling <- 44L
+  vw$diagnostics$violation_rate_before_handling <- 0.11
+  isl <- quiet_island(list(van_westendorp = vw, validation = fake_validation()), fake_config())
+  expect_equal(isl$vw$violations, 44L)
+  expect_equal(isl$vw$violationRate, 0.11)
+  expect_match(isl$meta$estimationNote$vw, "44 of them")
+
+  # A run that did not record it says nothing rather than showing a zero.
+  isl2 <- quiet_island(list(van_westendorp = fake_vw(), validation = fake_validation()),
+                       fake_config())
+  expect_false("violations" %in% names(isl2$vw))
+  expect_false(grepl("of them", isl2$meta$estimationNote$vw))
 })
 
 # ---------------------------------------------------------------------------

@@ -555,3 +555,65 @@ test_that("a complete ladder is untouched and says so (F4)", {
   expect_equal(cmp$rule, "none")
   expect_equal(r$demand_curve$purchase_intent, c(0.75, 0.5, 0.25))
 })
+
+# ------------------------------------------------------------------------------
+# F5: one definition of a monotonicity violation, and a count that survives
+# the handling it describes
+# ------------------------------------------------------------------------------
+
+# A clean sample with a known number of intransitive respondents added.
+vw_with_violators <- function(n_clean = 100, n_violators = 12, seed = 31) {
+  set.seed(seed)
+  base <- runif(n_clean, 60, 100)
+  clean <- data.frame(too_cheap = base * 0.5, cheap = base * 0.75,
+                      expensive = base * 1.25, too_expensive = base * 1.6)
+  vb <- runif(n_violators, 60, 100)
+  bad <- data.frame(too_cheap = vb * 0.75, cheap = vb * 0.5,
+                    expensive = vb * 1.25, too_expensive = vb * 1.6)
+  d <- rbind(clean, bad)
+  d$w <- 1
+  d$respondent_id <- seq_len(nrow(d))
+  d
+}
+
+test_that("the violation count survives the handling it describes (F5)", {
+  d <- vw_with_violators()
+  cfg <- vw_cfg(behavior = "drop")
+  v <- quiet(validate_pricing_data(d, cfg))
+  r <- quiet(run_van_westendorp(v$clean_data, cfg, validation = v))
+
+  # Under drop the recomputed rate on the arriving data is 0, which is the
+  # number the stats pack used to print.
+  expect_equal(r$diagnostics$violation_rate, 0)
+  # The count taken before the handling is carried through and is the truth.
+  expect_equal(r$diagnostics$n_violations_before_handling, 12L)
+  expect_equal(r$diagnostics$violation_rate_before_handling,
+               v$monotonicity_violations$violation_rate)
+  expect_gt(r$diagnostics$violation_rate_before_handling, 0)
+})
+
+test_that("without a validation object the count says so rather than implying zero (F5)", {
+  d <- vw_with_violators()
+  r <- quiet(run_van_westendorp(d, vw_cfg(behavior = "flag_only")))
+  expect_true(is.na(r$diagnostics$n_violations_before_handling))
+  # The engine's own recompute still sees them, because flag_only keeps them.
+  expect_equal(r$diagnostics$n_violations, 12)
+})
+
+test_that("the engine's rule is the strict one the validator uses (F5)", {
+  # A tie is a violation for check_vw_monotonicity() and for the package; the
+  # engine's own copy allowed it, so the two disagreed on the same respondents.
+  set.seed(7)
+  base <- runif(40, 60, 100)
+  d <- data.frame(too_cheap = base * 0.5, cheap = base * 0.75,
+                  expensive = base * 1.25, too_expensive = base * 1.6)
+  # Three respondents priced "cheap" and "expensive" the same.
+  d$expensive[1:3] <- d$cheap[1:3]
+  d$w <- 1
+  d$respondent_id <- seq_len(nrow(d))
+
+  strict <- check_vw_monotonicity(d$too_cheap, d$cheap, d$expensive, d$too_expensive)
+  expect_equal(strict$count, 3)
+  r <- quiet(run_van_westendorp(d, vw_cfg(behavior = "flag_only")))
+  expect_equal(r$diagnostics$n_violations, strict$count)
+})
