@@ -18,15 +18,20 @@ tracker.
 | F4, F6 | `56f7c77c` | The missingness shape decides between refusing and excluding, with disclosure |
 | F5 | `836aee3f` | The violation count survives the handling it describes |
 | F7 to F12 | `dd951770` | Currency, zero weights, the bootstrap warning, a refusal that could not fire, three disclosure gaps, the saver locator |
+| F4 knock-on | see below | The tabs export's `pricing_valid` honours the completeness exclusion |
 
-Pricing suite from the repo root: 28 files, 376 tests, 1,067 passing, 0 failed,
+Checked and clear: `create_pricing_config()` writes `Col_PI_Cheap` blank, so
+the F3 refusal does not fire on a fresh config from the template. Verified by
+generating a template and loading it back.
+
+Pricing suite from the repo root: 28 files, 377 tests, 1,071 passing, 0 failed,
 0 errors, 0 skipped, 14 warnings. The baseline at session start was 348 tests
 and 984 passing. The two extra warnings are the package's own flag_only warning
 from two new tests, the same one the existing H3 test raises.
 
 Node gates: pricing view 16 passed, island encoding 18 passed.
 
-Every new test was run against the code as found. Of the 24 added, 21 fail or
+Every new test was run against the code as found. Of the 25 added, 22 fail or
 error there; the three that pass are deliberate controls (the ONE_TWO wide
 path, Van Westendorp without the NMS extension, and the stop-early ladder that
 must still refuse).
@@ -75,6 +80,16 @@ whitelist, or jsonlite would have wrapped them in arrays.
 parse, which is a real failure worth refusing, so the refusal now describes
 that instead of a missing order column.
 
+## One thing the completeness rule broke, found and fixed in the same session
+
+The tabs export's `pricing_valid` column reproduced validation's exclusions
+only. A respondent the new Gabor-Granger completeness rule set aside afterwards
+would therefore sit in the tabs base with no mention at any rung, reading as
+"would not buy at any price" and pulling every rung below the module's own
+curve. `.pricing_tabs_valid_flag()` now also drops anyone absent from the frame
+the curve was computed from. On the probe fixture the exported base is 259 of
+300, matching the module's analysed base exactly, with 41 zeros.
+
 ## What Duncan should know
 
 **The exclusion rate is not small.** Gabor-Granger completeness is 1.0, so a
@@ -84,6 +99,12 @@ this session excluded 41 of 300. This is the ruling working as intended, and
 the count and rate are disclosed in the console, the diagnostics, three
 stats-pack rows and the workbook's Validation sheet. It is still a number worth
 seeing before a client does.
+
+**The Karoo both-methods run now prints a warning it never printed before.**
+F5 moved the "over 10% illogical" console warning onto the pre-handling rate,
+and Karoo has 44 violators in 400 under `drop`, which is 11.0%. The run is
+still PASS and the price points are unchanged; the line is the disclosure that
+was missing. Checked by running the shipped config headless this session.
 
 **The NMS question from the review is still unanswered.** The old code called
 the package with the intent columns on its defaults, which on this install
@@ -102,7 +123,14 @@ ever reached a client is Duncan's to check; no code change can settle it.
   is only caught under `NO_AFTER_STOP`. Without that setting the prices become
   NA and the demand curve is built on them. Not fixed: it needs a validation
   check of its own rather than a refusal inside the imputation branch.
-- **Pre-existing, observed not diagnosed.** In a probe run the workbook's
+- **Duncan's 90% threshold has an edge.** A genuine stop-early ladder whose
+stoppers also carry stray blanks, enough that fewer than 90% of the incomplete
+respondents match the staircase, takes the exclusion route instead of refusing.
+Everyone incomplete leaves, the survivors are the ones who said Yes at every
+rung, and the disclosed exclusion rate is the only signal that it happened.
+His rule, his call, but worth knowing it exists.
+
+**Pre-existing, observed not diagnosed.** In a probe run the workbook's
   Validation sheet printed an "EXCLUSION BREAKDOWN" heading with no rows under
   it. The condition guarding that block tested non-empty, so something in the
   breakdown frame read as blank. Nothing to do with this work.

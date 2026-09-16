@@ -339,3 +339,51 @@ test_that("Generate_Tabs_Export = Y is accepted now, and still needs an id", {
   expect_s3_class(err, "turas_refusal")
   expect_equal(err$code, "CFG_TABS_EXPORT_NO_ID")
 })
+
+# ------------------------------------------------------------------------------
+# F4: a respondent the completeness rule excluded is out of the exported base
+# ------------------------------------------------------------------------------
+
+test_that("pricing_valid drops the ladders the completeness rule excluded (F4)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  prices <- c(20, 40, 60, 80, 100)
+  cols <- paste0("p", prices)
+  config <- list(
+    analysis_method = "gabor_granger", weight_var = NA_character_, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    gg_monotonicity_behavior = "diagnostic_only", gg_stop_early_imputation = "NONE",
+    generate_tabs_export = TRUE, tabs_question_code = "GGACC", export_wtp = FALSE,
+    gabor_granger = list(data_format = "wide", price_sequence = prices,
+                         response_columns = cols, response_type = "binary",
+                         binary_coding = "ZERO_ONE", smoothing_method = "isotonic",
+                         check_monotonicity = FALSE, calculate_elasticity = FALSE,
+                         revenue_optimization = TRUE, confidence_intervals = FALSE,
+                         bootstrap_iterations = 10, confidence_level = 0.95),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000))
+
+  set.seed(21)
+  n <- 300
+  ceiling <- runif(n, 15, 105)
+  m <- sapply(prices, function(p) as.integer(p <= ceiling))
+  m[matrix(runif(n * length(prices)) < 0.03, nrow = n)] <- NA_integer_
+  d <- as.data.frame(m)
+  names(d) <- cols
+  d$respondent_id <- seq_len(n)
+
+  invisible(capture.output(v <- validate_pricing_data(d, config)))
+  invisible(capture.output(g <- run_gabor_granger(v$clean_data, config)))
+  n_excluded <- g$diagnostics$completeness$n_excluded
+  expect_gt(n_excluded, 0)
+
+  out <- file.path(tempdir(), "pricing_f4_tabs_export.xlsx")
+  unlink(out)
+  on.exit(unlink(out), add = TRUE)
+  invisible(capture.output(res <- export_pricing_for_tabs(
+    list(data = d, validation = v, gabor_granger = g), config, out, verbose = FALSE)))
+
+  data_sheet <- openxlsx::read.xlsx(out, sheet = "DATA", skipEmptyRows = FALSE)
+  expect_true("pricing_valid" %in% names(data_sheet))
+  # The exported base is the module's own analysed base, not the whole file.
+  expect_equal(sum(data_sheet$pricing_valid == 1), g$diagnostics$n_respondents)
+  expect_equal(sum(data_sheet$pricing_valid == 0), n_excluded)
+})
