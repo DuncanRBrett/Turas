@@ -51,3 +51,61 @@ test_that("the Summary sheet's Effective Sample Size is the Kish figure on the a
   expect_false(isTRUE(all.equal(as.numeric(values[eff_row]), nrow(ex$data))))
   expect_match(items[eff_row], "Kish")
 })
+
+# ------------------------------------------------------------------------------
+# F3: the Newton-Miller-Smith extension is refused by name, ahead of both
+# Van Westendorp branches, and PI_Scale is no longer handed to the package.
+# ------------------------------------------------------------------------------
+
+nms_cfg <- function(col_pi_cheap = "PI_Cheap", weight_var = NA_character_) {
+  list(
+    analysis_method = "van_westendorp", weight_var = weight_var, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    vw_monotonicity_behavior = "drop",
+    van_westendorp = list(col_too_cheap = "tc", col_cheap = "ch",
+                          col_expensive = "ex", col_too_expensive = "te",
+                          col_pi_cheap = col_pi_cheap, col_pi_expensive = NA_character_,
+                          pi_scale = 5, validate_monotonicity = FALSE),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000)
+  )
+}
+
+nms_data <- function(n = 40) {
+  set.seed(3)
+  tc <- runif(n, 5, 15)
+  data.frame(respondent_id = seq_len(n), tc = tc, ch = tc + 5, ex = tc + 12,
+             te = tc + 20, PI_Cheap = sample(1:5, n, TRUE), w = 1)
+}
+
+test_that("a configured NMS extension refuses by name before any price point (F3)", {
+  err <- tryCatch(validate_pricing_data(nms_data(), nms_cfg()), error = function(e) conditionMessage(e))
+  expect_match(err, "FEATURE_NMS_WITHDRAWN")
+  expect_match(err, "Col_PI_Cheap")
+})
+
+test_that("the NMS refusal reaches the weighted branch as well (F3)", {
+  d <- nms_data()
+  err <- tryCatch(validate_pricing_data(d, nms_cfg(weight_var = "w")),
+                  error = function(e) conditionMessage(e))
+  expect_match(err, "FEATURE_NMS_WITHDRAWN")
+})
+
+test_that("Van Westendorp without the extension still validates (F3)", {
+  d <- nms_data()
+  cfg <- nms_cfg(col_pi_cheap = NA_character_)
+  v <- validate_pricing_data(d, cfg)
+  expect_true(is.data.frame(v$clean_data))
+  expect_gt(nrow(v$clean_data), 0)
+  # An empty string is the config workbook's other way of saying nothing.
+  expect_silent(invisible(validate_pricing_data(d, nms_cfg(col_pi_cheap = ""))))
+})
+
+test_that("PI_Scale is no longer passed to the package (F3)", {
+  # The template pre-fills PI_Scale = 5, which the package reads as a vector of
+  # scale points and rejects. The engine must not forward it.
+  src <- readLines(file.path(TURAS_ROOT, "modules", "pricing", "R", "03_van_westendorp.R"))
+  call_start <- grep("^  psm_fit <- fit_vw_psm\\(", src)
+  expect_length(call_start, 1)
+  call_end <- call_start + which(grepl("^  \\)$", src[call_start:length(src)]))[1] - 1
+  expect_false(any(grepl("pi_scale", src[call_start:call_end])))
+})

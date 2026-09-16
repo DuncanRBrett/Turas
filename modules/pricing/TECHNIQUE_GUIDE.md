@@ -91,7 +91,7 @@ VW requires exactly four open-ended price questions. The standard wording:
 
 **Logical ordering violations.** A respondent who says "too cheap" > "too expensive" has misunderstood the questions or responded carelessly. Turas reports the violation rate. If it exceeds 10%, revisit the question wording. Rates of 5-8% are typical and acceptable.
 
-**NMS extension.** Do not use it in this version. Asking purchase probability at the "cheap" and "expensive" prices is meant to give Newton-Miller-Smith revenue-calibrated price points, but the 2026-09-03 review of the engine found the implementation broken on both the weighted and the unweighted path, with nothing in the suite exercising it (finding F3). Its numbers do not reach the Pricing tab or the simulator, and a refusal by name is owed on the review follow-up branch.
+**NMS extension.** Do not use it in this version. Asking purchase probability at the "cheap" and "expensive" prices is meant to give Newton-Miller-Smith revenue-calibrated price points, but the 2026-09-03 review of the engine found the implementation broken on both the weighted and the unweighted path, with nothing in the suite exercising it (finding F3). Its numbers do not reach the Pricing tab or the simulator, and a configured `Col_PI_Cheap` now refuses with `FEATURE_NMS_WITHDRAWN`.
 
 ### Gabor-Granger question design
 

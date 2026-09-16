@@ -344,6 +344,8 @@ Do NOT:
 
 ### NMS Extension (Newton-Miller-Smith)
 
+**Not available in this version.** A configured `Col_PI_Cheap` refuses with `FEATURE_NMS_WITHDRAWN`: the 2026-09-03 review found the extension broken on both the weighted and the unweighted path, with nothing in the suite exercising it (finding F3). For a revenue-calibrated optimal price, run Gabor-Granger: the ladder measures acceptance at each price directly.
+
 The NMS extension adds purchase intent calibration to the standard Van Westendorp
 analysis. It requires one or two additional questions asked after the core four.
 

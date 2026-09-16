@@ -533,8 +533,12 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
     too_cheap, cheap, expensive, too_expensive,
     weights = vw_weights, validate = validate_flag,
     pi_cheap = if (has_nms) pi_cheap else NULL,
-    pi_expensive = if (has_nms) pi_expensive else NULL,
-    pi_scale = vw$pi_scale
+    pi_expensive = if (has_nms) pi_expensive else NULL
+    # PI_Scale is deliberately not passed (review F3). The package reads it as
+    # a vector of scale points that must match pi_calibrated in length, so the
+    # template's PI_Scale = 5 killed both paths. NMS is refused upstream in
+    # validate_pricing_data(), which makes has_nms unreachable in a run; these
+    # two arguments stay only so a direct call behaves as it did before.
   )
   psm_result <- psm_fit$psm
   estimator <- psm_fit$estimator

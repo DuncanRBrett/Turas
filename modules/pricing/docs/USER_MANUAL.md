@@ -530,6 +530,8 @@ respondents, so the config refuses instead.
 
 ### 11.1 NMS Extension (Newton-Miller-Smith)
 
+**Not available in this version.** A configured `Col_PI_Cheap` refuses with `FEATURE_NMS_WITHDRAWN`: the 2026-09-03 review found the extension broken on both the weighted and the unweighted path, with nothing in the suite exercising it (finding F3). For a revenue-calibrated optimal price, run Gabor-Granger: the ladder measures acceptance at each price directly.
+
 Enhances Van Westendorp with behavioral calibration.
 
 **Additional Questions:**

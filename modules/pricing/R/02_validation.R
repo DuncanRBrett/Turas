@@ -177,6 +177,13 @@ validate_pricing_data <- function(data, config) {
   if (analysis_method %in% c("van_westendorp", "both")) {
     vw <- config$van_westendorp
 
+    # The Newton-Miller-Smith extension is not available in this version
+    # (review F3). It broke on the template's own PI_Scale, its weighted path
+    # disagreed with its unweighted one on unit weights, and nothing in the
+    # suite exercised it. The refusal sits here, ahead of both engine
+    # branches, so no NMS number is ever computed rather than computed wrong.
+    .pricing_refuse_nms(vw)
+
     required_cols <- c(
       vw$col_too_cheap,
       vw$col_cheap,
@@ -504,6 +511,36 @@ validate_pricing_data <- function(data, config) {
     n_warnings = length(warnings_list),
     weight_summary = weight_summary,
     monotonicity_violations = if (exists("monotonicity_violations", inherits = FALSE)) monotonicity_violations else NULL
+  )
+}
+
+
+#' Refuse A Configured Newton-Miller-Smith Extension
+#'
+#' NMS is withdrawn in this version. `Col_PI_Cheap` is the setting that turns
+#' it on, so a non-empty value refuses by name before any price point is
+#' computed, on the weighted and the unweighted path alike.
+#'
+#' @param vw The Van Westendorp config list.
+#' @return Invisibly TRUE when NMS is not configured.
+#' @keywords internal
+.pricing_refuse_nms <- function(vw) {
+  col <- vw$col_pi_cheap
+  if (is.null(col) || length(col) == 0) return(invisible(TRUE))
+  col <- as.character(col)[1]
+  if (is.na(col) || !nzchar(trimws(col))) return(invisible(TRUE))
+  pricing_refuse(
+    code = "FEATURE_NMS_WITHDRAWN",
+    title = "The NMS Extension Is Not Available In This Version",
+    problem = sprintf("Col_PI_Cheap names '%s', which turns on the Newton-Miller-Smith extension.", col),
+    why_it_matters = paste0(
+      "The 2026-09-03 review found the implementation broken on both the weighted and the ",
+      "unweighted path, with nothing in the suite exercising it, so any revenue-optimal price ",
+      "it produced would be unverified."),
+    how_to_fix = c(
+      "Clear Col_PI_Cheap (and Col_PI_Expensive) on the VanWestendorp sheet to run Van Westendorp without the extension.",
+      "For a revenue-calibrated optimal price, run Gabor-Granger alongside Van Westendorp: the ladder measures acceptance at each price directly."
+    )
   )
 }
 

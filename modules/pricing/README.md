@@ -120,8 +120,8 @@ The gold standard for unbiased price sensitivity measurement:
 at the bargain and expensive price points to give a revenue-optimal price. The
 2026-09-03 review of the pricing engine found it broken on both the weighted and
 the unweighted path, with nothing in the suite exercising it (finding F3). Its
-numbers do not reach the Pricing tab or the standalone simulator, and a refusal
-by name is owed on the review follow-up branch. For a revenue-calibrated optimal
+numbers do not reach the Pricing tab or the standalone simulator, and a
+configured `Col_PI_Cheap` now refuses with `FEATURE_NMS_WITHDRAWN`. For a revenue-calibrated optimal
 price, run Gabor-Granger: the ladder measures acceptance at each price directly.
 
 ## Configuration
