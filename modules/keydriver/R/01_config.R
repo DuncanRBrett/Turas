@@ -87,7 +87,67 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   # row, so hand-built configs (headers in row 1) are unaffected.
   settings <- as.data.frame(load_config_table_sheet(config_file, "Settings",
                                                     required_cols = c("Setting", "Value")))
+
+  # A malformed Settings sheet used to fall through to CFG_DATA_FILE_MISSING,
+  # which sends the analyst looking at the wrong thing entirely (review M13).
+  if (!all(c("Setting", "Value") %in% names(settings))) {
+    keydriver_refuse(
+      code = "CFG_SETTINGS_MALFORMED",
+      title = "Settings Sheet Has No Setting/Value Columns",
+      problem = paste0(
+        "The Settings sheet was read but has no 'Setting' and 'Value' columns. ",
+        "Columns found: ",
+        if (length(names(settings))) paste(names(settings), collapse = ", ") else "none"),
+      why_it_matters = paste0(
+        "Every path, feature gate and parameter is read from those two ",
+        "columns. Without them nothing the config asks for is seen, and the ",
+        "first thing to go missing is reported as a missing data file."),
+      how_to_fix = c(
+        "Give the Settings sheet a header row with the columns Setting and Value",
+        "Check the header spelling, which is case sensitive",
+        "Or regenerate the template with generate_keydriver_config_template()"
+      ),
+      expected = c("Setting", "Value"),
+      observed = names(settings)
+    )
+  }
+
+  # A duplicated Setting name silently took the first value, so the run used
+  # one figure and the analyst read another off the sheet (review M13).
+  setting_names <- trimws(as.character(settings$Setting))
+  named <- setting_names[!is.na(setting_names) & nzchar(setting_names)]
+  dupes <- unique(named[duplicated(named)])
+  if (length(dupes) > 0) {
+    keydriver_refuse(
+      code = "CFG_SETTINGS_DUPLICATED",
+      title = "Duplicate Settings",
+      problem = sprintf("%d setting(s) appear more than once on the Settings sheet: %s",
+                        length(dupes), paste(dupes, collapse = ", ")),
+      why_it_matters = paste0(
+        "Only one value can be used. The run took the first and left the ",
+        "other on the sheet, so the config a reader sees is not necessarily ",
+        "the config that ran."),
+      how_to_fix = c(
+        "Open the Settings sheet and delete the rows you do not want",
+        "Each Setting name may appear only once"
+      ),
+      observed = dupes
+    )
+  }
+
   settings_list <- setNames(as.list(settings$Value), settings$Setting)
+
+  # A typo'd Setting name was ignored without a word, so a config that asked
+  # for a feature ran without it and still reported PASS (review M13). Named
+  # rather than refused, because an analyst may keep notes on the sheet.
+  unknown <- setdiff(named, KD_KNOWN_SETTINGS)
+  if (length(unknown) > 0) {
+    cat(sprintf(paste0(
+      "   [WARNING] %d setting(s) on the Settings sheet are not read by this ",
+      "module and were ignored: %s. Check the spelling against the template ",
+      "if you expected one of them to do something.\n"),
+      length(unknown), paste(unknown, collapse = ", ")))
+  }
 
   # -----------------------------------------------------------------
   # v10.3: Parse on_fail policy for optional features
@@ -462,6 +522,84 @@ get_setting <- function(settings, name, default = NULL) {
 #' @param config The loaded configuration.
 #' @return The integer seed in use.
 #' @keywords internal
+#' Every Settings key this module reads
+#'
+#' A typo in a Settings name was ignored without a word, so a config that
+#' asked for a feature ran without it and reported PASS (review M13). These
+#' are refused if duplicated and named on the console if unrecognised.
+#'
+#' This list is bound to the config template by a test, so a key added to one
+#' and not the other fails the suite rather than drifting quietly.
+#' @keywords internal
+KD_KNOWN_SETTINGS <- c(
+    "accent_colour",
+    "analysis_name",
+    "Analyst_Name",
+    "bootstrap_ci_level",
+    "bootstrap_display",
+    "bootstrap_iterations",
+    "brand_colour",
+    "client_logo_path",
+    "client_name",
+    "colsample_bytree",
+    "company_name",
+    "correlation_display",
+    "data_file",
+    "elastic_net_alpha",
+    "elastic_net_nfolds",
+    "enable_bootstrap",
+    "enable_dominance",
+    "enable_elastic_net",
+    "enable_gam",
+    "enable_html_report",
+    "enable_nca",
+    "enable_quadrant",
+    "enable_shap",
+    "gam_k",
+    "Generate_Stats_Pack",
+    "html_show_bootstrap",
+    "html_show_correlations",
+    "html_show_diagnostics",
+    "html_show_effect_sizes",
+    "html_show_exec_summary",
+    "html_show_guide",
+    "html_show_importance",
+    "html_show_methods",
+    "html_show_quadrant",
+    "html_show_segments",
+    "html_show_shap",
+    "importance_source",
+    "importance_top_n",
+    "include_interactions",
+    "interaction_top_n",
+    "label_all_points",
+    "label_top_n",
+    "learning_rate",
+    "max_depth",
+    "min_segment_n",
+    "n_trees",
+    "nca_test_reps",
+    "normalize_axes",
+    "output_file",
+    "Project_Name",
+    "quadrant_on_fail",
+    "random_seed",
+    "report_title",
+    "Research_House",
+    "researcher_logo_path",
+    "researcher_name",
+    "shade_quadrants",
+    "shap_model",
+    "shap_on_fail",
+    "shap_sample_size",
+    "show_diagonal",
+    "subsample",
+    "threshold_method",
+    "vif_high_threshold",
+    "vif_moderate_threshold"
+)
+
+
 KD_DEFAULT_SEED <- 20260101L
 
 #' The one bootstrap iteration default
