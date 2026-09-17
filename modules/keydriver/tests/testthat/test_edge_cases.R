@@ -88,28 +88,6 @@ test_that("single driver gets 100% importance for Beta Weights", {
   expect_equal(as.numeric(beta_pct[1]), 100, tolerance = 0.01)
 })
 
-test_that("single driver gets 100% importance for Partial R2", {
-  data <- edge_cases$single_driver
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = "driver_1",
-    weight_var = NULL,
-    variables = data.frame(
-      VariableName = c("outcome", "driver_1"),
-      Label = c("Outcome", "Driver 1"),
-      stringsAsFactors = FALSE
-    )
-  )
-
-  pr2 <- calculate_importance_partial_r2(data, config)
-  expect_equal(as.numeric(pr2), 100, tolerance = 0.01)
-})
-
-
-# ==============================================================================
-# Near-zero variance driver
-# ==============================================================================
-
 test_that("zero variance driver produces TRS refusal in beta weights", {
   data <- edge_cases$zero_variance
   config <- list(

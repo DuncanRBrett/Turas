@@ -43,6 +43,30 @@ calculate_vif <- function(model) {
 }
 
 
+#' The importance method this run actually used
+#'
+#' The Run_Status sheet stamped a constant, "partial_r2", which named a v10.3
+#' engine that nothing called and that is now deleted (review H3). Importance
+#' is computed and ranked by Shapley value; a mixed run says so, because its
+#' categorical drivers are aggregated from model terms rather than decomposed
+#' directly.
+#'
+#' @param results The analysis results list.
+#' @return A single string.
+#' @keywords internal
+.kd_primary_method <- function(results) {
+  imp <- results$importance
+  if (!is.data.frame(imp)) return("unknown")
+  if (!"Shapley_Value" %in% names(imp)) {
+    return(if ("Relative_Weight" %in% names(imp)) "johnson_relative_weights" else "unknown")
+  }
+  mixed <- "Method_Note" %in% names(imp) &&
+    any(grepl("grouped", as.character(imp$Method_Note), fixed = TRUE), na.rm = TRUE)
+  if (mixed) "shapley_r2_decomposition (mixed: categorical terms aggregated)" else
+    "shapley_r2_decomposition"
+}
+
+
 #' Write Key Driver Results to Excel
 #'
 #' @param importance Importance data frame
@@ -340,7 +364,10 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       length(config$driver_vars),
       nobs(model),
       round(summary(model)$r.squared, 4),
-      "partial_r2",
+      # What actually ran. This said "partial_r2", naming an engine the
+      # pipeline never called: importance is computed and ranked by Shapley
+      # value (review H3).
+      .kd_primary_method(results),
       "TURAS-KD-CONTINUOUS-UPGRADE-v1.0"
     ),
     stringsAsFactors = FALSE

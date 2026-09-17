@@ -1136,7 +1136,11 @@ generate_keydriver_stats_pack <- function(config, survey_data, result,
     "Model R-squared"   = if (!is.na(r_squared)) sprintf("%.4f", r_squared) else "—",
     "Sample (model)"    = as.character(n_model),
     "Excluded (listwise)" = as.character(n_excluded),
-    "SHAP Values"       = if (shap_enabled) "shapr package" else "Not used",
+    # Not shapr. The SHAP path is TreeSHAP from an xgboost model, read with
+    # shapviz; the stats pack named a package the module does not use (H3).
+    "SHAP Values"       = if (shap_enabled) {
+      "TreeSHAP on a gradient-boosted model (xgboost, read with shapviz)"
+    } else "Not used",
     "Quadrant Analysis" = if (!is.null(result$quadrant)) "Enabled" else "Disabled",
     "TRS Status"        = run_result$status %||% "PASS",
     "TRS Events"        = trs_summary

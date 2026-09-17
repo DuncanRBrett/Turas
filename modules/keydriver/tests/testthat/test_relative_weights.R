@@ -92,3 +92,48 @@ test_that("a three-driver golden case matches an independent computation (C1)", 
   # And the ranking is the one the data implies.
   expect_equal(order(got_shares, decreasing = TRUE), 1:3)
 })
+
+# ------------------------------------------------------------------------------
+# H3: the provenance names the engine that ran
+# ------------------------------------------------------------------------------
+
+test_that("the dead v10.3 importance engine is gone (H3)", {
+  # Three functions implementing a partial-R-squared and permutation scheme
+  # that nothing in the pipeline called. The Run_Status sheet stamped
+  # "partial_r2" anyway, so the provenance named an engine that had not run.
+  for (fn in c("calculate_importance_partial_r2", "calculate_importance_permutation",
+               "calculate_importance_by_config")) {
+    expect_false(exists(fn, mode = "function"), info = fn)
+  }
+})
+
+test_that("primary_method reports Shapley, and says when a run was mixed (H3)", {
+  skip_if(!exists(".kd_primary_method", mode = "function"), "helper not loaded")
+  plain <- list(importance = data.frame(Driver = c("A", "B"),
+                                        Shapley_Value = c(0.3, 0.1),
+                                        stringsAsFactors = FALSE))
+  expect_equal(.kd_primary_method(plain), "shapley_r2_decomposition")
+  expect_false(grepl("partial_r2", .kd_primary_method(plain), fixed = TRUE))
+
+  mixed <- plain
+  mixed$importance$Method_Note <- c("direct", "grouped_terms")
+  expect_match(.kd_primary_method(mixed), "mixed")
+
+  # Nothing to report is said, not guessed.
+  expect_equal(.kd_primary_method(list()), "unknown")
+})
+
+test_that("AggregationMethod no longer refuses a run it cannot affect (H3)", {
+  src <- readLines(file.path(module_dir, "R", "01_config.R"))
+  expect_false(any(grepl("CFG_INVALID_AGGREGATION_METHOD", src, fixed = TRUE)))
+  expect_false(any(grepl("valid_agg_methods", src, fixed = TRUE)))
+  # And a config that still sets it is told, not refused.
+  expect_true(any(grepl("That setting is withdrawn", src, fixed = TRUE)))
+})
+
+test_that("the stats pack does not credit a package the module never used (H3)", {
+  src <- readLines(file.path(module_dir, "R", "00_main.R"))
+  expect_false(any(grepl('"shapr package"', src, fixed = TRUE)))
+  expect_true(any(grepl("TreeSHAP", src, fixed = TRUE)))
+  expect_true(any(grepl("xgboost", src, fixed = TRUE)))
+})
