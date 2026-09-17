@@ -279,35 +279,51 @@ calculate_relative_weights <- function(model, correlations, config) {
     )
   }
 
-  # sqrt(Λ) and Λ^{-1/2}
-  Lambda_sqrt <- diag(sqrt(vals), nrow = p, ncol = p)
-  Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
+  # Johnson's symmetric square root of R_xx: Lam = V sqrt(L) V'.
+  #
+  # This used to be V sqrt(L), which is the PCA rotation, not Johnson's
+  # orthogonal counterpart set (review C1). The two differ by the V' on the
+  # right and the consequence is not subtle: with two drivers the PCA form
+  # returns 50/50 whatever the data says, so every two-driver study's headline
+  # importance split was a constant. Johnson (2000) requires the symmetric
+  # root, which is the orthogonal basis closest to the original predictors in
+  # a least-squares sense.
+  Lam <- vecs %*% diag(sqrt(vals), nrow = p, ncol = p) %*% t(vecs)
 
-  # Correlations between original predictors X and orthogonal components Z
-  # Z = X * V * Λ^{-1/2}, so corr(X, Z) = V * Λ^{1/2}
-  Phi <- vecs %*% Lambda_sqrt  # p x p
+  # Betas of the outcome on the orthogonals, then the weights in R-squared
+  # units: RW_i = sum_j Lam_ij^2 * beta*_j^2.
+  beta_star <- solve(Lam) %*% r_xy
+  rw_raw <- as.numeric((Lam^2) %*% (beta_star^2))
 
-  # Correlations between Z and Y (with standardized Y)
-  # corr(Z, Y) = Λ^{-1/2} * V' * r_xy
-  r_z_y <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy  # p x 1
-  r2_z_y <- as.numeric(r_z_y)^2  # component-level R² contributions
-
-  # Total R² in orthogonal space
-  total_R2 <- sum(r2_z_y)
-  if (total_R2 <= 0) {
+  if (sum(rw_raw) <= 0) {
     return(rep(0, p))
   }
 
-  # Predictor-level relative weights in R² units:
-  # RW_i = Σ_j (phi_ij^2 * r_zj,y^2)
-  Phi_sq <- Phi^2  # element-wise square (p x p)
-  rw_raw <- Phi_sq %*% r2_z_y  # p x 1
-  rw_raw <- as.numeric(rw_raw)
-
-  # Optional rescale so that sum of raw RWs matches model R² exactly
+  # No rescale to R-squared. Correct raw weights already sum to it, which is
+  # the identity the old rescale was quietly papering over: a wrong
+  # decomposition was being stretched to the right total. Assert it instead,
+  # with room for the difference between the model's own R-squared and the one
+  # implied by the correlation matrix it was handed.
   model_R2 <- summary(model)$r.squared
-  if (!is.na(model_R2) && model_R2 > 0 && sum(rw_raw) > 0) {
-    rw_raw <- rw_raw * (model_R2 / sum(rw_raw))
+  if (!is.na(model_R2) && model_R2 > 0) {
+    drift <- abs(sum(rw_raw) - model_R2)
+    if (drift > 0.01 + 0.02 * model_R2) {
+      keydriver_refuse(
+        code = "CALC_RW_DOES_NOT_SUM_TO_R2",
+        title = "Relative Weights Do Not Reconstruct The Model",
+        problem = sprintf(
+          "The relative weights sum to %.4f and the model's R-squared is %.4f.",
+          sum(rw_raw), model_R2),
+        why_it_matters = paste0(
+          "Johnson's weights are a decomposition of R-squared, so they must add ",
+          "back up to it. A gap this size means the correlation matrix and the ",
+          "fitted model were not built from the same respondents."),
+        how_to_fix = paste0(
+          "Check that the correlation matrix and the regression used the same ",
+          "rows: a driver with missing values dropped from one and not the other ",
+          "will do this.")
+      )
+    }
   }
 
   # Convert to percentages
@@ -695,16 +711,11 @@ calculate_relative_weights_mixed <- function(model, data, config, term_mapping) 
     rw_term <- r_xy^2
     rw_term[is.na(rw_term)] <- 0
   } else {
-    # Standard Johnson relative weights at term level
-    Lambda_sqrt <- diag(sqrt(vals), nrow = p, ncol = p)
-    Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
-
-    Phi <- vecs %*% Lambda_sqrt
-    r_z_y <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy
-    r2_z_y <- as.numeric(r_z_y)^2
-
-    Phi_sq <- Phi^2
-    rw_term <- as.numeric(Phi_sq %*% r2_z_y)
+    # Johnson relative weights at term level, on the symmetric square root
+    # (review C1). The same PCA-rotation error lived here.
+    Lam <- vecs %*% diag(sqrt(vals), nrow = p, ncol = p) %*% t(vecs)
+    beta_star <- solve(Lam) %*% r_xy
+    rw_term <- as.numeric((Lam^2) %*% (beta_star^2))
   }
 
   names(rw_term) <- term_names

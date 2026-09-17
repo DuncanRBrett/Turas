@@ -428,21 +428,15 @@ calculate_single_bootstrap <- function(data, outcome, drivers, weights) {
 
   if (any(vals < 1e-10)) return(NULL)
 
+  # Johnson's symmetric square root, the same fix as the two sites in
+  # 03_analysis.R (review C1). A bootstrap of the wrong estimator produced
+  # intervals around the wrong point, so every replicate was affected.
   p <- n_drivers
-  Lambda_sqrt     <- diag(sqrt(vals),     nrow = p, ncol = p)
-  Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
-
-  Phi     <- vecs %*% Lambda_sqrt
-  r_z_y   <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy
-  r2_z_y  <- as.numeric(r_z_y)^2
-
-  rw_raw <- as.numeric(Phi^2 %*% r2_z_y)
-
-  # Rescale to model R-squared
-  model_R2 <- summary(model)$r.squared
-  if (!is.na(model_R2) && model_R2 > 0 && sum(rw_raw) > 0) {
-    rw_raw <- rw_raw * (model_R2 / sum(rw_raw))
-  }
+  Lam <- vecs %*% diag(sqrt(vals), nrow = p, ncol = p) %*% t(vecs)
+  beta_star <- solve(Lam) %*% r_xy
+  rw_raw <- as.numeric((Lam^2) %*% (beta_star^2))
+  # No rescale: correct raw weights already sum to R-squared. A replicate that
+  # cannot produce them is dropped by the caller, not stretched to fit.
 
   # Convert to percentages
   sum_rw <- sum(rw_raw)
