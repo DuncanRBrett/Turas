@@ -137,3 +137,70 @@ test_that("the stats pack does not credit a package the module never used (H3)",
   expect_true(any(grepl("TreeSHAP", src, fixed = TRUE)))
   expect_true(any(grepl("xgboost", src, fixed = TRUE)))
 })
+
+# ------------------------------------------------------------------------------
+# H4: the mixed path refuses where the non-mixed path refuses
+# ------------------------------------------------------------------------------
+
+test_that("a near-singular mixed model refuses instead of substituting a proxy (H4)", {
+  skip_if(!exists("calculate_relative_weights_mixed", mode = "function"), "mixed path not loaded")
+  skip_if(!exists("build_term_mapping", mode = "function"), "term mapping not loaded")
+  set.seed(19)
+  n <- 300
+  x1 <- rnorm(n)
+  # A second driver that is a near-perfect copy: the term correlation matrix
+  # is then singular to numerical tolerance.
+  x2 <- x1 + rnorm(n, sd = 1e-7)
+  grp <- factor(sample(c("A", "B"), n, TRUE))
+  y <- 0.8 * x1 + rnorm(n, sd = 0.3)
+  d <- data.frame(X1 = x1, X2 = x2, G = grp, Y = y)
+  cfg <- list(outcome_var = "Y", driver_vars = c("X1", "X2", "G"), weight_var = NULL)
+  f <- Y ~ X1 + X2 + G
+  model <- lm(f, data = d)
+  tm <- build_term_mapping(f, d, cfg$driver_vars)
+
+  err <- tryCatch({
+    suppressWarnings(capture.output(
+      calculate_relative_weights_mixed(model, d, cfg, tm)))
+    "NO REFUSAL"
+  }, error = function(e) conditionMessage(e))
+  expect_match(err, "MODEL_SINGULAR_MATRIX")
+  # The old behaviour named itself on the console and carried on.
+  expect_false(grepl("simplified relative weights", err, fixed = TRUE))
+  # And the refusal explains why a proxy was not acceptable.
+  expect_match(err, "do not decompose R-squared|not decompose")
+})
+
+test_that("the silent proxy is gone from the source (H4)", {
+  src <- readLines(file.path(module_dir, "R", "03_analysis.R"))
+  expect_false(any(grepl("using simplified relative weights", src, fixed = TRUE)))
+  expect_false(any(grepl("Fallback: use squared correlations as proxy", src, fixed = TRUE)))
+})
+
+test_that("a weighted mixed run uses weighted correlations (A1)", {
+  skip_if(!exists("calculate_relative_weights_mixed", mode = "function"), "mixed path not loaded")
+  skip_if(!exists("build_term_mapping", mode = "function"), "term mapping not loaded")
+  set.seed(23)
+  n <- 800
+  x1 <- rnorm(n); x2 <- rnorm(n)
+  grp <- factor(sample(c("A", "B"), n, TRUE))
+  # The relationship differs sharply between the halves the weight favours.
+  half <- seq_len(n / 2)
+  y <- 0.2 * x1 + 0.8 * x2 + rnorm(n, sd = 0.3)
+  y[half] <- 1.4 * x1[half] + 0.1 * x2[half] + rnorm(n / 2, sd = 0.3)
+  d <- data.frame(X1 = x1, X2 = x2, G = grp, Y = y, W = 1)
+  d$W[half] <- 9
+  f <- Y ~ X1 + X2 + G
+  model <- lm(f, data = d)
+  tm <- build_term_mapping(f, d, c("X1", "X2", "G"))
+
+  base <- list(outcome_var = "Y", driver_vars = c("X1", "X2", "G"))
+  un <- suppressWarnings(capture.output(
+    a <- calculate_relative_weights_mixed(model, d, c(base, list(weight_var = NULL)), tm)))
+  we <- suppressWarnings(capture.output(
+    b <- calculate_relative_weights_mixed(model, d, c(base, list(weight_var = "W")), tm)))
+  expect_equal(length(a), length(b))
+  # The weights move the correlations, so they move the weights. Before the
+  # fix the mixed path used plain cor() whatever the config said.
+  expect_gt(max(abs(as.numeric(a) - as.numeric(b))), 1)
+})

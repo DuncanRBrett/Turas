@@ -688,12 +688,35 @@ calculate_relative_weights_mixed <- function(model, data, config, term_mapping) 
   mm <- mm[complete, , drop = FALSE]
   y <- y[complete]
 
-  # Correlation matrix of model matrix columns (terms)
-  R_xx <- cor(mm)
-  r_xy <- cor(mm, y)[, 1]
-
+  # Correlation matrix of model matrix columns (terms). Weighted when the study
+  # is weighted: these were plain cor() while the non-mixed path used the
+  # weighted machinery, so a weighted mixed run's relative weights were
+  # computed on the wrong correlations (review A1).
+  w <- NULL
+  if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
+      config$weight_var %in% names(data)) {
+    w <- as.numeric(data[[config$weight_var]])[complete]
+  }
   p <- ncol(mm)
   term_names <- colnames(mm)
+
+  if (is.null(w)) {
+    R_xx <- cor(mm)
+    r_xy <- cor(mm, y)[, 1]
+  } else {
+    R_xx <- matrix(1, p, p, dimnames = list(term_names, term_names))
+    for (i in seq_len(p)) {
+      for (j in seq_len(p)) {
+        if (i < j) {
+          r <- weighted_cor(mm[, i], mm[, j], w)
+          R_xx[i, j] <- r
+          R_xx[j, i] <- r
+        }
+      }
+    }
+    r_xy <- vapply(seq_len(p), function(i) weighted_cor(mm[, i], y, w), numeric(1))
+    names(r_xy) <- term_names
+  }
 
   # Eigen decomposition
   eig <- eigen(R_xx, symmetric = TRUE)
@@ -703,13 +726,35 @@ calculate_relative_weights_mixed <- function(model, data, config, term_mapping) 
   # Guard against numerical negatives
   vals[vals < 0] <- 0
 
-  # Check for near-singularity
+  # Near-singularity refuses, the same as the non-mixed path (review H4).
+  #
+  # It used to substitute squared correlations for Johnson's weights, print one
+  # console line, and carry on. Squared correlations are not relative weights:
+  # they ignore the predictors' correlations with each other, which is the
+  # entire problem the method exists to solve, and they do not sum to R-squared.
+  # The report labelled them "Relative_Weight" and nothing downstream knew the
+  # difference. The identical condition in the non-mixed path refuses, so the
+  # same data got a refusal or a silently different number depending on whether
+  # a categorical driver happened to be in the model.
   if (any(vals < 1e-10)) {
-    # Matrix is near-singular - use fallback to beta weights
-    cat("   [WARN] Near-singular correlation matrix - using simplified relative weights\n")
-    # Fallback: use squared correlations as proxy
-    rw_term <- r_xy^2
-    rw_term[is.na(rw_term)] <- 0
+    keydriver_refuse(
+      code = "MODEL_SINGULAR_MATRIX",
+      title = "Singular Correlation Matrix",
+      problem = paste0(
+        "The model-term correlation matrix is singular or nearly singular ",
+        "(severe multicollinearity among the drivers' model terms)."),
+      why_it_matters = paste0(
+        "Relative weights cannot be computed reliably when terms are this ",
+        "closely related. The previous behaviour substituted squared ",
+        "correlations, which ignore how the drivers relate to each other and do ",
+        "not decompose R-squared, and reported them under the same column name."),
+      how_to_fix = c(
+        "Identify highly correlated driver pairs using a correlation matrix",
+        "Remove or combine drivers that are too similar",
+        "A categorical driver with a level almost nobody chose will do this: check the level counts",
+        "Aim for correlations below 0.9 between predictors"
+      )
+    )
   } else {
     # Johnson relative weights at term level, on the symmetric square root
     # (review C1). The same PCA-rotation error lived here.
