@@ -40,6 +40,10 @@ weighted_cov <- function(x, y, w) {
 #'   carry a usable weight.
 #' @keywords internal
 weighted_sd <- function(x, w) {
+  # A standard deviation is only defined for numbers. A categorical driver
+  # reaching here means the caller should not have asked; NA is the honest
+  # answer and the caller already treats NA as "no standardised beta".
+  if (!is.numeric(x)) return(NA_real_)
   ok <- !is.na(x) & !is.na(w) & w > 0
   if (sum(ok) < 2) return(NA_real_)
   x <- x[ok]; w <- w[ok]
@@ -49,6 +53,12 @@ weighted_sd <- function(x, w) {
 
 
 weighted_cor <- function(x, y, w) {
+  # A correlation is only defined between numbers. On a weighted study with a
+  # categorical driver this multiplied a factor by a weight, which warns
+  # "'*' not meaningful for factors" and yields NA anyway. Found by running the
+  # Suiderland example, which is the first keydriver study to pair a weight
+  # column with a categorical driver.
+  if (!is.numeric(x) || !is.numeric(y)) return(NA_real_)
   w <- w / sum(w)
   mx <- sum(w * x)
   my <- sum(w * y)

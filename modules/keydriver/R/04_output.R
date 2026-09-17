@@ -367,7 +367,10 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       # What actually ran. This said "partial_r2", naming an engine the
       # pipeline never called: importance is computed and ranked by Shapley
       # value (review H3).
-      .kd_primary_method(results),
+      # write_keydriver_output() takes importance as its own argument; there is
+      # no `results` object in this frame. Caught by the Suiderland example on
+      # its first end-to-end run, which is what an example is for.
+      .kd_primary_method(list(importance = importance)),
       "TURAS-KD-CONTINUOUS-UPGRADE-v1.0"
     ),
     stringsAsFactors = FALSE
