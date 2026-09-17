@@ -187,6 +187,8 @@ $$= \frac{Q_2 - Q_1}{Q_2 + Q_1} \times \frac{P_2 + P_1}{P_2 - P_1}$$
 
 ### 2.3 Newton-Miller-Smith (NMS) Extension
 
+**Not available in this version.** A configured `Col_PI_Cheap` refuses with `FEATURE_NMS_WITHDRAWN`: the 2026-09-03 review found the extension broken on both the weighted and the unweighted path, with nothing in the suite exercising it (finding F3). For a revenue-calibrated optimal price, run Gabor-Granger: the ladder measures acceptance at each price directly.
+
 #### Purpose
 
 The NMS extension calibrates Van Westendorp results with actual purchase intent to provide more accurate revenue predictions.

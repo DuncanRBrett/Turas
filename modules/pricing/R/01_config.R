@@ -34,10 +34,43 @@
 # helper itself rather than assuming the caller has already loaded it.
 if (!exists("turas_saveWorkbook", mode = "function")) {
   .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
-  .turas_saver_dir <- getwd()
+
+  # Where to start walking up from. The working directory is the right answer
+  # when the module is run from the project root, and the wrong one whenever
+  # it is sourced from somewhere else, which printed the IO_SAVER_NOT_FOUND
+  # warning on an otherwise clean headless run (review F12). This file's own
+  # location is the reliable answer, the way 00_main.R finds its guard.
+  .turas_saver_start <- function() {
+    if (exists(".PRICING_MODULE_DIR", inherits = TRUE)) {
+      d <- get(".PRICING_MODULE_DIR", inherits = TRUE)
+      if (is.character(d) && length(d) == 1 && dir.exists(d)) return(d)
+    }
+    for (i in rev(seq_len(sys.nframe()))) {
+      ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+      if (is.character(ofile) && length(ofile) == 1 && grepl("01_config\\.R$", ofile)) {
+        return(dirname(normalizePath(ofile, mustWork = FALSE)))
+      }
+      srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+      if (is.list(srcfile) && is.character(srcfile$filename) &&
+          grepl("01_config\\.R$", srcfile$filename)) {
+        return(dirname(normalizePath(srcfile$filename, mustWork = FALSE)))
+      }
+    }
+    getwd()
+  }
+
+  .turas_saver_dir <- .turas_saver_start()
   while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
          .turas_saver_dir != dirname(.turas_saver_dir)) {
     .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  if (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel))) {
+    # Fall back to the working directory, which is where it used to start.
+    .turas_saver_dir <- getwd()
+    while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+           .turas_saver_dir != dirname(.turas_saver_dir)) {
+      .turas_saver_dir <- dirname(.turas_saver_dir)
+    }
   }
   .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
   if (file.exists(.turas_saver_path)) {
@@ -55,7 +88,7 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
       openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)
     }
   }
-  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path, .turas_saver_start)
 }
 
 #' Parse A Delimited List Setting

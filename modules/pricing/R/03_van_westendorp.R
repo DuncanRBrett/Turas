@@ -430,12 +430,15 @@ validate_vw_with_refusal <- function(data, config, verbose = TRUE) {
 #' @param data Data frame containing price perception responses
 #' @param config Configuration list with van_westendorp settings
 #' @param validate Logical, run comprehensive validation first (default TRUE)
+#' @param validation Optional result of `validate_pricing_data()`. It carries
+#'   the monotonicity violations counted before any were dropped or fixed,
+#'   which the engine cannot recover from the data it receives (review F5).
 #'
 #' @return List containing price_points, ranges, curves, nms_results,
 #'         descriptives, diagnostics, validation
 #'
 #' @export
-run_van_westendorp <- function(data, config, validate = TRUE) {
+run_van_westendorp <- function(data, config, validate = TRUE, validation = NULL) {
 
   # Load package
   if (!requireNamespace("pricesensitivitymeter", quietly = TRUE)) {
@@ -533,8 +536,12 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
     too_cheap, cheap, expensive, too_expensive,
     weights = vw_weights, validate = validate_flag,
     pi_cheap = if (has_nms) pi_cheap else NULL,
-    pi_expensive = if (has_nms) pi_expensive else NULL,
-    pi_scale = vw$pi_scale
+    pi_expensive = if (has_nms) pi_expensive else NULL
+    # PI_Scale is deliberately not passed (review F3). The package reads it as
+    # a vector of scale points that must match pi_calibrated in length, so the
+    # template's PI_Scale = 5 killed both paths. NMS is refused upstream in
+    # validate_pricing_data(), which makes has_nms unreachable in a run; these
+    # two arguments stay only so a direct call behaves as it did before.
   )
   psm_result <- psm_fit$psm
   estimator <- psm_fit$estimator
@@ -625,12 +632,23 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
   n_total <- length(too_cheap)
   n_valid <- sum(complete_cases)
 
-  # Check monotonicity violations
-  monotonic <- too_cheap[complete_cases] <= cheap[complete_cases] &
-               cheap[complete_cases] <= expensive[complete_cases] &
-               expensive[complete_cases] <= too_expensive[complete_cases]
+  # Monotonicity violations on the data the engine received. The rule is the
+  # strict one check_vw_monotonicity() and the package both use; this copy
+  # allowed ties, so the two counts disagreed on the same respondents
+  # (review F5).
+  monotonic <- too_cheap[complete_cases] < cheap[complete_cases] &
+               cheap[complete_cases] < expensive[complete_cases] &
+               expensive[complete_cases] < too_expensive[complete_cases]
   n_violations <- sum(!monotonic)
   violation_rate <- if (n_valid > 0) n_violations / n_valid else 0
+
+  # Under "drop" and "fix" the data arriving here has already had the
+  # violators removed or sorted, so the count above is 0 and says nothing
+  # about the sample. The count taken before the handling is the one a reader
+  # needs, and only the validation result has it (review F5).
+  pre <- validation$monotonicity_violations
+  n_violations_before <- if (is.null(pre)) NA_integer_ else as.integer(pre$n_violations)
+  violation_rate_before <- if (is.null(pre)) NA_real_ else as.numeric(pre$violation_rate)
 
   # The analysed base is psm's own: the complete cases it received minus the
   # cases it set aside as invalid (review H3: the old n_valid counted
@@ -650,6 +668,8 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
     n_invalid_psm = n_invalid_psm,
     n_violations = n_violations,
     violation_rate = violation_rate,
+    n_violations_before_handling = n_violations_before,
+    violation_rate_before_handling = violation_rate_before,
     monotonicity_behavior = behavior,
     validate_flag = validate_flag,
     weighted = !is.null(vw_weights),
@@ -659,11 +679,25 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
     method = "van_westendorp"
   )
 
-  # Add warning if violation rate high
-  if (violation_rate > 0.10) {
+  # Add warning if violation rate high. Under "drop" and "fix" the rate on the
+  # arriving data is 0 by construction, so the pre-handling rate is what this
+  # warning is about (review F5).
+  #
+  # It goes to the console as well as into the diagnostics. `diagnostics$warning`
+  # was set here and read nowhere: not printed, not written to a sheet, not in
+  # the stats pack. Turas runs inside Shiny and the console is where a run is
+  # debugged, so a diagnostic that reaches no one is the same as no diagnostic.
+  warn_rate <- if (!is.na(violation_rate_before)) violation_rate_before else violation_rate
+  if (warn_rate > 0.10) {
+    warn_n <- if (!is.na(n_violations_before)) n_violations_before else n_violations
     diagnostics$warning <- sprintf(
-      "%.1f%% of respondents gave illogical price sequences. Review data quality.",
-      violation_rate * 100
+      "%d respondents (%.1f%%) gave illogical price sequences. Review data quality.",
+      as.integer(warn_n), warn_rate * 100
+    )
+    pricing_console_warning(
+      sprintf("%s Handled as '%s'; the stats pack records the count.",
+              diagnostics$warning, behavior),
+      context = "Van Westendorp Monotonicity"
     )
   }
 
@@ -858,10 +892,21 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
   successful <- 0L
   for (i in seq_len(iterations)) {
     idx <- sample.int(n_c, n_c, replace = TRUE)
+    # Under flag_only the package warns "Some respondents have inconsistent
+    # price structures" on every call, so a 1000-iteration bootstrap put a
+    # thousand identical lines on the GUI console (review F9). The headline
+    # call keeps the warning; this loop muffles that one and nothing else.
     fit <- tryCatch(
-      fit_vw_psm(too_cheap_c[idx], cheap_c[idx], expensive_c[idx], too_expensive_c[idx],
-                 weights = if (!is.null(weights_c)) weights_c[idx] else NULL,
-                 validate = validate, interpolate = TRUE),
+      withCallingHandlers(
+        fit_vw_psm(too_cheap_c[idx], cheap_c[idx], expensive_c[idx], too_expensive_c[idx],
+                   weights = if (!is.null(weights_c)) weights_c[idx] else NULL,
+                   validate = validate, interpolate = TRUE),
+        warning = function(w) {
+          if (grepl("inconsistent price structures", conditionMessage(w), fixed = TRUE)) {
+            invokeRestart("muffleWarning")
+          }
+        }
+      ),
       error = function(e) NULL
     )
     if (is.null(fit)) next

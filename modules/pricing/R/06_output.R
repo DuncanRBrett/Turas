@@ -8,6 +8,20 @@
 #
 # ==============================================================================
 
+#' The Gabor-Granger Completeness Block, Whichever Shape `results` Has
+#'
+#' A gabor_granger-only run passes the engine result itself; a `both` run
+#' nests it. Both reach the same diagnostics.
+#'
+#' @keywords internal
+.pricing_gg_completeness <- function(results, config) {
+  method <- tolower(config$analysis_method %||% "")
+  if (!method %in% c("gabor_granger", "both")) return(NULL)
+  gg <- if (identical(method, "both")) results$gabor_granger else results
+  gg$diagnostics$completeness
+}
+
+
 #' Write Pricing Analysis Output
 #'
 #' Generates comprehensive Excel output file with analysis results.
@@ -346,7 +360,9 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       openxlsx::addWorksheet(wb, "GG_Confidence_Intervals")
       openxlsx::writeData(wb, "GG_Confidence_Intervals",
                           pricing_escape_df(gg_results$confidence_intervals), headerStyle = header_style)
-      openxlsx::setColWidths(wb, "GG_Confidence_Intervals", cols = 1:5, widths = "auto")
+      openxlsx::setColWidths(wb, "GG_Confidence_Intervals",
+                             cols = seq_len(ncol(gg_results$confidence_intervals)),
+                             widths = "auto")
     }
   }
 
@@ -432,8 +448,16 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       ),
       stringsAsFactors = FALSE
     )
+    # The caveat reached the console and the stats pack but not the sheet a
+    # client reads, which showed "p-value 0.000000" with nothing beside it
+    # (review F11).
+    if (!is.null(ms$p_value_caveat) && nzchar(ms$p_value_caveat)) {
+      model_df <- rbind(model_df, data.frame(
+        Metric = "p-value caveat", Value = as.character(ms$p_value_caveat),
+        stringsAsFactors = FALSE))
+    }
     openxlsx::writeData(wb, "Mon_Model_Summary", pricing_escape_df(model_df), headerStyle = header_style)
-    openxlsx::setColWidths(wb, "Mon_Model_Summary", cols = 1:2, widths = c(25, 20))
+    openxlsx::setColWidths(wb, "Mon_Model_Summary", cols = 1:2, widths = c(25, 60))
 
     # Elasticity
     if (!is.null(results$elasticity) && nrow(results$elasticity) > 0) {
@@ -494,7 +518,14 @@ write_pricing_output <- function(results, plots, validation, config, output_file
   # --------------------------------------------------------------------------
   # Validation Details
   # --------------------------------------------------------------------------
-  if (validation$n_warnings > 0 || validation$n_excluded > 0) {
+  # A Gabor-Granger completeness exclusion is a reason to write this sheet in
+  # its own right: a run can exclude incomplete ladders with no validation
+  # warning and no validation exclusion of its own (review F4 and F6).
+  gg_completeness <- .pricing_gg_completeness(results, config)
+  has_gg_exclusion <- !is.null(gg_completeness) &&
+    (isTRUE(gg_completeness$n_excluded > 0) || isTRUE(gg_completeness$n_incomplete > 0))
+
+  if (validation$n_warnings > 0 || validation$n_excluded > 0 || has_gg_exclusion) {
     openxlsx::addWorksheet(wb, "Validation")
 
     val_summary <- data.frame(
@@ -556,6 +587,30 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
       openxlsx::writeData(wb, "Validation", pricing_escape_df(mono_summary), startRow = current_row)
       current_row <- current_row + nrow(mono_summary) + 2
+    }
+
+    # Gabor-Granger completeness
+    if (has_gg_exclusion) {
+      openxlsx::writeData(wb, "Validation", "GABOR-GRANGER COMPLETENESS",
+                          startRow = current_row)
+      openxlsx::addStyle(wb, "Validation", subheader_style,
+                         rows = current_row, cols = 1:2)
+      current_row <- current_row + 2
+
+      cmp_summary <- data.frame(
+        Item = c("Respondents Before Exclusion", "Incomplete Ladders",
+                 "Respondents Excluded", "Exclusion Rate", "Rule Applied"),
+        Value = c(
+          as.character(gg_completeness$n_respondents %||% ""),
+          as.character(gg_completeness$n_incomplete %||% 0),
+          as.character(as.integer(gg_completeness$n_excluded %||% 0)),
+          sprintf("%.1f%%", (gg_completeness$exclusion_rate %||% 0) * 100),
+          as.character(gg_completeness$rule %||% "none")
+        ),
+        stringsAsFactors = FALSE
+      )
+      openxlsx::writeData(wb, "Validation", pricing_escape_df(cmp_summary), startRow = current_row)
+      current_row <- current_row + nrow(cmp_summary) + 2
     }
 
     # Add warnings list

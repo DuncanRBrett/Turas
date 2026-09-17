@@ -159,7 +159,12 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
   }
 
   # --- The module's own analysed base -------------------------------------------
-  out$pricing_valid <- .pricing_tabs_valid_flag(validation, nrow(data))
+  # Validation's exclusions, plus anyone the Gabor-Granger completeness rule
+  # set aside afterwards (review F4). Without the second part a respondent
+  # excluded for an incomplete ladder would sit in the tabs base with no
+  # mention at any rung, reading as "would not buy at any price" and pulling
+  # every rung below the module's own curve.
+  out$pricing_valid <- .pricing_tabs_valid_flag(validation, nrow(data), gg, ids)
 
   # --- Willingness to pay, opt-in ------------------------------------------------
   wtp_col <- NULL
@@ -329,11 +334,24 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
 
 
 #' The module's analysed base as a 0/1 column, in data row order
+#'
+#' Validation's own exclusions, and, when a Gabor-Granger ladder ran, the
+#' respondents its completeness rule set aside afterwards (review F4).
 #' @keywords internal
-.pricing_tabs_valid_flag <- function(validation, n_rows) {
+.pricing_tabs_valid_flag <- function(validation, n_rows, gg = NULL, ids = NULL) {
   mask <- validation$exclusion_mask
-  if (is.null(mask) || length(mask) != n_rows) return(rep(1L, n_rows))
-  as.integer(!mask)
+  valid <- if (is.null(mask) || length(mask) != n_rows) rep(1L, n_rows) else as.integer(!mask)
+
+  # A Gabor-Granger run may have excluded incomplete ladders after validation.
+  # Those respondents are not in the analysed base, and the frame the curve was
+  # computed from is the record of who is.
+  n_excluded <- gg$diagnostics$completeness$n_excluded %||% 0L
+  if (!is.null(gg$gg_data) && !is.null(ids) && length(ids) == n_rows &&
+      isTRUE(n_excluded > 0)) {
+    analysed <- unique(as.character(gg$gg_data$respondent_id))
+    valid[!ids %in% analysed] <- 0L
+  }
+  valid
 }
 
 

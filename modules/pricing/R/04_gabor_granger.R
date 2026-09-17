@@ -62,26 +62,75 @@ run_gabor_granger <- function(data, config) {
   # computed demand among the survivors only and pushed the optimum to the
   # top price. Per-rung bases are compared; when they differ the run refuses
   # unless the config opts into imputing No after the first No.
+  # Two different things leave a rung unanswered, and they need opposite
+  # treatment (review F4 and F6). A stop-early ladder leaves every gap above
+  # the respondent's first No, and demand computed on the survivors is the C2
+  # defect, so the run refuses. Ordinary item non-response scatters gaps
+  # anywhere, and refusing it turned away one full-presentation ladder in four
+  # at 2% missingness; those respondents are excluded and the exclusion is
+  # disclosed. The shape of the missingness decides which it is.
   imputation <- toupper(config$gg_stop_early_imputation %||% "NONE")
   rung_bases <- gg_rung_bases(gg_data)
+  shape <- gg_missingness_shape(gg_data)
+  completeness <- list(
+    n_respondents = shape$n_respondents,
+    n_incomplete = shape$n_incomplete,
+    stop_early_share = shape$stop_early_share,
+    n_excluded = 0L,
+    exclusion_rate = 0,
+    rule = "none"
+  )
+
   if (identical(imputation, "NO_AFTER_STOP")) {
     if (gg$data_format != "wide" && !.gg_order_derivable(gg_data)) {
       pricing_refuse(
-        code = "CFG_GG_IMPUTATION_ORDER",
-        title = "Stop-Early Imputation Needs A Known Presentation Order",
-        problem = "GG_Stop_Early_Imputation = NO_AFTER_STOP is set on long-format data whose rung order cannot be derived.",
-        why_it_matters = "Imputing No after the first No depends on which rung came first.",
-        how_to_fix = "Supply the data in wide format with Price_Sequence in ascending presentation order, or remove the setting."
+        code = "DATA_GG_PRICE_NOT_NUMERIC",
+        title = "Stop-Early Imputation Needs Prices It Can Order",
+        problem = paste0(
+          "GG_Stop_Early_Imputation = NO_AFTER_STOP is set, and the long-format Price_Column ",
+          "holds values that did not read as numbers."),
+        why_it_matters = paste0(
+          "Imputing No after the first No depends on which rung came first, and the ladder's ",
+          "order is ascending price. A price that did not parse has no place in that order."),
+        how_to_fix = c(
+          "Check the Price_Column for currency symbols, thousands separators or text such as 'R60'.",
+          "Supply the data in wide format with Price_Sequence in ascending presentation order, or remove the setting."
+        )
       )
     }
+    # Gaps the staircase does not explain are not the ladder stopping, so
+    # imputing No over them would invent an answer. Those respondents go
+    # before the imputation runs (review F6).
+    drop_ids <- shape$ids[shape$status == "unexplained"]
+    if (length(drop_ids) > 0) {
+      gg_data <- gg_exclude_respondents(gg_data, drop_ids)
+      completeness <- .gg_record_exclusion(completeness, shape, length(drop_ids),
+                                           "incomplete beyond the stop-early pattern")
+      .gg_check_min_sample(gg_data, config)
+    }
+    before <- sum(gg_rung_bases(gg_data)$n_answered)
     gg_data <- impute_gg_no_after_stop(gg_data)
-    rung_bases_after <- gg_rung_bases(gg_data)
+    rung_bases <- gg_rung_bases(gg_data)
     cat(sprintf("   Stop-early imputation: NA rungs after a respondent's first No coded as No (%d cells)\n",
-                sum(rung_bases_after$n_answered) - sum(rung_bases$n_answered)))
-    rung_bases <- rung_bases_after
-  } else {
+                sum(rung_bases$n_answered) - before))
+  } else if (shape$n_incomplete > 0 && isTRUE(shape$stop_early_share >= 0.9)) {
+    # The stop-early signature. Refuse on the terms the C2 fix set, which the
+    # existing tolerance still absorbs when the ragged edge is trivial.
     check_gg_rung_bases(rung_bases)
+  } else if (shape$n_incomplete > 0) {
+    drop_ids <- shape$ids[shape$status != "complete"]
+    gg_data <- gg_exclude_respondents(gg_data, drop_ids)
+    completeness <- .gg_record_exclusion(completeness, shape, length(drop_ids),
+                                         "incomplete ladder")
+    .gg_check_min_sample(gg_data, config)
+    cat(sprintf("   Gabor-Granger completeness: %d of %d respondents (%.1f%%) excluded for an incomplete ladder\n",
+                completeness$n_excluded, shape$n_respondents, completeness$exclusion_rate * 100))
+    rung_bases <- gg_rung_bases(gg_data)
   }
+
+  # The invariant, whichever route was taken: every rung is answered by the
+  # same respondents, or the run says why not.
+  check_gg_rung_bases(rung_bases)
 
   # Calculate demand curve
   demand_curve <- calculate_demand_curve(gg_data)
@@ -136,8 +185,19 @@ run_gabor_granger <- function(data, config) {
     )
   }
 
+  # The interval table brackets the published curve, so it carries it: without
+  # that column a reader could not check from the sheet that it does
+  # (review F11).
+  if (!is.null(confidence_intervals) && "price" %in% names(confidence_intervals)) {
+    confidence_intervals$published <- demand_curve$purchase_intent[
+      match(confidence_intervals$price, demand_curve$price)]
+  }
+
   weighted <- !is.na(config$weight_var %||% NA) && any(gg_data$weight != 1)
   coding_note <- gg_response_coding_note(gg)
+  # n_respondents was counted before any completeness exclusion; the
+  # deliverables must report the base the curve was computed on.
+  n_respondents <- length(unique(gg_data$respondent_id))
 
   # Return results
   list(
@@ -163,6 +223,7 @@ run_gabor_granger <- function(data, config) {
       weighted = weighted,
       response_coding = coding_note,
       imputation = if (identical(imputation, "NO_AFTER_STOP")) "NO_AFTER_STOP: unanswered rungs after a respondent's first No coded as No" else "none",
+      completeness = completeness,
       smoothing = smoothing
     )
   )
@@ -180,6 +241,94 @@ gg_rung_bases <- function(gg_data) {
   n_missing <- vapply(prices, function(p) sum(gg_data$price == p & is.na(gg_data$response)), integer(1))
   data.frame(price = prices, n_answered = n_answered, n_missing = n_missing,
              stringsAsFactors = FALSE)
+}
+
+
+#' Per-Respondent Missingness, And Whether A Staircase Explains It
+#'
+#' A stop-early ladder leaves every unanswered rung strictly above the
+#' respondent's first No; nothing else about the design produces that shape.
+#' Ordinary item non-response leaves gaps anywhere, including below a No and
+#' in respondents who never said No at all. Telling the two apart is what
+#' decides between refusing the run and excluding the respondent (review F4
+#' and F6).
+#'
+#' @param gg_data Long-format Gabor-Granger data.
+#' @return List with `ids`, a per-respondent `status` of "complete",
+#'   "explained" or "unexplained", the three counts, and the share of the
+#'   incomplete respondents a staircase explains (NA when none are incomplete).
+#' @keywords internal
+gg_missingness_shape <- function(gg_data) {
+  ids <- unique(gg_data$respondent_id)
+  by_id <- split(seq_len(nrow(gg_data)), as.character(gg_data$respondent_id))
+  status <- vapply(by_id, function(idx) {
+    d <- gg_data[idx, , drop = FALSE]
+    miss <- is.na(d$response)
+    if (!any(miss)) return("complete")
+    no_prices <- d$price[!miss & d$response == 0]
+    if (length(no_prices) == 0) return("unexplained")
+    if (all(d$price[miss] > min(no_prices))) return("explained")
+    "unexplained"
+  }, character(1))
+  status <- unname(status[as.character(ids)])
+  n_incomplete <- sum(status != "complete")
+  list(
+    ids = ids,
+    status = status,
+    n_respondents = length(ids),
+    n_complete = sum(status == "complete"),
+    n_incomplete = n_incomplete,
+    n_explained = sum(status == "explained"),
+    stop_early_share = if (n_incomplete == 0) NA_real_ else sum(status == "explained") / n_incomplete
+  )
+}
+
+
+#' Drop Whole Respondents From A Gabor-Granger Frame
+#'
+#' Gabor-Granger completeness is all or nothing: a respondent who answered
+#' four rungs of five cannot contribute to four of the five bases without
+#' making them unequal, which is the condition the base check exists to catch.
+#'
+#' @param gg_data Long-format Gabor-Granger data.
+#' @param ids Respondent ids to remove.
+#' @return The frame without those respondents.
+#' @keywords internal
+gg_exclude_respondents <- function(gg_data, ids) {
+  gg_data[!gg_data$respondent_id %in% ids, , drop = FALSE]
+}
+
+
+#' Record A Completeness Exclusion For The Deliverables
+#' @keywords internal
+.gg_record_exclusion <- function(completeness, shape, n_excluded, rule) {
+  completeness$n_excluded <- as.integer(n_excluded)
+  completeness$exclusion_rate <- if (shape$n_respondents > 0) n_excluded / shape$n_respondents else 0
+  completeness$rule <- rule
+  completeness
+}
+
+
+#' Hold A Completeness Exclusion To The Study's Own Min_Sample
+#'
+#' No new configuration key: the floor a completeness exclusion answers to is
+#' the Min_Sample the study already declares (Duncan's ruling, 2026-09-03).
+#' @keywords internal
+.gg_check_min_sample <- function(gg_data, config) {
+  min_sample <- suppressWarnings(as.numeric(config$validation$min_sample %||% NA))
+  n <- length(unique(gg_data$respondent_id))
+  if (!is.finite(min_sample) || n >= min_sample) return(invisible(TRUE))
+  pricing_refuse(
+    code = "DATA_GG_MIN_SAMPLE",
+    title = "Too Few Complete Ladders To Analyse",
+    problem = sprintf("%d respondents answered every rung; Min_Sample is %d.",
+                      n, as.integer(min_sample)),
+    why_it_matters = "A demand curve from a handful of complete ladders is not a finding.",
+    how_to_fix = c(
+      "Check the response columns for accidental blanks: every respondent must answer every rung.",
+      "Lower Min_Sample on the Validation sheet only if a small base is acceptable and will be disclosed."
+    )
+  )
 }
 
 
@@ -215,10 +364,15 @@ check_gg_rung_bases <- function(rung_bases, tolerance = 0.02) {
 
 
 #' Can A Rung Order Be Derived From Long-Format Data?
+#'
+#' `prepare_gg_long_data()` has already coerced the price column with
+#' `as.numeric()`, so this is FALSE exactly when a price failed to parse. The
+#' refusal it guards used to describe a missing order column, which nothing
+#' tested and which therefore could never fire as written (review F10); it now
+#' says what this actually checks.
+#'
 #' @keywords internal
 .gg_order_derivable <- function(gg_data) {
-  # Prices are numeric, so ascending price is a presentation order; the
-  # refusal above is for the case where prices are not comparable.
   is.numeric(gg_data$price) && !any(is.na(gg_data$price))
 }
 
@@ -392,9 +546,31 @@ code_gg_response <- function(response, config) {
 
     if (is.numeric(response)) {
       # Exact values only. "any positive number is a purchase" read 1 = Yes /
-      # 2 = No as 100% intent everywhere (review H5); the domain check in
-      # validation refuses anything outside the declared coding, so what
-      # arrives here is 0/1 (or 1/2 under ONE_TWO) and NA.
+      # 2 = No as 100% intent everywhere (review H5). Validation refuses
+      # out-of-domain values before this point, but it only reached wide data
+      # until review F1, so the coder refuses here too rather than mapping the
+      # unknown value to NA and letting the ladder lose a base it cannot
+      # explain.
+      allowed <- if (coding == "ONE_TWO") c(1, 2) else c(0, 1)
+      off <- unique(response[!is.na(response) & !response %in% allowed])
+      if (length(off) > 0) {
+        seen <- unique(response[!is.na(response)])
+        is_one_two <- all(seen %in% c(1, 2)) && coding != "ONE_TWO"
+        pricing_refuse(
+          code = "DATA_GG_NOT_BINARY",
+          title = "A Gabor-Granger Response Is Not Coded 0/1",
+          problem = sprintf("Responses are declared binary but include %s.",
+                            paste(head(sort(off), 6), collapse = ", ")),
+          why_it_matters = paste0(
+            "Any value that is not the declared Yes or No would be dropped as missing, ",
+            "which computes demand among whoever is left and pushes the revenue optimum ",
+            "towards the top price."),
+          how_to_fix = c(
+            if (is_one_two) "The values are 1 and 2: set Binary_Coding = ONE_TWO on the GaborGranger sheet (1 = would buy, 2 = would not).",
+            "Otherwise recode the responses to 0/1, or declare Response_Type = scale with a Scale_Threshold."
+          )
+        )
+      }
       if (coding == "ONE_TWO") {
         out <- rep(NA_real_, length(response))
         out[!is.na(response) & response == 1] <- 1
@@ -407,12 +583,27 @@ code_gg_response <- function(response, config) {
       return(out)
     }
 
-    # Text: yes/no in the usual spellings; anything else stays missing rather
-    # than silently becoming No.
+    # Text: yes/no in the usual spellings. An unrecognised spelling used to
+    # stay missing, which gave a long-format ladder n = 0 and NA demand at
+    # every rung with nothing said (review F1). It refuses instead, on the
+    # same terms as the wide-format domain check.
     txt <- tolower(trimws(as.character(response)))
+    yes <- c("1", "yes", "y", "true")
+    no <- c("0", "no", "n", "false")
+    unknown <- unique(txt[!is.na(txt) & nzchar(txt) & !txt %in% c(yes, no)])
+    if (length(unknown) > 0) {
+      pricing_refuse(
+        code = "DATA_GG_NOT_BINARY",
+        title = "A Gabor-Granger Response Is Not Yes/No",
+        problem = sprintf("Responses are declared binary but include text other than yes/no: %s.",
+                          paste(head(sort(unknown), 6), collapse = ", ")),
+        why_it_matters = "Every unrecognised answer would be dropped as missing, so the rung it belongs to loses part of its base.",
+        how_to_fix = "Recode the responses to 0/1, or set Response_Type = scale with a Scale_Threshold."
+      )
+    }
     out <- rep(NA_real_, length(txt))
-    out[txt %in% c("1", "yes", "y", "true")] <- 1
-    out[txt %in% c("0", "no", "n", "false")] <- 0
+    out[!is.na(txt) & txt %in% yes] <- 1
+    out[!is.na(txt) & txt %in% no] <- 0
     return(out)
 
   } else if (response_type == "scale") {

@@ -307,7 +307,7 @@ run_pricing_analysis_from_config <- function(config) {
 
   if (analysis_method == "van_westendorp") {
     cat("\n3. Running Van Westendorp PSM analysis...\n")
-    vw_results <- run_van_westendorp(validation$clean_data, config)
+    vw_results <- run_van_westendorp(validation$clean_data, config, validation = validation)
     analysis_results <- vw_results
     cat("   Price points calculated:\n")
     cat(sprintf("     PMC (Point of Marginal Cheapness): %s%.2f\n",
@@ -384,7 +384,7 @@ run_pricing_analysis_from_config <- function(config) {
     cat("\n3. Running both Van Westendorp and Gabor-Granger analyses...\n")
 
     cat("   a) Van Westendorp PSM...\n")
-    vw_results <- run_van_westendorp(validation$clean_data, config)
+    vw_results <- run_van_westendorp(validation$clean_data, config, validation = validation)
     cat(sprintf("      Acceptable range: %s%.2f - %s%.2f\n",
                 config$currency_symbol %||% "$", vw_results$price_points$PMC,
                 config$currency_symbol %||% "$", vw_results$price_points$PME))
@@ -820,14 +820,18 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     file_name           = basename(config$data_file %||% "unknown"),
     n_rows              = nrow(raw_data),
     n_cols              = ncol(raw_data),
-    questions_in_config = 0L  # pricing does not use a question list
+    # Pricing has no question list; what a pricing config names is columns.
+    # A hard 0 read as "the config is empty" (review F11).
+    questions_in_config = length(.pricing_configured_columns(config))
   )
 
-  # Price points tested (from config ladder/grid)
-  n_price_points <- length(config$price_points %||%
-                           config$gabor_granger$price_points %||%
-                           config$van_westendorp$price_range %||%
-                           list())
+  # Price points tested. The three keys this read do not exist on a pricing
+  # config, so the row said "not applicable" on a five-rung ladder (review
+  # F11). The Gabor-Granger rungs live in price_sequence, and the monadic
+  # design's cells in the config's own list.
+  # A monadic design has no declared grid: its cells are whatever prices the
+  # data carries, so the row stays "not applicable" there, honestly.
+  n_price_points <- length(config$gabor_granger$price_sequence %||% list())
 
   # Segmentation status
   seg_enabled <- !is.null(config$segmentation$segment_column) &&
@@ -868,6 +872,15 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
                                                           vw_results$diagnostics$n_valid)
     method_results[["VW: n_complete"]] <- as.character(vw_results$diagnostics$n_valid)
     method_results[["VW: violation_rate"]] <- sprintf("%.1f%%", vw_results$diagnostics$violation_rate * 100)
+    # Under "drop" and "fix" the rate above is 0 by construction, because the
+    # violators were handled before the engine saw them (review F5).
+    n_before <- vw_results$diagnostics$n_violations_before_handling
+    rate_before <- vw_results$diagnostics$violation_rate_before_handling
+    method_results[["VW: violations_before_handling"]] <- if (is.null(n_before) || is.na(n_before)) {
+      "not recorded"
+    } else {
+      sprintf("%d (%.1f%%)", as.integer(n_before), rate_before * 100)
+    }
     method_results[["VW: intransitive_handling"]] <- vw_results$diagnostics$monotonicity_behavior %||% "unknown"
     method_results[["VW: estimator"]] <- vw_results$diagnostics$estimator %||% "psm_analysis (unweighted)"
     if (!is.null(vw_results$nms_results)) {
@@ -891,6 +904,15 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     method_results[["GG: response_coding"]] <- gg_results$diagnostics$response_coding %||% "unknown"
     method_results[["GG: stop_early_imputation"]] <- gg_results$diagnostics$imputation %||% "none"
     method_results[["GG: smoothing"]] <- gg_results$diagnostics$smoothing %||% "none"
+    # Completeness (review F4 and F6). An exclusion that never reaches a
+    # deliverable is the same problem as no exclusion at all.
+    cmp <- gg_results$diagnostics$completeness
+    if (!is.null(cmp)) {
+      method_results[["GG: incomplete_ladders"]] <- as.character(cmp$n_incomplete %||% 0)
+      method_results[["GG: completeness_excluded"]] <- sprintf(
+        "%d (%.1f%%)", as.integer(cmp$n_excluded %||% 0), (cmp$exclusion_rate %||% 0) * 100)
+      method_results[["GG: completeness_rule"]] <- cmp$rule %||% "none"
+    }
     if (!is.null(gg_results$optimal_price_profit)) {
       method_results[["GG: profit_optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price_profit$price)
     }
