@@ -407,6 +407,12 @@ calculate_weighted_means <- function(data, drivers, weights = NULL) {
     performance = sapply(drivers, function(d) {
       if (!d %in% names(data)) return(NA_real_)
       x <- data[[d]]
+      # A mean performance score is not defined for a nominal driver.
+      # weighted.mean() on a factor returned NA anyway, after printing
+      # "'*' not meaningful for factors", so every mixed run ended with a
+      # row of warnings the analyst could do nothing about and which said
+      # nothing about their data (review F28). Answered quietly instead.
+      if (!is.numeric(x)) return(NA_real_)
       valid <- !is.na(x) & !is.na(w) & w > 0
       if (sum(valid) == 0) return(NA_real_)
       stats::weighted.mean(x[valid], w[valid])

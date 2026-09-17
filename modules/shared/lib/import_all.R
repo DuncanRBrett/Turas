@@ -52,10 +52,23 @@
         found <- dirname(normalizePath(of, mustWork = FALSE))
         break
       }
+      # This tested is.list(sf), and a frame's srcfile is never a list: it
+      # arrives either as the character path source() was given, or as a
+      # srcfile object carrying $filename. So the branch never fired and the
+      # ofile test above was doing all the work (review F23). Both shapes are
+      # handled now, which matters for the sourcing paths where ofile is
+      # absent.
       sf <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
-      if (is.list(sf) && is.character(sf$filename) &&
-          grepl("import_all[.]R$", sf$filename)) {
-        found <- dirname(normalizePath(sf$filename, mustWork = FALSE))
+      sf_name <- if (is.character(sf) && length(sf) == 1) {
+        sf
+      } else if (!is.null(sf)) {
+        nm <- tryCatch(sf$filename, error = function(e) NULL)
+        if (is.character(nm) && length(nm) == 1) nm else NULL
+      } else {
+        NULL
+      }
+      if (!is.null(sf_name) && grepl("import_all[.]R$", sf_name)) {
+        found <- dirname(normalizePath(sf_name, mustWork = FALSE))
         break
       }
     }

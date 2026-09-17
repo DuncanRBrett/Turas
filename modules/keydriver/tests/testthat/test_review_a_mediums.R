@@ -209,3 +209,99 @@ test_that("no test file reports zero tests in isolation (F17)", {
                  info = paste(basename(f), paste(offenders, collapse = " | ")))
   }
 })
+
+
+# ==============================================================================
+# LOWS (F21, F22, F23, F28)
+# ==============================================================================
+
+test_that("the part-reconciliation warning appears only where it is true (F21)", {
+  src <- readLines(file.path(module_dir, "R", "04_output.R"), warn = FALSE)
+  hits <- grep("TRS WARNING\\] Saving without part reconciliation", src)
+  # It was pasted into eight places: the real one beside the fallback save,
+  # and seven else branches with nothing to do with saving, including two
+  # "the expected columns are not there" fallbacks. So it printed on ordinary
+  # runs and told the reader something untrue about them.
+  expect_equal(length(hits), 1L)
+
+  # The surviving one sits in the branch that saves without the shared saver.
+  window <- paste(src[hits[1]:min(length(src), hits[1] + 8)], collapse = "\n")
+  expect_true(grepl("openxlsx::saveWorkbook(wb, output_file", window, fixed = TRUE))
+  # And it names the thing that is actually absent.
+  expect_true(grepl("turas_saveWorkbook() is not loaded",
+                    paste(src, collapse = "\n"), fixed = TRUE))
+})
+
+test_that("mixed-path weights are matched to the model's rows, not counted (F22)", {
+  src <- paste(readLines(file.path(module_dir, "R", "03_analysis.R"), warn = FALSE),
+               collapse = "\n")
+  # Taking the first nrow(mm) weights pairs respondent 1's weight with
+  # whichever respondent survived into row 1. Silently wrong whenever a
+  # dropped row is not at the end.
+  expect_false(grepl("w_all[seq_len(nrow(mm))]", src, fixed = TRUE))
+  expect_true(grepl("match(rownames(mm), rownames(data))", src, fixed = TRUE))
+  # sd_y is computed over the same rows as sd_x, rather than the full column.
+  expect_true(grepl("data[[outcome_var]][outcome_rows]", src, fixed = TRUE))
+
+  # The alignment this replaces: rows dropped from the middle.
+  d <- data.frame(y = 1:10, x = c(1:4, NA, 6:10), w = c(rep(1, 4), 99, rep(1, 5)))
+  m <- stats::lm(y ~ x, data = d)
+  mm <- stats::model.matrix(m)
+  rows <- match(rownames(mm), rownames(d))
+  expect_equal(length(rows), 9L)
+  # Row 5 is the one the fit dropped, and it carries the weight 99.
+  expect_equal(rows, c(1:4, 6:10))
+  # Counting the first nrow(mm) weights takes that 99 and hands it to the
+  # respondent who is now in row 5. Matching by row label does not.
+  expect_true(99 %in% d$w[seq_len(nrow(mm))])
+  expect_false(99 %in% d$w[rows])
+})
+
+test_that("the loader's srcfile branch can actually fire (F23)", {
+  src <- paste(readLines(file.path(project_root, "modules", "shared", "lib",
+                                   "import_all.R"), warn = FALSE), collapse = "\n")
+  # A frame's srcfile is never a list: it is either the character path
+  # source() was given or a srcfile object carrying $filename.
+  expect_false(grepl("is.list(sf) && is.character(sf$filename)", src, fixed = TRUE))
+  expect_true(grepl("is.character(sf) && length(sf) == 1", src, fixed = TRUE))
+  expect_true(grepl("tryCatch(sf$filename", src, fixed = TRUE))
+
+  # And the premise: srcfile really is not a list.
+  probe <- function() {
+    vapply(rev(seq_len(sys.nframe())), function(i) {
+      sf <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+      is.list(sf)
+    }, logical(1))
+  }
+  expect_false(any(probe()))
+})
+
+test_that("a mixed quadrant run does not warn about factors (F28)", {
+  skip_if(!exists("calculate_weighted_means", mode = "function"),
+          "quadrant prep not loaded")
+  # weighted.mean() on a factor returned NA anyway, after printing
+  # "'*' not meaningful for factors" once per categorical driver, so every
+  # mixed run ended with warnings the analyst could do nothing about.
+  d <- data.frame(
+    num1 = c(1, 2, 3, 4),
+    num2 = c(4, 3, 2, 1),
+    chan = factor(c("a", "b", "a", "b")),
+    w = c(1, 1, 2, 2))
+
+  warns <- character(0)
+  perf <- withCallingHandlers(
+    calculate_weighted_means(d, c("num1", "num2", "chan"), weights = "w"),
+    warning = function(w) {
+      warns <<- c(warns, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+
+  expect_equal(length(warns), 0L)
+  expect_true(is.data.frame(perf))
+  expect_setequal(perf$driver, c("num1", "num2", "chan"))
+  # The numeric drivers still get their weighted means.
+  expect_equal(perf$performance[perf$driver == "num1"],
+               stats::weighted.mean(d$num1, d$w))
+  # And the factor gets NA, which is the honest answer, not a warning.
+  expect_true(is.na(perf$performance[perf$driver == "chan"]))
+})

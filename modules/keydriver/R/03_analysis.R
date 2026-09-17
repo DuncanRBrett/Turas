@@ -657,17 +657,39 @@ calculate_beta_weights_mixed <- function(model, data, config, term_mapping) {
 
   # Calculate term-level standardized betas, weighted when the fit was
   # weighted (review M1).
+  #
+  # The model matrix can have fewer rows than the data, because the fit drops
+  # rows it cannot use. This took the FIRST nrow(mm) weights, which pairs
+  # respondent 1's weight with whichever respondent survived into row 1, and
+  # so on down: silently wrong whenever a dropped row is not at the end
+  # (review F22). The model matrix carries the row labels it kept, so they are
+  # matched rather than counted. The outcome is subset to the same rows, since
+  # sd_y used the full column against the full weight vector while sd_x used a
+  # subset of both.
+  mixed_rows <- match(rownames(mm), rownames(data))
+  if (anyNA(mixed_rows)) {
+    mixed_rows <- if (nrow(mm) == nrow(data)) seq_len(nrow(data)) else NULL
+  }
+
   mixed_w <- if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
                  config$weight_var %in% names(data)) {
-    w_all <- as.numeric(data[[config$weight_var]])
-    if (length(w_all) == nrow(mm)) w_all else w_all[seq_len(nrow(mm))]
+    if (is.null(mixed_rows)) {
+      cat(paste0("   [WARN] The model dropped rows and they could not be ",
+                 "matched back to the data, so standardised betas are ",
+                 "computed unweighted for this model.\n"))
+      NULL
+    } else {
+      as.numeric(data[[config$weight_var]])[mixed_rows]
+    }
   } else {
     NULL
   }
+
+  outcome_rows <- if (is.null(mixed_rows)) seq_len(nrow(data)) else mixed_rows
   sd_y <- if (is.null(mixed_w)) {
-    sd(data[[outcome_var]], na.rm = TRUE)
+    sd(data[[outcome_var]][outcome_rows], na.rm = TRUE)
   } else {
-    weighted_sd(data[[outcome_var]], as.numeric(data[[config$weight_var]]))
+    weighted_sd(data[[outcome_var]][outcome_rows], mixed_w)
   }
   term_betas <- numeric(length(all_coefs))
   names(term_betas) <- names(all_coefs)
