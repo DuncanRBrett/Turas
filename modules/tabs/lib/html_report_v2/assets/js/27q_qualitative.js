@@ -120,6 +120,64 @@
     return st.theme;
   };
 
+  /** The theme label for an id, or "" when the question does not carry it. */
+  qual.themeLabel = function (q, themeId) {
+    var hit = ((q && q.themes) || []).filter(function (t) { return t.id === themeId; });
+    return hit.length ? hit[0].label : "";
+  };
+
+  /**
+   * The note that tells a reader a quote is a FRAGMENT of a longer comment.
+   *
+   * Without it the page invites the opposite of the original complaint: a client
+   * reads three lines and asks how they earned four theme codes. The codes were
+   * coded on the whole comment; only the quote is an extract. Away from a theme
+   * page the fragment's own theme is named, so a quote is never presented as the
+   * whole comment with no clue which part of it this was.
+   *
+   * @param rec An island record.
+   * @param themeId The theme on screen, or null when there is none.
+   * @param q The island question (for theme labels).
+   * @return An HTML chip, or "" for a comment quoted in full.
+   */
+  qual.extractLabel = function (rec, themeId, q) {
+    if (!rec || !rec.hasExtracts || qual.textFor(rec, themeId) == null) return "";
+    var named = (themeId == null && rec.textTheme != null)
+      ? qual.themeLabel(q, rec.textTheme) : "";
+    return '<span class="ql-hint" title="An extract from a longer comment. ' +
+      'The themes on this comment were coded on the whole comment, not on this extract.">' +
+      "extract" + (named ? " on " + esc(named) : "") + "</span>";
+  };
+
+  /**
+   * How many comments this theme counts but does not quote, and the chip that
+   * says so.
+   *
+   * A theme page can read "18 comments" and show 11 quotes. Seven of them raised
+   * this theme, are counted in every number on the page, and their extract speaks
+   * to another theme they also raised, so it is quoted there instead. Saying that
+   * on the page is what keeps the two numbers reconcilable by a reader who cannot
+   * see the workbook.
+   *
+   * @param q The island question.
+   * @param st The tab state (theme, band).
+   * @param audience The already cut-filtered records.
+   * @return An HTML chip, or "" when every counted comment is also quoted here.
+   */
+  qual.elsewhereChip = function (q, st, audience) {
+    var theme = qual.drawerTheme(q, st || {});
+    if (theme == null) return "";
+    var here = qual.recordsForTheme(
+      qual.bandFilter(q, qual.shown(audience), (st || {}).band), theme);
+    var n = here.filter(function (r) { return !qual.quotableUnder(r, theme); }).length;
+    if (!n) return "";
+    return '<span class="ql-scopechip hide" title="' + n + " comment" + (n === 1 ? "" : "s") +
+      " raised this theme and " + (n === 1 ? "is" : "are") + " counted in every number on " +
+      "this page. The extract each one carries speaks to another theme the same comment " +
+      'raised, so it is quoted there instead.">' + n +
+      " counted here, quoted elsewhere</span>";
+  };
+
   /** Whether a comment may be QUOTED under this theme, by the extracts rule alone.
    *  True for every comment the analyst wrote no fragment for, which is the
    *  overwhelming majority and the whole pre-extracts world. Whether the comment's
@@ -953,17 +1011,26 @@
     var scope = (island && island.verbatimScope) || "all";
     var recs = q.records || [];
     var suppressed = recs.filter(function (r) { return r.suppressed; }).length;
+    var byExtract = recs.filter(function (r) { return r.hasExtracts; }).length;
+    // Appended, not folded into the branches below, so a report that both hides
+    // uninformative comments and quotes some by extract states both facts.
+    var exChip = byExtract ? '<span class="ql-scopechip hide" title="' + byExtract +
+      " of these comments " + (byExtract === 1 ? "is" : "are") + " quoted by extract: a short " +
+      "passage, shown beside the theme it speaks to. The theme coding is the whole " +
+      'comment\u2019s, and every comment is counted in full.">' +
+      "Some comments quoted by extract</span>" : "";
     if (scope === "noteworthy") {
       return '<span class="ql-scopechip note" title="This report shows only comments flagged ' +
         "noteworthy, must-read or priority. All " + recs.length +
-        ' comments are still counted in the theme distribution.">★ Noteworthy comments only</span>';
+        ' comments are still counted in the theme distribution.">★ Noteworthy comments only</span>' +
+        exChip;
     }
     if (suppressed > 0) {
       return '<span class="ql-scopechip hide" title="' + suppressed + " uninformative comment" +
         (suppressed === 1 ? "" : "s") + ' (marked hide) withheld from the list. Still counted in the ' +
-        'distribution.">Uninformative comments hidden</span>';
+        'distribution.">Uninformative comments hidden</span>' + exChip;
     }
-    return "";
+    return exChip;
   };
 
   /** The pool a sentiment pick filters: shown -> band -> theme -> tier -> shortlist
@@ -2343,7 +2410,8 @@
         'title="Read these comments one at a time. J/k or arrows to move, Esc to close">⤢ Focus</button>'
       : "";
     return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
-      ' <span class="ql-hint">(' + records.length + ")</span>" + focusBtn + "</div>" +
+      ' <span class="ql-hint">(' + records.length + ")</span>" +
+      qual.elsewhereChip(q, st, audience) + focusBtn + "</div>" +
       drawerCardsHtml(records, q, st) + "</div>";
   }
 
@@ -2358,7 +2426,7 @@
         : "No comments for this selection.") + "</p>";
     }
     var themeShown = qual.drawerTheme(q, st);
-    var cardOf = function (r) { return quoteCard(r, q.code, themeShown); };
+    var cardOf = function (r) { return quoteCard(r, q.code, themeShown, q); };
     var split = st.savedOnly ? { curated: [], rest: records }
               : qual.curatedSplit(records, q.code, themeShown);
     if (!split.curated.length) return records.map(cardOf).join("");
@@ -2378,7 +2446,7 @@
 
   // Reached only when the audience is at/above the disclosure threshold (drawerHtml gates
   // the whole list below k), so demographic tags are safe to show here.
-  function quoteCard(r, qcode, themeId) {
+  function quoteCard(r, qcode, themeId, q) {
     var sent = SENT[r.sentiment] || "neu";
     var key = markKeyFor(qcode, r);      // rid-keyed where the island carries one
     var hlKey = hlKeyFor(qcode, r, themeId);   // per-theme: marks belong to the fragment
@@ -2408,7 +2476,9 @@
       '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
       (tags ? '<div class="ql-tags">' + tags + '</div>' : '') +
       hubControlHtml(key) + '</div>' +
-      '<div class="ql-qfoot">' + save + sentWord + '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
+      '<div class="ql-qfoot">' + save + sentWord +
+      qual.extractLabel(r, themeId, q) +
+      '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
 
   function footerHtml(island, q) {
@@ -2518,6 +2588,7 @@
     var text = (r.text == null)   /* unscoped-text */
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
       : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r));   /* unscoped-text */
+    var exLabel = qual.extractLabel(r, null, q);
     var byId = {}; (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
     var chips = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null && byId[id]; })
       .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
@@ -2543,6 +2614,7 @@
       "</div>" +
       '<div class="ql-qfoot">' + (SENT_WORD[r.sentiment]
         ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "") +
+      exLabel +
       '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
   qual._collectionCard = collectionCard;   // node gate

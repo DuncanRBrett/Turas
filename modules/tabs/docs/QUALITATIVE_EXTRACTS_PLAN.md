@@ -517,3 +517,54 @@ Deviations and one gap the gate could not catch:
 
 Not done here, and it is stage 4's whole job: nothing on screen yet says a quote is an
 extract, and nothing tells a reader that a theme page counts comments it does not quote.
+
+### Stage 4, what the reader sees, plus the docs. BUILT 17 Sep 2026, not merged.
+
+Files changed: `27q_qualitative.js`, `qual_extracts_tests.mjs`,
+`test_qual_report.R`, and four documents. `styles.css` was NOT touched: both new
+notations reuse `.ql-hint` and `.ql-scopechip.hide`, which already exist.
+
+Three things now say on the page what the workbook knows:
+
+1. **A fragment is labelled `extract`.** Away from its theme page the label names the
+   theme the fragment speaks to ("extract on Pay"), so a partial quote in a collection,
+   a pin or the priority block is never presented as the whole comment with no clue
+   which part of it this was. `qual.extractLabel(rec, themeId, q)`.
+2. **A theme page states what it counts but cannot quote**: "N counted here, quoted
+   elsewhere", with a tooltip saying those comments raised this theme, are counted in
+   every number on the page, and are quoted beside the theme their extract speaks to.
+   This is what lets a reader reconcile "18 comments" with 11 quotes without seeing the
+   workbook. `qual.elsewhereChip(q, st, audience)`.
+3. **The question states the fact once**: "Some comments quoted by extract". Appended to
+   the scope chip rather than folded into its branches, so a question that both hides
+   uninformative comments and quotes by extract states both. A question with no extracts
+   is unchanged.
+
+Without (1) the page invites the exact opposite of Duncan's original complaint: a client
+reads three lines and asks how they earned four theme codes. The codes were coded on the
+whole comment; only the quote is a fragment.
+
+Docs updated: `QUALITATIVE_TAB_BUILD_NOTES.md` (new section D4, the technical record),
+`QUAL_COMMENT_APPENDIX_GUIDE.md` (new section 2b, the analyst's instructions, next to
+the noteworthy and hide rules it sits beside in practice), `README_comment_appendix.md`
+(the same for anyone driving the builder script), and this plan.
+
+Evidence: the whole tabs R suite, 79 files, 6,105 checks pass, 0 fail, 1 skip. All 50 JS
+suites, 1,186 checks pass, 0 fail, every suite exiting 0. The extracts JS suite is now 22
+checks.
+
+The strongest of them is end to end, in `test_qual_report.R`: a real workbook whose
+"Overall Extracts" sheet carries a Price-only fragment and an `all` fragment goes through
+`build_qual_report_v2`, and the HTML that comes out contains both fragments, does NOT
+contain either of those two comments' full verbatims, still contains the other ten in
+full, and carries an island keying the fragment to the Price theme id with both of that
+comment's themes still counted.
+
+Deviations: none. One decision worth recording: the card takes the question as an argument
+rather than reading `qual._view`, so the label is testable without a rendered view.
+
+## The fix is complete
+
+Stages 1 to 4 deliver the whole of it. What remains is stage 5 (the SACS migration script,
+section 11), the independent review, and Duncan's own regeneration through
+`launch_turas()`.

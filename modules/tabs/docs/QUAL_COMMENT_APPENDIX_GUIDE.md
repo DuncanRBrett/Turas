@@ -83,6 +83,45 @@ Open each sheet and code by hand. Everything here survives every re-run of the b
 In the report the tiers give each comment a star, a `Noteworthy+ / Must-read+ / Priority`
 filter, and, highest tier first, the order comments are listed and exported.
 
+### 2b. Quoting part of a long comment (the Extracts sheet)
+
+**Never shorten the verbatim in column C.** The theme codes on that row were coded
+on the whole comment, so a shortened cell is then quoted beside every theme the
+comment carries, and a passage about one theme turns up under another as if it
+were evidence for it.
+
+Leave column C as the archive and add a sheet named after the question sheet plus
+" Extracts" ("Engagement" gains "Engagement Extracts"), with the columns
+`ID | Theme | Extract | Lead`:
+
+| ID | Theme | Extract | Lead |
+|---|---|---|---|
+| 213 | Recognition; Workload & Burnout | the passage that speaks to those two | x |
+| 213 | Pay | the passage about pay | |
+| 193 | all | the whole comment, trimmed for length | |
+| 207 | | trimmed, shown in the comment list only | |
+
+- **Theme** holds the labels the fragment really speaks to, spelled exactly as the
+  theme columns are, separated by semicolons. The single word `all` claims every
+  theme the comment is coded on. Left blank, the fragment shows in the general
+  comment list and on no theme page, which is the safe default: if you forget to
+  name a theme you notice a missing quote rather than a misplaced one.
+- **Lead** marks the one fragment to lead with when the report quotes the comment
+  away from a theme page, such as a priority quote or a pin. At most one per
+  comment.
+- The comment keeps every code, so every percentage, base and crosstab is
+  unchanged. A comment with any extract never ships its full verbatim, so this is
+  also how you keep the long version out of the delivered file.
+- Beside a theme you did not name, the comment is counted and quoted nowhere, and
+  the page says "N counted here, quoted elsewhere" so a reader can reconcile the
+  two numbers.
+- The run REFUSES, naming the sheet, row and ID, if a fragment claims a theme its
+  comment was not coded on, if the ID does not exist, if the comment is
+  hide-marked, if two fragments are marked Lead, or if the sheet names a question
+  the workbook does not have.
+- The `Noteworthy` tier stays on the comment row, exactly as before. One comment,
+  one tier.
+
 ---
 
 ## 3. Wire it into the crosstab config

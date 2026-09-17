@@ -237,7 +237,60 @@ run("17. the drawer card keys its marks to the fragment it is showing", () => {
          "under Pay it shows its fragment");
 });
 
-run("18. STATIC GATE: every record-text read goes through the accessor", () => {
+run("18. a fragment says on its face that it is an extract", () => {
+  const q = load();
+  eq(q.extractLabel(recPay, PAY, Q3).indexOf("extract") >= 0, true, "labelled on its theme page");
+  assert(q.extractLabel(recPay, PAY, Q3).indexOf("on Pay") < 0,
+         "the theme is not named where the reader already is");
+  // Away from a theme page the fragment's own theme IS named, so a partial quote is
+  // never presented as the whole comment with no clue which part it is.
+  assert(q.extractLabel(recPay, null, Q3).indexOf("extract on Pay") >= 0,
+         "named away from its theme page");
+  eq(q.extractLabel(ISLAND.questions[0].records[0], 0, ISLAND.questions[0]), "",
+     "a comment quoted in full carries no label");
+  eq(q.extractLabel(recPay, WORKLOAD, Q3), "",
+     "and no label where there is no quote to label");
+});
+
+run("19. the theme page says how many comments it counts but does not quote", () => {
+  const q = load();
+  const chip = q.elsewhereChip(Q3, { theme: WORKLOAD }, Q3.records);
+  assert(chip.indexOf("1 counted here, quoted elsewhere") >= 0,
+         "Workload counts a comment it cannot quote: " + chip);
+  assert(chip.indexOf("counted in every number on this page") >= 0, "and says why");
+  eq(q.elsewhereChip(Q3, { theme: PAY }, Q3.records), "",
+     "Pay quotes everything it counts, so it says nothing");
+  eq(q.elsewhereChip(Q3, { theme: null }, Q3.records), "",
+     "and the all-comments list is not a theme page");
+});
+
+run("20. the question says once that some comments are quoted by extract", () => {
+  const q = load();
+  const chip = q.scopeChip(ISLAND, Q3);
+  assert(chip.indexOf("Some comments quoted by extract") >= 0, "Q3 says so");
+  assert(chip.indexOf("every comment is counted in full") >= 0, "and reassures on the counts");
+  assert(q.scopeChip(ISLAND, ISLAND.questions[1]).indexOf("quoted by extract") < 0,
+         "a question with no extracts never says it");
+  eq(q.scopeChip({ verbatimScope: "all" }, { records: [{ idx: 0, text: "plain" }] }), "",
+     "and a question with nothing to declare shows no chip at all");
+  // The fixture ships on the "noteworthy" scope, so Q3 has two facts to state. The
+  // extract chip is APPENDED rather than replacing the scope chip, or the older
+  // fact would silently disappear the moment a question gained an extract.
+  const both = q.scopeChip(ISLAND, Q3);
+  assert(both.indexOf("Noteworthy comments only") >= 0 &&
+         both.indexOf("Some comments quoted by extract") >= 0, "both facts survive");
+});
+
+run("21. the cards carry the label the reader needs", () => {
+  const q = load();
+  assert(q._quoteCard(recPay, "Q3", PAY, Q3).indexOf(">extract<") >= 0,
+         "the drawer card on the Pay page");
+  assert(q._collectionCard({ question: Q3, record: recPay, qcode: "Q3", saved: true })
+           .indexOf("extract on Pay") >= 0,
+         "and a collected comment names the theme its fragment speaks to");
+});
+
+run("22. STATIC GATE: every record-text read goes through the accessor", () => {
   const src = readFileSync(SRC, "utf8").split("\n");
   const READ = /\b(r|rec|recs\[[^\]]*\])\.text\b/;
   // The accessor itself is the one place allowed to read the raw field.

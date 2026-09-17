@@ -275,3 +275,66 @@ test_that("qual_warn_source_disclosure warns on a leaky protected config, quiet 
   expect_true(any(grepl("raw verbatims", out5)))
   expect_false(any(grepl("demographic tags", out5)))
 })
+
+# ==============================================================================
+# END-TO-END: extracts reach the shipped file, and the verbatim does not
+# ==============================================================================
+
+write_extracts_comment_workbook <- function(path = tempfile(fileext = ".xlsx")) {
+  rows <- list(c("Why did you rate us that way?", NA, NA, NA, NA, NA),
+               c("ID", "Group", "Comment", "Noteworthy", "Price", "Service"))
+  for (i in 1:12) {
+    grp <- if (i <= 6) "A" else "B"
+    # Everyone raises Price; respondents 1 and 2 raise Service as well, and it is
+    # respondent 1 who carries a fragment written for Price only.
+    rows[[length(rows) + 1L]] <- c(as.character(i), grp,
+      sprintf("A LONG COMMENT number %d about price and about service", i),
+      NA, "1", if (i <= 2) "3" else NA)
+  }
+  grid <- do.call(rbind, lapply(rows, function(r) { length(r) <- 6; r }))
+  ex <- rbind(c("ID", "Theme", "Extract", "Lead"),
+              c("1", "Price", "THE PRICE FRAGMENT", "x"),
+              c("2", "all", "A TRIM COVERING BOTH", NA))
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Overall")
+  openxlsx::writeData(wb, "Overall", as.data.frame(grid), colNames = FALSE)
+  openxlsx::addWorksheet(wb, "Overall Extracts")
+  openxlsx::writeData(wb, "Overall Extracts", as.data.frame(ex), colNames = FALSE)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  path
+}
+
+test_that("a fragment reaches the shipped report and its full verbatim does not", {
+  wbp <- write_extracts_comment_workbook()
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(c(wbp, out)), add = TRUE)
+  cfg <- build_config_object(list(project_name = "ExtractTest",
+                                  qual_confidentiality_mode = "full",
+                                  significance_min_base = 5))
+  res <- build_qual_report_v2(wbp, out, cfg)
+  expect_equal(res$status, "PASS")
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+
+  # The fragments ship.
+  expect_match(html, "THE PRICE FRAGMENT", fixed = TRUE)
+  expect_match(html, "A TRIM COVERING BOTH", fixed = TRUE)
+  # The two comments that carry a fragment do NOT ship their verbatim, which is
+  # the reason an analyst writes one. The other ten still ship theirs in full.
+  expect_false(grepl("A LONG COMMENT number 1 about", html, fixed = TRUE))
+  expect_false(grepl("A LONG COMMENT number 2 about", html, fixed = TRUE))
+  expect_true(grepl("A LONG COMMENT number 3 about", html, fixed = TRUE))
+
+  # And the island says which theme each fragment may be quoted beside.
+  island <- sub('.*<script type="application/json" id="data-qual"[^>]*>', "", html)
+  island <- sub("</script>.*", "", island)
+  isl <- jsonlite::fromJSON(island, simplifyVector = FALSE)
+  q <- isl$questions[[1]]
+  labels <- vapply(q$themes, function(t) t$label, character(1))
+  price_id <- as.character(q$themes[[which(labels == "Price")]]$id)
+  r1 <- Filter(function(r) identical(r$text, "THE PRICE FRAGMENT"), q$records)[[1]]
+  expect_equal(names(r1$extracts), price_id)
+  expect_true(r1$hasExtracts)
+  expect_equal(length(r1$themeVals), 2L)      # both themes still count the comment
+  r2 <- Filter(function(r) identical(r$text, "A TRIM COVERING BOTH"), q$records)[[1]]
+  expect_equal(r2$extractAll, "A TRIM COVERING BOTH")
+})

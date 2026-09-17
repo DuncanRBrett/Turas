@@ -334,6 +334,74 @@ After the first build, Duncan ran it and iterated. As-built now:
 
 Tests after round 2: `qual_tests.mjs` 47, `test_qual_join.R` 44, bundler 25. All green.
 
+## D4. Extracts. Quoting a fragment while counting the whole comment (2026-09-17)
+
+A coded row carries one verbatim and N theme codes. An analyst who shortens the
+verbatim for length or anonymity is therefore editing the evidence for counting,
+and the shortened text is shown beside every theme the WHOLE comment was coded
+to. Measured on the SACS 2026 appendix: 205 of the rows that ship text.
+
+The split: coding stays a judgement about the whole comment, quoting becomes a
+judgement about a fragment.
+
+**Workbook.** An optional sheet per coded sheet, `<CommentSheet> Extracts`, with
+`ID | Theme | Extract | Lead` (Lead optional). The Theme cell has three states,
+and the difference is the design:
+
+| Theme cell | Meaning |
+|---|---|
+| blank | the fragment stands in for the comment in the GENERAL comment list only, never on a theme page |
+| `all` | it stands in everywhere, including every theme the row is coded on |
+| `A; B` | quotable beside those themes only |
+
+Blank is the safe default because a forgotten theme list then fails VISIBLY, as a
+quote missing from a page, rather than silently mis-placing one. Theme cells
+themselves stay bare 1/2/3 codes: the analyst's own legend block (rows 2 to 5 of
+every sheet) counts them with COUNTIF, so a marker in a theme cell would break
+their arithmetic as well as the reader's purity check.
+
+**Routing.** Sheet-name routing runs BEFORE classification in
+`qual_classify_all_sheets`. An extracts sheet is ID-anchored, so the question
+classifier would otherwise read it as a question and refuse its several fragments
+of one comment as duplicated ResponseIDs.
+
+**Refusals.** Seven, collected into one pass, including the inverse of the
+original bug: a fragment claiming a theme its comment was never coded on. An
+extracts tab that exists but is empty is a console note, since that is work in
+progress.
+
+**Island.** `extracts` (keyed by theme id), `extractAll`, `hasExtracts`,
+`textTheme`, each emitted only when the workbook supplies it, so an island built
+without an extracts sheet is byte-identical to one built before this existed
+(pinned by the fixture drift gate). `record.text` is the unscoped text: the Lead
+fragment, else the general fragment, else the first themed fragment, else the
+verbatim. Every fragment passes `qual_verbatim_shows` and
+`qual_apply_text_mode` exactly as a verbatim does, which is what keeps the
+release audit's declared `textMode` an honest description of the file.
+
+**JS.** `qual.textFor(rec, themeId)` is the only place a comment's text is read
+for display; `qual.quotableUnder` is the extracts rule alone (NOT the same
+question as `qual.shown`, which filters on `suppressed`); `qual.drawerTheme` is
+the one definition of which theme is on screen. A static gate in
+`qual_extracts_tests.mjs` fails on any raw record-text read outside the accessor
+that does not carry an `unscoped-text` marker.
+
+**Highlights.** A range is an offset into the text ACTUALLY SHOWN, and a comment
+shows a different fragment on each theme page, so highlight keys carry an
+optional `:t<themeId>` suffix. The base format is untouched, so marks in a saved
+copy made before extracts existed still load. The shortlist key stays bare: a
+comment is starred once, not once per fragment (Duncan, 17 Sep 2026).
+
+**What the reader sees.** A fragment carries an `extract` label, and away from
+its theme page that label names the theme it speaks to. A theme page that counts
+comments it cannot quote says so: "N counted here, quoted elsewhere". The
+question-level chip states the fact once. Without those, the page invites the
+opposite complaint: a client reads three lines and asks how they earned four
+theme codes.
+
+Full design, decisions and implementation log:
+`modules/tabs/docs/QUALITATIVE_EXTRACTS_PLAN.md`.
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**

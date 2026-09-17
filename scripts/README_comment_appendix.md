@@ -140,6 +140,50 @@ sheets. That theme-split is an **analyst coding decision**, not something deriva
 data, so the tool gives you the by-question starting point; splitting/adding theme columns is
 your coding on top (which it then preserves on every re-run).
 
+## Quoting part of a comment: the Extracts sheet
+
+Sometimes a comment cannot ship as written. It is 800 words, or it identifies the
+person who wrote it. The wrong fix is to shorten the cell in column C: the theme
+codes on that row were coded on the WHOLE comment, so the shortened text is then
+shown beside every theme it was coded to, and a passage about unfairness turns up
+under compensation as if it were evidence for it.
+
+Instead, leave column C alone and add a sheet named after the question sheet plus
+" Extracts", so "Engagement" gains "Engagement Extracts". Four columns:
+
+| ID | Theme | Extract | Lead |
+|---|---|---|---|
+| 213 | Recognition; Workload & Burnout | the passage that speaks to those two themes | x |
+| 213 | Pay | the passage about pay | |
+| 193 | all | the whole comment, trimmed for length | |
+| 207 | | trimmed, shown in the comment list only | |
+
+- **ID** matches the comment's ID on the question sheet.
+- **Theme** is the theme labels the fragment actually speaks to, spelled exactly
+  as the theme columns are, separated by semicolons. The single word `all` means
+  every theme the comment is coded on. Leave it blank and the fragment shows in
+  the general comment list but on no theme page.
+- **Extract** is the text to show.
+- **Lead** marks the one fragment to lead with where the report quotes the
+  comment away from a theme page, such as a priority quote or a pin. Optional,
+  and at most one per comment.
+
+What the report then does: the comment keeps every code, so every percentage,
+base and crosstab is exactly as before. Its fragment is quoted beside the themes
+you named. Beside a theme you did not name, the comment is counted and quoted
+nowhere, and the page says "N counted here, quoted elsewhere" so the numbers
+still reconcile. A comment with any extract never ships its full verbatim, so
+writing one is also how you keep the long version out of the file.
+
+The build refuses, naming the sheet, row and ID, if a fragment claims a theme its
+comment was not coded on, if the ID does not exist, if the comment is hide-marked,
+if two fragments are marked Lead, or if the sheet names a question this workbook
+does not have. Those are all cases where a quote would land somewhere a reader
+would misread it, or vanish without telling you.
+
+This builder appends rows and never edits existing ones, so your extracts sheets
+survive every re-run.
+
 ## Tests
 
 ```bash
