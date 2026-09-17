@@ -1469,13 +1469,29 @@ write_keydriver_output_enhanced <- function(results, output_file,
                             cols = 1:ncol(dom$summary), gridExpand = TRUE)
           openxlsx::setColWidths(wb, "Dominance", cols = 1:ncol(dom$summary), widths = "auto")
           summary_row <- nrow(dom$summary) + 3
+          # Whether the fits were weighted, and which drivers are missing from
+          # the table, belong on the sheet. The truncation was a console line
+          # only, so a reader saw a dominance table that quietly omitted
+          # drivers the study measured (review H5).
           summary_df <- data.frame(
-            Metric = c("Total R-squared", "N drivers", "N sub-models", "N observations"),
+            Metric = c("Total R-squared", "N drivers", "N sub-models", "N observations",
+                       "Weighting", "Drivers omitted"),
             Value = c(
               round(dom$total_r_squared %||% 0, 4),
               dom$n_drivers %||% 0,
               2^(dom$n_drivers %||% 0),
-              dom$n_obs %||% 0
+              dom$n_obs %||% 0,
+              if (isTRUE(dom$weighted)) {
+                paste0("Weighted by ", dom$weight_variable %||% "the study weight",
+                       "; the dominance shares sum to the WEIGHTED model R-squared")
+              } else {
+                "Unweighted"
+              },
+              if (length(dom$drivers_omitted %||% character(0)) == 0) {
+                "None: every driver is in this table"
+              } else {
+                dom$truncation_note %||% paste(dom$drivers_omitted, collapse = ", ")
+              }
             ),
             stringsAsFactors = FALSE
           )
