@@ -33,6 +33,7 @@
 #   Rscript scripts/migrate_comment_extracts.R "<appendix.xlsx>"
 #   Rscript scripts/migrate_comment_extracts.R "<appendix.xlsx>" --out "<new.xlsx>"
 #   Rscript scripts/migrate_comment_extracts.R "<appendix.xlsx>" --plan-only
+# The Project Steps tile passes the workbook as --appendix "<path>"; both forms work.
 # ==============================================================================
 
 turas_migrate_root <- function() {
@@ -78,7 +79,16 @@ if (sys.nframe() == 0L) {
     cat("Usage: Rscript scripts/migrate_comment_extracts.R <appendix.xlsx> [--out <new.xlsx>] [--plan-only]\n")
     quit(status = 2L)
   }
-  in_path <- args[[1]]
+  # The path may be positional (a shell) or behind --appendix (the Project Steps
+  # tile, whose registry emits a switch for every argument).
+  in_path <- if ("--appendix" %in% args) {
+    at <- which(args == "--appendix")[[1]]
+    if (at + 1L > length(args)) "" else args[[at + 1L]]
+  } else if (startsWith(args[[1]], "--")) "" else args[[1]]
+  if (!nzchar(in_path)) {
+    cat("\nNo appendix given. Pass the workbook path, or --appendix <path>.\n")
+    quit(status = 2L)
+  }
   out_path <- if ("--out" %in% args) args[[which(args == "--out") + 1L]] else {
     sub("\\.xlsx$", sprintf(" (with extracts %s).xlsx", format(Sys.Date(), "%Y%m%d")), in_path)
   }

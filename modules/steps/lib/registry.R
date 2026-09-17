@@ -135,6 +135,29 @@ steps_builtin_manifests <- function() {
     ),
 
     list(
+      id          = "comment_extracts_migrate",
+      name        = "Comment Extracts - propose the migration",
+      description = "Write a NEW appendix with per-theme Extracts sheets pre-filled. Never touches the workbook it reads.",
+      runtime     = "Rscript",
+      entry       = "scripts/migrate_comment_extracts.R",
+      requires    = c("jsonlite", "openxlsx"),
+      docs        = "modules/tabs/docs/QUALITATIVE_EXTRACTS_PLAN.md",
+      args = list(
+        list(id = "appendix", label = "Comment appendix workbook (.xlsx)",
+             type = "file", required = TRUE, must_exist = TRUE, cli = "--appendix",
+             help = paste("Only for an appendix whose verbatim cells were shortened by hand.",
+                          "One row per comment that ships text and carries more than one theme,",
+                          "holding that comment's current text and all of its coded theme labels.")),
+        list(id = "out", label = "New workbook to write (blank = auto-name beside the appendix)",
+             type = "file", required = FALSE, must_exist = FALSE, cli = "--out",
+             help = "Refuses rather than overwriting an existing file."),
+        list(id = "plan_only", label = "Plan only (print the row counts, write nothing)",
+             type = "flag", required = FALSE, cli = "--plan-only",
+             help = "Run this first: it says how many rows each sheet would get.")
+      )
+    ),
+
+    list(
       id          = "comment_appendix_report_changes",
       name        = "Comment Appendix - report changed comments",
       description = "Write a review list of verbatims whose text differs between the data and the appendix. Changes nothing.",
