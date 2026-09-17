@@ -152,3 +152,63 @@ test_that("a full report is left alone, and the audit does not judge it", {
                            client_safe = FALSE, refuse = FALSE)
   expect_false(a$client_safe_violation)
 })
+
+# ==============================================================================
+# EXTRACTS THROUGH THE SAME CHAIN
+# ==============================================================================
+#
+# The release audit judges the DECLARED textMode and the per-record tokens, not
+# the text strings themselves (turas_release_audit.R:107 and :122). That is only
+# sound while every per-theme fragment obeys the same dial as a verbatim. If a
+# fragment could bypass it, a client-safe file would carry raw respondent text
+# behind a declaration that says it does not, and the audit would pass it.
+# ------------------------------------------------------------------------------
+
+chain_rec_with_extracts <- function(id) {
+  rec <- chain_rec(id, paste0("comment from ", id, ", reach me at ", id, "@example.com"))
+  rec$extracts <- list(Service = paste0("fragment from ", id, ", mail ", id, "@example.com"))
+  rec$extract_all <- paste0("general fragment from ", id, ", call 082 123 456", id)
+  rec$has_extracts <- TRUE
+  rec
+}
+
+chain_build_extracts <- function(config_obj) {
+  q <- list(code = "Q_A", title = "Why?", type = "themed",
+            roles = list(themes = list(list(label = "Service", id = 0L))),
+            records = lapply(as.character(1:6), chain_rec_with_extracts),
+            meta = list(dropped_codes = 0L))
+  qual_build_data_qual(list(q), chain_master(), list(
+    text_mode = config_obj$qual_confidentiality_mode,
+    demographic_cuts = config_obj$qual_demographic_cuts,
+    min_reporting_base = config_obj$min_reporting_base,
+    comment_key = config_obj$qual_comment_key))
+}
+
+test_that("a fragment cannot bypass the confidentiality dial the audit relies on", {
+  cfg <- raw_config()
+  dials <- tabs_delivery_qual_dials(cfg, "client_safe_interactive")
+  cfg <- tabs_apply_qual_floor(cfg, dials)
+  island <- chain_build_extracts(cfg)
+  json <- serialize_data_qual(island)
+
+  # The floor put the build on 'redacted', so no direct identifier survives in
+  # ANY field the fragments occupy, not just in the verbatim.
+  expect_equal(dials$text_mode, "redacted")
+  expect_false(grepl("@example.com", json, fixed = TRUE))
+  expect_false(grepl("082 123 456", json, fixed = TRUE))
+  # And the scrub is recorded rather than silently assumed.
+  expect_true(island$questions[[1]]$meta$scrub_ran)
+  expect_true(island$questions[[1]]$meta$redactions >= 6L)
+
+  a <- turas_release_audit(chain_page(json), client_safe = TRUE, refuse = FALSE)
+  expect_false(a$client_safe_violation)
+})
+
+test_that("the hidden dial ships no fragment text at all, and the counts survive", {
+  cfg <- raw_config()
+  cfg$qual_confidentiality_mode <- "hidden"
+  json <- serialize_data_qual(chain_build_extracts(cfg))
+  expect_false(grepl("fragment from", json, fixed = TRUE))
+  expect_false(grepl("comment from", json, fixed = TRUE))
+  expect_true(grepl("themeVals", json, fixed = TRUE))
+})

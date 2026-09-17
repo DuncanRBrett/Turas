@@ -426,3 +426,41 @@ Deviations from sections 3 to 6, all conservative:
 
 Not built yet: stages 2 to 5. Extracts are read, validated and attached to the records,
 and nothing displays them, so a report built from this branch today is unchanged.
+
+### Stage 2, island builder. BUILT 17 Sep 2026, not merged.
+
+Files changed: `modules/tabs/lib/qual_island_builder.R`, plus a one-field addition to
+stage 1's attach step (`extract_lead_theme`, the lead fragment's theme label, so the
+report can name the theme a fragment speaks to when it shows it away from that theme's
+page). Tests added to `test_qual_island_builder.R` and `test_client_safe_qual_chain.R`.
+
+The island record now carries, only when the workbook supplies them:
+
+| Field | Meaning |
+|---|---|
+| `extracts` | `{ "<themeId>": "fragment" }`, the themed fragments |
+| `extractAll` | the fragment claiming every coded theme, shipped once rather than repeated per theme |
+| `hasExtracts` | TRUE when the comment has any fragment. It cannot be inferred: a comment with only a blank-Theme fragment has neither field above, and must still not show that fragment beside a theme |
+| `textTheme` | the theme id the unscoped `text` speaks to, when `text` is a themed fragment |
+
+`record$text` keeps its meaning and is now the unscoped text, by the section 4 precedence:
+the Lead fragment, else the general fragment, else the first themed fragment, else the
+verbatim. A comment with any fragment never ships its verbatim.
+
+Evidence: 855 checks pass, 0 fail, across the 13 qual and client-safe files (49 new since
+stage 1). Two of those pin the disclosure invariant the release audit depends on: a
+client-safe build with fragments carrying an email and a phone number ships neither
+string anywhere in the island JSON, and the hidden dial ships no fragment text while
+`themeVals` survives. The committed island fixture's drift gate
+(`test_qual_island_fixture.R`) still passes, which is the byte-identical claim proven
+rather than asserted: a record without extracts emits exactly the fields it emitted
+before.
+
+Deviations: none from section 5. One addition, `extract_lead_theme` in stage 1, needed
+because the island must name the theme of a lead fragment and stage 1 stored only its
+text.
+
+JS baseline before stage 3, on this branch: 338 + 23 + 20 = 381 checks pass, 0 fail,
+across `qual_tests.mjs`, `qual_island_shape_tests.mjs` and `qual_rekey_tests.mjs`.
+Stage 3 should extend the committed island fixture with an extract-bearing record, so the
+JS suite exercises the real shape rather than a hand-authored one.

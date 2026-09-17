@@ -98,6 +98,59 @@ qual_verbatim_shows <- function(rec, scope) {
   TRUE
 }
 
+#' Which text stands in for a comment where the context is not a theme page.
+#'
+#' The precedence, from QUALITATIVE_EXTRACTS_PLAN.md section 4: the Lead-marked
+#' fragment, else the comment's general fragment (a blank Theme cell or `all`),
+#' else the first themed fragment, else the verbatim. A comment the analyst wrote
+#' any extract for never falls back to its verbatim, because the extract exists
+#' precisely so the whole comment does not ship.
+#'
+#' @param rec A reader record.
+#' @return list(text, theme): `theme` is the theme LABEL when the chosen text is a
+#'   themed fragment (so the report can name it), else NA.
+qual_unscoped_text <- function(rec) {
+  if (!is.null(rec$extract_lead)) {
+    lead_theme <- rec$extract_lead_theme
+    return(list(text = rec$extract_lead,
+                theme = if (is.null(lead_theme)) NA_character_ else lead_theme))
+  }
+  if (!is.null(rec$extract_all)) return(list(text = rec$extract_all, theme = NA_character_))
+  if (!is.null(rec$extract_general)) return(list(text = rec$extract_general, theme = NA_character_))
+  if (length(rec$extracts)) {
+    label <- names(rec$extracts)[[1]]
+    return(list(text = rec$extracts[[label]], theme = label))
+  }
+  list(text = rec$text, theme = NA_character_)
+}
+
+#' Apply the confidentiality dial to a comment's per-theme fragments.
+#'
+#' Every fragment passes through the SAME dial as a verbatim, which is the whole
+#' basis on which the release audit's declared textMode still describes the file:
+#' hidden emits nothing, redacted scrubs each fragment and counts what it removed,
+#' full ships them as typed.
+#'
+#' @param rec A reader record.
+#' @param theme_id_map Named list mapping theme label -> 0-based theme id.
+#' @param text_mode One of QUAL_TEXT_MODES.
+#' @return list(extracts, all, redactions): `extracts` is keyed by theme id as a
+#'   character, empty when nothing survives the dial.
+qual_apply_extracts_text_mode <- function(rec, theme_id_map, text_mode) {
+  out <- list(); redactions <- 0L
+  for (label in names(rec$extracts)) {
+    id <- theme_id_map[[label]]
+    if (is.null(id)) next            # a theme the island does not carry
+    applied <- qual_apply_text_mode(rec$extracts[[label]], text_mode)
+    redactions <- redactions + applied$redactions
+    if (!is.null(applied$text) && nzchar(applied$text)) out[[as.character(id)]] <- applied$text
+  }
+  all_applied <- if (is.null(rec$extract_all)) list(text = NULL, redactions = 0L)
+                 else qual_apply_text_mode(rec$extract_all, text_mode)
+  list(extracts = out, all = all_applied$text,
+       redactions = redactions + all_applied$redactions)
+}
+
 #' Build one record's island entry, remapping theme labels to ids and applying text mode.
 #' @param rec A reader record (id, text, noteworthy_tier, hidden, sentiment, rating, themeVals).
 #' @param idx The respondent's anonymous 0-based index.
@@ -117,7 +170,11 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
   shows <- qual_verbatim_shows(rec, scope)
   # A withheld verbatim never enters the island as text (build-time confidentiality /
   # curation): no text mode, no PII scrub needed, nothing readable in the page source.
-  applied <- if (shows) qual_apply_text_mode(rec$text, text_mode) else list(text = NULL, redactions = 0L)
+  # That covers its extracts too, which are the same respondent's words.
+  unscoped <- if (shows) qual_unscoped_text(rec) else list(text = NULL, theme = NA_character_)
+  applied <- if (shows) qual_apply_text_mode(unscoped$text, text_mode) else list(text = NULL, redactions = 0L)
+  frag <- if (shows) qual_apply_extracts_text_mode(rec, theme_id_map, text_mode)
+          else list(extracts = list(), all = NULL, redactions = 0L)
   theme_vals <- list()
   for (label in names(rec$themeVals)) {
     id <- theme_id_map[[label]]
@@ -129,6 +186,24 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
     noteworthy = isTRUE(rec$noteworthy), tier = rec$noteworthy_tier,
     sentiment = rec$sentiment, rating = rec$rating, themeVals = theme_vals
   )
+  # THE EXTRACTS. A fragment is quotable beside the themes the analyst named, and
+  # nowhere else: under a theme with no fragment the comment is counted and shows no
+  # text, exactly as a hide mark behaves. Emitted only when the workbook supplies
+  # them, so an island built without an extracts sheet is byte-identical to one
+  # built before this existed.
+  if (length(frag$extracts)) record$extracts <- frag$extracts
+  if (!is.null(frag$all) && nzchar(frag$all)) record$extractAll <- frag$all
+  # hasExtracts cannot be inferred from the two fields above: a comment carrying only
+  # a general fragment has neither, and still must not show that fragment beside a
+  # theme it makes no claim about.
+  if (shows && isTRUE(rec$has_extracts)) record$hasExtracts <- TRUE
+  # Which theme the unscoped text speaks to, when it is a themed fragment shown away
+  # from that theme's page (the priority block, a pin, the story tab), so the report
+  # can name it rather than presenting a fragment as the whole comment.
+  if (shows && !is.null(applied$text) && !is.na(unscoped$theme)) {
+    tid <- theme_id_map[[unscoped$theme]]
+    if (!is.null(tid)) record$textTheme <- as.integer(tid)
+  }
   # The stable reader key. Uniform random, so it discloses nothing under any privacy
   # dial (block / safe / hidden / aggregates-only): it is the ONE field that survives
   # a re-export, which is what stops a reader mark drifting onto another respondent.
@@ -165,7 +240,7 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
     }
     if (length(kept)) record$cut <- kept
   }
-  list(record = record, redactions = applied$redactions)
+  list(record = record, redactions = applied$redactions + frag$redactions)
 }
 
 #' k-anonymise per-respondent demographic tags (demographic_cuts = "safe").

@@ -522,6 +522,13 @@ test_that("the Lead mark names one fragment, and a second mark refuses", {
   )
   expect_equal(ok$problems, character(0))
   expect_equal(find_record(ok$question, "213")$extract_lead, "the unfairness bit")
+  expect_equal(find_record(ok$question, "213")$extract_lead_theme, "Unfairness")
+
+  # A general fragment may lead too, and then it claims no single theme.
+  general_lead <- attach_for(c("213", "", "the whole comment, trimmed", "x"))
+  expect_equal(find_record(general_lead$question, "213")$extract_lead,
+               "the whole comment, trimmed")
+  expect_null(find_record(general_lead$question, "213")$extract_lead_theme)
 
   two <- attach_for(
     c("213", "Unfairness", "one", "x"),

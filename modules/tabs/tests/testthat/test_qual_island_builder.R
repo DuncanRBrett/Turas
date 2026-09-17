@@ -491,3 +491,121 @@ test_that("manual review is carried as an assertion, and only when asserted", {
     c(base_args, list(manual_review = TRUE)))
   expect_true(claimed$manualReview)
 })
+
+# ==============================================================================
+# EXTRACTS. Fragments reach the island only under the themes they claim
+# ==============================================================================
+
+# One comment coded on BOTH themes, which is the shape that produced the bug,
+# with a fragment written for Service only.
+ex_rec <- function(..., id = "1", text = "the whole long comment", tier = 1L,
+                   hidden = FALSE) {
+  rec <- mk_rec(id, text, tier = tier, sentiment = 2L, hidden = hidden,
+                themeVals = list(Service = 1L, Price = 3L))
+  extra <- list(...)
+  for (nm in names(extra)) rec[[nm]] <- extra[[nm]]
+  rec
+}
+
+ex_island <- function(rec, text_mode = "full", scope = "all") {
+  island <- qual_build_data_qual(list(themed_question(list(rec))), master,
+                                 list(text_mode = text_mode, verbatim_scope = scope))
+  island$questions[[1]]$records[[1]]
+}
+
+test_that("a themed fragment is keyed by theme id, and the codes are untouched", {
+  r <- ex_island(ex_rec(extracts = list(Service = "the service half"),
+                        has_extracts = TRUE))
+  expect_equal(r$extracts, list(`0` = "the service half"))
+  expect_true(r$hasExtracts)
+  # Both themes still count this comment: the fix changes quoting, never counting.
+  expect_equal(r$themeVals, list(`0` = 1L, `1` = 3L))
+  # Away from a theme page the fragment stands in, and says which theme it speaks to.
+  expect_equal(r$text, "the service half")
+  expect_equal(r$textTheme, 0L)
+  # The verbatim never ships for a comment the analyst wrote a fragment for.
+  expect_false(identical(r$text, "the whole long comment"))
+})
+
+test_that("the Lead mark decides the unscoped text, and names its theme", {
+  r <- ex_island(ex_rec(
+    extracts = list(Service = "the service half", Price = "the price half"),
+    extract_lead = "the price half", extract_lead_theme = "Price",
+    has_extracts = TRUE))
+  expect_equal(r$text, "the price half")
+  expect_equal(r$textTheme, 1L)
+  expect_equal(r$extracts, list(`0` = "the service half", `1` = "the price half"))
+})
+
+test_that("a blank-Theme fragment stands in with no theme claim at all", {
+  r <- ex_island(ex_rec(extract_general = "trimmed for length", has_extracts = TRUE))
+  expect_equal(r$text, "trimmed for length")
+  expect_null(r$textTheme)          # it claims no theme, so nothing is named
+  expect_null(r$extracts)           # and it reaches no theme page
+  expect_true(r$hasExtracts)        # but the verbatim still must not ship
+})
+
+test_that("an 'all' fragment ships once and claims every coded theme", {
+  r <- ex_island(ex_rec(extract_all = "covers the lot", has_extracts = TRUE))
+  expect_equal(r$extractAll, "covers the lot")
+  expect_equal(r$text, "covers the lot")
+  expect_null(r$extracts)           # not repeated per theme; the reader falls back to it
+})
+
+test_that("hidden mode ships NO fragment text, only the counts", {
+  r <- ex_island(ex_rec(extracts = list(Service = "the service half"),
+                        extract_all = "covers the lot", has_extracts = TRUE),
+                 text_mode = "hidden")
+  expect_true(is.na(r$text))
+  expect_null(r$extracts)
+  expect_null(r$extractAll)
+  # The codes still ship, which is the whole point of the hidden dial.
+  expect_equal(r$themeVals, list(`0` = 1L, `1` = 3L))
+})
+
+test_that("redacted mode scrubs every fragment and counts what it removed", {
+  island <- qual_build_data_qual(
+    list(themed_question(list(ex_rec(
+      extracts = list(Service = "mail me at bob@example.com",
+                      Price = "or call 082 123 4567"),
+      extract_all = NULL, has_extracts = TRUE)))),
+    master, list(text_mode = "redacted"))
+  r <- island$questions[[1]]$records[[1]]
+  expect_false(grepl("bob@example.com", r$extracts[["0"]], fixed = TRUE))
+  expect_false(grepl("082 123 4567", r$extracts[["1"]], fixed = TRUE))
+  expect_match(r$extracts[["0"]], "[redacted]", fixed = TRUE)
+  # The unscoped text is the first fragment, so it is scrubbed and counted too.
+  expect_false(grepl("bob@example.com", r$text, fixed = TRUE))
+  expect_true(island$questions[[1]]$meta$redactions >= 2L)
+  expect_true(island$questions[[1]]$meta$scrub_ran)
+})
+
+test_that("a hide-marked comment ships no fragments, and stays counted", {
+  r <- ex_island(ex_rec(extracts = list(Service = "would leak"),
+                        extract_all = "would also leak", has_extracts = TRUE,
+                        hidden = TRUE))
+  expect_true(is.na(r$text))
+  expect_null(r$extracts)
+  expect_null(r$extractAll)
+  expect_null(r$hasExtracts)
+  expect_true(r$suppressed)
+  expect_equal(r$themeVals, list(`0` = 1L, `1` = 3L))
+})
+
+test_that("a comment the verbatim scope withholds ships no fragments either", {
+  r <- ex_island(ex_rec(extracts = list(Service = "would leak"), has_extracts = TRUE,
+                        tier = 0L),
+                 scope = "noteworthy")
+  expect_true(is.na(r$text))
+  expect_null(r$extracts)
+  expect_true(r$suppressed)
+})
+
+test_that("a record with no extracts carries none of the new fields", {
+  r <- ex_island(ex_rec())
+  expect_equal(r$text, "the whole long comment")
+  expect_null(r$extracts)
+  expect_null(r$extractAll)
+  expect_null(r$hasExtracts)
+  expect_null(r$textTheme)
+})

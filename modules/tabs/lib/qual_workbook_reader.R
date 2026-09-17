@@ -640,6 +640,7 @@ qual_classify_extracts_sheet <- function(rows, sheet_name) {
 #'   extract_all     the fragment claiming every coded theme
 #'   extract_general the fragment for the general comment list only
 #'   extract_lead    the fragment marked to lead a slide or a pin
+#'   extract_lead_theme  that fragment's theme label, absent for a general fragment
 #'   has_extracts    TRUE when the record carries any of the above
 #'
 #' @param question A question from `qual_classify_sheet`.
@@ -716,7 +717,11 @@ qual_attach_extracts <- function(question, entries, sheet_name) {
           "%s: a second fragment of this comment is also marked Lead - mark exactly one",
           where(e)))
       } else {
-        leads[[key]] <- e$text
+        # The label rides along so the report can say which theme a lead fragment
+        # speaks to when it shows it away from that theme's page. NA for a general
+        # fragment, which claims no single theme.
+        leads[[key]] <- list(text = e$text,
+                             label = if (identical(e$claim$kind, "named")) e$claim$labels[[1]] else NA_character_)
       }
     }
   }
@@ -731,7 +736,10 @@ qual_attach_extracts <- function(question, entries, sheet_name) {
     if (!is.null(g)) {
       if (identical(g$kind, "all")) rec$extract_all <- g$text else rec$extract_general <- g$text
     }
-    if (!is.null(leads[[key]])) rec$extract_lead <- leads[[key]]
+    if (!is.null(leads[[key]])) {
+      rec$extract_lead <- leads[[key]]$text
+      if (!is.na(leads[[key]]$label)) rec$extract_lead_theme <- leads[[key]]$label
+    }
     rec$has_extracts <- TRUE
     question$records[[at]] <- rec
     n_attached <- n_attached + 1L
