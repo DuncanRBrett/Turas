@@ -973,13 +973,30 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
 
       html_output_path <- sub("\\.xlsx$", ".html", output_file)
 
-      html_config <- list(
-        brand_colour  = config$settings$brand_colour  %||% "#323367",
-        accent_colour = config$settings$accent_colour %||% "#f59e0b",
-        report_title  = config$settings$report_title  %||% NULL,
-        output_file   = output_file,
-        settings      = config$settings
-      )
+      # The report layer reads thirteen fields off this object that a
+      # five-field list never carried, so the CustomSlides sheet, the
+      # Insights sheet and the analysis name were loaded, announced on the
+      # console, and then dropped (review B3).
+      # catdriver, whose report layer this is a fork of, passes its whole
+      # config. Same here, with the report-only fields resolved on top.
+      html_config <- config
+      html_config$brand_colour  <- config$settings$brand_colour  %||% "#323367"
+      html_config$accent_colour <- config$settings$accent_colour %||% "#f59e0b"
+      html_config$report_title  <- config$settings$report_title  %||% NULL
+      html_config$output_file   <- output_file
+
+      # Settings-sheet keys the report reads at the top level. Hoisted only
+      # when the analyst set one, so the report layer's own defaults still
+      # apply to the rest.
+      for (key in c("analysis_name", "company_name", "client_name",
+                    "researcher_name", "researcher_logo_path",
+                    "client_logo_path", "vif_moderate_threshold",
+                    "vif_high_threshold")) {
+        val <- config$settings[[key]]
+        if (!is.null(val) && !all(is.na(val)) && nzchar(trimws(as.character(val)[1]))) {
+          html_config[[key]] <- val
+        }
+      }
 
       html_result <- tryCatch({
         generate_keydriver_html_report(
