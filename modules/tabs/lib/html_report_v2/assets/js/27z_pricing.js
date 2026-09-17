@@ -205,15 +205,15 @@
       .concat(spec.rightAxis && spec.rightAxis.label
         ? [{ label: spec.rightAxis.label, colour: spec.rightAxis.colour }] : [])
       .map(function (s) {
-        return '<span class="pr-key"><span class="pr-swatch" style="background:' +
+        return '<span class="prc-key"><span class="prc-swatch" style="background:' +
           esc(s.colour) + '"></span>' + esc(s.label) + "</span>";
       }).join("");
 
-    return '<div class="pr-chart">' +
+    return '<div class="prc-chart">' +
       '<svg viewBox="0 0 ' + CHART_W + " " + CHART_H + '" role="img" aria-label="' +
       esc(spec.title || "chart") + '" preserveAspectRatio="xMidYMid meet">' +
       out.join("") + "</svg>" +
-      (legend ? '<div class="pr-legend">' + legend + "</div>" : "") +
+      (legend ? '<div class="prc-legend">' + legend + "</div>" : "") +
       "</div>";
   }
 
@@ -236,7 +236,7 @@
     var notes = [];
     var en = m.estimationNote || {};
     ["vw", "gg", "monadic"].forEach(function (k) {
-      if (en[k]) notes.push('<p class="pr-note">' + esc(en[k]) + "</p>");
+      if (en[k]) notes.push('<p class="prc-note">' + esc(en[k]) + "</p>");
     });
 
     var frozen = [];
@@ -245,15 +245,15 @@
 
     var sim = "";
     if (m.simulatorFile) {
-      sim = '<p class="pr-note">Simulator: <a href="' + esc(m.simulatorFile) + '">' +
+      sim = '<p class="prc-note">Simulator: <a href="' + esc(m.simulatorFile) + '">' +
         esc(m.simulatorFile) +
         "</a>. Open it beside this report to try prices against the demand curve.</p>";
     }
 
-    return '<div class="pr-provenance">' +
+    return '<div class="prc-provenance">' +
       (bits.length ? "<p>" + bits.join(" · ") + "</p>" : "") +
       notes.join("") +
-      (frozen.length ? '<p class="pr-note pr-frozen">' + frozen.join(" ") + "</p>" : "") +
+      (frozen.length ? '<p class="prc-note prc-frozen">' + frozen.join(" ") + "</p>" : "") +
       sim +
       "</div>";
   }
@@ -267,8 +267,8 @@
         ? money(lo[i]) + " to " + money(hi[i]) : "–";
       return "<tr><td>" + esc(p) + "</td><td>" +
         esc((arr(v.pointLabel) || [])[i] || "") + "</td>" +
-        '<td class="pr-num">' + esc(money(v.value[i])) + "</td>" +
-        '<td class="pr-num">' + esc(interval) + "</td></tr>";
+        '<td class="prc-num">' + esc(money(v.value[i])) + "</td>" +
+        '<td class="prc-num">' + esc(interval) + "</td></tr>";
     }).join("");
 
     var notes = [];
@@ -285,7 +285,7 @@
     notes.push("The acceptable range runs from the point of marginal cheapness to the point of marginal expensiveness; the optimal range sits between the optimal and indifference price points.");
 
     var ranges =
-      '<p class="pr-ranges">Acceptable range <strong>' + esc(money(v.acceptableLower)) +
+      '<p class="prc-ranges">Acceptable range <strong>' + esc(money(v.acceptableLower)) +
       " to " + esc(money(v.acceptableUpper)) + "</strong>" +
       (v.optimalLower != null
         ? " · Optimal range <strong>" + esc(money(v.optimalLower)) + " to " +
@@ -317,12 +317,12 @@
       });
     }
 
-    return '<section class="pr-panel"><h3>Van Westendorp price points</h3>' +
+    return '<section class="prc-panel"><h3>Van Westendorp price points</h3>' +
       ranges +
-      '<p class="pr-note">' + esc(notes.join(" ")) + "</p>" +
+      '<p class="prc-note">' + esc(notes.join(" ")) + "</p>" +
       chart +
-      '<table class="pr-table"><thead><tr><th>Point</th><th>What it is</th>' +
-      '<th class="pr-num">Price</th><th class="pr-num">Interval</th></tr></thead><tbody>' +
+      '<table class="prc-table"><thead><tr><th>Point</th><th>What it is</th>' +
+      '<th class="prc-num">Price</th><th class="prc-num">Interval</th></tr></thead><tbody>' +
       rows + "</tbody></table></section>";
   }
 
@@ -339,21 +339,21 @@
       var interval = (lo && hi && lo[i] != null && hi[i] != null)
         ? num(lo[i]) + " to " + num(hi[i]) : "–";
       return "<tr><td>" + esc(money(p)) + "</td>" +
-        '<td class="pr-num">' + esc(num((arr(g.baseN) || [])[i], 0)) + "</td>" +
-        (wn ? '<td class="pr-num">' + esc(num(wn[i], 0)) + "</td>" : "") +
-        '<td class="pr-num">' + esc(num(accept[i])) + "%</td>" +
-        (smoothed ? '<td class="pr-num">' + esc(num(smoothed[i])) + "%</td>" : "") +
-        '<td class="pr-num">' + esc(interval) + "</td>" +
-        '<td class="pr-num">' + esc(rev ? num(rev[i], 2) : "–") + "</td>" +
-        '<td class="pr-num">' + esc(el ? num(el[i], 2) : "–") + "</td></tr>";
+        '<td class="prc-num">' + esc(num((arr(g.baseN) || [])[i], 0)) + "</td>" +
+        (wn ? '<td class="prc-num">' + esc(num(wn[i], 0)) + "</td>" : "") +
+        '<td class="prc-num">' + esc(num(accept[i])) + "%</td>" +
+        (smoothed ? '<td class="prc-num">' + esc(num(smoothed[i])) + "%</td>" : "") +
+        '<td class="prc-num">' + esc(interval) + "</td>" +
+        '<td class="prc-num">' + esc(rev ? num(rev[i], 2) : "–") + "</td>" +
+        '<td class="prc-num">' + esc(el ? num(el[i], 2) : "–") + "</td></tr>";
     }).join("");
 
-    var head = "<tr><th>Price</th><th class=\"pr-num\">Base</th>" +
-      (wn ? '<th class="pr-num">Weighted base</th>' : "") +
-      '<th class="pr-num">Would buy</th>' +
-      (smoothed ? '<th class="pr-num">Published</th>' : "") +
-      '<th class="pr-num">Interval</th><th class="pr-num">Revenue index</th>' +
-      '<th class="pr-num">Elasticity</th></tr>';
+    var head = "<tr><th>Price</th><th class=\"prc-num\">Base</th>" +
+      (wn ? '<th class="prc-num">Weighted base</th>' : "") +
+      '<th class="prc-num">Would buy</th>' +
+      (smoothed ? '<th class="prc-num">Published</th>' : "") +
+      '<th class="prc-num">Interval</th><th class="prc-num">Revenue index</th>' +
+      '<th class="prc-num">Elasticity</th></tr>';
 
     var published = smoothed || accept;
     var series = [{ values: published, colour: SERIES[0], label: "Would buy" }];
@@ -391,10 +391,10 @@
     notes.push("The revenue index is price times the share who would buy, so it compares prices rather than forecasting revenue.");
     notes.push("Elasticity is the arc elasticity of the step that ends at that rung.");
 
-    return '<section class="pr-panel"><h3>Gabor-Granger demand</h3>' +
-      '<p class="pr-note">' + esc(notes.join(" ")) + "</p>" +
+    return '<section class="prc-panel"><h3>Gabor-Granger demand</h3>' +
+      '<p class="prc-note">' + esc(notes.join(" ")) + "</p>" +
       chart +
-      '<table class="pr-table"><thead>' + head + "</thead><tbody>" + rows +
+      '<table class="prc-table"><thead>' + head + "</thead><tbody>" + rows +
       "</tbody></table></section>";
   }
 
@@ -403,9 +403,9 @@
     var wn = arr(m.cellWeightedN);
     var rows = m.cellPrice.map(function (p, i) {
       return "<tr><td>" + esc(money(p)) + "</td>" +
-        '<td class="pr-num">' + esc(num((arr(m.cellN) || [])[i], 0)) + "</td>" +
-        (wn ? '<td class="pr-num">' + esc(num(wn[i], 0)) + "</td>" : "") +
-        '<td class="pr-num">' + esc(num((arr(m.cellIntentPct) || [])[i])) + "%</td></tr>";
+        '<td class="prc-num">' + esc(num((arr(m.cellN) || [])[i], 0)) + "</td>" +
+        (wn ? '<td class="prc-num">' + esc(num(wn[i], 0)) + "</td>" : "") +
+        '<td class="prc-num">' + esc(num((arr(m.cellIntentPct) || [])[i])) + "%</td></tr>";
     }).join("");
 
     var chart = "";
@@ -438,15 +438,15 @@
     }
 
     var caveat = m.pValueCaveat
-      ? '<p class="pr-stamp">' + esc(m.pValueCaveat) + "</p>" : "";
+      ? '<p class="prc-stamp">' + esc(m.pValueCaveat) + "</p>" : "";
 
-    return '<section class="pr-panel"><h3>Monadic cells</h3>' +
-      '<p class="pr-note">' + esc(notes.join(" ")) + "</p>" +
+    return '<section class="prc-panel"><h3>Monadic cells</h3>' +
+      '<p class="prc-note">' + esc(notes.join(" ")) + "</p>" +
       caveat +
       chart +
-      '<table class="pr-table"><thead><tr><th>Price</th><th class="pr-num">Base</th>' +
-      (wn ? '<th class="pr-num">Weighted base</th>' : "") +
-      '<th class="pr-num">Would buy</th></tr></thead><tbody>' + rows +
+      '<table class="prc-table"><thead><tr><th>Price</th><th class="prc-num">Base</th>' +
+      (wn ? '<th class="prc-num">Weighted base</th>' : "") +
+      '<th class="prc-num">Would buy</th></tr></thead><tbody>' + rows +
       "</tbody></table></section>";
   }
 
@@ -465,18 +465,18 @@
 
     var range = "";
     if (r.acceptableLower != null) {
-      range = '<p class="pr-note">Acceptable range ' + esc(money(r.acceptableLower)) +
+      range = '<p class="prc-note">Acceptable range ' + esc(money(r.acceptableLower)) +
         " to " + esc(money(r.acceptableUpper)) +
         (r.optimalLower != null
           ? ", optimal range " + esc(money(r.optimalLower)) + " to " +
             esc(money(r.optimalUpper)) : "") + ".</p>";
     }
 
-    return '<section class="pr-panel pr-rec"><h3>Recommended price</h3>' +
-      '<p class="pr-headline">' + esc(money(r.price)) + "</p>" +
-      (bits.length ? '<p class="pr-note">' + bits.join(" · ") + ".</p>" : "") +
+    return '<section class="prc-panel prc-rec"><h3>Recommended price</h3>' +
+      '<p class="prc-headline">' + esc(money(r.price)) + "</p>" +
+      (bits.length ? '<p class="prc-note">' + bits.join(" · ") + ".</p>" : "") +
       range +
-      '<p class="pr-note">The module reads this off the methods above. The reasoning, the risks and the tier structure are in the Excel deliverable; what to actually charge is a judgement this tab does not make.</p>' +
+      '<p class="prc-note">The module reads this off the methods above. The reasoning, the risks and the tier structure are in the Excel deliverable; what to actually charge is a judgement this tab does not make.</p>' +
       "</section>";
   }
 
@@ -488,12 +488,12 @@
     var d = TR.PR;
 
     if (!pr.available()) {
-      host.innerHTML = '<div class="pr-panel"><p>This report carries no pricing results.</p></div>';
+      host.innerHTML = '<div class="prc-panel"><p>This report carries no pricing results.</p></div>';
       return;
     }
 
     host.innerHTML =
-      '<div class="pr-view">' +
+      '<div class="prc-view">' +
       "<h2>Pricing</h2>" +
       provenanceHtml(d.meta || {}) +
       recommendationHtml(d.recommendation) +
