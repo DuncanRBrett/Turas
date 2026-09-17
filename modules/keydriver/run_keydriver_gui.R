@@ -112,6 +112,44 @@ run_keydriver_gui <- function() {
     unique(detected)
   }
 
+  # What to tell the user about a finished run
+  #
+  # A TRS refusal is not an R error: run_keydriver_analysis() returns an object
+  # and the process carries on. Reading only captured$has_error therefore
+  # reported a refused run as a success (review H2).
+  .kd_gui_verdict <- function(results, captured) {
+    status <- tryCatch(as.character(results$run_status %||% results$status$status %||% ""),
+                       error = function(e) "")
+    refused <- inherits(results, "turas_refusal_result") ||
+      inherits(results, "turas_error_result") ||
+      identical(toupper(status), "REFUSED") ||
+      identical(toupper(status), "ERROR")
+
+    if (isTRUE(captured$has_error) || refused) {
+      return(list(level = "refused",
+                  message = paste0("Analysis REFUSED - see the message above. ",
+                                   "No results were produced."),
+                  notice = "Key driver analysis was refused. Read the console above for the reason."))
+    }
+    if (identical(toupper(status), "PARTIAL")) {
+      reasons <- tryCatch(unlist(results$status$degraded_reasons %||% character(0)),
+                          error = function(e) character(0))
+      detail <- if (length(reasons)) {
+        paste0(" Degraded: ", paste(utils::head(reasons, 3), collapse = "; "))
+      } else ""
+      return(list(level = "partial",
+                  message = paste0("Analysis completed with DEGRADED OUTPUTS.", detail,
+                                   "\nSome results were not produced; read the console above."),
+                  notice = "Key driver analysis completed with degraded outputs. Check which results are missing."))
+    }
+    if (isTRUE(captured$has_warnings)) {
+      return(list(level = "warnings",
+                  message = "Analysis complete, with warnings - review above",
+                  notice = "Key driver analysis completed with warnings."))
+    }
+    list(level = "ok", message = "Analysis complete!", notice = "")
+  }
+
   # --- Source files (ordered by dependency) ---
   kd_source_files <- c(
     "modules/shared/lib/import_all.R",
@@ -439,7 +477,11 @@ run_keydriver_gui <- function() {
           }
 
           # Build HTML report flag
-          html_report <- isTRUE(input$enable_html_report)
+          # NULL means "the config decides". The checkbox is hard-coded to
+          # FALSE at start-up, so passing its value always overrode a config
+          # that asked for a report (review M7). Only an explicit tick
+          # overrides now.
+          html_report <- if (isTRUE(input$enable_html_report)) TRUE else NULL
 
           incProgress(0.10, detail = "Starting analysis...")
 
@@ -456,12 +498,17 @@ run_keydriver_gui <- function() {
 
           output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
 
-          if (captured$has_error) {
-            output_text <- paste0(output_text, "\n\nAnalysis failed - see error above")
-          } else if (captured$has_warnings) {
-            output_text <- paste0(output_text, "\n\nAnalysis complete with warnings - review above")
-          } else {
-            output_text <- paste0(output_text, "\n\nAnalysis complete!")
+          # What the run itself said, not only whether R threw. A TRS refusal
+          # returns a refusal object cleanly, so captured$has_error is FALSE
+          # and the GUI used to print "Analysis complete!" over a run that
+          # produced nothing. A PARTIAL run was reported the same as a clean
+          # one (review H2).
+          run_verdict <- .kd_gui_verdict(results, captured)
+          output_text <- paste0(output_text, "\n\n", run_verdict$message)
+          if (!identical(run_verdict$level, "ok")) {
+            showNotification(run_verdict$notice,
+                             type = if (identical(run_verdict$level, "refused")) "error" else "warning",
+                             duration = NULL)
           }
 
           incProgress(0.05, detail = "Done!")

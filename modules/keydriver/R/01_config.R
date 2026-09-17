@@ -449,6 +449,24 @@ get_setting <- function(settings, name, default = NULL) {
 #' @keywords internal
 KD_DEFAULT_SEED <- 20260101L
 
+#' The one bootstrap iteration default
+#'
+#' The run used 500 and the stats pack reported 1000, so the number a client
+#' read was not the number that produced their intervals (review M8). One
+#' constant, read everywhere the default is needed.
+#' @keywords internal
+KD_DEFAULT_BOOTSTRAP_ITERATIONS <- 1000L
+
+#' The configured bootstrap iterations, or the default.
+#' @keywords internal
+kd_bootstrap_iterations <- function(config) {
+  raw <- config$settings$bootstrap_iterations %||% config$bootstrap_iterations %||%
+    KD_DEFAULT_BOOTSTRAP_ITERATIONS
+  n <- suppressWarnings(as.integer(raw))
+  if (length(n) != 1 || is.na(n) || n < 1) n <- KD_DEFAULT_BOOTSTRAP_ITERATIONS
+  n
+}
+
 kd_seed_value <- function(config) {
   raw <- config$settings$random_seed %||% config$random_seed %||% KD_DEFAULT_SEED
   seed <- suppressWarnings(as.integer(raw))

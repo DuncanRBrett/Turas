@@ -706,7 +706,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
         outcome = config$outcome_var,
         drivers = config$driver_vars,
         weights = config$weight_var,
-        n_bootstrap = as.numeric(config$settings$bootstrap_iterations %||% 500),
+        n_bootstrap = kd_bootstrap_iterations(config),
         ci_level = as.numeric(config$settings$bootstrap_ci_level %||% 0.95)
       )
     }, error = function(e) {
@@ -719,7 +719,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     if (!is.null(bootstrap_result)) {
       results$bootstrap_ci <- bootstrap_result
       cat(sprintf("   [OK] Bootstrap CIs computed (%s iterations)\n",
-                  config$settings$bootstrap_iterations %||% "500"))
+                  kd_bootstrap_iterations(config)))
     }
   }
 
@@ -1156,7 +1156,7 @@ generate_keydriver_stats_pack <- function(config, survey_data, result,
   bootstrap_info <- list()
   if (!is.null(result$bootstrap_ci)) {
     bootstrap_info <- list(
-      iterations = config$settings$bootstrap_iterations %||% 1000,
+      iterations = kd_bootstrap_iterations(config),
       ci_level   = config$settings$bootstrap_ci_level %||% 0.95,
       methods    = "Correlation, Beta_Weight, Relative_Weight"
     )

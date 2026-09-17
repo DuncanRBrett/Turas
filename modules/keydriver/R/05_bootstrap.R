@@ -87,7 +87,9 @@ bootstrap_importance_ci <- function(data,
                                     drivers,
                                     weights = NULL,
                                     config = list(),
-                                    n_bootstrap = 1000,
+                                    n_bootstrap = if (exists("KD_DEFAULT_BOOTSTRAP_ITERATIONS")) {
+                                      KD_DEFAULT_BOOTSTRAP_ITERATIONS
+                                    } else 1000L,
                                     ci_level = 0.95) {
   # Seeded, so the same config gives the same intervals twice (review M3).
   if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config)
