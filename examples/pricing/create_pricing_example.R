@@ -197,7 +197,25 @@ simulate_pricing_responses <- function(respondents, seed = 2026,
 
 .pricing_example_saver <- function() {
   if (exists("turas_saveWorkbook", mode = "function")) return(turas_saveWorkbook)
-  function(wb, file, overwrite = TRUE) openxlsx::saveWorkbook(wb, file, overwrite = overwrite)
+  # Not loaded: locate the shared helper rather than silently falling back to
+  # the bare openxlsx save, which leaves every sheet pointing at a drawing part
+  # it never writes. Excel then offers to repair the file and its repair strips
+  # every dropdown. See docs/HANDOVER_openxlsx_broken_workbooks.md.
+  rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  dir <- getwd()
+  while (!file.exists(file.path(dir, rel)) && dir != dirname(dir)) dir <- dirname(dir)
+  if (file.exists(file.path(dir, rel))) {
+    source(file.path(dir, rel))
+    if (exists("turas_saveWorkbook", mode = "function")) return(turas_saveWorkbook)
+  }
+  cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+  cat("│ Code: IO_SAVER_NOT_FOUND\n")
+  cat("│ Message: turas_save_workbook_atomic.R was not found, so this example is\n")
+  cat("│          written without part reconciliation and Excel may offer to\n")
+  cat("│          repair it, losing its dropdowns.\n")
+  cat("│ How to fix: run from the Turas project root\n")
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  function(wb, file, overwrite = TRUE) openxlsx::saveWorkbook(wb, file, overwrite = overwrite)  # turas-saver-fallback
 }
 
 .pricing_settings_sheet <- function(wb, sheet, keys, values) {

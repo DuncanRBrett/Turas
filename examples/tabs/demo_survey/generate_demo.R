@@ -14,6 +14,43 @@
 #   - Demo_Crosstab_Config.xlsx (Settings, Selection)
 # ==============================================================================
 
+
+# ------------------------------------------------------------------------------
+# Shared workbook saver
+# ------------------------------------------------------------------------------
+# turas_saveWorkbook() reconciles worksheet relationships before saving. Without
+# it openxlsx leaves every sheet pointing at a drawing part it never writes, and
+# Excel reports a problem with the file and offers to repair it -- a repair that
+# strips every data-validation dropdown in the template.
+#
+# This file is designed to be sourced on its own, so it locates the shared
+# helper itself rather than assuming the caller has already loaded it.
+if (!exists("turas_saveWorkbook", mode = "function")) {
+  .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  .turas_saver_dir <- getwd()
+  while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+         .turas_saver_dir != dirname(.turas_saver_dir)) {
+    .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
+  if (file.exists(.turas_saver_path)) {
+    source(.turas_saver_path)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found, so workbooks are\n")
+    cat("│          written without part reconciliation and Excel may offer to\n")
+    cat("│          repair them, losing their dropdowns.\n")
+    cat("│ How to fix: run from the Turas project root, or set the working\n")
+    cat("│          directory so that modules/shared/lib is reachable\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)  # turas-saver-fallback
+    }
+  }
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+}
+
 library(openxlsx)
 set.seed(2025)
 
@@ -312,7 +349,7 @@ data_path <- file.path(output_dir, "Demo_Survey_Data.xlsx")
 wb_data <- createWorkbook()
 addWorksheet(wb_data, "Data")
 writeData(wb_data, "Data", survey_data)
-saveWorkbook(wb_data, data_path, overwrite = TRUE)
+turas_saveWorkbook(wb_data, data_path, overwrite = TRUE)
 cat(sprintf("  -> Data: %s (%d rows)\n", data_path, n))
 
 # ==============================================================================
@@ -616,7 +653,7 @@ writeData(wb_struct, "Options", options_df)
 addWorksheet(wb_struct, "Composite_Metrics")
 writeData(wb_struct, "Composite_Metrics", composite_df)
 
-saveWorkbook(wb_struct, struct_path, overwrite = TRUE)
+turas_saveWorkbook(wb_struct, struct_path, overwrite = TRUE)
 cat(sprintf("  -> Structure: %s\n", struct_path))
 
 # ==============================================================================
@@ -762,7 +799,7 @@ writeData(wb_config, "Instructions", data.frame(
   stringsAsFactors = FALSE
 ))
 
-saveWorkbook(wb_config, config_path, overwrite = TRUE)
+turas_saveWorkbook(wb_config, config_path, overwrite = TRUE)
 cat(sprintf("  -> Config: %s\n", config_path))
 
 # ==============================================================================
