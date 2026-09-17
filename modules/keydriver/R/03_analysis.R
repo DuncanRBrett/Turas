@@ -512,6 +512,27 @@ calculate_importance_mixed <- function(model, data, config, term_mapping,
   # METHOD 4: Correlations - only for numeric drivers
   numeric_drivers <- get_numeric_drivers(data, driver_vars)
   if (is.null(correlations)) {
+    # A correlation matrix needs at least two numeric columns, counting the
+    # outcome. With fewer, cor() raises a bare error part-way through the
+    # importance table and the run dies with a stack trace instead of a
+    # refusal that says what to do (review M6).
+    if (length(numeric_drivers) < 1) {
+      keydriver_refuse(
+        code = "DATA_NO_NUMERIC_DRIVERS",
+        title = "No Numeric Drivers To Correlate",
+        problem = paste0(
+          "Correlations were requested and every driver in this model is ",
+          "categorical."),
+        why_it_matters = paste0(
+          "A zero-order correlation is only defined between numbers. The other ",
+          "importance measures in this table do handle categorical drivers; the ",
+          "correlation column cannot."),
+        how_to_fix = c(
+          "Switch the correlation column off for this study, or",
+          "Declare at least one driver as continuous or ordinal on the Drivers sheet if it is one."
+        )
+      )
+    }
     correlations <- calculate_correlations(data, config)
   }
 

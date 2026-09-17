@@ -32,6 +32,10 @@
 #' @keywords internal
 run_elastic_net_analysis <- function(data, config) {
 
+  # cv.glmnet chooses its folds at random (review M3).
+  if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config)
+
+
   # --- Check glmnet availability ---
   if (!requireNamespace("glmnet", quietly = TRUE)) {
     return(list(

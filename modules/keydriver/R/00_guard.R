@@ -510,6 +510,12 @@ guard_validate_model_assumptions <- function(model, data, config, guard) {
     resids <- stats::residuals(model)
     n <- min(length(resids), 5000)
     if (n >= 30) {
+      # The subsample is drawn at random, so an unseeded run could report a
+      # normality violation on one pass and not the next (review M3). Seeded
+      # when a config is to hand; the guard is also called without one.
+      if (exists("kd_apply_seed", mode = "function") && !is.null(config)) {
+        kd_apply_seed(config)
+      }
       sw_test <- stats::shapiro.test(resids[sample(length(resids), n)])
       if (sw_test$p.value < 0.01) {
         guard <- guard_record_assumption_violation(guard,

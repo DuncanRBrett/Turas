@@ -436,6 +436,35 @@ get_setting <- function(settings, name, default = NULL) {
 #' @param default Default if NULL/NA
 #' @return Logical value
 #' @keywords internal
+#' The Run's Random Seed, Recorded
+#'
+#' The bootstrap, xgb.cv, cv.glmnet and the Shapiro subsample all draw at
+#' random and none of them was seeded, so two runs of the same config gave
+#' different confidence intervals and a different SHAP model (review M3). One
+#' seed, from the config when it sets one, applied at every draw and stamped on
+#' the provenance so a result can be reproduced.
+#'
+#' @param config The loaded configuration.
+#' @return The integer seed in use.
+#' @keywords internal
+KD_DEFAULT_SEED <- 20260101L
+
+kd_seed_value <- function(config) {
+  raw <- config$settings$random_seed %||% config$random_seed %||% KD_DEFAULT_SEED
+  seed <- suppressWarnings(as.integer(raw))
+  if (length(seed) != 1 || is.na(seed)) seed <- KD_DEFAULT_SEED
+  seed
+}
+
+#' Apply the run's seed before a randomised step.
+#' @keywords internal
+kd_apply_seed <- function(config, context = NULL) {
+  seed <- kd_seed_value(config)
+  set.seed(seed)
+  invisible(seed)
+}
+
+
 as_logical_setting <- function(value, default = FALSE) {
   if (is.null(value) || is.na(value)) {
     return(default)
@@ -446,7 +475,10 @@ as_logical_setting <- function(value, default = FALSE) {
   }
 
   if (is.character(value)) {
-    return(tolower(value) %in% c("true", "yes", "1", "on", "enabled"))
+    # "Y" and "T" are what an analyst types in a spreadsheet cell, and
+    # as.logical() reads both as NA (review M14).
+    return(tolower(trimws(value)) %in%
+             c("true", "t", "yes", "y", "1", "on", "enabled"))
   }
 
   if (is.numeric(value)) {

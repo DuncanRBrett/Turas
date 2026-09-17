@@ -191,7 +191,9 @@ calculate_shap_values <- function(model, prep, config) {
   max_n <- config$shap_sample_size %||% 1000
 
   if (n > max_n) {
-    set.seed(42)  # For reproducibility
+    # One seed for the whole run, from the config (review M3). This was 42,
+    # hard-coded, while every other randomised step was unseeded.
+    if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config) else set.seed(42)
     idx <- sample(n, max_n)
     X_explain <- prep$X[idx, , drop = FALSE]
     X_display <- prep$X_display[idx, , drop = FALSE]

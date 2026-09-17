@@ -180,10 +180,11 @@ step_load_config <- function(config_file, data_file, output_file) {
   config <- load_keydriver_config(config_file)
   validate_keydriver_config(config)
 
-  enable_shap <- isTRUE(config$settings$enable_shap) ||
-                 isTRUE(as.logical(config$settings$enable_shap))
-  enable_quadrant <- isTRUE(config$settings$enable_quadrant) ||
-                     isTRUE(as.logical(config$settings$enable_quadrant))
+  # as.logical("Yes") is NA, so isTRUE(as.logical("Yes")) is FALSE and a config
+  # that says Yes silently switched the feature off (review M14).
+  # as_logical_setting() reads the spellings an analyst actually types.
+  enable_shap <- as_logical_setting(config$settings$enable_shap, FALSE)
+  enable_quadrant <- as_logical_setting(config$settings$enable_quadrant, FALSE)
 
   if (is.null(data_file)) {
     data_file <- config$data_file
@@ -691,7 +692,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # --- Step 8: Bootstrap Confidence Intervals (if enabled) ---
-  enable_bootstrap <- isTRUE(as.logical(config$settings$enable_bootstrap))
+  enable_bootstrap <- as_logical_setting(config$settings$enable_bootstrap, FALSE)
   if (enable_bootstrap) {
     step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0) + 1
     cat(sprintf("\n%d. Bootstrap confidence intervals...\n", step_num))
@@ -835,7 +836,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   next_step <- step_num_effect + (if (!is.null(config$segments) && nrow(config$segments) > 0) 1 else 0) + 1
 
   # Elastic Net
-  enable_elastic_net <- isTRUE(as.logical(config$settings$enable_elastic_net))
+  enable_elastic_net <- as_logical_setting(config$settings$enable_elastic_net, FALSE)
   if (enable_elastic_net) {
     cat(sprintf("\n%d. Elastic Net analysis...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/09_elastic_net.R"), local = FALSE)
@@ -856,7 +857,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # Necessary Condition Analysis (NCA)
-  enable_nca <- isTRUE(as.logical(config$settings$enable_nca))
+  enable_nca <- as_logical_setting(config$settings$enable_nca, FALSE)
   if (enable_nca) {
     cat(sprintf("\n%d. Necessary Condition Analysis...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/10_nca.R"), local = FALSE)
@@ -877,7 +878,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # Dominance Analysis
-  enable_dominance <- isTRUE(as.logical(config$settings$enable_dominance))
+  enable_dominance <- as_logical_setting(config$settings$enable_dominance, FALSE)
   if (enable_dominance) {
     cat(sprintf("\n%d. Dominance Analysis...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/11_dominance.R"), local = FALSE)
@@ -898,7 +899,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # GAM Nonlinear Effects
-  enable_gam <- isTRUE(as.logical(config$settings$enable_gam))
+  enable_gam <- as_logical_setting(config$settings$enable_gam, FALSE)
   if (enable_gam) {
     cat(sprintf("\n%d. GAM nonlinear effects...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/12_gam.R"), local = FALSE)
@@ -955,7 +956,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   enable_html <- if (!is.null(html_report)) {
     isTRUE(html_report)
   } else {
-    isTRUE(as.logical(config$settings$enable_html_report))
+    as_logical_setting(config$settings$enable_html_report, FALSE)
   }
   if (enable_html) {
     step_num_html <- step_num_output + 1
@@ -1296,7 +1297,7 @@ run_shap_analysis_internal <- function(data, config) {
     subsample = as.numeric(config$settings$subsample %||% 0.8),
     colsample_bytree = as.numeric(config$settings$colsample_bytree %||% 0.8),
     shap_sample_size = as.numeric(config$settings$shap_sample_size %||% 1000),
-    include_interactions = isTRUE(as.logical(config$settings$include_interactions)),
+    include_interactions = as_logical_setting(config$settings$include_interactions, FALSE),
     interaction_top_n = as.numeric(config$settings$interaction_top_n %||% 5),
     importance_top_n = as.numeric(config$settings$importance_top_n %||% 15)
   )
@@ -1324,11 +1325,11 @@ run_quadrant_analysis_internal <- function(results, data, config) {
   quad_config <- list(
     importance_source = config$settings$importance_source %||% "auto",
     threshold_method = config$settings$threshold_method %||% "mean",
-    normalize_axes = isTRUE(as.logical(config$settings$normalize_axes %||% TRUE)),
-    shade_quadrants = isTRUE(as.logical(config$settings$shade_quadrants %||% TRUE)),
-    label_all_points = isTRUE(as.logical(config$settings$label_all_points %||% TRUE)),
+    normalize_axes = as_logical_setting(config$settings$normalize_axes, TRUE),
+    shade_quadrants = as_logical_setting(config$settings$shade_quadrants, TRUE),
+    label_all_points = as_logical_setting(config$settings$label_all_points, TRUE),
     label_top_n = as.numeric(config$settings$label_top_n %||% 10),
-    show_diagonal = isTRUE(as.logical(config$settings$show_diagonal %||% FALSE))
+    show_diagonal = as_logical_setting(config$settings$show_diagonal, FALSE)
   )
 
   # Always pass full results (has $config$driver_vars and $importance$Driver).
