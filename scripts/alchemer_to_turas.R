@@ -27,6 +27,43 @@
 # Usage from CLI:
 #   Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir>
 
+
+# ------------------------------------------------------------------------------
+# Shared workbook saver
+# ------------------------------------------------------------------------------
+# turas_saveWorkbook() reconciles worksheet relationships before saving. Without
+# it openxlsx leaves every sheet pointing at a drawing part it never writes, and
+# Excel reports a problem with the file and offers to repair it -- a repair that
+# strips every data-validation dropdown in the template.
+#
+# This file is designed to be sourced on its own, so it locates the shared
+# helper itself rather than assuming the caller has already loaded it.
+if (!exists("turas_saveWorkbook", mode = "function")) {
+  .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  .turas_saver_dir <- getwd()
+  while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+         .turas_saver_dir != dirname(.turas_saver_dir)) {
+    .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
+  if (file.exists(.turas_saver_path)) {
+    source(.turas_saver_path)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found, so workbooks are\n")
+    cat("│          written without part reconciliation and Excel may offer to\n")
+    cat("│          repair them, losing their dropdowns.\n")
+    cat("│ How to fix: run from the Turas project root, or set the working\n")
+    cat("│          directory so that modules/shared/lib is reachable\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)  # turas-saver-fallback
+    }
+  }
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+}
+
 suppressPackageStartupMessages({
   library(openxlsx)
   library(data.table)
@@ -612,7 +649,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     .att_clear_examples(wb, "Composite_Metrics", n_cols = 8L)
   }
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
 .att_write_crosstab_config <- function(selection_dt, output_path) {
@@ -621,7 +658,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   .att_clear_examples(wb, "Selection", n_cols = ncol(selection_dt))
   openxlsx::writeData(wb, "Selection", selection_dt, startRow = .ATT_DATA_START_ROW, colNames = FALSE)
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
 .att_write_brand_survey_structure <- function(questions_dt, options_dt,
@@ -661,7 +698,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     .att_overwrite_attitude_optionmap(wb, attitude_optionmap_dt)
   }
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
 # Map attitude option text to a canonical role token. Order-sensitive — earlier
@@ -779,7 +816,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   )
   .att_fill_brand_settings(wb, defaults)
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
 # Write values into the Settings sheet's Value column by matching on the
@@ -1279,7 +1316,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Headers")
   openxlsx::writeData(wb, "Headers", header_dt, startRow = 1L, colNames = TRUE)
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
 #' Write a Turas-ready data file from the raw Alchemer export
@@ -1334,7 +1371,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Data")
   openxlsx::writeData(wb, "Data", data_rows, startRow = 1L, colNames = TRUE)
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 
   cat(sprintf("  Turas-ready data: %d records x %d columns\n",
               nrow(data_rows), ncol(data_rows)))

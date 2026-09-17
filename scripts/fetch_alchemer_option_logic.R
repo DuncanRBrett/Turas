@@ -36,6 +36,43 @@
 #   Rscript scripts/fetch_alchemer_option_logic.R 8822527 ipk_logic.xlsx
 # ------------------------------------------------------------------------------
 
+
+# ------------------------------------------------------------------------------
+# Shared workbook saver
+# ------------------------------------------------------------------------------
+# turas_saveWorkbook() reconciles worksheet relationships before saving. Without
+# it openxlsx leaves every sheet pointing at a drawing part it never writes, and
+# Excel reports a problem with the file and offers to repair it -- a repair that
+# strips every data-validation dropdown in the template.
+#
+# This file is designed to be sourced on its own, so it locates the shared
+# helper itself rather than assuming the caller has already loaded it.
+if (!exists("turas_saveWorkbook", mode = "function")) {
+  .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  .turas_saver_dir <- getwd()
+  while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+         .turas_saver_dir != dirname(.turas_saver_dir)) {
+    .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
+  if (file.exists(.turas_saver_path)) {
+    source(.turas_saver_path)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found, so workbooks are\n")
+    cat("│          written without part reconciliation and Excel may offer to\n")
+    cat("│          repair them, losing their dropdowns.\n")
+    cat("│ How to fix: run from the Turas project root, or set the working\n")
+    cat("│          directory so that modules/shared/lib is reachable\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)  # turas-saver-fallback
+    }
+  }
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+}
+
 suppressPackageStartupMessages({
   library(httr)
   library(data.table)
@@ -386,7 +423,7 @@ save_alchemer_logic_audit <- function(survey_id,
       openxlsx::writeData(wb, "option_logic", opts)
       openxlsx::addWorksheet(wb, "logic_actions")
       openxlsx::writeData(wb, "logic_actions", acts)
-      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+      turas_saveWorkbook(wb, output_path, overwrite = TRUE)
     },
     "tsv" = {
       base <- tools::file_path_sans_ext(output_path)
