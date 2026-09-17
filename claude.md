@@ -799,6 +799,15 @@ quoting it.
   blank rows and shifts every row index.
 - **Python readers of survey data pass `keep_default_na=False, na_values=[""]`.**
   pandas otherwise turns the real answer "None" into missing.
+- **openpyxl writes INLINE strings and escapes every non-ASCII character as a
+  numeric reference**, and openxlsx 4.2.x reads inline strings without decoding
+  any reference. So an ellipsis written by `build_comment_appendix.py` or
+  `migrate_comment_extracts.py` arrives in R as `&#8230;`, six characters longer
+  than typed. `qual_decode_numeric_refs()` in
+  `modules/tabs/lib/qual_workbook_reader.R` decodes them for the comment reader;
+  any OTHER R code reading an openpyxl-written sheet needs the same treatment.
+  Excel-saved workbooks use shared strings and are unaffected. Proved with a probe
+  workbook, 17 Sep 2026.
 
 ### Whitelists that silently drop new code
 - **tabs Settings keys**: `build_config_object()` in
