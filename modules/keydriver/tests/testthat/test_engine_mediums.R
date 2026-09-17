@@ -90,3 +90,73 @@ test_that("an all-categorical model refuses the correlation column (M6)", {
   expect_match(err, "DATA_NO_NUMERIC_DRIVERS")
   expect_match(err, "only defined between numbers")
 })
+
+test_that("standardised betas use weighted SDs on a weighted study (M1)", {
+  skip_if(!exists("weighted_sd", mode = "function"), "helper not loaded")
+  # A standardised beta is b * (sd_x / sd_y). The coefficients came from a
+  # weighted fit and the SDs did not, so the ratio mixed the model's weighted
+  # population with the file's unweighted one.
+  x <- c(1, 2, 3, 4, 100)
+  w <- c(1, 1, 1, 1, 20)
+  expect_false(isTRUE(all.equal(weighted_sd(x, w), stats::sd(x))))
+  # Hand check: with equal weights it is the population SD, not the sample one.
+  y <- c(2, 4, 6)
+  expect_equal(weighted_sd(y, c(1, 1, 1)), sqrt(mean((y - mean(y))^2)))
+  # Too little to work with is NA, not a wrong number.
+  expect_true(is.na(weighted_sd(c(1, NA), c(1, NA))))
+  expect_true(is.na(weighted_sd(c(1, 2), c(0, 0))))
+})
+
+test_that("the engine asks for a weighted SD when a weight is configured (M1)", {
+  src <- readLines(file.path(module_dir, "R", "03_analysis.R"))
+  code <- src[!grepl("^\\s*#", src)]
+  # Both standardised-beta sites, the plain and the mixed, now branch on it.
+  expect_gte(sum(grepl("weighted_sd(", code, fixed = TRUE)), 3)
+})
+
+test_that("the bootstrap says what its numbers are (M4)", {
+  skip_if(!exists("bootstrap_importance_ci", mode = "function"), "bootstrap not loaded")
+  set.seed(5)
+  n <- 150
+  d <- data.frame(D1 = rnorm(n), D2 = rnorm(n), W = runif(n, 0.5, 2))
+  d$Y <- 0.7 * d$D1 + 0.2 * d$D2 + rnorm(n, sd = 0.5)
+
+  invisible(capture.output(
+    res <- bootstrap_importance_ci(d, "Y", c("D1", "D2"),
+                                   config = list(bootstrap_iterations = 100))))
+  policy <- attr(res, "bootstrap_policy")
+  expect_false(is.null(policy))
+  # The three things a reader of the sheet could not otherwise know.
+  expect_match(policy, "MEAN OF THE BOOTSTRAP DISTRIBUTION")
+  expect_match(policy, "will not equal")
+  expect_match(policy, "Shapley values carry no interval")
+  expect_equal(attr(res, "iterations_requested"), 100L)
+  expect_equal(attr(res, "iterations_used") + attr(res, "iterations_dropped"), 100L)
+  # Shapley is stamped in prose, not as rows of NA, which would read as
+  # missing data rather than as a method without an interval.
+  expect_false("Shapley_Value" %in% res$Method)
+})
+
+test_that("a weighted bootstrap names its resampling policy (M4)", {
+  skip_if(!exists("bootstrap_importance_ci", mode = "function"), "bootstrap not loaded")
+  set.seed(6)
+  n <- 150
+  d <- data.frame(D1 = rnorm(n), D2 = rnorm(n), W = runif(n, 0.5, 2))
+  d$Y <- 0.7 * d$D1 + 0.2 * d$D2 + rnorm(n, sd = 0.5)
+  invisible(capture.output(
+    res <- bootstrap_importance_ci(d, "Y", c("D1", "D2"), weights = "W",
+                                   config = list(bootstrap_iterations = 100))))
+  policy <- attr(res, "bootstrap_policy")
+  expect_match(policy, "probability proportional")
+  expect_match(policy, "fitted unweighted")
+})
+
+test_that("each facet gets its own quadrant lines (M5)", {
+  src <- readLines(file.path(module_dir, "R", "kda_quadrant", "quadrant_comparison.R"))
+  # The lines were drawn from the FIRST segment's thresholds on every panel,
+  # so each segment's points were divided by another segment's mean.
+  expect_false(any(grepl("xintercept = all_segments$x_threshold[1]", src, fixed = TRUE)))
+  expect_false(any(grepl("yintercept = all_segments$y_threshold[1]", src, fixed = TRUE)))
+  expect_true(any(grepl("aes(xintercept = x_threshold)", src, fixed = TRUE)))
+  expect_true(any(grepl("inherit.aes = FALSE", src, fixed = TRUE)))
+})

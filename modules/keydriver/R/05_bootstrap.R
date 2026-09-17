@@ -337,7 +337,41 @@ bootstrap_importance_ci <- function(data,
                              "CI_Lower", "CI_Upper", "SE")]
   rownames(result_df) <- NULL
 
-  cat(sprintf("  - Bootstrap complete: %d drivers analyzed\n", n_drivers))
+  # Shapley is stamped in the policy note below rather than added as rows of
+  # NA. A row of NAs in a confidence-interval table reads as missing data,
+  # which is a different claim from "this method has no interval in this
+  # version" (review M4, decision 5: extending the bootstrap to Shapley is
+  # deferred).
+
+  # What these numbers are, carried with them. Point_Estimate is the mean of
+  # the bootstrap distribution, not the headline importance figure, and on a
+  # weighted study the resample is probability-proportional while each
+  # replicate's fit is unweighted. Both were invisible to a reader of the
+  # sheet, who would reasonably read Point_Estimate as the reported importance
+  # (review M4).
+  attr(result_df, "bootstrap_policy") <- paste0(
+    "Point_Estimate is the MEAN OF THE BOOTSTRAP DISTRIBUTION and will not equal ",
+    "the headline importance column; read the interval, not this column, and ",
+    "reconcile against the importance table. ",
+    if (!is.null(weights)) {
+      paste0("Respondents were resampled with probability proportional to '",
+             weights, "' and each replicate was fitted unweighted. ")
+    } else {
+      "Respondents were resampled with equal probability. "
+    },
+    "Shapley values carry no interval: the bootstrap does not extend to them ",
+    "in this version.")
+  attr(result_df, "iterations_requested") <- as.integer(n_bootstrap)
+  attr(result_df, "iterations_used") <- as.integer(n_bootstrap - n_failed)
+  attr(result_df, "iterations_dropped") <- as.integer(n_failed)
+
+  cat(sprintf("  - Bootstrap complete: %d drivers analyzed, %d of %d iterations used\n",
+              n_drivers, as.integer(n_bootstrap - n_failed), as.integer(n_bootstrap)))
+  if (n_failed > 0) {
+    cat(sprintf(paste0("  - %d iteration(s) dropped as near-singular; the intervals ",
+                       "rest on the %d that succeeded\n"),
+                as.integer(n_failed), as.integer(n_bootstrap - n_failed)))
+  }
 
   result_df
 }

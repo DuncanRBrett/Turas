@@ -27,6 +27,27 @@ weighted_cov <- function(x, y, w) {
 
 #' Weighted Correlation
 #' @keywords internal
+#' Weighted Standard Deviation
+#'
+#' A standardised beta is b * (sd_x / sd_y). On a weighted study the
+#' coefficients came from a weighted fit and the standard deviations did not,
+#' so the ratio mixed two populations: the model's weighted one and the file's
+#' unweighted one (review M1). This is the same convention weighted_cor() uses.
+#'
+#' @param x Numeric vector.
+#' @param w Weights, the same length as x.
+#' @return The weighted standard deviation, or NA when fewer than two cases
+#'   carry a usable weight.
+#' @keywords internal
+weighted_sd <- function(x, w) {
+  ok <- !is.na(x) & !is.na(w) & w > 0
+  if (sum(ok) < 2) return(NA_real_)
+  x <- x[ok]; w <- w[ok]
+  mu <- sum(w * x) / sum(w)
+  sqrt(sum(w * (x - mu)^2) / sum(w))
+}
+
+
 weighted_cor <- function(x, y, w) {
   w <- w / sum(w)
   mx <- sum(w * x)
@@ -191,9 +212,21 @@ calculate_beta_weights <- function(model, data, config) {
     )
   }
 
-  # Standard deviations
-  sd_x <- vapply(driver_vars, function(v) stats::sd(data[[v]], na.rm = TRUE), numeric(1))
-  sd_y <- stats::sd(data[[outcome_var]], na.rm = TRUE)
+  # Standard deviations, weighted when the fit was weighted (review M1).
+  kd_w <- if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
+              config$weight_var %in% names(data)) {
+    as.numeric(data[[config$weight_var]])
+  } else {
+    NULL
+  }
+  sd_x <- vapply(driver_vars, function(v) {
+    if (is.null(kd_w)) stats::sd(data[[v]], na.rm = TRUE) else weighted_sd(data[[v]], kd_w)
+  }, numeric(1))
+  sd_y <- if (is.null(kd_w)) {
+    stats::sd(data[[outcome_var]], na.rm = TRUE)
+  } else {
+    weighted_sd(data[[outcome_var]], kd_w)
+  }
 
   # Additional safety checks (should have been caught in validation, but double-check)
   if (any(sd_x == 0)) {
@@ -617,15 +650,27 @@ calculate_beta_weights_mixed <- function(model, data, config, term_mapping) {
   mm <- stats::model.matrix(model)
   mm <- mm[, colnames(mm) != "(Intercept)", drop = FALSE]
 
-  # Calculate term-level standardized betas
-  sd_y <- sd(data[[outcome_var]], na.rm = TRUE)
+  # Calculate term-level standardized betas, weighted when the fit was
+  # weighted (review M1).
+  mixed_w <- if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
+                 config$weight_var %in% names(data)) {
+    w_all <- as.numeric(data[[config$weight_var]])
+    if (length(w_all) == nrow(mm)) w_all else w_all[seq_len(nrow(mm))]
+  } else {
+    NULL
+  }
+  sd_y <- if (is.null(mixed_w)) {
+    sd(data[[outcome_var]], na.rm = TRUE)
+  } else {
+    weighted_sd(data[[outcome_var]], as.numeric(data[[config$weight_var]]))
+  }
   term_betas <- numeric(length(all_coefs))
   names(term_betas) <- names(all_coefs)
 
   for (term in names(all_coefs)) {
     if (!is.na(all_coefs[term]) && term %in% colnames(mm)) {
-      sd_x <- sd(mm[, term], na.rm = TRUE)
-      if (sd_x > 0 && sd_y > 0) {
+      sd_x <- if (is.null(mixed_w)) sd(mm[, term], na.rm = TRUE) else weighted_sd(mm[, term], mixed_w)
+      if (!is.na(sd_x) && !is.na(sd_y) && sd_x > 0 && sd_y > 0) {
         term_betas[term] <- all_coefs[term] * (sd_x / sd_y)
       }
     }

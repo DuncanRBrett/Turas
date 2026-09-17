@@ -143,16 +143,24 @@ create_faceted_quadrant_plot <- function(all_segments, config) {
     all_segments,
     ggplot2::aes(x = x, y = y, color = factor(quadrant))
   ) +
-    # Quadrant lines (use first row's threshold as reference)
+    # Quadrant lines, per facet. They used to be drawn from the FIRST
+    # segment's thresholds on every panel, so each segment's points were
+    # divided by another segment's mean and a driver could be shown in the
+    # wrong quadrant for its own segment (review M5). One row per segment
+    # carries that segment's own thresholds.
     ggplot2::geom_vline(
-      xintercept = all_segments$x_threshold[1],
+      data = unique(all_segments[, c("segment", "x_threshold")]),
+      ggplot2::aes(xintercept = x_threshold),
       linetype = "dashed",
-      color = "gray40"
+      color = "gray40",
+      inherit.aes = FALSE
     ) +
     ggplot2::geom_hline(
-      yintercept = all_segments$y_threshold[1],
+      data = unique(all_segments[, c("segment", "y_threshold")]),
+      ggplot2::aes(yintercept = y_threshold),
       linetype = "dashed",
-      color = "gray40"
+      color = "gray40",
+      inherit.aes = FALSE
     ) +
     # Points
     ggplot2::geom_point(size = 3, alpha = 0.8)
