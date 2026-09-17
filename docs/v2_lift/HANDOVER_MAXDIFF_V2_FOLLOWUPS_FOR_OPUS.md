@@ -201,9 +201,13 @@ first, retirement second, never the reverse.
    its header comment says so and would need rewriting. Add blocks for head to
    head, segments and diagnostics. Watch the F2 lesson: per-row fields are
    vectors, scalars in a block stay unboxed, or the panel silently vanishes.
-2. Widen the tab. `27y_maxdiff.js` grows from four panels to seven. Charts are
-   the open sub-question: the classic report has its own chart builder (767
-   lines) and v2 has its own charting, so this is a port, not a copy.
+2. Widen the tab. `27y_maxdiff.js` grows from four panels to seven.
+   **Charts: Duncan ruled on 2026-09-17 that they are REDRAWN in the v2
+   report's own charting, not ported from the classic chart builder.** The
+   classic `04_chart_builder.R` (767 lines) is therefore reference material
+   for what each chart shows, not code to carry across, and it goes when the
+   rest of `lib/html_report/` goes at step 4. The reason for the ruling was
+   that one charting system is worth more than the time saved by a port.
 3. Prove parity on a real config before anything is deleted. The shipped Karoo
    example runs both paths today, so run it with `Generate_HTML_Report = YES`
    and read the classic report and the widened tab side by side, panel by panel.
@@ -217,3 +221,12 @@ first, retirement second, never the reverse.
    save.
 
 Step 4 does not start until Duncan has done step 3.
+
+**Scope, as it stands on 2026-09-17.** The charting question is answered, so
+the session that takes this on starts with no open decisions. It is larger than
+the whole of sections 2 and 3, which took one session: three new island blocks
+(head to head, segments, diagnostics), three new panels, and every chart
+redrawn. Watch the F2 lesson throughout: per-row fields in a block are vectors,
+scalars in a block stay unboxed, or the panel silently vanishes. The node gate
+`modules/tabs/tests/js/test_maxdiff_provenance.mjs`, added on 2026-09-17,
+renders the tab in a vm and is the place to add a check per new panel.
