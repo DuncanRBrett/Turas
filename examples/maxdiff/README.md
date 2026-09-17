@@ -46,11 +46,24 @@ It writes into `examples/maxdiff/Output/`:
 The module's hierarchical Bayes model runs in Stan. On a machine without
 cmdstanr it falls back to an empirical-Bayes approximation on the count
 scores, and says so everywhere: the console, the SUMMARY sheet, the island,
-the MaxDiff tab and the tabs export. This example is configured for that
-world. `Allow_Approx_Utilities_Export = YES` lets the fallback through the
-tabs export, and the export is then stamped "approximate: count-based" in the
-QuestionText and the METHOD sheet. With cmdstanr installed the same config
-fits the Stan model and the stamp disappears.
+the MaxDiff tab and the tabs export. This example ships with
+`Allow_Approx_Utilities_Export = NO`, so on a machine without cmdstanr the
+tabs export refuses rather than shipping approximate utilities into a
+crosstab that cannot tell them apart from posterior estimates. Everything
+else in the run still completes: the workbook, the island and the MaxDiff
+tab are produced, carrying the fallback's stamp.
+
+To see the export anyway, set `Allow_Approx_Utilities_Export = YES` in the
+config's OUTPUT_SETTINGS sheet. The export then carries "approximate:
+count-based" in the QuestionText and the METHOD sheet, so a reader of the
+crosstab knows what the numbers are.
+
+With cmdstanr installed the same config fits the Stan model, the export runs
+without the override, and the METHOD sheet carries the sampler's diagnostics:
+mean R-hat, divergences, max treedepth exceedances and minimum ESS. The
+MaxDiff tab says the same thing in one sentence. One item is the model's
+reference, fixed at zero, so its spread and standard error show as a dash
+rather than as a measured zero.
 
 ## Rebuild the example
 
