@@ -334,6 +334,9 @@
     var lo = arr(g.ciLowerPct), hi = arr(g.ciUpperPct);
     var el = arr(g.arcElasticity);
     var wn = arr(g.weightedN);
+    // The prose names a profit optimum when the config carries a unit cost,
+    // and the curve it came from was not in the table (review F10).
+    var prof = arr(g.profitIndex);
 
     var rows = g.price.map(function (p, i) {
       var interval = (lo && hi && lo[i] != null && hi[i] != null)
@@ -345,6 +348,7 @@
         (smoothed ? '<td class="prc-num">' + esc(num(smoothed[i])) + "%</td>" : "") +
         '<td class="prc-num">' + esc(interval) + "</td>" +
         '<td class="prc-num">' + esc(rev ? num(rev[i], 2) : "–") + "</td>" +
+        (prof ? '<td class="prc-num">' + esc(num(prof[i], 2)) + "</td>" : "") +
         '<td class="prc-num">' + esc(el ? num(el[i], 2) : "–") + "</td></tr>";
     }).join("");
 
@@ -353,6 +357,7 @@
       '<th class="prc-num">Would buy</th>' +
       (smoothed ? '<th class="prc-num">Published</th>' : "") +
       '<th class="prc-num">Interval</th><th class="prc-num">Revenue index</th>' +
+      (prof ? '<th class="prc-num">Profit index</th>' : "") +
       '<th class="prc-num">Elasticity</th></tr>';
 
     var published = smoothed || accept;
@@ -458,7 +463,9 @@
       bits.push("confidence " + esc(String(r.confidence).toLowerCase()) +
         (r.confidenceScore != null ? " (" + esc(num(r.confidenceScore * 100, 0)) + "%)" : ""));
     }
-    if (r.methodSpreadPct != null) {
+    // A spread needs something to spread across. A one-method run carried
+    // "spread 0.0% across 1 estimates", which is not information (review F9).
+    if (r.methodSpreadPct != null && (r.nMethodPrices == null || r.nMethodPrices > 1)) {
       bits.push("the methods' own prices spread " + esc(num(r.methodSpreadPct)) + "%" +
         (r.nMethodPrices ? " across " + esc(num(r.nMethodPrices, 0)) + " estimates" : ""));
     }

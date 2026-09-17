@@ -219,7 +219,10 @@ run_pricing_gui <- function() {
             tableOutput("results_table"),
             hr(),
             tags$p(
-              "Full results written to Excel. Open the HTML file for the interactive report.",
+              paste0("Full results are written to the Excel workbook. The module also writes ",
+                     "a contribution file that gives the client's interactive report a Pricing ",
+                     "tab, and, when the config asks for them, a standalone simulator and a ",
+                     "crosstab export. There is no separate HTML report."),
               class = "turas-help-text"
             )
           )

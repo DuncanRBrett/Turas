@@ -206,7 +206,11 @@ test_that("the violation count reaches the island, and only when it is real (F5)
   isl <- quiet_island(list(van_westendorp = vw, validation = fake_validation()), fake_config())
   expect_equal(isl$vw$violations, 44L)
   expect_equal(isl$vw$violationRate, 0.11)
-  expect_match(isl$meta$estimationNote$vw, "44 of them")
+  # The denominator is named, so "44" cannot read as 44 of the analysed base
+  # (review F6).
+  expect_match(isl$meta$estimationNote$vw, "44")
+  expect_false(grepl("44 of them", isl$meta$estimationNote$vw, fixed = TRUE))
+  expect_match(isl$meta$estimationNote$vw, "respondents")
 
   # A run that did not record it says nothing rather than showing a zero.
   isl2 <- quiet_island(list(van_westendorp = fake_vw(), validation = fake_validation()),
@@ -438,4 +442,60 @@ test_that("the Karoo run writes an island whose numbers are the headline numbers
   raw <- paste(readLines(island_file, warn = FALSE), collapse = "")
   expect_false(grepl("—", raw))
   expect_false(grepl("NaN|Infinity", raw))
+})
+
+# ---------------------------------------------------------------------------
+# Session B review: the notes say what the tab actually shows
+# ---------------------------------------------------------------------------
+
+test_that("the smoothing sentence matches what the tab draws (F4)", {
+  # Smoothing that changed something: the island carries both series and the
+  # note points at the second one.
+  both <- quiet_island(list(gabor_granger = fake_gg(smoothed = TRUE),
+                            validation = fake_validation()), fake_config())
+  expect_false(is.null(both$gg$smoothedPct))
+  expect_match(both$meta$estimationNote$gg, "shown beside it")
+
+  # Smoothing that changed nothing: no second series, so no promise of one.
+  gg <- fake_gg(smoothed = TRUE)
+  gg$demand_curve$purchase_intent_raw <- gg$demand_curve$purchase_intent
+  flat <- quiet_island(list(gabor_granger = gg, validation = fake_validation()),
+                       fake_config())
+  expect_null(flat$gg$smoothedPct)
+  expect_false(grepl("shown beside it", flat$meta$estimationNote$gg, fixed = TRUE))
+  expect_match(flat$meta$estimationNote$gg, "changed nothing")
+})
+
+test_that("the imputation note is a sentence, not the setting's value (F8)", {
+  gg <- fake_gg()
+  gg$diagnostics$imputation <-
+    "NO_AFTER_STOP: unanswered rungs after a respondent's first No coded as No"
+  isl <- quiet_island(list(gabor_granger = gg, validation = fake_validation()),
+                      fake_config())
+  note <- isl$meta$estimationNote$gg
+  expect_false(grepl("NO_AFTER_STOP", note, fixed = TRUE))
+  expect_match(note, "stopped after a respondent's first No")
+})
+
+test_that("the monadic note says what a would-buy is (F5)", {
+  mon <- fake_monadic()
+  mon$diagnostics$intent_coding <- "scale, 4 or higher counts as would buy"
+  isl <- quiet_island(list(monadic = mon, validation = fake_validation()), fake_config())
+  expect_match(isl$meta$estimationNote$monadic, "4 or higher counts as would buy")
+
+  # A run whose engine recorded nothing says nothing rather than guessing.
+  bare <- quiet_island(list(monadic = fake_monadic(), validation = fake_validation()),
+                       fake_config())
+  expect_false(grepl("coded", bare$meta$estimationNote$monadic, fixed = TRUE))
+})
+
+test_that("the violation sentence names its denominator (F6)", {
+  vw <- fake_vw()
+  vw$diagnostics$n_violations_before_handling <- 44L
+  vw$diagnostics$violation_rate_before_handling <- 0.11
+  vw$diagnostics$n_total <- 400L
+  isl <- quiet_island(list(van_westendorp = vw, validation = fake_validation()),
+                      fake_config())
+  expect_match(isl$meta$estimationNote$vw, "44 of the 400 respondents")
+  expect_match(isl$meta$estimationNote$vw, "11.0%", fixed = TRUE)
 })

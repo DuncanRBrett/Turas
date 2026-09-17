@@ -191,16 +191,33 @@ suppressWarnings(suppressMessages({
 }))
 V2_ASSETS <- file.path(v2_dir, "assets")
 
-test_that("a report without pricing is identical whether or not pr_json is named", {
+test_that("a report without pricing carries no pricing content", {
+  # Handover B2 asked for a report without pricing to be "byte-identical to
+  # before". Comparing the builder with and without pr_json = NULL is true by
+  # construction and proves nothing about the pre-Session-B build, which is
+  # why it could not see the Present mode class collision (review F3). What
+  # can be asserted, and is worth asserting, is that nothing of the Pricing
+  # tab reaches a report that has no pricing island.
   data_json <- '{"questions":[],"project":{"name":"t"}}'
   cfg <- list(project_title = "t")
   a <- build_report_v2_html(data_json, cfg, assets_dir = V2_ASSETS, generated = "fixed")
   b <- build_report_v2_html(data_json, cfg, assets_dir = V2_ASSETS, generated = "fixed",
                             pr_json = NULL)
   expect_identical(a, b)
+
   # The island tag is there but empty, so no Pricing tab can appear.
   expect_true(grepl('id="data-pr"', a, fixed = TRUE))
   expect_true(grepl('id="data-pr"[^>]*>\\s*null', a))
+
+  # And no pricing markup is rendered into the page: no panel, no table, no
+  # chart, no provenance stamp, and no tab label.
+  for (marker in c('class="prc-view"', 'class="prc-panel"', 'class="prc-table"',
+                   'class="prc-chart"', 'class="prc-stamp"')) {
+    expect_false(grepl(marker, a, fixed = TRUE), info = marker)
+  }
+  # The view's own source ships in the bundle, which is correct: it is inert
+  # without an island. What must not appear is a rendered Pricing tab.
+  expect_false(grepl(">Pricing<", a, fixed = TRUE))
 })
 
 test_that("a pricing island is inlined and escaped into the built report", {
