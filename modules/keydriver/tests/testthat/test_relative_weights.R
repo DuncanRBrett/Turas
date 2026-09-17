@@ -16,7 +16,10 @@
 # equal before any normalisation.
 # ==============================================================================
 
-skip_if(!exists("calculate_relative_weights", mode = "function"), "engine not loaded")
+# Loaded rather than skipped: a file-level skip made this report 0 tests
+# under test_file, which reads as success (review F17).
+kd_ensure_module_loaded("core")
+expect_true(exists("calculate_relative_weights", mode = "function"))
 
 # Johnson's method, written out here so the test does not lean on the engine.
 johnson_reference <- function(R, rxy) {

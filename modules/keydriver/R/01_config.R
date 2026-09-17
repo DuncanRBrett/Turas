@@ -449,6 +449,26 @@ get_setting <- function(settings, name, default = NULL) {
 #' @keywords internal
 KD_DEFAULT_SEED <- 20260101L
 
+#' Split a Segments sheet segment_values cell
+#'
+#' One parser. Pre-flight split on "," alone, the quadrant comparison on
+#' ",\\s*" and the pipeline on "[;,|]", so a cell written "18-24; 25-34" built
+#' one segment in the pipeline, checked as two different strings in pre-flight
+#' and produced a segment the quadrant could not match (review F15). Every
+#' consumer reads a cell the same way now: comma, semicolon or pipe, trimmed,
+#' empties dropped.
+#'
+#' @param raw A single segment_values cell
+#' @return Character vector of values, possibly empty
+#' @keywords internal
+kd_split_segment_values <- function(raw) {
+  if (is.null(raw) || length(raw) == 0) return(character(0))
+  raw <- as.character(raw)[1]
+  if (is.na(raw) || !nzchar(trimws(raw))) return(character(0))
+  vals <- trimws(unlist(strsplit(raw, "[;,|]")))
+  vals[nzchar(vals)]
+}
+
 kd_seed_value <- function(config) {
   raw <- config$settings$random_seed %||% config$random_seed %||% KD_DEFAULT_SEED
   seed <- suppressWarnings(as.integer(raw))

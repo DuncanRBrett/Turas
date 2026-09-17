@@ -9,25 +9,9 @@
 # it does.
 # ==============================================================================
 
-# Load the pipeline here rather than skipping when another file has not
-# already loaded it. A skip is how three of these findings stayed green.
-if (!exists("run_shap_analysis_internal", mode = "function")) {
-  Sys.setenv(TURAS_ROOT = project_root)
-  assign("TURAS_ROOT", project_root, envir = .GlobalEnv)
-  for (f in list.files(file.path(project_root, "modules", "shared", "lib"),
-                       pattern = "[.]R$", full.names = TRUE)) {
-    tryCatch(source(f), error = function(e) NULL)
-  }
-  for (d in c(file.path(module_dir, "R"),
-              file.path(module_dir, "R", "kda_quadrant"),
-              file.path(module_dir, "R", "kda_shap"),
-              file.path(module_dir, "R", "kda_methods"))) {
-    if (!dir.exists(d)) next
-    for (f in list.files(d, pattern = "[.]R$", full.names = TRUE)) {
-      tryCatch(source(f), error = function(e) NULL)
-    }
-  }
-}
+# One loader, in helper-paths.R, rather than a skip. A skip is how three of
+# these findings stayed green (review F17).
+kd_ensure_module_loaded("all")
 
 test_that("SHAP produces a driver-level number for a categorical driver (F3)", {
   skip_if_not_installed("xgboost")

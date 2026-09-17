@@ -170,7 +170,13 @@ create_quadrant_analysis <- function(
       segments = segment_results,
       config = config
     ),
-    class = "quadrant_results"
+    class = "quadrant_results",
+    # extract_importance_scores() records which source was asked for and which
+    # was actually used, and prepare_quadrant_data() drops the attributes on
+    # its way through, so the substitution reached nobody (review F10). Carried
+    # onto the result, where the output writer puts it in Run_Status.
+    importance_source_requested = attr(importance, "importance_source_requested"),
+    importance_source_used = attr(importance, "importance_source_used")
   )
 
   cat("\n")

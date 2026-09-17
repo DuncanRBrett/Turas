@@ -7,8 +7,9 @@
 # the call-site defects are covered in test_segment_pipeline.R.
 # ==============================================================================
 
-skip_if(!exists("run_segment_importance_comparison", mode = "function"),
-        "segment comparison not loaded")
+# Loaded rather than skipped (review F17).
+kd_ensure_module_loaded("core")
+expect_true(exists("run_segment_importance_comparison", mode = "function"))
 
 # Two segments. In segment A the driver X1 dominates; in segment B it is X2.
 # A weight column deliberately favours the half of each segment where the

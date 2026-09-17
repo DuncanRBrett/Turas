@@ -47,8 +47,16 @@ order is not a matter of opinion:
 | `product_range` | 0.05 |
 
 A correct engine returns that order, by relative weights and by Shapley alike.
-The gaps are wide enough that sampling noise cannot reorder them, and that is
-deliberate: a test which sometimes fails teaches nobody anything.
+
+The order is guaranteed at the committed seed, which is what the test asserts.
+It is not guaranteed by the design at n = 900. An independent check scored 20
+seeds unweighted and weighted: relative weights and standardised betas recover
+the order in all 40 runs, and the Shapley column, which computes LMG, swaps
+`staff_knowledge` and `product_range` in 3 of them. Those two are 0.16 and 0.05
+against an R-squared of about 0.74, so the gap between them is genuinely thin.
+At seed 2026 the margins are 0.024 and 0.035 and every measure agrees, which is
+why the fixture is committed at that seed rather than generated fresh. A test
+that sometimes fails teaches nobody anything.
 
 `contact_channel` carries a real effect too (App best, call centre worst), and
 exists to exercise the mixed-model path rather than to be ranked.
@@ -59,11 +67,24 @@ solve, and an engine that ignores it will still look plausible.
 
 ## Why the mixed config runs PARTIAL
 
-Because it should. A bootstrap cannot resample a factor, and a zero-order
-correlation is not defined for one. Both refuse by name, the run degrades, and
-the report says which outputs are affected. It is in the example deliberately,
-as a picture of honest degradation: the alternative is a module that produces
-numbers for things it cannot compute.
+Because it should, though for one of the two reasons this file used to give.
+
+A zero-order correlation really is undefined for a nominal driver, so the
+correlation column is empty for `contact_channel` and the run says so.
+
+The bootstrap is a different case, and the old wording here was wrong. There is
+nothing about resampling that a factor breaks: resampling rows is indifferent
+to column types, and `lm` fits the factor in every replicate. The limitation is
+narrower and it is ours, not statistics': this bootstrap's estimators are
+written for numeric drivers only, so it refuses a study that contains a factor
+and the five continuous drivers lose their intervals along with it. Treat the
+`how_to_fix` that says to convert the column to numeric as wrong for a nominal
+driver: do not score App, branch and call centre 1, 2, 3 to get intervals. The
+right fix is to the bootstrap, and it is not in this session's scope.
+
+Both paths degrade by name and the report says which outputs are affected,
+which is the picture this example is here to give: the alternative is a module
+that produces numbers for things it cannot compute.
 
 ## The weighting
 

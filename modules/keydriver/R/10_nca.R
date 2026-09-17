@@ -167,6 +167,9 @@ run_nca_analysis <- function(data, config) {
   # --- Build bottleneck table ---
   # Shows: for outcome at 50%, 75%, 90%, what minimum driver level is needed?
   bottleneck_levels <- c(50, 75, 90)
+  # Intervals for NCA's 0 to 100 outcome grid. Twenty gives 5 point steps,
+  # which contain every level above exactly (review F12).
+  KD_NCA_BOTTLENECK_STEPS <- 20L
   bottleneck_rows <- lapply(numeric_drivers[numeric_drivers %in%
     results_df$Driver[results_df$Is_Necessary]], function(drv) {
     tryCatch({
@@ -175,18 +178,29 @@ run_nca_analysis <- function(data, config) {
       # no such parameter, so the call errored and every bottleneck was NA
       # (review H7). The table comes back on $bottlenecks$ce_fdh with the
       # outcome in the first column and the driver in the second.
+      # steps is the number of intervals the 0 to 100 outcome grid is cut
+      # into, not the number of levels wanted. steps = 3 gave a grid of
+      # 0, 33.3, 66.7, 100, and the nearest-level lookup below then filled
+      # the column headed Y_50pct with the value at 33.3 or 66.7 (review
+      # F12). Twenty intervals is a 5 point grid, which contains 50, 75 and
+      # 90 exactly, so each column holds the number its header names.
       nca_out <- NCA::nca_analysis(data = d, x = drv, y = outcome_var,
                                    ceilings = "ce_fdh", test.rep = 0,
                                    bottleneck.y = "percentage.range",
-                                   steps = length(bottleneck_levels))
+                                   steps = KD_NCA_BOTTLENECK_STEPS)
       bn_vals <- tryCatch({
         tbl <- nca_out$bottlenecks$ce_fdh
         if (is.data.frame(tbl) && ncol(tbl) >= 2) {
           y_levels <- suppressWarnings(as.numeric(tbl[[1]]))
           x_needed <- suppressWarnings(as.numeric(tbl[[2]]))
           vapply(bottleneck_levels, function(lv) {
-            hit <- which.min(abs(y_levels - lv))
-            if (length(hit) == 1 && is.finite(y_levels[hit])) x_needed[hit] else NA_real_
+            # Exact, not nearest. A nearest match is how a number computed at
+            # one outcome level ended up under another level's heading. If the
+            # grid does not contain the level, the cell is empty rather than
+            # wrong. A cell is also empty when NCA reports "NN", meaning the
+            # driver places no constraint at that outcome level.
+            hit <- which(abs(y_levels - lv) < 1e-6)
+            if (length(hit) == 1) x_needed[hit] else NA_real_
           }, numeric(1))
         } else {
           rep(NA_real_, length(bottleneck_levels))

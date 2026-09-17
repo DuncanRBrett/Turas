@@ -630,7 +630,17 @@ check_segment_variables <- function(segments_df, data, error_log) {
 
     # Check segment values are present in data
     if (!is.na(seg_values_raw) && seg_values_raw != "") {
-      seg_values <- trimws(unlist(strsplit(seg_values_raw, ",")))
+      # One parser for the Segments sheet, shared with the pipeline and the
+      # quadrant comparison. This split on "," alone, so a cell separated
+      # with semicolons was checked as one long string that is never in the
+      # data, and the analyst got a warning about a value they never typed
+      # (review F15).
+      seg_values <- if (exists("kd_split_segment_values", mode = "function")) {
+        kd_split_segment_values(seg_values_raw)
+      } else {
+        v <- trimws(unlist(strsplit(seg_values_raw, "[;,|]")))
+        v[nzchar(v)]
+      }
       actual_values <- as.character(unique(data[[seg_var]]))
       actual_values <- actual_values[!is.na(actual_values)]
 

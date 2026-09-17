@@ -77,8 +77,50 @@ calculate_vif <- function(model) {
 #' @param run_status TRS run status (PASS, PARTIAL)
 #' @param status_details Optional list with status details
 #' @keywords internal
+#' Build the Run_Status disclosure rows for optional features
+#'
+#' @param results The results list, or NULL
+#' @param escape_text Excel escaping function
+#' @return A two-column data frame, possibly with no rows
+#' @keywords internal
+.kd_disclosure_rows <- function(results, escape_text = identity) {
+  rows <- data.frame(Field = character(0), Value = character(0),
+                     stringsAsFactors = FALSE)
+  add <- function(field, value) {
+    if (is.null(value) || length(value) == 0 || all(is.na(value))) return(invisible(NULL))
+    rows <<- rbind(rows, data.frame(Field = field,
+                                    Value = escape_text(as.character(value)[1]),
+                                    stringsAsFactors = FALSE))
+  }
+  if (is.null(results)) return(rows)
+
+  boot <- results$bootstrap_ci
+  if (!is.null(boot)) {
+    add("bootstrap_iterations_requested", attr(boot, "iterations_requested"))
+    add("bootstrap_iterations_used", attr(boot, "iterations_used"))
+    add("bootstrap_iterations_dropped", attr(boot, "iterations_dropped"))
+    add("bootstrap_policy", attr(boot, "bootstrap_policy"))
+  }
+
+  quad <- results$quadrant
+  if (!is.null(quad)) {
+    req <- attr(quad, "importance_source_requested")
+    used <- attr(quad, "importance_source_used")
+    if (is.null(req) && is.list(quad)) {
+      req <- attr(quad$data, "importance_source_requested")
+      used <- attr(quad$data, "importance_source_used")
+    }
+    add("quadrant_importance_source_requested", req)
+    add("quadrant_importance_source_used", used)
+  }
+
+  rows
+}
+
+
 write_keydriver_output <- function(importance, model, correlations, config, output_file,
-                                    run_status = "PASS", status_details = NULL) {
+                                    run_status = "PASS", status_details = NULL,
+                                    results = NULL) {
 
   wb <- openxlsx::createWorkbook()
 
@@ -383,6 +425,15 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     ),
     stringsAsFactors = FALSE
   )
+
+  # Disclosures the features compute and used to attach to their own return
+  # value, where nothing read them: the bootstrap's policy and iteration
+  # counts, and which importance source the quadrant asked for against the one
+  # it got (reviews F10 and F11). A reader of the workbook could not tell that
+  # Point_Estimate is the mean of the bootstrap distribution, that iterations
+  # had been dropped, or that a requested quadrant source had been substituted.
+  status_table <- rbind(status_table,
+                        .kd_disclosure_rows(results, escape_text))
 
   openxlsx::writeData(wb, "Run_Status", status_table, startRow = 1)
   openxlsx::addStyle(wb, "Run_Status", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)

@@ -13,7 +13,9 @@
 example_script <- file.path(project_root, "examples", "keydriver",
                             "create_keydriver_example.R")
 skip_if(!file.exists(example_script), "example generator not present")
-skip_if(!exists("run_keydriver_analysis_impl", mode = "function"), "pipeline not loaded")
+# Loaded rather than skipped (review F17).
+kd_ensure_module_loaded("all")
+expect_true(exists("run_keydriver_analysis_impl", mode = "function"))
 
 old_opt <- getOption("turas.example.no_run")
 options(turas.example.no_run = TRUE)

@@ -15,7 +15,10 @@
 skip_if_not(file.exists(file.path(module_dir, "R", "10_nca.R")), "10_nca.R not present")
 skip_if_not_installed("NCA")
 suppressWarnings(try(source(file.path(module_dir, "R", "10_nca.R")), silent = TRUE))
-skip_if(!exists("run_nca_analysis", mode = "function"), "NCA runner not loaded")
+# Loaded rather than skipped: a file-level skip makes this file report
+# 0 tests under test_file, which reads as success (review F17).
+kd_ensure_module_loaded("core")
+expect_true(exists("run_nca_analysis", mode = "function"))
 
 # A driver with a genuine ceiling: Y can never exceed Need by much, so a high Y
 # requires a high Need. That is what necessity means.

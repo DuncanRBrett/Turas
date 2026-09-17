@@ -12,7 +12,10 @@
 skip_if_not(file.exists(file.path(module_dir, "R", "11_dominance.R")), "dominance not present")
 skip_if_not_installed("domir")
 suppressWarnings(try(source(file.path(module_dir, "R", "11_dominance.R")), silent = TRUE))
-skip_if(!exists("run_dominance_analysis", mode = "function"), "dominance not loaded")
+# Loaded rather than skipped: a file-level skip makes this file report
+# 0 tests under test_file, which reads as success (review F17).
+kd_ensure_module_loaded("core")
+expect_true(exists("run_dominance_analysis", mode = "function"))
 
 dom_fixture <- function(n = 300, seed = 1) {
   set.seed(seed)

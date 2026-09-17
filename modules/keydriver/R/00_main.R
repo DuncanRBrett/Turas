@@ -411,12 +411,7 @@ handle_optional_feature <- function(feature_name, feature_fn, on_fail_policy,
     var <- trimws(var)
     nm <- as.character(segments$segment_name[i] %||% NA)
     raw <- as.character(segments$segment_values[i] %||% NA)
-    vals <- if (is.na(raw) || !nzchar(trimws(raw))) {
-      character(0)
-    } else {
-      trimws(unlist(strsplit(raw, "[;,|]")))
-    }
-    vals <- vals[nzchar(vals)]
+    vals <- kd_split_segment_values(raw)
     if (is.null(out[[var]])) out[[var]] <- list()
     if (length(vals) > 0) {
       label <- if (is.na(nm) || !nzchar(trimws(nm))) paste(vals, collapse = " / ") else trimws(nm)
@@ -1054,8 +1049,12 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   results$run_result <- run_result
 
   # --- Generate Stats Pack (optional) ---
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
+  # This compared toupper(x) == "Y", so a config that said "Yes", which is
+  # what the example ships and what an analyst writes, produced no stats pack
+  # and said nothing about it (review F13). It is the M14 defect class on the
+  # one gate the M14 sweep did not reach, because it is spelled with capitals.
+  generate_stats_pack_flag <- as_logical_setting(
+    config$settings$Generate_Stats_Pack, TRUE
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {
@@ -1437,7 +1436,10 @@ write_keydriver_output_enhanced <- function(results, output_file,
     importance = results$importance, model = results$model,
     correlations = results$correlations, config = results$config,
     output_file = output_file, run_status = run_status,
-    status_details = status_details)
+    status_details = status_details,
+    # So the bootstrap and quadrant disclosures reach Run_Status rather than
+    # living on attributes nothing reads (reviews F10 and F11).
+    results = results)
 
   # Re-open workbook to add optional sheets
   has_extras <- !is.null(results$shap) || !is.null(results$quadrant) ||

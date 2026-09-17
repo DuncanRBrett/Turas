@@ -12,7 +12,10 @@ skip_if_not(file.exists(file.path(module_dir, "R", "kda_quadrant", "quadrant_dat
             "quadrant prep not present")
 suppressWarnings(try(source(file.path(module_dir, "R", "kda_quadrant", "quadrant_data_prep.R")),
                      silent = TRUE))
-skip_if(!exists("extract_importance_scores", mode = "function"), "quadrant prep not loaded")
+# Loaded rather than skipped: a file-level skip makes this file report
+# 0 tests under test_file, which reads as success (review F17).
+kd_ensure_module_loaded("quadrant")
+expect_true(exists("extract_importance_scores", mode = "function"))
 
 quad_results <- function(...) {
   extra <- list(...)

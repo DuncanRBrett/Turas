@@ -590,7 +590,20 @@ run_segment_importance_comparison <- function(data,
     # driver. Numeric drivers have one term each, so this is one code path.
     mm <- tryCatch(stats::model.matrix(seg_formula, data = seg_data),
                    error = function(e) NULL)
-    term_sd <- if (is.null(mm)) NULL else apply(mm, 2, stats::sd, na.rm = TRUE)
+    # Weighted where the outcome's spread is weighted. A standardised beta is
+    # b * (sd_x / sd_y); the coefficients come from a weighted fit and sd_y
+    # was already weighted, so an unweighted sd_x made the ratio mix two
+    # different populations. On a split where the weights vary within a
+    # segment it moved a driver's share by over a point (review F8).
+    term_sd <- if (is.null(mm)) {
+      NULL
+    } else if (is.null(seg_w)) {
+      apply(mm, 2, stats::sd, na.rm = TRUE)
+    } else {
+      stats::setNames(
+        apply(mm, 2, function(col) .kd_weighted_sd(col, seg_w)),
+        colnames(mm))
+    }
     mapping <- if (!is.null(mm) && exists("build_term_mapping", mode = "function")) {
       tryCatch(build_term_mapping(seg_formula, seg_data, drivers), error = function(e) NULL)
     } else NULL

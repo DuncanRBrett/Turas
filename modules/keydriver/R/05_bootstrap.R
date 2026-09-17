@@ -180,13 +180,31 @@ bootstrap_importance_ci <- function(data,
   cols_to_check <- if (!is.null(weights)) c(all_vars, weights) else all_vars
   for (col in cols_to_check) {
     if (!is.numeric(data[[col]])) {
+      # The advice used to be "convert it to numeric", which an analyst must
+      # not follow for a nominal driver: scoring App, branch and call centre
+      # 1, 2, 3 invents an ordering and a spacing that are not in the data,
+      # and every number downstream would inherit them (review F14). The
+      # honest statement is that this limitation is ours, not statistics':
+      # resampling rows is indifferent to column types, and these estimators
+      # are the part that is numeric-only.
       return(keydriver_refuse(
         code   = "DATA_INVALID",
         title  = "Non-Numeric Variable",
         problem = paste0("Column '", col, "' is not numeric (class: ",
                          paste(class(data[[col]]), collapse = "/"), ")."),
-        why_it_matters = "Bootstrap importance requires numeric outcome, drivers, and weights.",
-        how_to_fix = paste0("Convert '", col, "' to numeric before calling bootstrap_importance_ci().")
+        why_it_matters = paste0(
+          "The bootstrap estimators in this module are written for numeric ",
+          "drivers only, so a study containing a categorical driver gets no ",
+          "intervals at all, including for its numeric drivers. The ",
+          "resampling itself is not the obstacle."),
+        how_to_fix = c(
+          paste0("If '", col, "' is genuinely a number recorded as text, ",
+                 "correct it in the data and rerun."),
+          paste0("If it is a nominal driver, do NOT score its categories ",
+                 "1, 2, 3 to get past this: that invents an order and a ",
+                 "spacing the data does not have."),
+          "Otherwise run without bootstrap intervals, or drop the categorical driver from this study."
+        )
       ))
     }
   }

@@ -53,7 +53,14 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
 
     seg_name <- as.character(segments$segment_name[i])
     seg_var <- as.character(segments$segment_variable[i])
-    seg_vals <- strsplit(as.character(segments$segment_values[i]), ",\\s*")[[1]]
+    # One parser for the Segments sheet, shared with the pipeline and
+    # pre-flight. This split on ",\\s*" alone (review F15).
+    seg_vals <- if (exists("kd_split_segment_values", mode = "function")) {
+      kd_split_segment_values(segments$segment_values[i])
+    } else {
+      v <- trimws(unlist(strsplit(as.character(segments$segment_values[i]), "[;,|]")))
+      v[nzchar(v)]
+    }
 
     # Check segment variable exists
     if (!seg_var %in% names(data)) {

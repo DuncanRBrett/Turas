@@ -14,8 +14,12 @@ skip_if_not(file.exists(file.path(module_dir, "R", "kda_shap", "shap_calculate.R
             "shap_calculate.R not present")
 suppressWarnings(try(source(file.path(module_dir, "R", "kda_shap", "shap_calculate.R")),
                      silent = TRUE))
-skip_if(!exists("encode_features", mode = "function"), "encoder not loaded")
-skip_if(!exists("create_feature_map", mode = "function"), "map builder not loaded")
+# Loaded rather than skipped (review F17). This file in particular stayed
+# green while SHAP produced nothing for a categorical driver, because it
+# stops at the map and never runs the model (review F3).
+kd_ensure_module_loaded("shap")
+expect_true(exists("encode_features", mode = "function"))
+expect_true(exists("create_feature_map", mode = "function"))
 
 test_that("the old pattern could not match a dummy name (H6)", {
   # Kept as the reason this file exists: the fix is not a preference.
