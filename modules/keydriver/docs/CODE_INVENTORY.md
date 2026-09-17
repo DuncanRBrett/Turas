@@ -47,19 +47,19 @@ snapshots, and 1280x720 PNG slide export.
 | Total R lines | \~21,429 |
 | Total JS lines | \~2,329 |
 | **Grand total (R + JS)** | **\~23,758** |
-| R source files | 39 |
+| R source files | 42 |
 | JS source files | 5 |
-| **Total source files** | **43** |
-| Test files | 14 |
-| Test lines | \~5,484 |
-| Test assertions | 711 pass, 0 fail, 14 skip |
+| **Total source files** | **47** |
+| Test files | 31 |
+| Test lines | \~9,082 |
+| Test assertions | 1,344 pass, 0 fail, 2 skip |
 | Submodules | 3 (SHAP, Quadrant, HTML Report) |
 | Classical importance methods | 5 |
 | ML importance methods | 1 (SHAP/XGBoost) |
 | v10.4 advanced methods | 4 (Elastic Net, NCA, Dominance, GAM) |
 | HTML chart types | 7 SVG + quadrant |
 | Config template sheets | 6 (Settings, Variables, Segments, StatedImportance, CustomSlides, Insights) |
-| Largest file | `03_page_builder.R` (3,483 lines) |
+| Largest file | `00_main.R` (1,615 lines) |
 | Smallest file | `00_html_guard.R` / `04_html_writer.R` (\~112 lines each) |
 
 ------------------------------------------------------------------------
@@ -70,38 +70,38 @@ snapshots, and 1280x720 PNG slide export.
 
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
-| `run_keydriver_gui.R` | 422 | Shiny GUI for interactive key driver analysis | 87 | Launches standalone Shiny app; `withProgress()` bar during analysis; wires GUI controls to core pipeline |
+| `run_keydriver_gui.R` | 530 | Shiny GUI for interactive key driver analysis | 87 | Launches standalone Shiny app; `withProgress()` bar during analysis; wires GUI controls to core pipeline |
 
 ### Core Pipeline -- `R/`
 
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
-| `00_guard.R` | 523 | TRS v1.1 guard layer; validates all inputs before analysis begins | 92 | Comprehensive type/range/existence checks; structured refusals with actionable messages |
-| `00_main.R` | 1,064 | 18-step orchestration pipeline; single public entry point | 90 | Coordinates guard, config, validation, analysis, optional SHAP/Quadrant, bootstrap, effect sizes, segment comparison, elastic net, NCA, dominance, GAM, executive summary, output, HTML report |
-| `01_config.R` | 749 | Loads and validates Excel-based configuration | 90 | Reads 6 sheets (Settings, Variables, Segments, StatedImportance, CustomSlides, Insights); normalises column names; applies defaults; returns structured config list |
-| `02_term_mapping.R` | 495 | Mixed predictor handling (continuous + categorical variables) | 90 | Maps survey terms to analysis-ready columns; handles dummy expansion for categoricals |
-| `02_validation.R` | 261 | Data validation (sample size, zero-variance columns) | 91 | Checks minimum N, detects degenerate predictors, returns TRS refusals |
-| `03_analysis.R` | 997 | Core algorithms: correlation, regression, 5 importance methods | 93 | Pearson, Spearman, standardised beta, relative importance (Lindeman-Merenda-Gold), Shapley regression; handles missing data, multicollinearity |
-| `04_output.R` | 483 | Excel workbook generation | 85 | Creates formatted multi-sheet `.xlsx`; **v10.4 gap: does not yet write Elastic Net, NCA, Dominance, GAM sheets** |
-| `05_bootstrap.R` | 524 | Bootstrap confidence intervals (v10.3) | 90 | BCa and percentile methods; configurable replications (min 100); handles weighted data |
-| `06_effect_size.R` | 495 | Effect-size interpretation (v10.3) | 90 | Cohen's d, confidence intervals on effect sizes; magnitude labels (small/medium/large) |
-| `07_segment_comparison.R` | 610 | Cross-segment driver importance comparison (v10.3) | 88 | Runs analysis per segment, aligns results, flags divergent drivers |
-| `08_executive_summary.R` | 907 | Plain-English narrative findings (v10.3) | 88 | Template-based text generation; identifies top drivers, at-risk areas, segment differences |
-| `09_elastic_net.R` | 185 | Elastic Net regularized regression (v10.4) | 89 | glmnet with CV; zero-variance guard; lambda.1se and lambda.min; handles weighted data |
-| `10_nca.R` | 185 | Necessary Condition Analysis (v10.4) | 88 | NCA package; CE-FDH method; bottleneck table with API validation; identifies hygiene factors |
-| `11_dominance.R` | 177 | Dominance Analysis (v10.4) | 89 | domir package; general/conditional/complete dominance; closure-safe weight handling; top-15 driver limit |
+| `00_guard.R` | 529 | TRS v1.1 guard layer; validates all inputs before analysis begins | 92 | Comprehensive type/range/existence checks; structured refusals with actionable messages |
+| `00_main.R` | 1,615 | 18-step orchestration pipeline; single public entry point | 90 | Coordinates guard, config, validation, analysis, optional SHAP/Quadrant, bootstrap, effect sizes, segment comparison, elastic net, NCA, dominance, GAM, executive summary, output, HTML report |
+| `01_config.R` | 964 | Loads and validates Excel-based configuration | 90 | Reads 6 sheets (Settings, Variables, Segments, StatedImportance, CustomSlides, Insights); normalises column names; applies defaults; returns structured config list |
+| `02_term_mapping.R` | 500 | Mixed predictor handling (continuous + categorical variables) | 90 | Maps survey terms to analysis-ready columns; handles dummy expansion for categoricals |
+| `02_validation.R` | 274 | Data validation (sample size, zero-variance columns) | 91 | Checks minimum N, detects degenerate predictors, returns TRS refusals |
+| `03_analysis.R` | 952 | Core algorithms: correlation, regression, 5 importance methods | 93 | Pearson, Spearman, standardised beta, relative importance (Lindeman-Merenda-Gold), Shapley regression; handles missing data, multicollinearity |
+| `04_output.R` | 602 | Excel workbook generation | 85 | Creates formatted multi-sheet `.xlsx`; **v10.4 gap: does not yet write Elastic Net, NCA, Dominance, GAM sheets** |
+| `05_bootstrap.R` | 569 | Bootstrap confidence intervals (v10.3) | 90 | BCa and percentile methods; configurable replications (min 100); handles weighted data |
+| `06_effect_size.R` | 510 | Effect-size interpretation (v10.3) | 90 | Cohen's d, confidence intervals on effect sizes; magnitude labels (small/medium/large) |
+| `07_segment_comparison.R` | 698 | Cross-segment driver importance comparison (v10.3) | 88 | Runs analysis per segment, aligns results, flags divergent drivers |
+| `08_executive_summary.R` | 903 | Plain-English narrative findings (v10.3) | 88 | Template-based text generation; identifies top drivers, at-risk areas, segment differences |
+| `09_elastic_net.R` | 189 | Elastic Net regularized regression (v10.4) | 89 | glmnet with CV; zero-variance guard; lambda.1se and lambda.min; handles weighted data |
+| `10_nca.R` | 253 | Necessary Condition Analysis (v10.4) | 88 | NCA package; CE-FDH method; bottleneck table with API validation; identifies hygiene factors |
+| `11_dominance.R` | 225 | Dominance Analysis (v10.4) | 89 | domir package; general/conditional/complete dominance; closure-safe weight handling; top-15 driver limit |
 | `12_gam.R` | 194 | GAM nonlinear effects (v10.4) | 89 | mgcv with REML; auto-reduces k when sample too small; classifies nonlinearity shape |
 
 ### SHAP Submodule -- `R/kda_shap/`
 
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
-| `shap_model.R` | 203 | XGBoost model building | 87 | Hyperparameter defaults, early stopping, handles categorical encoding |
-| `shap_calculate.R` | 273 | SHAP value computation | 86 | Wraps `shapr`/`treeshap`; aggregates to mean |
+| `shap_model.R` | 213 | XGBoost model building | 87 | Hyperparameter defaults, early stopping, handles categorical encoding |
+| `shap_calculate.R` | 288 | SHAP value computation | 86 | Wraps `shapr`/`treeshap`; aggregates to mean |
 | `shap_visualize.R` | 427 | Beeswarm, waterfall, and dependence plots | 85 | ggplot2-based; colour-coded by feature value; supports segment overlay |
 | `shap_segment.R` | 254 | Per-segment SHAP analysis | 86 | Runs SHAP pipeline within each segment; aligns feature ordering |
 | `shap_interaction.R` | 212 | Feature interaction detection | 85 | SHAP interaction values; flags top-N interactions |
-| `shap_export.R` | 323 | SHAP results to Excel | 88 | Multi-sheet export with summary, raw values, and plot metadata |
+| `shap_export.R` | 360 | SHAP results to Excel | 88 | Multi-sheet export with summary, raw values, and plot metadata |
 
 ### SHAP Orchestrator -- `R/kda_methods/`
 
@@ -114,17 +114,17 @@ snapshots, and 1280x720 PNG slide export.
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
 | `quadrant_main.R` | 270 | Quadrant pipeline orchestration | 88 | Coordinates data prep, calculation, plotting, comparison, export |
-| `quadrant_data_prep.R` | 444 | Data normalisation for quadrant analysis | 87 | Scales importance and performance to 0-100; handles missing segments |
+| `quadrant_data_prep.R` | 491 | Data normalisation for quadrant analysis | 87 | Scales importance and performance to 0-100; handles missing segments |
 | `quadrant_calculate.R` | 328 | Quadrant classification logic | 88 | Assigns drivers to quadrants (Concentrate Here, Keep Up, Low Priority, Possible Overkill) based on configurable thresholds |
 | `quadrant_plot.R` | 468 | SVG/ggplot2 quadrant charts | 86 | Labelled scatter with quadrant shading; handles overlapping labels |
-| `quadrant_comparison.R` | 269 | Cross-segment quadrant analysis | 86 | Compares quadrant assignments across segments; flags movers |
-| `quadrant_export.R` | 293 | Quadrant data to Excel | 88 | Multi-sheet export with classification, coordinates, and plot metadata |
+| `quadrant_comparison.R` | 277 | Cross-segment quadrant analysis | 86 | Compares quadrant assignments across segments; flags movers |
+| `quadrant_export.R` | 330 | Quadrant data to Excel | 88 | Multi-sheet export with classification, coordinates, and plot metadata |
 
 ### Configuration & Validation -- `lib/`
 
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
-| `generate_config_templates.R` | 832 | Professional Excel template generator | 90 | Creates pre-formatted config workbooks with validation dropdowns, instructions, and example data |
+| `generate_config_templates.R` | 1,360 | Professional Excel template generator | 90 | Creates pre-formatted config workbooks with validation dropdowns, instructions, and example data |
 | `validation/preflight_validators.R` | 1,023 | 14 cross-referential preflight checks | 90 | Validates config-to-data consistency: column existence, scale ranges, segment definitions, predictor overlap, outcome validity. **Untested** |
 
 ### HTML Report R Files -- `lib/html_report/`
@@ -132,14 +132,17 @@ snapshots, and 1280x720 PNG slide export.
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
 | `00_html_guard.R` | 112 | Input validation for HTML report generation | 88 | Guards report inputs; checks result object structure |
-| `01_data_transformer.R` | 781 | Transforms analysis results for HTML rendering | 87 | Reshapes, ranks, and annotates data; passes through v10.4 results with `has_*` flags |
-| `02_table_builder.R` | 953 | Builds 9+ HTML table types | 86 | Driver rankings, correlation matrices, bootstrap CIs, segment comparisons, effect sizes; inline styling |
-| `03_page_builder.R` | 3,483 | CSS, page layout, section assembly, insight areas | 85 | Largest file in module. 10 section builders; config-driven insight pre-population with base64 image support. v10.4 sections extracted to `07_v104_sections.R` |
+| `01_data_transformer.R` | 798 | Transforms analysis results for HTML rendering | 87 | Reshapes, ranks, and annotates data; passes through v10.4 results with `has_*` flags |
+| `02_table_builder.R` | 956 | Builds 9+ HTML table types | 86 | Driver rankings, correlation matrices, bootstrap CIs, segment comparisons, effect sizes; inline styling |
+| `03_page_builder.R` | 314 | Page layout and section assembly | 85 | No longer the largest file: CSS, components and section builders were split out into 03a, 03b and 03c. 10 section builders; config-driven insight pre-population with base64 image support. v10.4 sections extracted to `07_v104_sections.R` |
+| `03a_page_styling.R` | 1,467 | The report's CSS | 85 | Built as a token-substituted template, not sprintf, because of the format-string limits |
+| `03b_page_components.R` | 557 | Header, nav, footer, insight areas | 86 | Section visibility is read here; insight areas pre-populate from the config's Insights sheet |
+| `03c_section_builders.R` | 1,254 | The section builders | 85 | Ten sections, plus the Added Slides cards the CustomSlides sheet asks for |
 | `04_html_writer.R` | 112 | Atomic HTML file writing | 90 | Writes final HTML string to disk; ensures atomic write (temp + rename) |
-| `05_chart_builder.R` | 758 | 7 SVG chart types | 86 | Bar, grouped bar, horizontal bar, lollipop, heatmap, radar, bootstrap CI; inline SVG with viewBox scaling |
-| `06_quadrant_section.R` | 640 | SVG quadrant plot embedded in HTML report | 85 | Standalone SVG quadrant with interactive legend toggles; coordinates with JS navigation |
-| `07_v104_sections.R` | 281 | v10.4 section builders (elastic net, NCA, dominance, GAM) | 90 | Extracted from `03_page_builder.R`; self-contained with own `%||%` operator |
-| `99_html_report_main.R` | 397 | HTML report orchestrator | 88 | Coordinates guard, transform, tables, charts, quadrant, page build, write |
+| `05_chart_builder.R` | 806 | 7 SVG chart types | 86 | Bar, grouped bar, horizontal bar, lollipop, heatmap, radar, bootstrap CI; inline SVG with viewBox scaling |
+| `06_quadrant_section.R` | 662 | SVG quadrant plot embedded in HTML report | 85 | Standalone SVG quadrant with interactive legend toggles; coordinates with JS navigation |
+| `07_v104_sections.R` | 280 | v10.4 section builders (elastic net, NCA, dominance, GAM) | 90 | Extracted from `03_page_builder.R`; self-contained with own `%||%` operator |
+| `99_html_report_main.R` | 401 | HTML report orchestrator | 88 | Coordinates guard, transform, tables, charts, quadrant, page build, write |
 
 ### JavaScript -- `lib/html_report/js/`
 
@@ -159,20 +162,20 @@ forks that no report ever embedded. They have been deleted (review M24).
 
 | File | Lines | Tests | Notes |
 |------------------|-----------------:|-----------------:|------------------|
-| `test_config.R` | 265 | 18 | Config loading, sheet validation, settings parsing |
-| `test_guard.R` | 225 | 15 | TRS guard layer, refusal codes, edge cases |
-| `test_core_importance.R` | 380 | 28 | 5 importance methods, weighted data, rankings |
-| `test_edge_cases.R` | 398 | 30 | Missing data, zero variance, single driver, negative correlations |
-| `test_effect_size.R` | 210 | 14 | Cohen's d, classification, TRS refusals for invalid input |
-| `test_bootstrap.R` | 310 | 22 | BCa/percentile, weighted, minimum iterations guard |
-| `test_segment_comparison.R` | 285 | 20 | Multi-segment analysis, alignment, classification |
-| `test_executive_summary.R` | 320 | 24 | Narrative generation, template interpolation |
-| `test_quadrant.R` | 275 | 18 | IPA classification, threshold methods, normalization |
-| `test_html_report.R` | 350 | 25 | Data transformer, table builder, guard, full report gen |
-| `test_term_mapping.R` | 180 | 12 | Continuous/categorical/ordinal mapping, dummy expansion |
-| `test_integration.R` | 520 | 38 | End-to-end pipeline, bootstrap, HTML report, mixed predictors |
-| `test_v104_features.R` | 430 | 41 | Elastic Net, NCA, Dominance, GAM with edge cases |
-| `test_bug_fixes.R` | 150 | 8 | Regression tests for BUG-2 through BUG-8 |
+| `test_config.R` | 368 | 18 | Config loading, sheet validation, settings parsing |
+| `test_guard.R` | 372 | 15 | TRS guard layer, refusal codes, edge cases |
+| `test_core_importance.R` | 273 | 28 | 5 importance methods, weighted data, rankings |
+| `test_edge_cases.R` | 449 | 30 | Missing data, zero variance, single driver, negative correlations |
+| `test_effect_size.R` | 334 | 14 | Cohen's d, classification, TRS refusals for invalid input |
+| `test_bootstrap.R` | 368 | 22 | BCa/percentile, weighted, minimum iterations guard |
+| `test_segment_comparison.R` | 391 | 20 | Multi-segment analysis, alignment, classification |
+| `test_executive_summary.R` | 474 | 24 | Narrative generation, template interpolation |
+| `test_quadrant.R` | 383 | 18 | IPA classification, threshold methods, normalization |
+| `test_html_report.R` | 297 | 25 | Data transformer, table builder, guard, full report gen |
+| `test_term_mapping.R` | 346 | 12 | Continuous/categorical/ordinal mapping, dummy expansion |
+| `test_integration.R` | 528 | 38 | End-to-end pipeline, bootstrap, HTML report, mixed predictors |
+| `test_v104_features.R` | 606 | 41 | Elastic Net, NCA, Dominance, GAM with edge cases |
+| `test_bug_fixes.R` | 164 | 8 | Regression tests for BUG-2 through BUG-8 |
 
 ### Test Fixtures -- `tests/fixtures/`
 
@@ -186,14 +189,20 @@ forks that no report ever embedded. They have been deleted (review M24).
 |-------------------|-------------------------|----------------------------|
 | `KeyDriver_Config_Template.xlsx` | 6 | Production template with v10.4 settings, CustomSlides, and Insights sheets |
 
-### Demo -- `examples/keydriver/demo_showcase/`
+### Worked example -- `examples/keydriver/`
+
+A `demo_showcase` folder was listed here, with four files in it, and it has
+never existed. The worked example is Suiderland Bank, whose outcome is built
+from known standardised effects so the answer can be checked rather than
+eyeballed.
 
 | File | Purpose |
 |-----------------------------|-------------------------------------------|
-| `create_demo_config.R` | Generates demo Excel config with all 6 sheets including example insights |
-| `generate_demo_data.R` | Creates synthetic 800-respondent telecom survey dataset |
-| `run_demo.R` | End-to-end demo runner with all 18 analysis steps |
-| `README.md` | Demo documentation with v10.4 feature table |
+| `create_keydriver_example.R` | Builds the data file and both configs, continuous and mixed |
+| `Suiderland_KeyDriver_Data.xlsx` | 900 respondents, committed at the example's seed |
+| `Suiderland_KeyDriver_Config.xlsx` | Continuous config |
+| `Suiderland_KeyDriver_Config_Mixed.xlsx` | Mixed config, which degrades on purpose |
+| `README.md` | The known answer, and what each degradation is there to show |
 
 ------------------------------------------------------------------------
 

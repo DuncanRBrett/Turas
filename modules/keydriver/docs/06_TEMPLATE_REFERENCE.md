@@ -360,13 +360,13 @@ These settings control which sections appear in the HTML report. All default to 
 
 ### Effect Size Settings
 
-#### effect_size_method
+#### effect_size_method (withdrawn)
 
-- **Purpose:** Method for calculating effect size benchmarks
-- **Required:** No
-- **Default:** cohen_f2
-- **Valid Values:** cohen_f2, standardized_beta, correlation
-- **NEW in v10.3**
+Documented here since v10.3 and read by no code, so setting it has never
+changed anything. Effect sizes are reported as Cohen's f-squared. The setting
+is not in the config template and is listed here only so a config that still
+carries it is understood: it is ignored, and the run says so on the console
+along with any other unrecognised Setting.
 
 ---
 
@@ -635,13 +635,12 @@ Compares:
 
 | Column | Description | Example |
 |--------|-------------|---------|
-| slide_image | File path to an image to embed in the slide | `images/context_chart.png` |
-| slide_order | Integer controlling display order in the Pinned Views panel | `1` |
+| image_path | File path to an image to embed in the slide | `images/context_chart.png` |
 
 ### Example CustomSlides Sheet
 
 ```
-slide_title      | slide_content                              | slide_image              | slide_order
+slide_title      | slide_content                              | image_path
 Key Takeaways    | Service quality dominates all segments     |                          | 1
 Methodology      | Analysis uses 5 complementary methods...   |                          | 2
 Market Context   | Q4 saw increased competitive pressure...   | images/market_trend.png  | 3
@@ -650,7 +649,7 @@ Market Context   | Q4 saw increased competitive pressure...   | images/market_tr
 ### Notes
 
 - Slides appear in the Pinned Views panel of the HTML report
-- If `slide_order` is omitted, slides appear in the order defined in the sheet
+- Slides appear in the order defined in the sheet, and can be reordered in the report
 - The `slide_content` column supports basic markdown: headings, bullet lists, bold, italic
 - Image paths are resolved relative to the config file directory
 
@@ -867,7 +866,6 @@ website_ease     | 45
 | bootstrap_ci_level | Numeric 0.80-0.99 |
 | brand_colour | Valid hex colour code |
 | accent_colour | Valid hex colour code |
-| effect_size_method | One of: cohen_f2, standardized_beta, correlation |
 | cv_nfold | Integer 3-10 |
 | early_stopping_rounds | Integer 5-50 |
 | enable_elastic_net | TRUE or FALSE |

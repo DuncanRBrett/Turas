@@ -1452,8 +1452,7 @@ in the R console:
 |--------|----------|-------------|
 | `slide_title` | Yes | Title displayed on the slide |
 | `slide_content` | Yes | Slide body text (supports markdown) |
-| `slide_image` | No | File path to an image to embed in the slide |
-| `slide_order` | No | Integer controlling display order |
+| `image_path` | No | File path to an image to embed in the slide |
 
 Custom slides appear in the HTML report's Pinned Views panel,
 allowing analysts to add qualitative commentary, methodology
