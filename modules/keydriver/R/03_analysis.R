@@ -75,24 +75,34 @@ calculate_correlations <- function(data, config) {
   vars <- c(config$outcome_var, config$driver_vars)
   weight_var <- config$weight_var
 
-  if (is.null(weight_var)) {
-    # Simple Pearson correlation
-    cors <- stats::cor(data[, vars, drop = FALSE], use = "pairwise.complete.obs")
-    return(cors)
-  }
+  # A categorical driver has no zero-order correlation. The weighted path
+  # returned NA for one, but the unweighted path handed the factor straight to
+  # stats::cor(), which errors, so an unweighted mixed study died with a bare
+  # "'x' must be numeric" part-way through building the importance table
+  # (review F1). Both paths now return a full matrix carrying NA wherever a
+  # column is not numeric, and the caller reads only the cells it wants.
+  is_num <- vapply(vars, function(v) is.numeric(data[[v]]), logical(1))
+  num_vars <- vars[is_num]
 
-  # Weighted correlation matrix
-  w <- data[[weight_var]]
-  w <- as.numeric(w)
   m <- length(vars)
   mat <- matrix(NA_real_, nrow = m, ncol = m,
                 dimnames = list(vars, vars))
+  if (length(num_vars) == 0) return(mat)
 
-  for (i in seq_len(m)) {
-    for (j in i:m) {
-      r <- weighted_cor(data[[vars[i]]], data[[vars[j]]], w)
-      mat[i, j] <- r
-      mat[j, i] <- r
+  if (is.null(weight_var)) {
+    # Simple Pearson correlation
+    cors <- stats::cor(data[, num_vars, drop = FALSE], use = "pairwise.complete.obs")
+    mat[num_vars, num_vars] <- cors
+    return(mat)
+  }
+
+  # Weighted correlation matrix
+  w <- as.numeric(data[[weight_var]])
+  for (i in seq_along(num_vars)) {
+    for (j in i:length(num_vars)) {
+      r <- weighted_cor(data[[num_vars[i]]], data[[num_vars[j]]], w)
+      mat[num_vars[i], num_vars[j]] <- r
+      mat[num_vars[j], num_vars[i]] <- r
     }
   }
 
@@ -555,27 +565,12 @@ calculate_importance_mixed <- function(model, data, config, term_mapping,
   # METHOD 4: Correlations - only for numeric drivers
   numeric_drivers <- get_numeric_drivers(data, driver_vars)
   if (is.null(correlations)) {
-    # A correlation matrix needs at least two numeric columns, counting the
-    # outcome. With fewer, cor() raises a bare error part-way through the
-    # importance table and the run dies with a stack trace instead of a
-    # refusal that says what to do (review M6).
-    if (length(numeric_drivers) < 1) {
-      keydriver_refuse(
-        code = "DATA_NO_NUMERIC_DRIVERS",
-        title = "No Numeric Drivers To Correlate",
-        problem = paste0(
-          "Correlations were requested and every driver in this model is ",
-          "categorical."),
-        why_it_matters = paste0(
-          "A zero-order correlation is only defined between numbers. The other ",
-          "importance measures in this table do handle categorical drivers; the ",
-          "correlation column cannot."),
-        how_to_fix = c(
-          "Switch the correlation column off for this study, or",
-          "Declare at least one driver as continuous or ordinal on the Drivers sheet if it is one."
-        )
-      )
-    }
+    # An all-categorical study used to be refused here, and told to switch the
+    # correlation column off with a setting that does not exist (review F2).
+    # Beta weights, relative weights and Shapley values are all defined for
+    # categorical drivers and computed just below, so only the correlation
+    # column is missing. calculate_correlations() fills it with NA and the
+    # pipeline records a degraded reason naming what is not there.
     correlations <- calculate_correlations(data, config)
   }
 

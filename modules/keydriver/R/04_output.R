@@ -355,6 +355,9 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       "sample_size",
       "r_squared",
       "primary_method",
+      # The run is seeded, and nothing recorded which seed, so a set of
+      # intervals could not be reproduced from the outputs alone (review F6).
+      "random_seed",
       "spec_version"
     ),
     Value = c(
@@ -371,6 +374,11 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       # no `results` object in this frame. Caught by the Suiderland example on
       # its first end-to-end run, which is what an example is for.
       .kd_primary_method(list(importance = importance)),
+      as.character(if (exists("kd_seed_value", mode = "function")) {
+        kd_seed_value(config)
+      } else {
+        config$settings$random_seed %||% config$random_seed %||% NA
+      }),
       "TURAS-KD-CONTINUOUS-UPGRADE-v1.0"
     ),
     stringsAsFactors = FALSE

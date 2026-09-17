@@ -572,7 +572,6 @@ columns.
 | Column        | Description                                   | When Needed                   |
 |---------------|-----------------------------------------------|-------------------------------|
 | `driver_type` | Declares the data type of the driver          | Required for mixed-predictor mode |
-| `aggregation_method` | How categorical driver terms are aggregated | Only for categorical drivers in mixed mode |
 
 #### Variable Types
 
@@ -2322,7 +2321,6 @@ drivers.
 | Type               | Yes      | Outcome, Driver, Weight                          |
 | Label              | Yes      | Any text                                         |
 | driver_type        | No       | continuous, categorical, ordinal                 |
-| aggregation_method | No       | partial_r2, grouped_permutation                  |
 
 ### 9.6 Quick Reference: Segments Sheet
 

@@ -584,15 +584,6 @@ build_variables_columns <- function() {
       numeric_range = NULL
     ),
     list(
-      name = "AggregationMethod",
-      width = 22,
-      required = FALSE,
-      description = "Method for aggregating categorical driver importance.",
-      dropdown = c("partial_r2", "grouped_permutation", "grouped_shapley"),
-      integer_range = NULL,
-      numeric_range = NULL
-    ),
-    list(
       name = "ReferenceLevel",
       width = 20,
       required = FALSE,
@@ -618,7 +609,6 @@ build_variables_examples <- function() {
       Type = "Outcome",
       Label = "Overall Satisfaction",
       DriverType = "",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -626,7 +616,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Service Quality",
       DriverType = "continuous",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -634,7 +623,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Value for Money",
       DriverType = "continuous",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -642,7 +630,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Ease of Use",
       DriverType = "continuous",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -650,7 +637,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Brand Trust",
       DriverType = "categorical",
-      AggregationMethod = "partial_r2",
       ReferenceLevel = "Low"
     ),
     list(
@@ -658,7 +644,6 @@ build_variables_examples <- function() {
       Type = "Weight",
       Label = "Survey Weight",
       DriverType = "",
-      AggregationMethod = "",
       ReferenceLevel = ""
     )
   )

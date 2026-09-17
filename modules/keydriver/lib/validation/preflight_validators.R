@@ -19,7 +19,6 @@
 # - check_drivers_in_data()          - Driver variables existence
 # - check_weight_in_data()           - Weight variable validity
 # - check_driver_type_specified()    - DriverType completeness
-# - check_categorical_aggregation()  - Aggregation method for categoricals
 # - check_reference_levels_valid()   - Reference levels exist in data
 # - check_sample_size_rule()         - Minimum sample size
 # - check_zero_variance_drivers()    - Zero-variance detection
@@ -356,61 +355,6 @@ check_driver_type_specified <- function(variables_df, error_log) {
         error_log, "Driver Type",
         sprintf("Driver '%s' has invalid DriverType '%s'. Must be one of: %s",
                 var_name, driver_type, paste(valid_types, collapse = ", ")),
-        severity = "Error",
-        field = var_name
-      )
-    }
-  }
-
-  return(error_log)
-}
-
-
-# ==============================================================================
-# CHECK 5: Categorical drivers have AggregationMethod specified
-# ==============================================================================
-
-#' Check Categorical Aggregation Method
-#'
-#' Verifies that categorical drivers have an AggregationMethod specified.
-#' Defaults to partial_r2 if not provided (warning, not error).
-#'
-#' @param variables_df Data frame from the Variables config sheet.
-#' @param error_log Data frame, running error log.
-#' @return Updated error_log.
-#' @keywords internal
-check_categorical_aggregation <- function(variables_df, error_log) {
-  if (!"DriverType" %in% names(variables_df)) return(error_log)
-  if (!"AggregationMethod" %in% names(variables_df)) return(error_log)
-
-  driver_rows <- variables_df[
-    !is.na(variables_df$Type) & toupper(trimws(variables_df$Type)) == "DRIVER", ]
-
-  cat_drivers <- driver_rows[
-    !is.na(driver_rows$DriverType) &
-    tolower(trimws(driver_rows$DriverType)) == "categorical", ]
-
-  if (nrow(cat_drivers) == 0) return(error_log)
-
-  valid_methods <- c("partial_r2", "grouped_permutation", "grouped_shapley")
-
-  for (i in seq_len(nrow(cat_drivers))) {
-    var_name <- trimws(cat_drivers$VariableName[i])
-    agg_method <- cat_drivers$AggregationMethod[i]
-
-    if (is.na(agg_method) || trimws(agg_method) == "") {
-      error_log <- log_preflight_issue(
-        error_log, "Categorical Aggregation",
-        sprintf("Categorical driver '%s' has no AggregationMethod specified. Will default to 'partial_r2'.",
-                var_name),
-        severity = "Warning",
-        field = var_name
-      )
-    } else if (!tolower(trimws(agg_method)) %in% valid_methods) {
-      error_log <- log_preflight_issue(
-        error_log, "Categorical Aggregation",
-        sprintf("Categorical driver '%s' has invalid AggregationMethod '%s'. Must be one of: %s",
-                var_name, agg_method, paste(valid_methods, collapse = ", ")),
         severity = "Error",
         field = var_name
       )
@@ -784,17 +728,41 @@ check_stated_importance_drivers <- function(stated_df, variables_df, error_log) 
 # and the checks never fired on a real run (review H8). They read both shapes
 # now, preferring the live one, so the unit tests that build a flat config
 # still work.
+#' Read a setting as a logical, the way the rest of the module reads one
+#'
+#' These checks compared `toupper(trimws(x)) == "TRUE"`, so they fired for a
+#' config spelled TRUE and never for one spelled Yes, which is what the
+#' template's own dropdown and every example emit (review F4).
+#'
+#' @param value The raw setting value
+#' @return TRUE or FALSE
+#' How many pre-flight checks the orchestrator runs
+#'
+#' Thirteen since check 5, which policed the withdrawn AggregationMethod
+#' column, was deleted (review F5). The banner reads this rather than a typed
+#' number, so it cannot claim a check that no longer runs.
+#' @keywords internal
+KD_PREFLIGHT_CHECK_COUNT <- 13L
+
+
+#' @keywords internal
+.pf_logical <- function(value) {
+  if (exists("as_logical_setting", mode = "function")) {
+    return(isTRUE(as_logical_setting(value, FALSE)))
+  }
+  if (is.null(value) || all(is.na(value))) return(FALSE)
+  if (is.logical(value)) return(isTRUE(value[1]))
+  isTRUE(tolower(trimws(as.character(value)[1])) %in%
+           c("true", "t", "yes", "y", "1", "on", "enabled"))
+}
+
+
 #' @keywords internal
 check_shap_dependencies <- function(config, error_log) {
   enable_shap <- config$settings$enable_shap %||% config$enable_shap
   if (is.null(enable_shap)) return(error_log)
 
-  # Normalise to logical
-  if (is.character(enable_shap)) {
-    enable_shap <- toupper(trimws(enable_shap)) == "TRUE"
-  }
-
-  if (!isTRUE(enable_shap)) return(error_log)
+  if (!.pf_logical(enable_shap)) return(error_log)
 
   if (!requireNamespace("xgboost", quietly = TRUE)) {
     error_log <- log_preflight_issue(
@@ -826,28 +794,49 @@ check_shap_dependencies <- function(config, error_log) {
 check_quadrant_requirements <- function(config, stated_df, error_log) {
   enable_quadrant <- config$settings$enable_quadrant %||% config$enable_quadrant
   if (is.null(enable_quadrant)) return(error_log)
-
-  # Normalise to logical
-  if (is.character(enable_quadrant)) {
-    enable_quadrant <- toupper(trimws(enable_quadrant)) == "TRUE"
-  }
-
-  if (!isTRUE(enable_quadrant)) return(error_log)
+  if (!.pf_logical(enable_quadrant)) return(error_log)
 
   has_stated <- !is.null(stated_df) && is.data.frame(stated_df) && nrow(stated_df) > 0
 
-  importance_source <- config$importance_source
-  if (is.null(importance_source) || trimws(importance_source) == "") {
+  # The live config keeps this in settings. Reading the top level meant every
+  # run looked like "auto" (review F4).
+  importance_source <- config$settings$importance_source %||% config$importance_source
+  if (is.null(importance_source) || all(is.na(importance_source)) ||
+      trimws(as.character(importance_source)[1]) == "") {
     importance_source <- "auto"
   }
+  importance_source <- tolower(trimws(as.character(importance_source)[1]))
 
-  # When importance_source is "auto", stated importance is needed for the
-  # performance axis. Without it, quadrant analysis cannot place drivers.
-  if (tolower(trimws(importance_source)) == "auto" && !has_stated) {
+  valid_sources <- if (exists("KD_QUADRANT_IMPORTANCE_SOURCES")) {
+    KD_QUADRANT_IMPORTANCE_SOURCES
+  } else {
+    c("auto", "shap", "relative_weights", "regression", "correlation")
+  }
+  if (!importance_source %in% valid_sources) {
     error_log <- log_preflight_issue(
       error_log, "Quadrant Requirements",
-      "enable_quadrant is TRUE and importance_source is 'auto', but no StatedImportance data is provided. Provide stated importance ratings or set importance_source to a derived method (shapley, relative, beta, or shap).",
+      sprintf(paste0("importance_source is '%s', which is not a source the ",
+                     "quadrant can use. Use one of: %s."),
+              importance_source, paste(valid_sources, collapse = ", ")),
       severity = "Error",
+      field = "importance_source"
+    )
+    return(error_log)
+  }
+
+  # Stated importance is NOT required. The quadrant's importance axis comes
+  # from the derived measure and its performance axis from driver means, so a
+  # study without the sheet plots perfectly well. This used to refuse the run
+  # on a premise that was simply untrue (review F4). What is genuinely lost is
+  # the stated against derived comparison, so that is what it says, as a
+  # warning the run carries on past.
+  if (!has_stated) {
+    error_log <- log_preflight_issue(
+      error_log, "Quadrant Requirements",
+      paste0("enable_quadrant is on and no StatedImportance sheet is provided. ",
+             "The quadrant will still be produced, from derived importance and ",
+             "driver means. The stated against derived comparison will not be."),
+      severity = "Warning",
       field = "enable_quadrant"
     )
   }
@@ -963,7 +952,11 @@ validate_keydriver_preflight <- function(config, data, variables_df,
   error_log <- check_driver_type_specified(variables_df, error_log)
 
   # 5. Categorical aggregation method
-  error_log <- check_categorical_aggregation(variables_df, error_log)
+  # Check 5 policed the AggregationMethod column. Its engine was deleted in
+  # this programme, so the check warned that a blank column "will default to
+  # partial_r2", which was not true of anything, and refused a run outright
+  # over a value nothing reads (review F5). The column is gone from the
+  # template too, and 01_config.R tells an analyst once if they still have it.
 
   # 6. Reference level validity
   error_log <- check_reference_levels_valid(variables_df, data, error_log)
@@ -1006,7 +999,9 @@ validate_keydriver_preflight <- function(config, data, variables_df,
     n_info <- sum(error_log$Component == "Preflight" & error_log$Severity == "Info")
 
     if (n_preflight == 0) {
-      cat("  All 14 pre-flight checks passed\n")
+      # Counted from the constant rather than typed, so deleting a check
+      # cannot leave the banner claiming one that no longer runs.
+      cat(sprintf("  All %d pre-flight checks passed\n", KD_PREFLIGHT_CHECK_COUNT))
     } else {
       cat(sprintf("  Pre-flight found %d issue(s): %d error(s), %d warning(s), %d info\n",
                   n_preflight, n_errors, n_warnings, n_info))

@@ -66,7 +66,7 @@ test_that("the randomised steps all ask for the seed (M3)", {
   expect_false(any(grepl("^\\s*set.seed(42)", shap)))
 })
 
-test_that("an all-categorical model refuses the correlation column (M6)", {
+test_that("an all-categorical model runs, with an empty correlation column (M6, F2)", {
   skip_if(!exists("calculate_importance_mixed", mode = "function"),
           "mixed path not loaded")
   set.seed(3)
@@ -81,14 +81,63 @@ test_that("an all-categorical model refuses the correlation column (M6)", {
   model <- lm(f, data = d)
   tm <- build_term_mapping(f, d, cfg$driver_vars)
 
+  # It used to die inside cor() with a bare error, then for a while it refused
+  # the study and told the analyst to switch the correlation column off with a
+  # setting that does not exist (review F2). Beta weights, relative weights and
+  # Shapley values are all defined here, so the study runs and only the
+  # correlation column is empty.
+  imp <- NULL
   err <- tryCatch({
     suppressWarnings(capture.output(
-      calculate_importance_mixed(model, d, cfg, tm, correlations = NULL)))
-    "NO REFUSAL"
+      imp <- calculate_importance_mixed(model, d, cfg, tm, correlations = NULL)))
+    ""
   }, error = function(e) conditionMessage(e))
-  # It used to die inside cor() with a bare error and no guidance.
-  expect_match(err, "DATA_NO_NUMERIC_DRIVERS")
-  expect_match(err, "only defined between numbers")
+
+  expect_equal(err, "")
+  expect_true(is.data.frame(imp))
+  expect_setequal(imp$Driver, c("G1", "G2"))
+  expect_true(all(is.na(imp$Correlation)))
+  # The measures that are defined for a factor all produced a number.
+  expect_true(all(is.finite(imp$Beta_Weight)))
+  expect_true(all(is.finite(imp$Relative_Weight)))
+  expect_true(all(is.finite(imp$Shapley_Value)))
+  # And the one that carries the real signal is G1, which built the outcome.
+  expect_equal(imp$Driver[which.max(imp$Shapley_Value)], "G1")
+})
+
+test_that("one numeric driver among categoricals does not kill the run (F1)", {
+  skip_if(!exists("calculate_correlations", mode = "function"),
+          "analysis not loaded")
+  # stats::cor() on a frame with a factor column raises "'x' must be numeric".
+  # The unweighted path handed it the whole driver list, so an unweighted
+  # mixed study with one numeric driver died part-way through the importance
+  # table. The weighted twin survived, which is how it stayed hidden.
+  set.seed(11)
+  n <- 150
+  d <- data.frame(
+    x1 = rnorm(n),
+    g  = factor(sample(c("a", "b"), n, TRUE)),
+    h  = factor(sample(c("p", "q"), n, TRUE)),
+    w  = runif(n, 0.5, 2)
+  )
+  d$Y <- d$x1 * 2 + rnorm(n)
+
+  for (wv in list(NULL, "w")) {
+    cfg <- list(outcome_var = "Y", driver_vars = c("x1", "g", "h"), weight_var = wv)
+    m <- calculate_correlations(d, cfg)
+    expect_true(is.matrix(m))
+    expect_setequal(rownames(m), c("Y", "x1", "g", "h"))
+    # The numeric pair is real and the factor cells are NA, not an error.
+    expect_true(is.finite(m["Y", "x1"]))
+    expect_gt(m["Y", "x1"], 0.7)
+    expect_true(is.na(m["Y", "g"]))
+    expect_true(is.na(m["g", "h"]))
+  }
+
+  # And with no numeric driver at all it is a full NA matrix, not a failure.
+  cfg0 <- list(outcome_var = "Y", driver_vars = c("g", "h"), weight_var = NULL)
+  m0 <- calculate_correlations(d, cfg0)
+  expect_true(all(is.na(m0[, c("g", "h")])))
 })
 
 test_that("standardised betas use weighted SDs on a weighted study (M1)", {

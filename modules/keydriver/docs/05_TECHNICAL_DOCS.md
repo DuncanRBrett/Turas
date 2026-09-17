@@ -210,7 +210,7 @@ modules/keydriver/
 | `01_config.R` | ~700 | Config loading, driver declaration validation, feature policies | `load_keydriver_config()`, `validate_driver_declarations()`, `parse_feature_policies()`, `get_setting()`, `get_driver_type()`, `get_aggregation_method()` |
 | `02_term_mapping.R` | ~490 | Term-to-driver coefficient mapping, encoding policy | `build_term_mapping()`, `validate_term_mapping()`, `enforce_encoding_policy()`, `has_categorical_predictors()`, `validate_driver_type_consistency()` |
 | `02_validation.R` | ~240 | Data loading, format detection, missing data handling | `load_keydriver_data()`, `coerce_numeric_safe()` |
-| `03_analysis.R` | ~980 | Five importance methods, mixed predictor aggregation | `calculate_importance_scores()`, `calculate_shapley_values()`, `calculate_relative_weights()`, `calculate_beta_weights()`, `calculate_correlations()`, `calculate_importance_mixed()`, `calculate_partial_r2()`, `calculate_importance_permutation()` |
+| `03_analysis.R` | ~980 | Five importance methods, mixed predictor aggregation | `calculate_importance_scores()`, `calculate_shapley_values()`, `calculate_relative_weights()`, `calculate_beta_weights()`, `calculate_correlations()`, `calculate_importance_mixed()` |
 | `04_output.R` | ~440 | Excel workbook generation (7 sheets) | `write_keydriver_output()`, `calculate_vif()` |
 | `05_bootstrap.R` | ~200 | Bootstrap confidence intervals for importance | `bootstrap_driver_importance()` |
 | `06_effect_size.R` | ~150 | Effect size classification (Cohen's f2, beta, r) | `get_effect_size_benchmarks()`, `classify_effect_size()`, `interpret_effect_sizes()` |
@@ -463,7 +463,7 @@ validated config list.
 
 - `Settings` -- Key-value pairs (Setting, Value columns)
 - `Variables` -- Variable definitions (VariableName, Type, Label,
-  DriverType, AggregationMethod, ReferenceLevel)
+  DriverType, ReferenceLevel)
 
 **Optional Sheets:**
 
@@ -503,16 +503,13 @@ list(
 
 Each driver in the Variables sheet must have an explicit `DriverType`
 column with one of: `continuous`, `ordinal`, `categorical`. Type
-inference is no longer permitted. Categorical drivers must also
-specify an `AggregationMethod` (defaults to `partial_r2`).
+inference is no longer permitted.
 
-Valid aggregation methods:
-
-| Method | Description |
-|--------|-------------|
-| `partial_r2` | R-squared contribution of the driver as a whole (default) |
-| `grouped_permutation` | Permutation-based importance with grouped shuffling |
-| `grouped_shapley` | Shapley decomposition at driver level (requires SHAP enabled) |
+There is no `AggregationMethod` column any more. It selected between three
+v10.3 engines, all of which were deleted, and nothing read the value. A
+categorical driver's importance is computed by Shapley decomposition, with
+its model terms aggregated by the term mapping in `02_term_mapping.R`. A
+config that still carries the column is told so once and runs unchanged.
 
 ### Data Validation (02_validation.R)
 
@@ -668,17 +665,12 @@ between each driver and the outcome.
 
 Weighted correlation uses: `r = cov_w(x,y) / (sd_w(x) * sd_w(y))`
 
-#### Method 5: Partial R-squared (v10.3)
+#### Method 5: withdrawn
 
-```r
-calculate_importance_partial_r2(data, config)
-```
-
-Computes the partial R-squared for each driver:
-`partial_r2 = (R2_full - R2_reduced) / (1 - R2_reduced)`.
-This is the default aggregation method for v10.3 when drivers
-have explicit type declarations. Works naturally with both
-continuous and categorical drivers.
+`calculate_importance_partial_r2()` and the two grouped variants beside it
+were never called by any run and have been deleted. `calculate_partial_r2()`
+survives as a helper, but no importance figure comes from it. Mixed studies
+go through `calculate_importance_mixed()`.
 
 #### Mixed Predictor Aggregation
 
@@ -1428,7 +1420,6 @@ in the R console:
 | `Type` | Yes | Outcome, Driver, Weight | Variable role |
 | `Label` | Yes | Any string | Human-readable label for output |
 | `DriverType` | Yes (drivers) | continuous, ordinal, categorical | v10.3: explicit type declaration |
-| `AggregationMethod` | Categorical only | partial_r2, grouped_permutation, grouped_shapley | How to aggregate multi-term importance |
 | `ReferenceLevel` | Optional | Any level value | Reference level for categorical encoding |
 
 ### Segments Sheet (Optional)

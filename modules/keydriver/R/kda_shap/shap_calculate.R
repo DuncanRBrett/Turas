@@ -117,6 +117,20 @@ encode_features <- function(X) {
 }
 
 
+#' Turn a dummy-to-driver map into shapviz's driver-to-dummies form
+#'
+#' @param feature_map Named list, dummy column name to driver name, or NULL
+#' @return Named list, driver name to its dummy columns, or NULL
+#' @keywords internal
+.kd_shap_collapse <- function(feature_map) {
+  if (is.null(feature_map) || length(feature_map) == 0) return(NULL)
+  owners <- unlist(feature_map, use.names = FALSE)
+  dummies <- names(feature_map)
+  if (is.null(dummies) || anyNA(owners)) return(NULL)
+  split(dummies, owners)
+}
+
+
 #' Create Feature Map for Collapsing Dummy Variables
 #'
 #' Creates a mapping to collapse one-hot encoded dummies back to original features.
@@ -207,12 +221,18 @@ calculate_shap_values <- function(model, prep, config) {
   # Calculate SHAP values with interactions if requested
   include_interactions <- isTRUE(config$include_interactions)
 
-  # Create shapviz object
+  # Create shapviz object.
+  # create_feature_map() returns dummy -> driver, because that is the question
+  # the encoder can answer and what everything else here reads. shapviz's
+  # collapse argument takes the opposite, driver -> its dummies, and it was
+  # handed the map the wrong way round, so SHAP for a categorical driver died
+  # with "'collapse' cannot have overlapping vectors" and the feature was
+  # dropped from every mixed study (review F3).
   shp <- shapviz::shapviz(
     object = model,
     X_pred = X_explain,
     X = X_display,
-    collapse = prep$feature_map,
+    collapse = .kd_shap_collapse(prep$feature_map),
     interactions = include_interactions
   )
 

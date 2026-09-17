@@ -225,32 +225,28 @@ test_that("Check 4 - driver type fails when DriverType column missing", {
 
 
 # ==============================================================================
-# CHECK 5: check_categorical_aggregation
+# CHECK 5 is gone (review F5)
 # ==============================================================================
 
-test_that("Check 5 - categorical with valid aggregation passes", {
-  vars_df <- make_variables_df(
-    drivers = c("brand"),
-    driver_types = c("categorical"),
-    agg_methods = c("partial_r2")
-  )
-  log <- init_preflight_log()
+test_that("no pre-flight check polices AggregationMethod any more (F5)", {
+  # The column's engine was deleted in this programme. The check warned that a
+  # blank column "will default to partial_r2", which defaulted to nothing, and
+  # refused the run for a value outside a set that decides nothing. Every
+  # template-built mixed study hit the warning, because the template emitted
+  # the column blank.
+  expect_false(exists("check_categorical_aggregation", mode = "function"))
+  src <- paste(readLines(file.path(module_dir, "lib", "validation",
+                                   "preflight_validators.R"), warn = FALSE),
+               collapse = "\n")
+  expect_false(grepl("check_categorical_aggregation(", src, fixed = TRUE))
+  expect_false(grepl("Will default to 'partial_r2'", src, fixed = TRUE))
 
-  result <- check_categorical_aggregation(vars_df, log)
-  expect_equal(nrow(result), 0)
-})
-
-test_that("Check 5 - categorical with missing aggregation warns", {
-  vars_df <- make_variables_df(
-    drivers = c("brand"),
-    driver_types = c("categorical"),
-    agg_methods = c(NA_character_)
-  )
-  log <- init_preflight_log()
-
-  result <- check_categorical_aggregation(vars_df, log)
-  expect_true(nrow(result) > 0)
-  expect_equal(result$Severity[1], "Warning")
+  # And the template no longer offers the column at all.
+  gen <- paste(readLines(file.path(module_dir, "lib",
+                                   "generate_config_templates.R"), warn = FALSE),
+               collapse = "\n")
+  expect_false(grepl("AggregationMethod", gen, fixed = TRUE))
+  expect_false(grepl("grouped_permutation", gen, fixed = TRUE))
 })
 
 
@@ -466,22 +462,68 @@ test_that("Check 13 - quadrant disabled skips check", {
   expect_equal(nrow(result), 0)
 })
 
-test_that("Check 13 - quadrant auto without stated importance errors", {
-  config <- list(enable_quadrant = TRUE, importance_source = "auto")
+test_that("Check 13 - quadrant without stated importance warns, it does not refuse (F4)", {
+  # It used to refuse, on the premise that the performance axis needed stated
+  # importance. It does not: performance comes from driver means and
+  # importance from the derived measure. What is actually lost is the stated
+  # against derived comparison, so that is what the warning says.
+  config <- list(settings = list(enable_quadrant = TRUE, importance_source = "auto"))
   log <- init_preflight_log()
 
   result <- check_quadrant_requirements(config, NULL, log)
-  expect_true(nrow(result) > 0)
-  expect_equal(result$Severity[1], "Error")
+  expect_equal(nrow(result), 1)
+  expect_equal(result$Severity[1], "Warning")
   expect_true(grepl("StatedImportance", result$Message[1]))
+  expect_true(grepl("will still be produced", result$Message[1]))
 })
 
-test_that("Check 13 - quadrant with derived importance_source passes without stated", {
-  config <- list(enable_quadrant = TRUE, importance_source = "shapley")
+test_that("Check 13 - a config spelled Yes is read the same as TRUE (F4)", {
+  # The check compared toupper(x) == "TRUE", so it fired for the spelling the
+  # template's dropdown emits and never for the spelling every example uses.
+  log <- init_preflight_log()
+  for (spelling in list(TRUE, "TRUE", "Yes", "yes", "Y", 1)) {
+    config <- list(settings = list(enable_quadrant = spelling,
+                                   importance_source = "auto"))
+    result <- check_quadrant_requirements(config, NULL, log)
+    expect_equal(nrow(result), 1, info = paste("spelling:", spelling))
+  }
+  for (spelling in list(FALSE, "FALSE", "No", "n", 0)) {
+    config <- list(settings = list(enable_quadrant = spelling,
+                                   importance_source = "auto"))
+    result <- check_quadrant_requirements(config, NULL, log)
+    expect_equal(nrow(result), 0, info = paste("spelling:", spelling))
+  }
+})
+
+test_that("Check 13 - importance_source is read from settings, and the set is real (F4)", {
+  # It read config$importance_source, which is NULL on the live object because
+  # the value sits in config$settings, so every run looked like "auto".
   log <- init_preflight_log()
 
-  result <- check_quadrant_requirements(config, NULL, log)
-  expect_equal(nrow(result), 0)
+  # A real derived source, with stated importance present: nothing to say.
+  stated <- data.frame(driver = "a", stated_importance = 5, stringsAsFactors = FALSE)
+  config <- list(settings = list(enable_quadrant = "Yes",
+                                 importance_source = "relative_weights"))
+  expect_equal(nrow(check_quadrant_requirements(config, stated, log)), 0)
+
+  # A source outside the set the quadrant can actually use is an Error, and
+  # the message names the real set rather than the old "shapley, relative,
+  # beta, or shap".
+  bad <- list(settings = list(enable_quadrant = "Yes", importance_source = "shapley"))
+  res <- check_quadrant_requirements(bad, stated, log)
+  expect_equal(nrow(res), 1)
+  expect_equal(res$Severity[1], "Error")
+  expect_true(grepl("relative_weights", res$Message[1], fixed = TRUE))
+  expect_false(grepl("beta, or shap", res$Message[1], fixed = TRUE))
+
+  # And the set the message quotes is the one the quadrant code enforces.
+  if (exists("KD_QUADRANT_IMPORTANCE_SOURCES")) {
+    for (src in KD_QUADRANT_IMPORTANCE_SOURCES) {
+      cfg <- list(settings = list(enable_quadrant = "Yes", importance_source = src))
+      expect_equal(nrow(check_quadrant_requirements(cfg, stated, log)), 0,
+                   info = src)
+    }
+  }
 })
 
 

@@ -253,21 +253,29 @@ step_calculate_correlations <- function(data, config, guard, has_mixed) {
   affected_outputs <- character(0)
   correlations <- NULL
 
-  if (has_mixed) {
-    numeric_drivers <- get_numeric_drivers(data$data, config$driver_vars)
-    if (length(numeric_drivers) < length(config$driver_vars)) {
-      degraded_reasons <- "Correlations only computed for numeric drivers (categorical excluded)"
-      affected_outputs <- c("Correlation matrix", "Quadrant chart correlations")
-      if (length(numeric_drivers) >= 2) {
-        numeric_config <- config
-        numeric_config$driver_vars <- numeric_drivers
-        correlations <- calculate_correlations(data$data, numeric_config)
-      }
+  # One path. calculate_correlations() now carries NA for every non-numeric
+  # column instead of erroring on it, so there is nothing left to branch on.
+  # This used to leave correlations NULL whenever fewer than two drivers were
+  # numeric, and the mixed importance path then recomputed them itself on the
+  # full driver list and died with a bare error (review F1).
+  correlations <- calculate_correlations(data$data, config)
+
+  numeric_drivers <- get_numeric_drivers(data$data, config$driver_vars)
+  if (length(numeric_drivers) < length(config$driver_vars)) {
+    affected_outputs <- c("Correlation matrix", "Quadrant chart correlations")
+    degraded_reasons <- if (length(numeric_drivers) == 0) {
+      # Refusing this study was wrong: beta weights, relative weights and
+      # Shapley values are all defined for categorical drivers and the mixed
+      # path computes them. Only the correlation column is undefined, and the
+      # refusal told the analyst to switch it off with a setting that does not
+      # exist (review F2).
+      paste0("No driver in this study is numeric, so the correlation column ",
+             "is empty. Beta weights, relative weights and Shapley values are ",
+             "unaffected.")
     } else {
-      correlations <- calculate_correlations(data$data, config)
+      "Correlations only computed for numeric drivers (categorical excluded)"
     }
-  } else {
-    correlations <- calculate_correlations(data$data, config)
+    cat(sprintf("   [NOTE] %s\n", degraded_reasons))
   }
 
   if (!is.null(correlations)) {
@@ -515,6 +523,21 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   # testing code no run reached (review H8). An Error stops the run, because an
   # Error is a configuration that cannot produce a correct answer. Anything
   # else is reported and the run continues.
+  # Sourced here rather than left to the caller. The GUI sourced the
+  # validators and a headless call did not, so the same config refused from
+  # one entry point and passed from the other, and the suite's one end to end
+  # test was the silent path (review F7). Every other step the pipeline needs
+  # sources itself the same way.
+  if (!exists("validate_keydriver_preflight", mode = "function")) {
+    pf_file <- file.path(find_turas_root(), "modules", "keydriver", "lib",
+                         "validation", "preflight_validators.R")
+    if (file.exists(pf_file)) {
+      tryCatch(source(pf_file, local = FALSE), error = function(e) {
+        cat(sprintf("   [WARN] Pre-flight validators could not be loaded: %s\n",
+                    conditionMessage(e)))
+      })
+    }
+  }
   if (exists("validate_keydriver_preflight", mode = "function")) {
     preflight_log <- tryCatch(
       validate_keydriver_preflight(
@@ -706,6 +729,11 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
         outcome = config$outcome_var,
         drivers = config$driver_vars,
         weights = config$weight_var,
+        # Without this the function seeded itself from an empty list, so it
+        # always applied the default seed and random_seed changed nothing:
+        # two runs with different seeds produced identical intervals to the
+        # last decimal (review F6).
+        config = config,
         n_bootstrap = as.numeric(config$settings$bootstrap_iterations %||% 500),
         ci_level = as.numeric(config$settings$bootstrap_ci_level %||% 0.95)
       )
@@ -1290,6 +1318,9 @@ run_shap_analysis_internal <- function(data, config) {
   source(file.path(methods_dir, "method_shap.R"), local = FALSE)
 
   shap_config <- list(
+    # Carried through so the seeding inside the SHAP path uses the configured
+    # seed rather than falling back to the default every time (review F6).
+    random_seed = config$settings$random_seed %||% config$random_seed,
     shap_model = config$settings$shap_model %||% "xgboost",
     n_trees = as.numeric(config$settings$n_trees %||% 100),
     max_depth = as.numeric(config$settings$max_depth %||% 6),
