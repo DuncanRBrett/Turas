@@ -29,7 +29,7 @@ build_kd_elastic_net_section <- function(html_data, config = NULL) {
 
   coefs <- enet$coefficients
   if (is.null(coefs) || !is.data.frame(coefs) || nrow(coefs) == 0) {
-    cat("    [WARN] Elastic net data present but coefficients table is empty — section skipped\n")
+    cat("    [WARN] Elastic net data present but coefficients table is empty, so the section is skipped\n")
     return(NULL)
   }
 
@@ -94,7 +94,7 @@ build_kd_nca_section <- function(html_data, config = NULL) {
 
   summary_df <- nca$nca_summary
   if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) {
-    cat("    [WARN] NCA data present but summary table is empty — section skipped\n")
+    cat("    [WARN] NCA data present but summary table is empty, so the section is skipped\n")
     return(NULL)
   }
 
@@ -160,7 +160,7 @@ build_kd_dominance_section <- function(html_data, config = NULL) {
 
   summary_df <- dom$summary
   if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) {
-    cat("    [WARN] Dominance data present but summary table is empty — section skipped\n")
+    cat("    [WARN] Dominance data present but summary table is empty, so the section is skipped\n")
     return(NULL)
   }
 
@@ -220,7 +220,7 @@ build_kd_gam_section <- function(html_data, config = NULL) {
 
   summary_df <- gam_data$nonlinearity_summary
   if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) {
-    cat("    [WARN] GAM data present but nonlinearity summary is empty — section skipped\n")
+    cat("    [WARN] GAM data present but nonlinearity summary is empty, so the section is skipped\n")
     return(NULL)
   }
 

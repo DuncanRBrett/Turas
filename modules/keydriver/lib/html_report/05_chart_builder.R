@@ -196,6 +196,12 @@ build_kd_method_agreement_chart <- function(method_comparison,
   if (is.data.frame(method_comparison)) {
     if (nrow(method_comparison) == 0) return(NULL)
     rank_cols <- grep("^Rank_", names(method_comparison), value = TRUE)
+    # A method whose ranks are all absent used to keep its column, and every
+    # dot in it was drawn at cy="NA". Browsers drop those circles, so the
+    # column rendered empty with no explanation (review M19).
+    rank_cols <- rank_cols[vapply(rank_cols, function(k) {
+      any(is.finite(suppressWarnings(as.numeric(method_comparison[[k]]))))
+    }, logical(1))]
     if (length(rank_cols) < 2) return(NULL)
     method_labels <- gsub("_", " ", gsub("^Rank_", "", rank_cols))
     entries <- lapply(seq_len(nrow(method_comparison)), function(i) {
@@ -207,6 +213,11 @@ build_kd_method_agreement_chart <- function(method_comparison,
   } else if (is.list(method_comparison)) {
     if (length(method_comparison) == 0) return(NULL)
     rk <- grep("_Rank$|_rank$", names(method_comparison[[1]]), value = TRUE)
+    rk <- rk[vapply(rk, function(k) {
+      any(vapply(method_comparison, function(d) {
+        is.finite(suppressWarnings(as.numeric(d[[k]] %||% NA)))
+      }, logical(1)))
+    }, logical(1))]
     if (length(rk) < 2) return(NULL)
     method_labels <- gsub("_", " ", gsub("_Rank$|_rank$", "", rk))
     n_d <- length(method_comparison)
@@ -245,15 +256,20 @@ build_kd_method_agreement_chart <- function(method_comparison,
     lo <- if (is_t) 0.9 else 0.3; lw <- if (is_t) 2.5 else 1.2
     yp <- tm + (d$ranks - 1) * rh + rh / 2
 
-    s <- paste0(s, "\n", .kd_svg_text(lm - 12, yp[1], d$label, size = 11,
+    label_y <- if (is.finite(yp[1])) yp[1] else tm + (i - 1) * rh + rh / 2
+    s <- paste0(s, "\n", .kd_svg_text(lm - 12, label_y, d$label, size = 11,
                                        fill = if (is_t) .kd_value_colour else .kd_muted_colour,
                                        weight = if (is_t) "500" else "400",
                                        anchor = "end", baseline = "central"))
 
+    # One missing rank inside an otherwise usable method leaves a gap rather
+    # than a line or a dot at NA (review M19).
     for (m in seq_len(n_m - 1))
-      s <- paste0(s, "\n", .kd_svg_line(col_x[m], yp[m], col_x[m+1], yp[m+1],
-                                         stroke = lc, width = lw, opacity = lo))
+      if (is.finite(yp[m]) && is.finite(yp[m + 1]))
+        s <- paste0(s, "\n", .kd_svg_line(col_x[m], yp[m], col_x[m+1], yp[m+1],
+                                           stroke = lc, width = lw, opacity = lo))
     for (m in seq_len(n_m)) {
+      if (!is.finite(yp[m])) next
       dr <- if (is_t) 5 else 3; dop <- if (is_t) 1.0 else 0.4
       s <- paste0(s, sprintf('\n<circle cx="%.1f" cy="%.1f" r="%d" fill="%s" opacity="%.2f"/>',
                              col_x[m], yp[m], dr, lc, dop))
@@ -506,12 +522,19 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
     })
   } else { return(NULL) }
 
-  # If multiple methods, keep only the first method (most common)
+  # This plot shows one method. The comment said "most common" and the code
+  # took whichever appeared first, and nothing on the chart said which one it
+  # was, so the chart and the table underneath it disagreed with no way to
+  # tell why (review M20). It is now genuinely the most common, and the
+  # chart says so.
   methods <- vapply(entries, function(d) d$method, character(1))
   unique_methods <- unique(methods[methods != ""])
+  shown_method <- NULL
   if (length(unique_methods) > 1) {
-    keep_method <- unique_methods[1]
+    counts <- vapply(unique_methods, function(m) sum(methods == m), integer(1))
+    keep_method <- unique_methods[which.max(counts)]
     entries <- entries[methods == keep_method]
+    shown_method <- keep_method
   }
 
   # Sort descending by point estimate
@@ -519,7 +542,9 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
   n <- length(entries); if (n == 0) return(NULL)
 
   rh <- 28; gap <- 8; lbl_w <- 200; chart_w <- 700
-  pa <- chart_w - lbl_w - 60; total_h <- n * (rh + gap) + 50
+  # Room for the method caption when there is one to show.
+  caption_h <- if (is.null(shown_method)) 0 else 18
+  pa <- chart_w - lbl_w - 60; total_h <- n * (rh + gap) + 50 + caption_h
 
   all_lo <- vapply(entries, function(d) d$lo, numeric(1))
   all_hi <- vapply(entries, function(d) d$hi, numeric(1))
@@ -537,14 +562,14 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
   gs <- .kd_nice_step(ax_rng)
   for (g in seq(ceiling(ax_min/gs)*gs, floor(ax_max/gs)*gs, by = gs)) {
     gx <- to_x(g)
-    s <- paste0(s, "\n", .kd_svg_line(gx, 25, gx, total_h - 10))
+    s <- paste0(s, "\n", .kd_svg_line(gx, 25, gx, total_h - 10 - caption_h))
     s <- paste0(s, "\n", .kd_svg_text(gx, 18, format(g, digits = 2, nsmall = if (gs < 1) 1 else 0),
                                        size = 9, fill = .kd_muted_colour, anchor = "middle"))
   }
 
   # Zero reference line
   if (ax_min <= 0 && ax_max >= 0)
-    s <- paste0(s, "\n", .kd_svg_line(to_x(0), 25, to_x(0), total_h - 10,
+    s <- paste0(s, "\n", .kd_svg_line(to_x(0), 25, to_x(0), total_h - 10 - caption_h,
                                        stroke = .kd_muted_colour, width = 1.5, dash = "4,3"))
 
   # Whiskers + points
@@ -568,7 +593,15 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
     s <- paste0(s, "\n</g>")
   }
 
-  s <- paste0(s, "\n</svg>")
+    if (!is.null(shown_method)) {
+    s <- paste0(s, "\n", .kd_svg_text(
+      lbl_w, total_h - 6,
+      sprintf("Intervals shown for the %s method. The table below lists every method.",
+              shown_method),
+      size = 10, fill = .kd_muted_colour, anchor = "start"))
+  }
+
+s <- paste0(s, "\n</svg>")
   htmltools::tags$div(class = "kd-chart-container", htmltools::HTML(s))
 }
 

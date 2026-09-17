@@ -42,7 +42,33 @@
     window.scrollTo({ top: 0 });
   };
 
+  /**
+   * The exec summary carries kd-page-active and the "active" nav class in the
+   * markup. Turn it off with html_show_exec_summary and nothing was active,
+   * so the report opened on a blank content area (review M18). Whatever the
+   * first rendered section turns out to be, it opens.
+   */
+  function kdEnsureAPageIsActive() {
+    var content = document.querySelector('.kd-content');
+    if (!content) return;
+    var sections = content.querySelectorAll('.kd-section[data-kd-section]');
+    if (sections.length === 0) return;
+    if (content.querySelector('.kd-section.kd-page-active')) return;
+
+    var first = sections[0];
+    first.classList.add('kd-page-active');
+    var pageName = first.getAttribute('data-kd-section');
+    var navBar = document.querySelector('.kd-section-nav');
+    if (navBar) {
+      navBar.querySelectorAll('a[data-kd-page]').forEach(function(link) {
+        link.classList.toggle('active',
+          link.getAttribute('data-kd-page') === pageName);
+      });
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
+    kdEnsureAPageIsActive();
     // Hydrate saved state
     kdHydratePage();
     // Initialize table export buttons (CSV/Excel)
@@ -207,6 +233,17 @@
   };
 
   /**
+   * The chips are labelled "Total" and the table's Total cells are keyed
+   * "total", so a raw comparison hid the Total column for good on the first
+   * chip click (review M17). Both the filter and the sort go through here.
+   * @param {string} segName - Chip label
+   * @return {string} The matching data-kd-seg-col value
+   */
+  function kdSegColKey(segName) {
+    return segName === 'Total' ? 'total' : segName;
+  }
+
+  /**
    * Apply segment filter based on active chips.
    * Hides/shows columns in the table and bars in the chart.
    */
@@ -215,7 +252,7 @@
     var activeSegs = {};
     section.querySelectorAll('[data-kd-seg-chip].active').forEach(function(chip) {
       var seg = chip.getAttribute('data-kd-seg-chip');
-      if (seg !== 'all') activeSegs[seg] = true;
+      if (seg !== 'all') activeSegs[kdSegColKey(seg)] = true;
     });
 
     // Filter table columns
@@ -284,7 +321,7 @@
         }
       });
       // Sort by the segment's percentage (descending)
-      var colName = segName === 'Total' ? 'total' : segName;
+      var colName = kdSegColKey(segName);
       rows.sort(function(a, b) {
         var aCell = a.querySelector('[data-kd-seg-col="' + colName + '"][data-kd-sort-val]');
         var bCell = b.querySelector('[data-kd-seg-col="' + colName + '"][data-kd-sort-val]');

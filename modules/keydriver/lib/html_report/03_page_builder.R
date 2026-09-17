@@ -71,6 +71,11 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
   .show <- function(key, default = TRUE) {
     val <- settings[[key]]
     if (is.null(val)) return(default)
+    # as.logical("Yes") is NA, which silently read as FALSE and hid a
+    # section the analyst had asked for (review M14).
+    if (exists("as_logical_setting", mode = "function")) {
+      return(as_logical_setting(val, default))
+    }
     isTRUE(as.logical(val))
   }
 

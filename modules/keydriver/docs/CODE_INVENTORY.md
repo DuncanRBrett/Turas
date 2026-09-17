@@ -145,11 +145,15 @@ snapshots, and 1280x720 PNG slide export.
 
 | File | Lines | Purpose | Quality | Notes |
 |---------------|--------------:|---------------|--------------:|---------------|
-| `kd_utils.js` | 186 | DOM manipulation, string helpers, localStorage utilities | 88 | Shared utility namespace; no global pollution |
-| `kd_navigation.js` | 428 | Sticky navigation bar, section scrolling, active-section tracking | 87 | Scroll-spy with debounce; smooth-scroll to sections; responsive collapse |
-| `kd_table_export.js` | 45 | Table export to clipboard | 88 | CSV clipboard export for individual tables |
-| `kd_pinned_views.js` | 676 | Pin and restore analysis snapshots | 86 | Serialises visible state to localStorage; restore with visual diff indicator |
-| `kd_slide_export.js` | 670 | 1280x720 PNG slide export | 85 | html2canvas-based capture; adds title bar and branding; download trigger |
+| `kd_utils.js` | 206 | DOM helpers, insight sync before Save Report | 88 | Shared utility namespace; no global pollution |
+| `kd_navigation.js` | 457 | Page-based section navigation, segment filter and sort, Save Report | 87 | Sections are pages, not scroll anchors |
+| `kd_table_export.js` | 200 | Per-table CSV and Excel export | 88 | One export control per table |
+| `kd_pins.js` | 332 | Capture a section's chart, table and commentary for pinning | 87 | A thin wrapper over the shared TurasPins library |
+| `kd_pins_extras.js` | 312 | Added Slides tab, slide images, Print and PDF overlay | 86 | Commentary renders through the shared pin renderer |
+
+Line counts above were taken with `wc -l` on 17 September 2026. Two files
+listed here previously, `kd_pinned_views.js` and `kd_slide_export.js`, were
+forks that no report ever embedded. They have been deleted (review M24).
 
 ### Test Suite -- `tests/testthat/`
 
@@ -264,8 +268,8 @@ snapshots, and 1280x720 PNG slide export.
               +-- js/kd_utils.js
               +-- js/kd_navigation.js
               +-- js/kd_table_export.js
-              +-- js/kd_pinned_views.js
-              +-- js/kd_slide_export.js
+              +-- js/kd_pins.js
+              +-- js/kd_pins_extras.js
 ```
 
 ------------------------------------------------------------------------

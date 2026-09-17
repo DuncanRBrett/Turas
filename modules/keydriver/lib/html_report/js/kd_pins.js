@@ -27,6 +27,28 @@
    * @param {string} prefix - ID prefix for multi-analysis reports
    * @returns {object|null} Captured content or null if section not found
    */
+  /**
+   * The nearest enclosing panel heading for a captured element.
+   * @param {Element} el
+   * @return {string} Heading text, or "" when there is none
+   */
+  function kdNearestPanelHeading(el) {
+    var node = el;
+    while (node && node !== document.body) {
+      var h = node.querySelector ? node.querySelector("h3.kd-panel-heading-label") : null;
+      if (h) return h.textContent.trim();
+      node = node.parentElement;
+    }
+    return "";
+  }
+
+  /** Escape text taken from the page before putting it back as markup. */
+  function kdEscapeForPin(text) {
+    var d = document.createElement("div");
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
   function kdCaptureSectionContent(sectionKey, prefix) {
     var sectionId = prefix + "kd-" + sectionKey;
     var section = document.getElementById(sectionId);
@@ -122,10 +144,26 @@
       if (execContent) tableHtml = '<div class="kd-pinned-exec-content">' + execContent + "</div>";
     }
 
-    // Diagnostics table
-    if (sectionKey === "diagnostics" && !chartSvg) {
-      var diagTable = section.querySelector("table.kd-diagnostics-table");
-      if (diagTable) tableHtml = TurasPins.capturePortableHtml(diagTable);
+    // Diagnostics carries two tables, Model Summary and VIF. The generic
+    // capture above takes the first, and this branch used to look for a
+    // diagnostics-specific table class that no builder assigns, so the VIF
+    // table could never be pinned and the multicollinearity caveat dropped
+    // out of every exported deck (review M23). Both tables are captured
+    // now, each under its own heading.
+    if (sectionKey === "diagnostics") {
+      var diagTables = section.querySelectorAll("table.kd-table");
+      if (diagTables.length > 1) {
+        var parts = [];
+        diagTables.forEach(function(t) {
+          var heading = kdNearestPanelHeading(t);
+          parts.push(
+            (heading ? '<div class="kd-pinned-table-heading">' +
+                       kdEscapeForPin(heading) + "</div>" : "") +
+            TurasPins.capturePortableHtml(t)
+          );
+        });
+        tableHtml = parts.join("");
+      }
     }
 
     // Metadata from panel stats or header badges
@@ -185,7 +223,7 @@
     if (!content) return;
 
     var title = content.panelLabel
-      ? content.panelLabel + " \u2014 " + content.sectionTitle
+      ? content.panelLabel + ": " + content.sectionTitle
       : content.sectionTitle;
 
     if (!flags.chart) content.chartSvg = "";
