@@ -52,15 +52,27 @@ MAXDIFF_VERSION <- "11.1"
   # knows where it is; the Rscript --file argument (below) knows only where
   # the CALLER is, and a guard looked up there is silently never loaded, so
   # the first refusal died with "could not find function maxdiff_refuse".
-  for (i in seq_len(sys.nframe())) {
+  # Walk the stack INNERMOST-first. Frame 1 is the OUTERMOST source(), so an
+  # outermost-first walk matched a CALLER named 00_main.R (every Turas module
+  # has one) before this file's own frame, and the guard was then looked up
+  # beside the caller and never found. Require 00_guard.R beside the candidate
+  # as well, so a match has to be a module R directory and not just a file with
+  # the right name.
+  .dir_with_guard <- function(path) {
+    d <- dirname(normalizePath(path, mustWork = FALSE))
+    if (file.exists(file.path(d, "00_guard.R"))) d else NULL
+  }
+  for (i in rev(seq_len(sys.nframe()))) {
     ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
     if (is.character(ofile) && length(ofile) == 1 && grepl("00_main\\.R$", ofile)) {
-      return(dirname(normalizePath(ofile, mustWork = FALSE)))
+      d <- .dir_with_guard(ofile)
+      if (!is.null(d)) return(d)
     }
     srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
     if (is.list(srcfile) && is.character(srcfile$filename) &&
         grepl("00_main\\.R$", srcfile$filename)) {
-      return(dirname(normalizePath(srcfile$filename, mustWork = FALSE)))
+      d <- .dir_with_guard(srcfile$filename)
+      if (!is.null(d)) return(d)
     }
   }
   args <- commandArgs(trailingOnly = FALSE)
@@ -138,7 +150,15 @@ get_script_dir <- function() {
 
   # Method 1: Try to find from source() call stack using srcfile
   # This is the most reliable method when file is being sourced
-  for (i in seq_len(sys.nframe())) {
+  # Innermost-first, and the candidate directory must hold 00_guard.R. See the
+  # note on .get_script_dir_for_guard above: a caller named 00_main.R used to
+  # win this walk, and the module then tried to load its own files out of the
+  # caller's directory.
+  .dir_with_guard <- function(path) {
+    d <- dirname(normalizePath(path, mustWork = FALSE))
+    if (file.exists(file.path(d, "00_guard.R"))) d else NULL
+  }
+  for (i in rev(seq_len(sys.nframe()))) {
     srcfile <- tryCatch({
       sys.frame(i)$srcfile
     }, error = function(e) NULL)
@@ -147,7 +167,8 @@ get_script_dir <- function() {
     if (!is.null(srcfile) && is.list(srcfile) && !is.null(srcfile$filename)) {
       script_path <- srcfile$filename
       if (grepl("00_main\\.R$", script_path)) {
-        return(dirname(normalizePath(script_path, mustWork = FALSE)))
+        d <- .dir_with_guard(script_path)
+        if (!is.null(d)) return(d)
       }
     }
 
@@ -157,7 +178,8 @@ get_script_dir <- function() {
     }, error = function(e) NULL)
 
     if (!is.null(ofile) && is.character(ofile) && length(ofile) == 1 && grepl("00_main\\.R$", ofile)) {
-      return(dirname(normalizePath(ofile, mustWork = FALSE)))
+      d <- .dir_with_guard(ofile)
+      if (!is.null(d)) return(d)
     }
   }
 

@@ -51,3 +51,28 @@ test_that("a missing config refuses with a boxed message, not an error", {
   expect_false(res)
   expect_true(any(grepl("IO_CONFIG_NOT_FOUND", out, fixed = TRUE)))
 })
+
+# M1 from the maxdiff v2 review, same shape here: the walk went outermost-first
+# and matched any file named run_tabs.R, so a caller of that name was found
+# before this runner's own frame and lib/ was resolved beside the caller.
+test_that("run_tabs.R resolves its own lib when the caller is itself named run_tabs.R", {
+  rscript <- file.path(R.home("bin"), "Rscript")
+  skip_if(!file.exists(rscript), "Rscript not found")
+  runner <- file.path(root, "modules", "tabs", "run_tabs.R")
+  caller_dir <- tempfile("tabs_caller_runtabs_")
+  dir.create(caller_dir)
+  caller <- file.path(caller_dir, "run_tabs.R")
+  writeLines(c(
+    sprintf('setwd("%s")', caller_dir),
+    sprintf('source("%s")', runner),
+    'cat("LIB:", tabs_runner_lib_dir(), "\\n")'
+  ), caller)
+  out <- suppressWarnings(system2(
+    rscript, c("-e", shQuote(sprintf('source("%s")', caller))),
+    stdout = TRUE, stderr = TRUE
+  ))
+  lib_line <- grep("^LIB:", out, value = TRUE)
+  expect_length(lib_line, 1)
+  expect_match(trimws(lib_line), "modules/tabs/lib$")
+  unlink(caller_dir, recursive = TRUE)
+})
