@@ -67,15 +67,55 @@
 #
 # Pairing it with the file that uses it is what stops that returning: a ninth
 # caller gets the audit without knowing it needs one.
-.MINIFY_LIB_DIR <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) NA_character_)
+# Where this file is, found by scanning EVERY frame for source()'s own `ofile`.
+#
+# `ofile` is a local of source(), so which frame holds it depends on how deep
+# the caller was when it sourced this file. sys.frame(1) alone assumed source()
+# was called from the top level. Every module GUI sources it inside a Shiny
+# observer instead, so frame 1 is the observer, `ofile` was never found, and the
+# lib directory came out NA. Duncan, SACS 2026-09-17: a client-safe build
+# refused for want of the audit and no deliverable was written (see the refusal
+# in step 8b), and the two fallbacks could not save it either, because
+# TURAS_HOME is an R
+# variable in the GUIs rather than an environment variable, and the tabs GUI
+# setwd()s into modules/tabs/lib for the run, so getwd() is not the Turas root.
+.minify_source_dir <- function() {
+  for (i in seq_len(sys.nframe())) {
+    of <- tryCatch(get0("ofile", envir = sys.frame(i), inherits = FALSE),
+                   error = function(e) NULL)
+    if (is.character(of) && length(of) == 1L && nzchar(of)) {
+      return(tryCatch(dirname(normalizePath(of, mustWork = FALSE)),
+                      error = function(e) dirname(of)))
+    }
+  }
+  NA_character_
+}
+.MINIFY_LIB_DIR <- .minify_source_dir()
+
+#' Directories to try as the Turas root, nearest first.
+#' The working directory during a run is NOT the root, so walk up from it.
+.minify_root_candidates <- function() {
+  named <- c(as.character(get0("TURAS_HOME", envir = .GlobalEnv, ifnotfound = "")),
+             Sys.getenv("TURAS_ROOT"), Sys.getenv("TURAS_HOME"))
+  named <- named[!is.na(named) & nzchar(named)]
+  up <- character(0)
+  d <- tryCatch(normalizePath(getwd(), mustWork = FALSE), error = function(e) getwd())
+  for (i in seq_len(8L)) {
+    up <- c(up, d)
+    parent <- dirname(d)
+    if (identical(parent, d)) break
+    d <- parent
+  }
+  unique(c(named, up))
+}
 
 .minify_load_release_audit <- function() {
   if (exists("turas_release_audit", mode = "function")) return(TRUE)
   candidates <- c(
-    if (!is.na(.MINIFY_LIB_DIR)) file.path(.MINIFY_LIB_DIR, "turas_release_audit.R"),
-    if (nzchar(Sys.getenv("TURAS_HOME")))
-      file.path(Sys.getenv("TURAS_HOME"), "modules", "shared", "lib", "turas_release_audit.R"),
-    file.path(getwd(), "modules", "shared", "lib", "turas_release_audit.R")
+    if (length(.MINIFY_LIB_DIR) == 1L && !is.na(.MINIFY_LIB_DIR))
+      file.path(.MINIFY_LIB_DIR, "turas_release_audit.R"),
+    file.path(.minify_root_candidates(), "modules", "shared", "lib",
+              "turas_release_audit.R")
   )
   for (path in candidates) {
     if (!is.null(path) && file.exists(path)) {
