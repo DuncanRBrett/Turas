@@ -149,11 +149,24 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
     for (i in seq_along(grid_prices)) {
       out[[paste0(question_code, "_", i)]] <- grid$values[, i]
     }
+    # The rejecters' own answer, in the column after the last rung, so the
+    # tabs base is the analysed base (review F1).
+    n_no_accept <- grid$n_no_accept
+    out[[paste0(question_code, "_", length(grid_prices) + 1)]] <- grid$no_accept
+    if (n_no_accept > 0) {
+      cat(sprintf(paste0(
+        "   [NOTE] %d of %d analysed respondents would not buy at any rung. ",
+        "They carry '%s' in the last column, which keeps them in the tabs base; ",
+        "without it tabs would drop them and every rung would read higher than ",
+        "in the pricing report.\n"),
+        n_no_accept, length(ids), PRICING_TABS_NO_ACCEPT_LABEL))
+    }
     if (any(rung_answered < length(ids))) {
       cat(sprintf(paste0(
         "   [NOTE] Some rungs were not answered by everyone (bases %s of %d). ",
-        "Tabs reports over the banner base, so those rungs read lower there ",
-        "than in the pricing report. The METHOD sheet says so.\n"),
+        "A respondent who skipped rung k but answered another one stays in the ",
+        "tabs base, so that rung reads lower in tabs than in the pricing report. ",
+        "The METHOD sheet says so.\n"),
         paste(rung_answered, collapse = " / "), length(ids)))
     }
   }
@@ -277,6 +290,15 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
 
 #' The acceptance grid as a respondent-by-rung matrix of option labels
 #'
+#' The Answer A Respondent Who Would Not Buy At Any Price Gives
+#'
+#' Its own option, so tabs counts these respondents in the question's base
+#' instead of dropping them for having an empty row (review F1). It must never
+#' read like a price, or a reader would take it for a rung.
+#' @keywords internal
+PRICING_TABS_NO_ACCEPT_LABEL <- "Would not buy at any price"
+
+
 #' Built from the coded long data the engine analysed, so what is exported is
 #' what was reported, imputation included.
 #'
@@ -328,7 +350,26 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
     values[!is.na(coded[, j]) & coded[, j] > 0, j] <- labels[j]
   }
 
+  # THE LAST COLUMN KEEPS THE REJECTERS IN THE BASE. A tabs Multi_Mention base
+  # counts a respondent only when at least one of the question's columns holds
+  # a non-blank value (`calculate_multimention_base()`,
+  # `modules/tabs/lib/weighting.R`). A respondent who would not buy at any
+  # rung has an empty row, so tabs dropped them from the base while the
+  # pricing report kept them in the denominator at every rung, and every rung
+  # read higher in tabs than in the report. Under GG_Stop_Early_Imputation =
+  # NO_AFTER_STOP it was worse than a rounding difference: a No at the first
+  # rung cascades to every rung, so everyone left in tabs' base had accepted
+  # the cheapest rung and it read 100% by construction. Giving those
+  # respondents an answer of their own puts them back in the base and makes
+  # the two sets of numbers agree (review F1).
+  in_analysed <- ids %in% long_ids
+  accepted_any <- rowSums(!is.na(coded) & coded > 0) > 0
+  no_accept <- rep(NA_character_, length(ids))
+  no_accept[in_analysed & !accepted_any] <- PRICING_TABS_NO_ACCEPT_LABEL
+
   list(prices = prices, labels = labels, values = values,
+       no_accept = no_accept,
+       n_no_accept = sum(!is.na(no_accept)),
        answered = apply(coded, 2, function(x) sum(!is.na(x))))
 }
 
@@ -402,8 +443,12 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
   if (length(prices) > 0) {
     add(question_code,
         sprintf("Would buy at each price (Gabor-Granger, %d rungs)", length(prices)),
-        "Multi_Mention", length(prices), "This export's DATA sheet",
-        "Observed acceptance, one 0/1 column per rung in ascending price order.")
+        "Multi_Mention", length(prices) + 1L, "This export's DATA sheet",
+        paste0("Observed acceptance, one column per rung in ascending price order, ",
+               "each cell holding that rung's own price label where the respondent ",
+               "would buy. One further column carries '",
+               PRICING_TABS_NO_ACCEPT_LABEL, "' for respondents who would not buy ",
+               "at any rung, which is what keeps them in the base."))
   }
 
   if (!is.null(wtp_col)) {
@@ -471,12 +516,15 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
     return(empty)
   }
   labels <- paste0(currency, formatC(prices, format = "f", digits = 2))
+  # One row per rung, then the rejecters' own option in the column after the
+  # last rung (review F1). Without a row of its own that column's answers
+  # would be reported as unmatched values.
   data.frame(
-    QuestionCode = paste0(question_code, "_", seq_along(prices)),
-    OptionText = labels,
-    DisplayText = labels,
+    QuestionCode = paste0(question_code, "_", seq_len(length(prices) + 1)),
+    OptionText = c(labels, PRICING_TABS_NO_ACCEPT_LABEL),
+    DisplayText = c(labels, PRICING_TABS_NO_ACCEPT_LABEL),
     ShowInOutput = "Y",
-    DisplayOrder = seq_along(prices),
+    DisplayOrder = seq_len(length(prices) + 1),
     stringsAsFactors = FALSE
   )
 }
@@ -520,14 +568,22 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
       paste0(imputation, ". Those rungs are exported as 'would not buy', the ",
              "same as the analysis used.")
     })
-    df <- add(df, "Variable type in tabs",
-              "Multi_Mention. Tabs reports the share who would buy at each price, over whatever base the banner defines.")
+    df <- add(df, "Variable type in tabs", paste0(
+      "Multi_Mention with ", length(prices) + 1, " columns: one per rung, then '",
+      PRICING_TABS_NO_ACCEPT_LABEL, "'. Tabs counts a respondent in the base when ",
+      "any one of those columns is filled, so the last column is what keeps the ",
+      "respondents who would not buy at all in it."))
+    df <- add(df, "Base agreement", paste0(
+      "The tabs base equals the pricing report's analysed base, because every ",
+      "analysed respondent fills exactly one column or more. Without the last ",
+      "column tabs would drop the rejecters and every rung would read HIGHER in ",
+      "tabs than in the pricing report, not lower."))
     if (length(rung_answered) == length(prices)) {
       df <- add(df, "Per-rung answered base", paste0(
         paste(rung_answered, collapse = " / "),
-        ". The pricing report divides by these; tabs divides by the banner base. ",
-        "Where they differ, a rung with unanswered cells reads lower in tabs. ",
-        "Filter on pricing_valid, and read this row, before reconciling the two."))
+        ". A respondent who skipped rung k but answered another one is still in ",
+        "the base, so that rung alone reads lower in tabs than in the pricing ",
+        "report. Read this row before reconciling the two."))
     }
   }
 
@@ -550,10 +606,13 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
   n_valid <- validation$n_valid %||% NA_integer_
   df <- add(df, "pricing_valid", paste0(
     "1 for the respondents the pricing module analysed, 0 for those its ",
-    "validation excluded (", format(validation$n_excluded %||% 0L),
-    " of ", format(validation$n_total %||% n_exported),
-    "). Filter on it to reproduce the pricing report's base; leave it out and ",
-    "a tabs base will be larger."))
+    "validation or its Gabor-Granger completeness rule excluded (",
+    format(validation$n_excluded %||% 0L), " of ",
+    format(validation$n_total %||% n_exported),
+    " at validation). An excluded respondent has every acceptance column blank, ",
+    "so a Multi_Mention table already leaves them out and filtering on this ",
+    "column will not change it. Use the column on tables built from the survey's ",
+    "own questions, where the pricing module's exclusions are not otherwise visible."))
   df <- add(df, "Respondents exported", n_exported)
   df <- add(df, "Analysed base in the pricing report", n_valid)
   df <- add(df, "Id column", paste0(
