@@ -75,7 +75,8 @@ serialize_pricing_layer <- function(results, config, verbose = TRUE) {
   rec_block <- .pricing_island_recommendation(results$synthesis)
 
   meta <- .pricing_island_meta(results, config,
-                               has_vw = has_vw, has_gg = has_gg, has_mon = has_mon)
+                               has_vw = has_vw, has_gg = has_gg, has_mon = has_mon,
+                               gg_block = gg_block)
 
   out <- .pricing_drop_null(list(
     meta = meta,
@@ -464,7 +465,9 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
     optimalUpper = .pricing_scalar(synthesis$optimal_zone$upper),
     methodSpreadPct = if (is.null(cv)) NULL else cv * 100,
     # How many method price points the spread was taken across. Four on a
-    # both-methods run (two VW points, GG, the ladder), not four methods.
+    # both-methods run: the Van Westendorp OPP and IDP, the midpoint of its
+    # optimal zone, and the Gabor-Granger optimum. Not four methods, and the
+    # price ladder is not one of them (review F14).
     nMethodPrices = {
       mp <- synthesis$method_prices
       if (is.null(mp)) NULL else length(mp)
@@ -481,7 +484,8 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
 #' anything to describe the run.
 #'
 #' @keywords internal
-.pricing_island_meta <- function(results, config, has_vw, has_gg, has_mon) {
+.pricing_island_meta <- function(results, config, has_vw, has_gg, has_mon,
+                                gg_block = NULL) {
 
   vw <- results$van_westendorp
   gg <- results$gabor_granger
@@ -536,9 +540,18 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
     # How many that was, when the run recorded it (review F5).
     n_before <- d$n_violations_before_handling
     if (!is.null(n_before) && length(n_before) == 1 && !is.na(n_before)) {
-      notes$vw <- paste(notes$vw, sprintf(
-        "That was %d of them (%.1f%%).",
-        as.integer(n_before), (d$violation_rate_before_handling %||% 0) * 100))
+      # The rate is over everyone who answered, not over the analysed base, so
+      # "44 of them" after a sentence about 356 read as the wrong denominator
+      # (review F6). Name the denominator.
+      n_total <- d$n_total %||% d$n_valid
+      notes$vw <- paste(notes$vw, if (!is.null(n_total) && length(n_total) == 1 && !is.na(n_total)) {
+        sprintf("That was %d of the %s respondents who answered all four questions (%.1f%%).",
+                as.integer(n_before), format(as.integer(n_total)),
+                (d$violation_rate_before_handling %||% 0) * 100)
+      } else {
+        sprintf("That was %d respondents (%.1f%%).",
+                as.integer(n_before), (d$violation_rate_before_handling %||% 0) * 100)
+      })
     }
   }
   if (has_gg) {
@@ -547,12 +560,31 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
                     as.character(d$response_coding %||% "binary"))
     smoothing <- as.character(d$smoothing %||% "none")
     if (!identical(smoothing, "none")) {
-      bits <- paste(bits, sprintf(
-        paste0("The published curve is smoothed (%s) so it never rises with price; ",
-               "the observed acceptance is shown beside it."), smoothing))
+      # Only promise the second series when the tab actually draws one. The
+      # island omits smoothedPct when smoothing changed nothing, which is the
+      # shipped Karoo case, and the sentence then pointed at a column that is
+      # not there (review F4).
+      shows_both <- !is.null(gg_block$smoothedPct)
+      bits <- paste(bits, if (shows_both) {
+        sprintf(paste0("The published curve is smoothed (%s) so it never rises with ",
+                       "price; the observed acceptance is shown beside it."), smoothing)
+      } else {
+        sprintf(paste0("Smoothing (%s) was applied and changed nothing: the acceptance ",
+                       "shown is what respondents said."), smoothing)
+      })
     }
     imputation <- as.character(d$imputation %||% "none")
-    if (!identical(imputation, "none")) bits <- paste(bits, paste0("Imputation: ", imputation, "."))
+    if (!identical(imputation, "none")) {
+      # The setting's own value is not a sentence a client should read
+      # (review F8).
+      bits <- paste(bits, if (identical(toupper(imputation), "NO_AFTER_STOP") ||
+                              grepl("^NO_AFTER_STOP", imputation)) {
+        paste0("The ladder stopped after a respondent's first No, so the rungs above it ",
+               "are counted as would not buy rather than left out.")
+      } else {
+        paste0("Unanswered rungs were imputed: ", imputation, ".")
+      })
+    }
     notes$gg <- bits
   }
   if (has_mon) {
@@ -564,6 +596,12 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
     }
     bits <- sprintf("The fitted curve is %s across %s price cells.",
                     form, format(mon$diagnostics$n_cells %||% NA_integer_))
+    # What a "would buy" is, the way the Gabor-Granger note already says it
+    # (review F5).
+    coding <- mon$diagnostics$intent_coding
+    if (!is.null(coding) && nzchar(as.character(coding))) {
+      bits <- paste(bits, sprintf("Purchase intent is coded %s.", as.character(coding)))
+    }
     if (!is.null(ms$p_value_caveat)) bits <- paste(bits, as.character(ms$p_value_caveat))
     notes$monadic <- bits
   }

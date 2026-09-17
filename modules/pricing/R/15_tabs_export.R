@@ -167,6 +167,19 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
 
   # --- The acceptance grid ------------------------------------------------------
   currency <- as.character(config$currency_symbol %||% "")
+  # A blank currency makes every rung label look like a number ("60.00"). Read
+  # back from xlsx it stays text and matches; read back from CSV, or pasted
+  # into Excel by hand, it becomes the number 60 and matches nothing, so the
+  # question reports 0% at every rung (review F18). The shipped default is a
+  # currency symbol, so this is opt-in and a warning rather than a refusal.
+  blank_currency <- !nzchar(trimws(currency))
+  if (blank_currency && has_grid) {
+    cat(paste0(
+      "   [WARNING] Currency_Symbol is blank, so every rung label is a bare number ",
+      "such as '60.00'. Tabs matches these as text. If this export is converted to CSV, ",
+      "or the labels are pasted into Excel by hand, they become numbers and every rung ",
+      "reports 0%. Set Currency_Symbol on the Settings sheet.\n"))
+  }
   grid_prices <- numeric(0)
   grid_labels <- character(0)
   rung_answered <- integer(0)
@@ -254,13 +267,17 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
 
   openxlsx::addWorksheet(wb, "QUESTIONMAP_SNIPPET")
   openxlsx::writeData(wb, "QUESTIONMAP_SNIPPET",
-                      "Paste these rows into your tabs QuestionMap sheet:",
+                      paste0("Paste these rows into the Questions sheet of your tabs ",
+                             "Survey_Structure workbook. That is the sheet tabs reads ",
+                             "question definitions from; QuestionMap is the tracking ",
+                             "mapping sheet and is a different thing. Data_Source and Note ",
+                             "are notes for you, not tabs columns: tabs ignores them."),
                       startRow = 1, startCol = 1)
   openxlsx::writeData(wb, "QUESTIONMAP_SNIPPET", questionmap,
                       startRow = 2, headerStyle = header_style)
   opt_start <- nrow(questionmap) + 5
   openxlsx::writeData(wb, "QUESTIONMAP_SNIPPET",
-                      "...and these rows into your Options sheet:",
+                      "...and these rows into the Options sheet of the same workbook:",
                       startRow = opt_start - 1, startCol = 1)
   openxlsx::writeData(wb, "QUESTIONMAP_SNIPPET", options_sheet,
                       startRow = opt_start, headerStyle = header_style)
@@ -553,7 +570,13 @@ PRICING_TABS_NO_ACCEPT_LABEL <- "Would not buy at any price"
     OptionText = c(labels, PRICING_TABS_NO_ACCEPT_LABEL),
     DisplayText = c(labels, PRICING_TABS_NO_ACCEPT_LABEL),
     ShowInOutput = "Y",
-    DisplayOrder = seq_len(length(prices) + 1),
+    # Tabs reads every structure sheet as text and sorts DisplayOrder with
+    # order(), so an unpadded 1..12 displays as 1, 10, 11, 12, 2, 3 and a
+    # ladder of ten or more rungs comes out shuffled (review F19). Padding to
+    # the width the ladder needs sorts correctly and leaves a short ladder's
+    # "1".."5" exactly as it was.
+    DisplayOrder = formatC(seq_len(length(prices) + 1), width = nchar(length(prices) + 1),
+                           flag = "0"),
     stringsAsFactors = FALSE
   )
 }
@@ -642,6 +665,13 @@ PRICING_TABS_NO_ACCEPT_LABEL <- "Would not buy at any price"
     "so a Multi_Mention table already leaves them out and filtering on this ",
     "column will not change it. Use the column on tables built from the survey's ",
     "own questions, where the pricing module's exclusions are not otherwise visible."))
+  if (!nzchar(trimws(as.character(currency)))) {
+    df <- add(df, "Currency symbol", paste0(
+      "Blank, so every rung label is a bare number such as '60.00'. Tabs matches option ",
+      "labels as text: keep this file as .xlsx and do not retype the labels in Excel, or ",
+      "they become numbers and every rung reports 0%. Setting Currency_Symbol removes the ",
+      "risk entirely."))
+  }
   df <- add(df, "Respondents exported", n_exported)
   df <- add(df, "Analysed base in the pricing report", n_valid)
   df <- add(df, "Id column", paste0(

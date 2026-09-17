@@ -274,7 +274,20 @@ run_monadic_analysis <- function(data, config) {
   # --------------------------------------------------------------------------
   # Step 8: Compile diagnostics
   # --------------------------------------------------------------------------
+  # One sentence saying what a "would buy" is, so the deliverables can repeat
+  # it the way Gabor-Granger already does. The engine knew the coding and never
+  # recorded it, so the Pricing tab showed 76.5% with nothing saying what was
+  # counted (review F5).
+  intent_coding <- if (identical(intent_type, "scale")) {
+    sprintf("scale, %s or higher counts as would buy", format(scale_threshold))
+  } else if (identical(toupper(as.character(mon$binary_coding %||% "ZERO_ONE")), "ONE_TWO")) {
+    "binary, 1 = would buy, 2 = would not (Binary_Coding = ONE_TWO)"
+  } else {
+    "binary, 1 = would buy, 0 = would not"
+  }
+
   diagnostics <- list(
+    intent_coding = intent_coding,
     n_total = n_total,
     n_valid = n_valid,
     n_excluded = n_total - n_valid,

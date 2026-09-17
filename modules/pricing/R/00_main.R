@@ -614,7 +614,7 @@ run_pricing_analysis_from_config <- function(config) {
   tabs_export_path <- NULL
   tabs_export <- NULL
   if (isTRUE(config$generate_tabs_export) && exists("export_pricing_for_tabs", mode = "function")) {
-    cat("\n8b. Writing the tabs export...\n")
+    cat("\n8c. Writing the tabs export...\n")
     export_note <- function(code, text) {
       cat(sprintf("   ! Tabs export not written: %s\n", text))
       message(sprintf("[TRS PARTIAL] %s: %s", code, text))

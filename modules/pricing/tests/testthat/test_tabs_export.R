@@ -175,7 +175,11 @@ test_that("the Options rows are keyed by column, which is how Multi_Mention look
   expect_true(all(grepl("^GGACC_[0-9]+$", res$options$QuestionCode)))
   expect_equal(res$options$DisplayText, res$options$OptionText)
   expect_true(all(res$options$ShowInOutput == "Y"))
-  expect_equal(res$options$DisplayOrder, 1:4)
+  # DisplayOrder is written as text, because tabs reads every structure sheet
+  # as text and sorts with order(). A short ladder is unpadded, exactly as it
+  # was; a ladder of ten or more rungs is zero-padded so it does not display as
+  # 1, 10, 11, 2 (review F19).
+  expect_equal(res$options$DisplayOrder, c("1", "2", "3", "4"))
   # The data columns and the option keys are the same set, in the same order.
   grid_cols <- grep("^GGACC_[0-9]+$", res$columns, value = TRUE)
   expect_equal(grid_cols, res$options$QuestionCode)
@@ -590,4 +594,75 @@ test_that("a long-format study is told the export needs one row per respondent (
   expect_false(grepl("Give every respondent one unique id", err, fixed = TRUE))
   # The analysis itself was fine; only the export is refused.
   expect_equal(length(unique(g$gg_data$respondent_id)), n)
+})
+
+
+test_that("a ladder of ten or more rungs still displays in price order (F19)", {
+  skip_if(!exists(".pricing_tabs_options", mode = "function"), "helper not available")
+  prices <- seq(10, 120, by = 10)   # eleven rungs, twelve options with the rejecters
+  opts <- .pricing_tabs_options("GGACC", prices, "R")
+  expect_equal(nrow(opts), length(prices) + 1)
+  # Sorted as text, which is what tabs does, the order is still the price order.
+  expect_equal(order(opts$DisplayOrder), seq_len(nrow(opts)))
+  expect_equal(opts$DisplayOrder[1], "01")
+  expect_equal(opts$DisplayOrder[12], "12")
+  # The unpadded form is the one that breaks, which is why this test exists.
+  expect_false(identical(order(as.character(seq_len(12))), seq_len(12)))
+})
+
+# ------------------------------------------------------------------------------
+# F17, F18: the snippet names the sheet tabs reads, and a blank currency warns
+# ------------------------------------------------------------------------------
+
+test_that("the snippet sends the analyst to the sheet tabs actually reads (F17)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  res <- run_export(base_results(), export_config())
+  sheet <- openxlsx::read.xlsx(res$output_file, sheet = "QUESTIONMAP_SNIPPET",
+                               skipEmptyRows = FALSE, colNames = FALSE)
+  header <- as.character(sheet[[1]][1])
+  expect_match(header, "Questions sheet")
+  expect_match(header, "Survey_Structure")
+  # It says plainly that QuestionMap is something else, and which columns tabs ignores.
+  expect_match(header, "QuestionMap is the tracking")
+  expect_match(header, "ignores them")
+  # And the grid row's note no longer describes a coding tabs cannot read.
+  grid <- res$questionmap[res$questionmap$QuestionCode == "GGACC", ]
+  expect_false(grepl("0/1 column per rung", grid$Note, fixed = TRUE))
+  expect_match(grid$Note, "price label")
+})
+
+test_that("a blank currency warns that the labels can turn into numbers (F18)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  cfg <- export_config()
+  cfg$currency_symbol <- ""
+  out <- file.path(tempdir(), "pricing_f18.xlsx")
+  unlink(out)
+  on.exit(unlink(out), add = TRUE)
+  console <- capture.output(
+    res <- export_pricing_for_tabs(base_results(), cfg, out, verbose = FALSE))
+  expect_true(any(grepl("Currency_Symbol is blank", console, fixed = TRUE)))
+  expect_true(any(grepl("reports 0%", console, fixed = TRUE)))
+
+  method <- openxlsx::read.xlsx(out, sheet = "METHOD", skipEmptyRows = FALSE)
+  row <- method$Value[method$Item == "Currency symbol"]
+  expect_length(row, 1)
+  expect_match(row, "bare number")
+
+  # A currency is set, so nothing is warned about.
+  out2 <- file.path(tempdir(), "pricing_f18_ok.xlsx")
+  unlink(out2)
+  on.exit(unlink(out2), add = TRUE)
+  console2 <- capture.output(
+    export_pricing_for_tabs(base_results(), export_config(), out2, verbose = FALSE))
+  expect_false(any(grepl("Currency_Symbol is blank", console2, fixed = TRUE)))
+  method2 <- openxlsx::read.xlsx(out2, sheet = "METHOD", skipEmptyRows = FALSE)
+  expect_length(method2$Value[method2$Item == "Currency symbol"], 0)
+})
+
+test_that("the GUI names the deliverables that exist (F7)", {
+  gui <- file.path(TURAS_ROOT, "modules", "pricing", "run_pricing_gui.R")
+  skip_if(!file.exists(gui), "GUI not present")
+  src <- paste(readLines(gui, warn = FALSE), collapse = "\n")
+  expect_false(grepl("Open the HTML file for the interactive report", src, fixed = TRUE))
+  expect_match(src, "There is no separate HTML report")
 })
