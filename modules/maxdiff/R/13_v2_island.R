@@ -79,6 +79,13 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
   # jsonlite writes a NULL list element as {} (truthy in JavaScript). A block
   # the run did not produce must be ABSENT, at every level.
   drop_null <- function(x) Filter(Negate(is.null), x)
+  # Blank one position of a per-item vector, for the reference item's
+  # structural zeros. NULL in, NULL out; no reference item, unchanged.
+  .md_blank_ref <- function(v, pos) {
+    if (is.null(v) || is.na(pos)) return(v)
+    v[pos] <- NA
+    v
+  }
   # A column pulled out of a frame in the island's item order, or NULL.
   pick <- function(df, col, ids) {
     if (is.null(df) || !col %in% names(df)) return(NULL)
@@ -108,6 +115,19 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
   } else {
     "counts"
   }
+
+  # --- The item the Stan model fixed at zero ---------------------------------
+  # Every utility is relative to this one, so its spread across respondents and
+  # its Mean SE are exactly 0 by construction, and classify_item_discrimination()
+  # filed it from that zero as Low Priority. A structural zero is not a finding
+  # (review M3). Taken from the fit, which knows which slot it anchored;
+  # prepare_stan_data moves the designated anchor there, so it is not simply the
+  # last item in the config.
+  reference_item <- if (identical(method, "stan_hb")) {
+    ri <- hb$model_fit$reference_item
+    if (is.character(ri) && length(ri) == 1 && ri %in% ids) ri else NULL
+  } else NULL
+  ref_pos <- if (!is.null(reference_item)) match(reference_item, ids) else NA_integer_
 
   # --- Preference shares -----------------------------------------------------
   # From individual utilities when there are any (mean of per-respondent
@@ -159,15 +179,26 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     rescaleMethod = if (!is.null(rescaled)) rescale_method else NULL
   ))
 
+  # The reference item's spread and Mean SE are structurally 0, not measured.
+  # Blank them so the view shows a dash rather than a confident zero.
+  if (!is.na(ref_pos)) {
+    if (!is.null(scores$hbSpread)) scores$hbSpread[ref_pos] <- NA_real_
+    if (!is.null(scores$hbMeanSe)) scores$hbMeanSe[ref_pos] <- NA_real_
+  }
+
   # --- Discrimination classes (HB runs only) ----------------------------------
   disc <- results$discrimination_data
   disc_block <- if (!is.null(disc) && is.data.frame(disc) && nrow(disc) > 0) {
     drop_null(list(
       itemId = ids,
-      classification = as.character(disc$Classification[match(ids, disc$Item_ID)]),
-      label = as.character(disc$Classification_Label[match(ids, disc$Item_ID)]),
+      # The reference item is classified from a spread that is 0 by
+      # construction, so it has no class here: NA, shown as a dash.
+      classification = .md_blank_ref(
+        as.character(disc$Classification[match(ids, disc$Item_ID)]), ref_pos),
+      label = .md_blank_ref(
+        as.character(disc$Classification_Label[match(ids, disc$Item_ID)]), ref_pos),
       meanUtility = pick(disc, "Mean_Utility", ids),
-      sdUtility = pick(disc, "SD_Utility", ids),
+      sdUtility = .md_blank_ref(pick(disc, "SD_Utility", ids), ref_pos),
       note = paste0("Classes come from median splits on the mean and the ",
                     "spread of individual utilities: a universal favourite is ",
                     "high and agreed on, a polarising item is one respondents ",
@@ -265,6 +296,15 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     nTasks = num(ss$n_tasks),
     nItems = length(ids),
     itemsPerTask = num(items_per_task),
+    # Sampler diagnostics, Stan path only: the island used to carry the
+    # estimator's name and nothing about whether the fit behaved (review F6).
+    # Absent on every other path, where there is no sampler to diagnose.
+    nDivergences = if (identical(method, "stan_hb")) num(hb$diagnostics$n_divergences) else NULL,
+    maxTreedepthExceeded = if (identical(method, "stan_hb")) num(hb$diagnostics$max_treedepth_exceeded) else NULL,
+    meanRhat = if (identical(method, "stan_hb")) num(hb$diagnostics$mean_rhat) else NULL,
+    minEss = if (identical(method, "stan_hb")) num(hb$diagnostics$min_ess) else NULL,
+    referenceItem = reference_item,
+    referenceItemLabel = if (!is.na(ref_pos)) labels[ref_pos] else NULL,
     weighted = weighted,
     effectiveN = if (weighted) num(ss$effective_n) else NULL,
     weightingNote = if (weighted) {

@@ -506,7 +506,14 @@ maxdiff_extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
     model_fit = list(
       method = "cmdstanr",
       n_iter = fit$metadata()$iter_sampling,
-      n_chains = fit$num_chains()
+      n_chains = fit$num_chains(),
+      # The item the model fixed at zero (beta[r,J] = 0). prepare_stan_data
+      # moves the designated anchor into that slot, so it is not simply the
+      # last item in the config. Every utility is relative to this one, and
+      # its spread across respondents and its Mean SE are structurally 0:
+      # deliverables have to say so rather than report the zeros as findings
+      # (review M3).
+      reference_item = as.character(stan_data$item_ids[stan_data$J])
     )
   )
 }

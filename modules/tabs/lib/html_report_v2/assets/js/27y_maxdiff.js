@@ -70,6 +70,28 @@
       stamp = '<p class="' + cls + '">' + esc(meta.estimationNote) + "</p>";
     }
 
+    // Sampler diagnostics, Stan path only. The panel used to name the
+    // estimator and say nothing about whether the fit behaved, so a divergent
+    // run read exactly like a clean one (review F6). Max treedepth is only
+    // worth a reader's attention when it happened.
+    var diag = "";
+    if (meta.meanRhat !== null && meta.meanRhat !== undefined) {
+      var dparts = [];
+      if (meta.nDivergences !== null && meta.nDivergences !== undefined) {
+        dparts.push(num(meta.nDivergences, 0) + " divergence" +
+          (Number(meta.nDivergences) === 1 ? "" : "s"));
+      }
+      dparts.push("mean R-hat " + num(meta.meanRhat, 3));
+      if (meta.minEss !== null && meta.minEss !== undefined) {
+        dparts.push("min ESS " + num(meta.minEss, 0));
+      }
+      if (meta.maxTreedepthExceeded) {
+        dparts.push("max treedepth exceeded " + num(meta.maxTreedepthExceeded, 0) +
+          " times");
+      }
+      diag = '<p class="md-note">Sampler: ' + esc(dparts.join(", ")) + ".</p>";
+    }
+
     var sim = "";
     if (meta.simulatorFile) {
       sim = '<p class="md-note">Simulator: <a href="' + esc(meta.simulatorFile) + '">' +
@@ -80,6 +102,7 @@
     return '<div class="md-provenance">' +
       "<p>" + bits.join(" · ") + "</p>" +
       stamp +
+      diag +
       (notes.length ? '<p class="md-note">' + notes.join(" ") + "</p>" : "") +
       sim +
       "</div>";
@@ -187,6 +210,16 @@
         ? "Spread (SD) is how much the item's utility varies across respondents, not the precision of the average. Mean SE is that precision: the posterior standard deviation of the population mean."
         : "Spread (SD) is how much the item's utility varies across respondents, not the precision of the average. This run has no posterior, so there is no standard error for the mean.");
     }
+    // The Stan model fixes one item at zero, so its Spread and Mean SE are
+    // structurally 0 rather than measured. The island blanks them; say why,
+    // or a dash in two cells reads as missing data (review M3).
+    if (meta.referenceItem) {
+      // No esc() here: the whole notes list is escaped once where it is joined.
+      notes.push((meta.referenceItemLabel || meta.referenceItem) +
+        " is the reference item, fixed at zero, so the other utilities are " +
+        "relative to it. Its spread and standard error are not measured and " +
+        "show as a dash.");
+    }
     if (rescaled) {
       var rm = sc.rescaleMethod;
       notes.push(rm === "0_100" ? "Score rescales the headline utility so the least-preferred item is 0 and the most-preferred is 100."
@@ -244,7 +277,7 @@
       var k = ids.indexOf(id);
       var lab = k >= 0 ? labels[k] : id;
       return "<tr><td>" + esc(lab) + "</td><td>" +
-        (d.label && d.label[i] ? '<span class="md-tag">' + esc(d.label[i]) + "</span>" : "") + "</td>" +
+        (d.label && d.label[i] ? '<span class="md-tag">' + esc(d.label[i]) + "</span>" : "\u2013") + "</td>" +
         '<td class="md-num">' + num(d.meanUtility ? d.meanUtility[i] : null, 2) + "</td>" +
         '<td class="md-num">' + num(d.sdUtility ? d.sdUtility[i] : null, 2) + "</td></tr>";
     }).join("");
