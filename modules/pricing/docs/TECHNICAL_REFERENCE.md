@@ -549,7 +549,7 @@ Pricing tab links to it by file name rather than embedding it.
 ### 8.2 The engine (`js/pricing_simulator.js`)
 
 Linear interpolation between the prices that were tested, the metric cards, the
-SVG chart, preset scenario cards, the segment toggle, the scenario comparison
+SVG chart, the segment toggle, the scenario comparison
 table and PNG export. `PricingSimulator.init()` is called once the page has
 parsed its islands.
 

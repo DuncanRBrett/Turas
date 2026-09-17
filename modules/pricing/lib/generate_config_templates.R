@@ -752,53 +752,6 @@ build_monadic_settings_def <- function() {
 
 
 # ==============================================================================
-# SIMULATOR SHEET DEFINITION (TABLE FORMAT)
-# ==============================================================================
-
-build_simulator_columns_def <- function() {
-  list(
-    list(
-      name = "Scenario_Name",
-      width = 22,
-      required = TRUE,
-      description = "Display name for this scenario preset (e.g., 'Budget Launcher', 'Premium Pro')."
-    ),
-    list(
-      name = "Product_Price",
-      width = 16,
-      required = TRUE,
-      description = "Product price for this scenario.",
-      numeric_range = c(0, 999999)
-    ),
-    list(
-      name = "Competitor_1_Price",
-      width = 18,
-      required = FALSE,
-      description = "Competitor 1 price. Leave blank if not applicable."
-    ),
-    list(
-      name = "Competitor_2_Price",
-      width = 18,
-      required = FALSE,
-      description = "Competitor 2 price. Leave blank if not applicable."
-    ),
-    list(
-      name = "Competitor_3_Price",
-      width = 18,
-      required = FALSE,
-      description = "Competitor 3 price. Leave blank if not applicable."
-    ),
-    list(
-      name = "Description",
-      width = 40,
-      required = FALSE,
-      description = "Brief description shown on scenario card in the simulator."
-    )
-  )
-}
-
-
-# ==============================================================================
 # VALIDATION SHEET DEFINITION
 # ==============================================================================
 
@@ -857,14 +810,12 @@ build_validation_settings_def <- function() {
 #'
 #' @param output_path Path for the output Excel file
 #' @param include_monadic Include the Monadic sheet (default TRUE)
-#' @param include_simulator Include the Simulator Scenarios sheet (default TRUE)
 #' @param overwrite Overwrite existing file (default TRUE)
 #'
 #' @return Invisibly returns the output path
 #' @export
 generate_pricing_config_template <- function(output_path,
                                               include_monadic = TRUE,
-                                              include_simulator = TRUE,
                                               overwrite = TRUE) {
 
   cat("\n=== TURAS Pricing Module: Generating Config Template ===\n")
@@ -919,31 +870,11 @@ generate_pricing_config_template <- function(output_path,
     cat("  [4/7] Monadic sheet... SKIPPED\n")
   }
 
-  # --------------------------------------------------------------------------
-  # Sheet 5: Simulator Scenarios
-  # --------------------------------------------------------------------------
-  if (include_simulator) {
-    cat("  [5/7] Simulator sheet...\n")
-    sim_cols <- build_simulator_columns_def()
-    example_scenarios <- list(
-      list(Scenario_Name = "[Example] Budget Launcher", Product_Price = 9.99,
-           Competitor_1_Price = 12.99, Competitor_2_Price = 14.99,
-           Competitor_3_Price = "", Description = "Aggressive entry-level pricing"),
-      list(Scenario_Name = "[Example] Market Match", Product_Price = 12.99,
-           Competitor_1_Price = 12.99, Competitor_2_Price = 14.99,
-           Competitor_3_Price = "", Description = "Price parity with main competitor"),
-      list(Scenario_Name = "[Example] Premium Pro", Product_Price = 16.99,
-           Competitor_1_Price = 12.99, Competitor_2_Price = 14.99,
-           Competitor_3_Price = "", Description = "Premium positioning with value story")
-    )
-    write_table_sheet(wb, "Simulator", sim_cols,
-                      title = "Pricing Simulator - Preset Scenarios",
-                      subtitle = "Define preset scenarios for the interactive simulator dashboard. Each row becomes a clickable scenario card.",
-                      example_rows = example_scenarios,
-                      num_blank_rows = 10)
-  } else {
-    cat("  [5/7] Simulator sheet... SKIPPED\n")
-  }
+  # Sheet 5 was "Simulator - Preset Scenarios". Withdrawn (review F12): the
+  # sheet was read into settings$simulator_scenarios and the simulator looked
+  # for config$simulator$scenarios, so nothing typed on it ever reached the
+  # page. The simulator's own "+ Add scenario" comparison, built live by the
+  # reader, is a different feature and is unaffected.
 
   # --------------------------------------------------------------------------
   # Sheet 6: Validation

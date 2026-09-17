@@ -1370,7 +1370,6 @@ from calculations without corrupting the numeric data.
 | **GaborGranger** | GG and Combined | `data_format`, `price_sequence`, `response_columns`, `response_type`, `scale_threshold` |
 | **Monadic** | Monadic | `price_column`, `intent_column`, `intent_type`, `scale_threshold`, `model_type` |
 | **Validation** | Optional (all) | `min_completeness`, `price_min`, `price_max`, `flag_outliers` |
-| **Simulator** | Optional (all) | Preset scenario definitions for interactive simulator |
 
 ### Van Westendorp Output Price Points
 

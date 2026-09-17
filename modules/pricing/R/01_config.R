@@ -390,9 +390,16 @@ load_pricing_config <- function(config_file) {
     }
   }
 
-  # Load simulator scenarios if present
+  # Preset simulator scenarios are withdrawn (review F12). The sheet was read
+  # into settings$simulator_scenarios and the simulator looked for
+  # config$simulator$scenarios, a different name, so nothing an analyst typed
+  # on it ever reached the page, in this generation or the retired report's.
+  # A config that still carries the sheet is not refused; it is told.
   if ("Simulator" %in% sheets) {
-    settings$simulator_scenarios <- load_simulator_config(config_file)
+    cat(paste0(
+      "   [NOTE] The config has a Simulator sheet. Preset scenario cards are ",
+      "withdrawn and the sheet is not read. The simulator's price slider reaches ",
+      "every price; nothing else changes. You can delete the sheet.\n"))
   }
 
   # Load validation settings if present
@@ -998,70 +1005,6 @@ load_monadic_config <- function(config_file) {
 }
 
 
-#' Load Simulator Scenarios Configuration
-#'
-#' Reads the Simulator sheet (table format) containing preset scenarios
-#' for the interactive pricing simulator.
-#'
-#' @param config_file Path to config file
-#' @return List of scenario definitions
-#' @keywords internal
-load_simulator_config <- function(config_file) {
-
-  # Read raw — table format, so headers should be column names
-  raw <- tryCatch(
-    readxl::read_excel(config_file, sheet = "Simulator"),
-    error = function(e) NULL
-  )
-
-  if (is.null(raw)) return(list())
-
-  # Autodetect header row for table sheets
-  required_col <- "Scenario_Name"
-  if (!required_col %in% names(raw)) {
-    # Scan first 10 rows
-    raw_scan <- suppressMessages(
-      readxl::read_excel(config_file, sheet = "Simulator",
-                         col_names = FALSE, n_max = 10)
-    )
-    header_row <- NULL
-    for (r in seq_len(nrow(raw_scan))) {
-      row_vals <- trimws(as.character(unlist(raw_scan[r, ])))
-      if (required_col %in% row_vals) {
-        header_row <- r
-        break
-      }
-    }
-    if (!is.null(header_row)) {
-      raw <- readxl::read_excel(config_file, sheet = "Simulator",
-                                skip = header_row - 1)
-    }
-  }
-
-  if (!required_col %in% names(raw)) return(list())
-
-  # Filter out help rows, the template's own example rows and empty rows.
-  # The example scenarios used to load as real presets from an unedited
-  # template (review M11); they are now titled "[Example] ..." and skipped.
-  first_col <- as.character(raw[[1]])
-  help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]|^\\[Example\\]", first_col, ignore.case = TRUE)
-  all_na <- apply(raw, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
-  raw <- raw[!help_rows & !all_na, , drop = FALSE]
-
-  if (nrow(raw) == 0) return(list())
-
-  # Convert to list of scenarios
-  scenarios <- lapply(seq_len(nrow(raw)), function(i) {
-    row <- as.list(raw[i, ])
-    # Clean NAs
-    row <- lapply(row, function(x) if (is.na(x)) NULL else x)
-    row
-  })
-
-  scenarios
-}
-
-
 #' Get Default Validation Settings
 #'
 #' @return Default validation configuration
@@ -1465,7 +1408,6 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
     generate_pricing_config_template(
       output_path = output_file,
       include_monadic = method %in% c("monadic", "both"),
-      include_simulator = TRUE,
       overwrite = overwrite
     )
   } else {

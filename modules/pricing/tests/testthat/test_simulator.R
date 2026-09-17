@@ -131,23 +131,6 @@ test_that("a nonsense unit cost becomes zero rather than reaching the page", {
   expect_equal(jsonlite::fromJSON(build_simulator_config_json(list(unit_cost = "abc")))$unit_cost, 0)
 })
 
-test_that("preset scenarios come from a data frame or a list, and bad rows are dropped", {
-  df <- data.frame(name = c("Value", "Premium"), price = c(60, 120),
-                   description = c("Entry", "Top"), stringsAsFactors = FALSE)
-  out <- build_scenarios_list(df)
-  expect_equal(length(out), 2)
-  expect_equal(out[[1]]$name, "Value")
-  expect_equal(out[[2]]$price, 120)
-
-  lst <- list(list(name = "A", price = 10), list(name = "B", price = "not a price"))
-  out2 <- build_scenarios_list(lst)
-  expect_equal(length(out2), 1)
-  expect_equal(out2[[1]]$name, "A")
-
-  expect_equal(length(build_scenarios_list(NULL)), 0)
-  expect_equal(length(build_scenarios_list(list())), 0)
-})
-
 test_that("an island cannot close the script element it lives in", {
   # P2a: real JSON plus island escaping, in place of the hand-rolled escaper.
   segs <- list("</script><script>alert(1)" = list(price_range = c(1, 2),
@@ -299,4 +282,41 @@ test_that("the engine is syntactically valid and safe to inline", {
   skip_if(!nzchar(node), "node not on PATH")
   expect_equal(system2(node, c("--check", shQuote(js_path)),
                        stdout = FALSE, stderr = FALSE), 0L)
+})
+
+# ---------------------------------------------------------------------------
+# F12: preset scenario cards are withdrawn; the live comparison is not
+# ---------------------------------------------------------------------------
+
+test_that("nothing in the simulator reads preset scenarios any more (F12)", {
+  skip_if(!exists("build_simulator_config_json", mode = "function"), "builder not available")
+  # A config carrying scenarios under either old name contributes nothing.
+  cfg <- list(currency_symbol = "R", project_name = "F12", unit_cost = 10,
+              simulator = list(scenarios = list(list(name = "Launch", price = 79.99))),
+              simulator_scenarios = list(list(Scenario_Name = "Launch", Product_Price = 79.99)))
+  json <- build_simulator_config_json(cfg)
+  expect_false(grepl("scenarios", json, fixed = TRUE))
+  expect_false(grepl("Launch", json, fixed = TRUE))
+  expect_false(exists("build_scenarios_list", mode = "function"))
+})
+
+test_that("the reader can still build a comparison in the page (F12)", {
+  parts <- file.path(TURAS_ROOT, "modules", "pricing", "lib", "html_simulator",
+                     "01_simulator_parts.R")
+  js <- file.path(TURAS_ROOT, "modules", "pricing", "lib", "html_simulator", "js",
+                  "pricing_simulator.js")
+  skip_if(!file.exists(parts) || !file.exists(js), "simulator sources not present")
+  markup <- paste(readLines(parts, warn = FALSE), collapse = "\n")
+  script <- paste(readLines(js, warn = FALSE), collapse = "\n")
+
+  # The "+ Add scenario" comparison is a different feature and survives.
+  expect_true(grepl("Add scenario", markup, fixed = TRUE))
+  expect_true(grepl("sim-compare-add", script, fixed = TRUE))
+  expect_true(grepl("renderComparisonTable", script, fixed = TRUE))
+
+  # The preset-card surface is gone from both.
+  expect_false(grepl("sim-scenarios-section", markup, fixed = TRUE))
+  expect_false(grepl("sim-scenario-cards", markup, fixed = TRUE))
+  expect_false(grepl("setupScenarios", script, fixed = TRUE))
+  expect_false(grepl("config.scenarios", script, fixed = TRUE))
 })
