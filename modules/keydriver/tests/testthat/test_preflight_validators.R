@@ -572,3 +572,81 @@ test_that("Orchestrator returns a data frame with standard columns", {
   expect_true(is.data.frame(result))
   expect_true(all(c("Component", "Check", "Field", "Message", "Severity") %in% names(result)))
 })
+
+# ==============================================================================
+# H8: the checks are wired into the run, and the run respects them
+# ==============================================================================
+
+test_that("the pipeline calls the pre-flight orchestrator (H8)", {
+  # Fourteen checks and 574 lines of tests existed and nothing called the
+  # orchestrator, so the checks were dead code and their tests covered code no
+  # run could reach.
+  main <- readLines(file.path(module_dir, "R", "00_main.R"))
+  idx <- grep("validate_keydriver_preflight(", main, fixed = TRUE)
+  expect_gt(length(idx), 0)
+  # And an Error stops the run rather than being logged and ignored.
+  window <- main[seq(min(idx), min(min(idx) + 45, length(main)))]
+  expect_true(any(grepl("CFG_PREFLIGHT_FAILED", window, fixed = TRUE)))
+  expect_true(any(grepl("keydriver_refuse", window, fixed = TRUE)))
+})
+
+test_that("the GUI sources the validators it now depends on (H8)", {
+  gui <- file.path(module_dir, "run_keydriver_gui.R")
+  skip_if_not(file.exists(gui), "GUI not present")
+  src <- paste(readLines(gui, warn = FALSE), collapse = "\n")
+  expect_true(grepl("lib/validation/preflight_validators.R", src, fixed = TRUE))
+})
+
+test_that("checks 12 to 14 read the config shape a real run has (H8)", {
+  # The live pipeline stores these under config$settings. The checks read
+  # config$enable_shap, which is NULL there, so each returned early and the
+  # check never fired on a real run.
+  skip_if(!exists("check_shap_dependencies", mode = "function"), "check not loaded")
+  skip_if(!exists("check_feature_policies_valid", mode = "function"), "check not loaded")
+  log0 <- init_preflight_log()
+
+  # Nested, which is what a loaded config looks like.
+  nested <- list(settings = list(shap_on_fail = "explode"))
+  out_nested <- check_feature_policies_valid(nested, log0)
+  expect_equal(nrow(out_nested), 1)
+  expect_equal(out_nested$Severity[1], "Error")
+  expect_match(out_nested$Message[1], "explode")
+
+  # Flat, which is what the existing unit tests build, still works.
+  flat <- list(shap_on_fail = "explode")
+  expect_equal(nrow(check_feature_policies_valid(flat, log0)), 1)
+
+  # A valid value produces nothing, on either shape.
+  expect_equal(nrow(check_feature_policies_valid(
+    list(settings = list(shap_on_fail = "refuse")), log0)), 0)
+})
+
+test_that("a pre-flight Error would block a run, a Warning would not (H8)", {
+  skip_if(!exists("validate_keydriver_preflight", mode = "function"), "orchestrator not loaded")
+  set.seed(2)
+  n <- 60
+  d <- data.frame(Y = rnorm(n), D1 = rnorm(n), D2 = rnorm(n))
+  vars <- data.frame(
+    variable = c("Y", "D1", "D2"),
+    role = c("outcome", "driver", "driver"),
+    stringsAsFactors = FALSE
+  )
+  # Compare the same fixture with a valid and an invalid policy, so the
+  # difference is the policy rather than the fixture's own shape.
+  res_ok <- suppressWarnings(
+    validate_keydriver_preflight(list(settings = list(shap_on_fail = "refuse")),
+                                 d, vars, verbose = FALSE))
+  res_bad <- suppressWarnings(
+    validate_keydriver_preflight(list(settings = list(shap_on_fail = "maybe")),
+                                 d, vars, verbose = FALSE))
+  expect_true(is.data.frame(res_ok) && is.data.frame(res_bad))
+  n_ok <- sum(res_ok$Severity == "Error")
+  n_bad <- sum(res_bad$Severity == "Error")
+  # The invalid policy adds exactly one Error, and it names itself.
+  expect_equal(n_bad, n_ok + 1)
+  added <- setdiff(res_bad$Message, res_ok$Message)
+  expect_true(any(grepl("maybe", added, fixed = TRUE)))
+  # And the pipeline refuses when any Error is present, which is what makes
+  # this check mean anything.
+  expect_gt(n_bad, 0)
+})

@@ -119,6 +119,10 @@ run_keydriver_gui <- function() {
     "modules/keydriver/R/01_config.R",
     "modules/keydriver/R/02_term_mapping.R",
     "modules/keydriver/R/02_validation.R",
+    # The pre-flight checks live under lib/validation and were not sourced, so
+    # the GUI ran without them even once the pipeline started calling them
+    # (review H8).
+    "modules/keydriver/lib/validation/preflight_validators.R",
     "modules/keydriver/R/03_analysis.R",
     "modules/keydriver/R/04_output.R",
     "modules/keydriver/R/00_main.R"

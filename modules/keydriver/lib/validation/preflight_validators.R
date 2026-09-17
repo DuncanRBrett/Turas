@@ -779,9 +779,14 @@ check_stated_importance_drivers <- function(stated_df, variables_df, error_log) 
 #' @param config List, configuration object.
 #' @param error_log Data frame, running error log.
 #' @return Updated error_log.
+# The live pipeline stores these under config$settings; checks 12 to 14 read
+# config$enable_shap and friends, which is NULL there, so each returned early
+# and the checks never fired on a real run (review H8). They read both shapes
+# now, preferring the live one, so the unit tests that build a flat config
+# still work.
 #' @keywords internal
 check_shap_dependencies <- function(config, error_log) {
-  enable_shap <- config$enable_shap
+  enable_shap <- config$settings$enable_shap %||% config$enable_shap
   if (is.null(enable_shap)) return(error_log)
 
   # Normalise to logical
@@ -819,7 +824,7 @@ check_shap_dependencies <- function(config, error_log) {
 #' @return Updated error_log.
 #' @keywords internal
 check_quadrant_requirements <- function(config, stated_df, error_log) {
-  enable_quadrant <- config$enable_quadrant
+  enable_quadrant <- config$settings$enable_quadrant %||% config$enable_quadrant
   if (is.null(enable_quadrant)) return(error_log)
 
   # Normalise to logical
@@ -868,7 +873,7 @@ check_feature_policies_valid <- function(config, error_log) {
   valid_policies <- c("refuse", "continue_with_flag")
 
   # Check shap_on_fail
-  shap_policy <- config$shap_on_fail
+  shap_policy <- config$settings$shap_on_fail %||% config$shap_on_fail
   if (!is.null(shap_policy) && !is.na(shap_policy) && trimws(shap_policy) != "") {
     if (!tolower(trimws(shap_policy)) %in% valid_policies) {
       error_log <- log_preflight_issue(
@@ -882,7 +887,7 @@ check_feature_policies_valid <- function(config, error_log) {
   }
 
   # Check quadrant_on_fail
-  quadrant_policy <- config$quadrant_on_fail
+  quadrant_policy <- config$settings$quadrant_on_fail %||% config$quadrant_on_fail
   if (!is.null(quadrant_policy) && !is.na(quadrant_policy) && trimws(quadrant_policy) != "") {
     if (!tolower(trimws(quadrant_policy)) %in% valid_policies) {
       error_log <- log_preflight_issue(

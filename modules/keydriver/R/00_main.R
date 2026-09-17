@@ -508,6 +508,56 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     if (!is.null(config$encoding_report)) print_encoding_summary(config$encoding_report)
   }
 
+  # --- Step 2b: Pre-flight cross-reference checks ---
+  # Fourteen checks and 574 lines of tests for them existed, and nothing ever
+  # called the orchestrator: the checks were dead code and their tests were
+  # testing code no run reached (review H8). An Error stops the run, because an
+  # Error is a configuration that cannot produce a correct answer. Anything
+  # else is reported and the run continues.
+  if (exists("validate_keydriver_preflight", mode = "function")) {
+    preflight_log <- tryCatch(
+      validate_keydriver_preflight(
+        config = config,
+        data = data$data,
+        variables_df = config$variables %||% NULL,
+        segments_df = config$segments %||% NULL,
+        stated_df = config$stated_importance %||% NULL,
+        verbose = TRUE
+      ),
+      error = function(e) {
+        cat(sprintf("   [WARN] Pre-flight checks could not run: %s\n", conditionMessage(e)))
+        NULL
+      }
+    )
+    if (is.data.frame(preflight_log) && nrow(preflight_log) > 0) {
+      pf_errors <- preflight_log[preflight_log$Severity == "Error", , drop = FALSE]
+      pf_warnings <- preflight_log[preflight_log$Severity == "Warning", , drop = FALSE]
+      if (nrow(pf_errors) > 0) {
+        keydriver_refuse(
+          code = "CFG_PREFLIGHT_FAILED",
+          title = "Pre-Flight Checks Failed",
+          problem = sprintf("%d pre-flight check(s) reported an error: %s",
+                            nrow(pf_errors),
+                            paste(sprintf("[%s] %s", pf_errors$Check, pf_errors$Message),
+                                  collapse = "; ")),
+          why_it_matters = paste0(
+            "These checks cross-reference the config against the data. An error ",
+            "means the run would produce numbers from a setup that does not ",
+            "describe this study."),
+          how_to_fix = c(
+            "Read the boxed pre-flight errors on the console above; each names the field.",
+            "Fix the config or the data file, then run again."
+          )
+        )
+      }
+      if (nrow(pf_warnings) > 0) {
+        degraded_reasons <- c(degraded_reasons, sprintf(
+          "Pre-flight warning: %s", pf_warnings$Message))
+        affected_outputs <- c(affected_outputs, "preflight")
+      }
+    }
+  }
+
   # --- Step 3: Calculate Correlations ---
   cat("\n3. Calculating correlations...\n")
   step3 <- step_calculate_correlations(data, config, guard, has_mixed)
