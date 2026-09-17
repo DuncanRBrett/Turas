@@ -24,14 +24,14 @@ Checked and clear: `create_pricing_config()` writes `Col_PI_Cheap` blank, so
 the F3 refusal does not fire on a fresh config from the template. Verified by
 generating a template and loading it back.
 
-Pricing suite from the repo root: 28 files, 377 tests, 1,071 passing, 0 failed,
+Pricing suite from the repo root: 28 files, 379 tests, 1,078 passing, 0 failed,
 0 errors, 0 skipped, 14 warnings. The baseline at session start was 348 tests
 and 984 passing. The two extra warnings are the package's own flag_only warning
 from two new tests, the same one the existing H3 test raises.
 
 Node gates: pricing view 16 passed, island encoding 18 passed.
 
-Every new test was run against the code as found. Of the 25 added, 22 fail or
+Every new test was run against the code as found. Of the 27 added, 23 fail or
 error there; the three that pass are deliberate controls (the ONE_TWO wide
 path, Van Westendorp without the NMS extension, and the stop-early ladder that
 must still refuse).
@@ -90,6 +90,25 @@ curve. `.pricing_tabs_valid_flag()` now also drops anyone absent from the frame
 the curve was computed from. On the probe fixture the exported base is 259 of
 300, matching the module's analysed base exactly, with 41 zeros.
 
+## A dead field, found by Duncan's eyeball
+
+`diagnostics$warning` in `03_van_westendorp.R` was set and read nowhere: not
+printed, not written to a sheet, not in the stats pack. That was true before
+this work; F5 only changed which rate fed it, so a dead field went from saying
+nothing to saying nothing. Turas runs inside Shiny and the console is where a
+run is debugged, so it now prints, names the count and the handling, and points
+at the stats pack. Duncan asked for this before the merge.
+
+On the shipped Karoo config the line reads:
+
+```
+[WARNING] Van Westendorp Monotonicity: 44 respondents (11.0%) gave illogical
+price sequences. Review data quality. Handled as 'drop'; the stats pack records
+the count.
+```
+
+Nothing else about violations reaches the pricing console, before or after.
+
 ## What Duncan should know
 
 **The exclusion rate is not small.** Gabor-Granger completeness is 1.0, so a
@@ -100,11 +119,9 @@ the count and rate are disclosed in the console, the diagnostics, three
 stats-pack rows and the workbook's Validation sheet. It is still a number worth
 seeing before a client does.
 
-**The Karoo both-methods run now prints a warning it never printed before.**
-F5 moved the "over 10% illogical" console warning onto the pre-handling rate,
-and Karoo has 44 violators in 400 under `drop`, which is 11.0%. The run is
-still PASS and the price points are unchanged; the line is the disclosure that
-was missing. Checked by running the shipped config headless this session.
+**The Karoo both-methods run now prints a warning it never printed before**,
+for the reason in the section above. The run is still PASS and the price points
+are unchanged. Checked by running the shipped config headless this session.
 
 **The NMS question from the review is still unanswered.** The old code called
 the package with the intent columns on its defaults, which on this install
@@ -141,6 +158,19 @@ The GUI path, `launch_turas()`, and a regeneration of the Karoo deliverables.
 No workbook under `examples/pricing/Output` was touched, and nothing was
 written to OneDrive. Duncan regenerates; a session does not.
 
-Owed: Duncan's eyeball of a regenerated Karoo workbook, with the Price_Ladder
-sheet's currency and the Validation sheet's completeness block as the two lines
-to look at, then the merge.
+## Duncan's eyeball, 2026-09-17
+
+Run through `launch_turas()` on this branch. `Karoo_Pricing_Config.xlsx`
+completed. `Karoo_Pricing_Config_StopEarly.xlsx` refused, which is the C2
+protection the F4 rule had to keep and the thing most at risk from this change.
+
+The eyeball found the dead warning field above, because the line it was told to
+expect was not there. Fixed before the merge on Duncan's instruction.
+
+Confirmed by this session against the real Karoo output rather than a fixture:
+the Price_Ladder sheet reads "Standard tier anchored to optimal price point
+(R100.99)", which carried a dollar sign before; the stats pack's Assumptions
+sheet carries "VW: violations_before_handling | 44 (11.0%)" beside the old
+"VW: violation_rate | 0.0%"; and the console now carries the warning line.
+
+Owed: the merge.

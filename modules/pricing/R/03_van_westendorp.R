@@ -682,11 +682,22 @@ run_van_westendorp <- function(data, config, validate = TRUE, validation = NULL)
   # Add warning if violation rate high. Under "drop" and "fix" the rate on the
   # arriving data is 0 by construction, so the pre-handling rate is what this
   # warning is about (review F5).
+  #
+  # It goes to the console as well as into the diagnostics. `diagnostics$warning`
+  # was set here and read nowhere: not printed, not written to a sheet, not in
+  # the stats pack. Turas runs inside Shiny and the console is where a run is
+  # debugged, so a diagnostic that reaches no one is the same as no diagnostic.
   warn_rate <- if (!is.na(violation_rate_before)) violation_rate_before else violation_rate
   if (warn_rate > 0.10) {
+    warn_n <- if (!is.na(n_violations_before)) n_violations_before else n_violations
     diagnostics$warning <- sprintf(
-      "%.1f%% of respondents gave illogical price sequences. Review data quality.",
-      warn_rate * 100
+      "%d respondents (%.1f%%) gave illogical price sequences. Review data quality.",
+      as.integer(warn_n), warn_rate * 100
+    )
+    pricing_console_warning(
+      sprintf("%s Handled as '%s'; the stats pack records the count.",
+              diagnostics$warning, behavior),
+      context = "Van Westendorp Monotonicity"
     )
   }
 

@@ -617,3 +617,28 @@ test_that("the engine's rule is the strict one the validator uses (F5)", {
   r <- quiet(run_van_westendorp(d, vw_cfg(behavior = "flag_only")))
   expect_equal(r$diagnostics$n_violations, strict$count)
 })
+
+test_that("a high violation rate reaches the console, not just a dead field (F5)", {
+  # 12 violators in 112 is 10.7%, over the threshold. Under drop the engine's
+  # own recompute is 0, so without the pre-handling count nothing would fire.
+  d <- vw_with_violators(n_clean = 100, n_violators = 12)
+  cfg <- vw_cfg(behavior = "drop")
+  v <- quiet(validate_pricing_data(d, cfg))
+  out <- capture.output(r <- run_van_westendorp(v$clean_data, cfg, validation = v))
+  line <- grep("illogical price sequences", out, value = TRUE)
+  expect_length(line, 1)
+  expect_match(line, "12 respondents")
+  expect_match(line, "10.7%", fixed = TRUE)
+  expect_match(line, "drop")
+  # The diagnostics field still carries it for anything that wants to read it.
+  expect_match(r$diagnostics$warning, "illogical price sequences")
+})
+
+test_that("a clean sample says nothing about violations (F5)", {
+  d <- vw_with_violators(n_clean = 100, n_violators = 0)
+  cfg <- vw_cfg(behavior = "drop")
+  v <- quiet(validate_pricing_data(d, cfg))
+  out <- capture.output(r <- run_van_westendorp(v$clean_data, cfg, validation = v))
+  expect_length(grep("illogical price sequences", out), 0)
+  expect_null(r$diagnostics$warning)
+})
