@@ -195,8 +195,11 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
   if (!is.null(frag$all) && nzchar(frag$all)) record$extractAll <- frag$all
   # hasExtracts cannot be inferred from the two fields above: a comment carrying only
   # a general fragment has neither, and still must not show that fragment beside a
-  # theme it makes no claim about.
-  if (shows && isTRUE(rec$has_extracts)) record$hasExtracts <- TRUE
+  # theme it makes no claim about. It is gated on text having SURVIVED the dial:
+  # under `hidden` (the default, numbers-only ship) no fragment and no verbatim
+  # ships, and the flag on its own made the report drop those comments from every
+  # theme list and then claim they were quoted elsewhere (review 2026-09-17, C3).
+  if (shows && isTRUE(rec$has_extracts) && !is.null(applied$text)) record$hasExtracts <- TRUE
   # Which theme the unscoped text speaks to, when it is a themed fragment shown away
   # from that theme's page (the priority block, a pin, the story tab), so the report
   # can name it rather than presenting a fragment as the whole comment.

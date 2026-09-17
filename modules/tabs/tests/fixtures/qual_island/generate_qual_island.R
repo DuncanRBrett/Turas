@@ -125,12 +125,21 @@ qual_fixture_island <- function(turas_root) {
                     list(Pay = 2L, Workload = 2L), demos = d("Finance", "5+ yrs"))
   q3_rec_all$extract_all <- "a trim that covers both"
   q3_rec_all$has_extracts <- TRUE
+  # Respondent 8 carries a DIFFERENT fragment for each of its two themes, which is
+  # the shape a reader mark has to survive: the text on the Pay page and the text
+  # on the Workload page are different strings, so a highlight on one cannot be the
+  # same mark as a highlight on the other (review 2026-09-17, C2).
+  q3_rec_two <- rec("8", "a comment with a distinct half for each theme", 2L, 3L,
+                    list(Pay = 3L, Workload = 3L), demos = d("Admin", "5+ yrs"))
+  q3_rec_two$extracts <- list(Pay = "the pay half only",
+                              Workload = "the workload half only")
+  q3_rec_two$has_extracts <- TRUE
   q3 <- list(
     code = "Q3", title = "What would you change?", type = "themed", sheet = "Q3",
     roles = list(themes = list(theme("Pay"), theme("Workload"))),
-    records = list(q3_rec_pay, q3_rec_all), meta = list(dropped_codes = 0L))
+    records = list(q3_rec_pay, q3_rec_all, q3_rec_two), meta = list(dropped_codes = 0L))
 
-  ids <- c("1", "2", "3", "4", "5", "6", "7")
+  ids <- c("1", "2", "3", "4", "5", "6", "7", "8")
   master <- list(
     id_to_idx = stats::setNames(seq_along(ids) - 1L, ids), n = length(ids),
     banner_dims = list(list(label = "Dept",   values = c("Admin", "Finance")),

@@ -380,3 +380,31 @@ test_that("a workbook with no extracts sheet reads exactly as it did before", {
     expect_null(rec$extract_general)
   }
 })
+
+test_that("a question sheet whose name ends in 'Extracts' is read as a question", {
+  # "Key Extracts" was routed to the extracts parser and hard-refused the whole
+  # report with a message about missing columns on a sheet the analyst thinks is a
+  # question (review 2026-09-17, C8).
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Key Extracts` = rbind(
+      c("ID", "Noteworthy", "Comment", "Overall Sentiment", "Service"),
+      c("1", NA, "a genuine open-end on a sheet with an awkward name", "1", "1"))
+  ))
+  on.exit(unlink(path), add = TRUE)
+  out <- capture.output(res <- qual_read_workbook(path))
+  expect_length(res$questions, 2L)
+  expect_true("Key Extracts" %in% vapply(res$questions, function(q) q$sheet, character(1)))
+  expect_true(any(grepl("read as a question sheet", out)))
+})
+
+test_that("a MISNAMED extracts sheet still refuses, because it is shaped like one", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Cultuer Extracts` = rbind(c("ID", "Theme", "Extract"), c("1", "Service", "typo"))
+  ))
+  on.exit(unlink(path), add = TRUE)
+  err <- tryCatch(qual_read_workbook(path), turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_match(paste(unlist(err), collapse = " "), "no question sheet named 'Cultuer'")
+})

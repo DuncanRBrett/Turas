@@ -549,8 +549,9 @@ Docs updated: `QUALITATIVE_TAB_BUILD_NOTES.md` (new section D4, the technical re
 the noteworthy and hide rules it sits beside in practice), `README_comment_appendix.md`
 (the same for anyone driving the builder script), and this plan.
 
-Evidence: the whole tabs R suite, 79 files, 6,105 checks pass, 0 fail, 1 skip. All 50 JS
-suites, 1,186 checks pass, 0 fail, every suite exiting 0. The extracts JS suite is now 22
+Evidence: the whole tabs R suite, 79 files, 6,105 checks pass, 0 fail, 1 skip. All 49 JS
+suites (the directory holds 50 .mjs files, one of which is a shared helper), 1,186
+checks pass, 0 fail, every suite exiting 0. The extracts JS suite is now 22
 checks.
 
 The strongest of them is end to end, in `test_qual_report.R`: a real workbook whose
@@ -563,8 +564,31 @@ comment's themes still counted.
 Deviations: none. One decision worth recording: the card takes the question as an argument
 rather than reading `qual._view`, so the label is testable without a rendered view.
 
+### Review fixes. BUILT 17 Sep 2026, not merged.
+
+An independent Opus session reviewed stages 1 to 4 and found thirteen confirmed defects,
+two of them serious enough to reach a client: the drawer's Excel export dropped the theme
+and wrote another theme's fragment into the file, and highlight keys were suffixed per
+theme for every comment, which retired every reader mark in every saved copy the moment a
+theme was selected, on projects with no extracts sheet at all.
+
+All thirteen are fixed, each one mutation-checked by reverting the fix and requiring the
+suite to go red. Three of the tests written with the first attempt at these fixes passed
+against the reverted code and were rewritten. Findings, fixes and the evidence per finding:
+`modules/tabs/docs/REVIEW_FINDINGS_QUAL_EXTRACTS_2026-09-17.md`.
+
+What the review could not break, having probed it directly: extracts obey the
+confidentiality dial on every path, the release audit's declared-mode shortcut stays
+honest, an island built without an extracts sheet is identical field for field, and
+unions carry fragments through by label.
+
+Also recorded there: a story pin frozen before an extracts sheet was added stops
+rendering, because `textPublished` refuses a pin whose text the island no longer
+publishes. That is the designed behaviour for any change to what ships, and it applies
+equally to editing a verbatim by hand.
+
 ## The fix is complete
 
-Stages 1 to 4 deliver the whole of it. What remains is stage 5 (the SACS migration script,
-section 11), the independent review, and Duncan's own regeneration through
+Stages 1 to 4 plus the review fixes deliver the whole of it. What remains is stage 5 (the
+SACS migration script, section 11) and Duncan's own regeneration through
 `launch_turas()`.

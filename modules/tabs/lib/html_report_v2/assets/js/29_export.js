@@ -139,7 +139,8 @@
           { "font-size": 14, "font-style": "italic", fill: "#1c2333" }));
         y += 20;
       });
-      var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
+      var chip = [qt.q, qt.band].concat(qt.tags || [])
+        .concat([qt.extract || null]).filter(Boolean).join(" · ");
       if (chip) {
         parts.push(S.text(PAD + 16, y + 12, TR.charts.clip(chip, 120),
           { "font-size": 11, fill: "#6b7280" }));
@@ -1335,8 +1336,11 @@
           { size: SIZE.quote, italic: true, colour: INK })]);
       // qt.band (NPS Detractor/Passive/Promoter and the like) leads the tags when
       // the payload carries one; payloads without it are unchanged.
+      // qt.extract marks a quote that is an EXTRACT from a longer comment, so a
+      // slide never presents a fragment as a complete verbatim (review 2026-09-17, C7).
       var chip = [qt.q, qt.band].concat(qt.tags || [])
-        .concat([SENT_WORD[qt.sentiment] || null]).filter(Boolean).join(" · ");
+        .concat([qt.extract || null, SENT_WORD[qt.sentiment] || null])
+        .filter(Boolean).join(" · ");
       content += textBox(next(), { x: MARGIN + 1.0, y: y + blockH - 0.34,
         w: 9.5, h: 0.26 },
         [para(TR.charts.clip(chip, 120), { size: SIZE.chip, colour: GREY })]);

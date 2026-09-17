@@ -529,7 +529,7 @@ qual_classify_sheet <- function(rows, sheet_name) {
 QUAL_EXTRACTS_SHEET_PATTERN <- "^(.*)\\bextracts$"
 QUAL_EXTRACTS_THEME_PATTERN <- "^themes?$"
 QUAL_EXTRACTS_TEXT_PATTERN  <- "^extract$"
-QUAL_EXTRACTS_LEAD_PATTERN  <- "^lead$"
+QUAL_EXTRACTS_LEAD_PATTERN  <- "^lead"
 # The Theme cell token claiming every theme the row is coded on.
 QUAL_EXTRACTS_ALL_TOKEN <- "all"
 # Several fragments for one theme read as one quote, joined the way an analyst
@@ -552,6 +552,20 @@ qual_is_extracts_sheet <- function(sheet_name) {
 #' @return The base sheet name, or "" when the name carries none.
 qual_extracts_base_name <- function(sheet_name) {
   trimws(sub(QUAL_EXTRACTS_SHEET_PATTERN, "\\1", trimws(sheet_name), ignore.case = TRUE))
+}
+
+#' Normalise a theme label for MATCHING only (never for storage).
+#'
+#' Excel headers pasted from Word or a PDF carry U+00A0 where they look like a
+#' space, and `trimws` does not touch it. A coded header "Pay Rise" with a
+#' non-breaking space and an analyst typing a normal space are then unequal, so the
+#' run refused and listed a valid label visually identical to the one it had just
+#' rejected (review 2026-09-17, C12).
+#' @param x A character vector of labels.
+#' @return The labels with non-breaking spaces normalised and whitespace collapsed.
+qual_label_key <- function(x) {
+  v <- gsub("\u00a0", " ", as.character(x), useBytes = FALSE)
+  trimws(gsub("[[:space:]]+", " ", v))
 }
 
 #' Parse a Theme cell into its claim.
@@ -651,6 +665,7 @@ qual_attach_extracts <- function(question, entries, sheet_name) {
   problems <- character(0)
   n_blank <- 0L
   labels <- vapply(question$roles$themes, function(t) t$label, character(1))
+  label_by_key <- stats::setNames(as.list(labels), qual_label_key(labels))
   ids <- vapply(question$records, function(r) r$id, character(1))
   # Per record index: themed fragments, the general/all fragment, the lead mark.
   themed <- list(); general <- list(); leads <- list()
@@ -659,6 +674,14 @@ qual_attach_extracts <- function(question, entries, sheet_name) {
 
   for (e in entries) {
     if (!nzchar(trimws(e$text))) { n_blank <- n_blank + 1L; next }
+    if (!nzchar(e$id)) {
+      # A blank ID used to `match` a blank-ID coded record (itself only an integrity
+      # WARNING), so the fragment attached to a record that never joins the host
+      # survey and vanished from the report in silence (review 2026-09-17, C6).
+      problems <- c(problems, sprintf(
+        "%s: no ID in the ID column - add the comment's ID, or delete the row", where(e)))
+      next
+    }
     at <- match(e$id, ids)
     if (is.na(at)) {
       problems <- c(problems, sprintf(
@@ -676,14 +699,18 @@ qual_attach_extracts <- function(question, entries, sheet_name) {
     key <- as.character(at)
     if (identical(e$claim$kind, "named")) {
       ok <- TRUE
+      claimed <- character(0)
       for (label in e$claim$labels) {
-        if (!(label %in% labels)) {
+        coded <- label_by_key[[qual_label_key(label)]]
+        if (is.null(coded)) {
           problems <- c(problems, sprintf(
             "%s: theme '%s' is not a theme column on sheet '%s'. Valid: %s",
             where(e), label, question$sheet, paste(labels, collapse = "; ")))
           ok <- FALSE
           next
         }
+        label <- coded                      # the coded spelling wins from here on
+        claimed <- c(claimed, label)
         if (is.null(rec$themeVals[[label]])) {
           problems <- c(problems, sprintf(
             paste0("%s: that comment is not coded '%s', so the fragment would be quoted ",
@@ -693,7 +720,7 @@ qual_attach_extracts <- function(question, entries, sheet_name) {
         }
       }
       if (!ok) next
-      for (label in e$claim$labels) {
+      for (label in claimed) {
         prior <- themed[[key]][[label]]
         themed[[key]][[label]] <- if (is.null(prior)) e$text else
           paste0(prior, QUAL_EXTRACTS_JOIN, e$text)

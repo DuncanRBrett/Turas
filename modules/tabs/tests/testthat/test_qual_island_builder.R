@@ -609,3 +609,21 @@ test_that("a record with no extracts carries none of the new fields", {
   expect_null(r$hasExtracts)
   expect_null(r$textTheme)
 })
+
+test_that("hidden mode ships no extracts FLAG either, so the report claims nothing", {
+  # The flag alone made a numbers-only report drop every extract-bearing comment
+  # from its theme lists and then state that they were quoted elsewhere, on a
+  # report that quotes nothing at all (review 2026-09-17, C3).
+  r <- ex_island(ex_rec(extracts = list(Service = "the service half"),
+                        extract_all = "covers the lot", has_extracts = TRUE),
+                 text_mode = "hidden")
+  expect_null(r$hasExtracts)
+  expect_null(r$textTheme)
+  expect_true(is.na(r$text))
+  # And in the two modes that DO ship text, the flag is there.
+  for (mode in c("redacted", "full")) {
+    rr <- ex_island(ex_rec(extracts = list(Service = "the service half"),
+                           has_extracts = TRUE), text_mode = mode)
+    expect_true(isTRUE(rr$hasExtracts), info = mode)
+  }
+})

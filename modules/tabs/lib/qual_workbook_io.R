@@ -51,8 +51,21 @@ qual_classify_all_sheets <- function(path, sheets) {
     # question and refuse it for duplicated ResponseIDs (one comment, several
     # fragments) before the extracts parser ever saw it.
     if (qual_is_extracts_sheet(sheet)) {
-      extracts[[length(extracts) + 1L]] <- qual_classify_extracts_sheet(rows, sheet)
-      next
+      parsed_ex <- qual_classify_extracts_sheet(rows, sheet)
+      # A name ending in " Extracts" is not proof: a study can have an open-end sheet
+      # called "Key Extracts". Route it only when the name points at a sheet that is
+      # really here, or when the sheet is shaped like an extracts sheet (ID, Theme,
+      # Extract), which is what makes a MISNAMED extracts sheet refuse rather than
+      # being read as a question (review 2026-09-17, C8).
+      base_exists <- nzchar(parsed_ex$base) &&
+        tolower(parsed_ex$base) %in% tolower(trimws(sheets))
+      if (base_exists || !isTRUE(parsed_ex$skip)) {
+        extracts[[length(extracts) + 1L]] <- parsed_ex
+        next
+      }
+      cat(sprintf(paste0("[TABS/qual] %s: name ends in 'Extracts' but it names no sheet ",
+                         "here and carries no Theme/Extract columns, so it is read as a ",
+                         "question sheet.\n"), sheet))
     }
     question <- qual_classify_sheet(rows, sheet)
     if (isTRUE(question$skip)) {
@@ -199,6 +212,9 @@ qual_attach_workbook_extracts <- function(path, parsed, module = "TABS") {
     n_attached <- n_attached + res$n_attached
     n_blank <- n_blank + res$n_blank
     n_sheets <- n_sheets + 1L
+    n_lead <- sum(vapply(ex$entries, function(e) isTRUE(e$lead), logical(1)))
+    cat(sprintf("[TABS/qual] %s: %d extract row(s), %d marked Lead.\n",
+                ex$sheet, length(ex$entries), n_lead))
   }
 
   if (length(problems)) qual_refuse_extracts_invalid(path, problems, module)

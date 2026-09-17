@@ -72,8 +72,41 @@ function load(island) {
   return box.TR.qual;
 }
 
+/** Loads the module with TR.xlsx stubbed, and returns what the download was handed.
+ *  The point is to drive the REAL wiring rather than the inner row builder. */
+function loadWithXlsx(island) {
+  const captured = {};
+  const store = {};
+  const box = {
+    console,
+    localStorage: {
+      getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => { store[k] = String(v); },
+      removeItem: (k) => { delete store[k]; }
+    }
+  };
+  box.globalThis = box; box.window = box;
+  vm.createContext(box);
+  box.TR = {
+    fmt: { escapeHtml: (s) => String(s == null ? "" : s),
+           score: (v) => Number(v).toFixed(1), base: (n) => String(n),
+           slug: (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "_") },
+    d2: { storeKey: (k) => k + "::fixture" },
+    QUAL: island || ISLAND,
+    xlsx: { download: (name, sheet, rows, opts) => {
+      captured.name = name; captured.rows = rows; captured.opts = opts;
+    } }
+  };
+  vm.runInContext(readFileSync(path.join(JS_DIR, "21_stats.js"), "utf8"), box,
+                  { filename: "21_stats.js" });
+  vm.runInContext(readFileSync(SRC, "utf8"), box, { filename: "27q_qualitative.js" });
+  box.TR.qual._resetRekey();
+  return { q: box.TR.qual, captured: captured };
+}
+
 const recPay = Q3.records[0];          // coded Pay + Workload, fragment for Pay
 const recAll = Q3.records[1];          // coded Pay + Workload, "all" fragment
+const recTwo = Q3.records[2];          // coded Pay + Workload, a DIFFERENT fragment each
 
 console.log("Qualitative extracts. A fragment beside the theme it evidences:");
 
@@ -101,8 +134,8 @@ run("4. but the comment still COUNTS under both themes", () => {
   const rows = q.prevalence(Q3.records, Q3.themes);
   const workload = rows.filter((r) => r.id === WORKLOAD)[0];
   const pay = rows.filter((r) => r.id === PAY)[0];
-  eq(workload.n, 2, "Workload is still raised by both commenters");
-  eq(pay.n, 2, "and so is Pay");
+  eq(workload.n, 3, "Workload is still raised by all three commenters");
+  eq(pay.n, 3, "and so is Pay");
   eq(workload.pct, 100, "the distribution is untouched by where quotes appear");
 });
 
@@ -137,23 +170,41 @@ run("8. a withheld comment stays withheld, fragments or not", () => {
   eq(q.textFor(suppressed, 0), null, "and no theme page shows it");
 });
 
+run("8b. a withheld comment carrying fragments still shows nothing", () => {
+  // The R builder cannot currently emit text: null WITH fragments, because the
+  // dial withholds both together. This pins the guard against a future builder
+  // change or a hand-edited island; the check that claimed to pin it was passing
+  // through a different branch entirely (review 2026-09-17, C11).
+  const q = load();
+  const handBuilt = { idx: 99, text: null, hasExtracts: true,
+                      extracts: { "0": "would leak" }, extractAll: "would also leak",
+                      themeVals: { "0": 1 } };
+  eq(q.textFor(handBuilt, 0), null, "no theme page shows it");
+  eq(q.textFor(handBuilt, null), null, "and neither does any unscoped context");
+  eq(q.quotableUnder(handBuilt, 0), false, "so it is not quotable anywhere");
+});
+
 run("9. the comment list drops a comment with nothing to say here, and keeps its count", () => {
   const q = load();
   const st = { tier: "all", sentiment: null, theme: WORKLOAD };
   const visible = q.visibleRecords(Q3, st, Q3.records);
-  eq(visible.length, 1, "only the 'all' comment is quotable under Workload");
-  eq(visible[0].idx, recAll.idx, "and it is the right one");
-  const both = q.visibleRecords(Q3, { tier: "all", sentiment: null, theme: PAY }, Q3.records);
-  eq(both.length, 2, "both are quotable under Pay");
+  eq(visible.length, 2, "the 'all' comment and the two-fragment one are quotable here");
+  assert(visible.every((r) => r.idx !== recPay.idx),
+         "and the Pay-only comment is not among them");
+  const all3 = q.visibleRecords(Q3, { tier: "all", sentiment: null, theme: PAY }, Q3.records);
+  eq(all3.length, 3, "all three are quotable under Pay");
 });
 
 run("10. a champion quote is never a fragment from another theme", () => {
   const q = load();
-  const champs = q.championQuotes(Q3.records, WORKLOAD, "Q3", 2);
-  eq(champs.length, 1, "only one comment can champion Workload");
-  eq(champs[0].idx, recAll.idx, "the 'all' comment");
-  const payChamps = q.championQuotes(Q3.records, PAY, "Q3", 2);
-  eq(payChamps.length, 2, "both champion Pay");
+  const champs = q.championQuotes(Q3.records, WORKLOAD, "Q3", 3);
+  eq(champs.length, 2, "only the two comments with something to say here can champion it");
+  assert(champs.every((r) => r.idx !== recPay.idx),
+         "the Pay-only comment can never champion Workload");
+  // And what each champion SHOWS is this theme's fragment, not its default one.
+  const two = champs.filter((r) => r.idx === recTwo.idx)[0];
+  eq(q.textFor(two, WORKLOAD), "the workload half only", "its Workload half champions");
+  eq(q.championQuotes(Q3.records, PAY, "Q3", 3).length, 3, "all three champion Pay");
 });
 
 run("11. the drawer export writes the text the drawer is showing", () => {
@@ -166,6 +217,27 @@ run("11. the drawer export writes the text the drawer is showing", () => {
   eq(payRows[1][verbatimCol], "the pay half of the comment", "and under Pay it exports the Pay fragment");
 });
 
+run("11b. the Excel file the reader downloads carries the theme's fragment", () => {
+  // exportXlsx took a themeId and never passed it on, so a Workload-scoped export
+  // carried the Pay fragment: the feature's own bug, in a file, with the screen
+  // showing the right text (review 2026-09-17, C1). Test 11 could not see it
+  // because it called exportRows directly and skipped the wiring.
+  const { q, captured } = loadWithXlsx();
+  q.exportXlsx(ISLAND, Q3, Q3.records, WORKLOAD);
+  const verbatimCol = captured.rows[0].length - 1;
+  const texts = captured.rows.slice(1).map((r) => r[verbatimCol]);
+  assert(texts.indexOf("the workload half only") >= 0,
+         "the downloaded file carries the Workload fragment: " + JSON.stringify(texts));
+  assert(texts.indexOf("the pay half only") < 0,
+         "and never the Pay fragment of the same comment");
+  assert(texts.indexOf("[hidden]") >= 0, "the Pay-only comment exports as withheld here");
+
+  const pay = loadWithXlsx();
+  pay.q.exportXlsx(ISLAND, Q3, Q3.records, PAY);
+  const payTexts = pay.captured.rows.slice(1).map((r) => r[verbatimCol]);
+  assert(payTexts.indexOf("the pay half only") >= 0, "and the Pay export carries the Pay half");
+});
+
 run("12. drawerTheme is the one definition of which theme is on screen", () => {
   const q = load();
   eq(q.drawerTheme(Q3, { theme: PAY }), PAY, "a theme selection");
@@ -176,21 +248,43 @@ run("12. drawerTheme is the one definition of which theme is on screen", () => {
 
 run("13. a mark on one fragment does not move to another fragment", () => {
   const q = load();
+  // recTwo shows a DIFFERENT string on each theme page, so each needs its own mark.
+  q.addHighlight("Q3", recTwo, 0, 3, WORKLOAD);
+  eq(q.getHighlights("Q3", recTwo, WORKLOAD).length, 1, "the Workload fragment carries it");
+  eq(q.getHighlights("Q3", recTwo, PAY).length, 0, "the Pay page does not");
+  assert(Object.keys(q.highlightsAll()).some((k) => k.indexOf(":t" + WORKLOAD) > 0),
+         "a fragment's mark carries its theme in the key");
+});
+
+run("13b. a comment that shows the SAME text everywhere keeps ONE mark", () => {
+  // The regression this guards (review C2): suffixing every card's key on a theme
+  // page retired every reader mark in every saved copy ever made, including on
+  // projects with no extracts sheet at all.
+  const q = load();
+  const plain = ISLAND.questions[0].records[0];        // no extracts anywhere
+  q.addHighlight("Q1", plain, 0, 5);                   // as an older build wrote it
+  eq(q.getHighlights("Q1", plain).length, 1, "the mark is there unscoped");
+  eq(q.getHighlights("Q1", plain, 0).length, 1, "and still there on a theme page");
+  eq(q.getHighlights("Q1", plain, 1).length, 1, "and on any other theme");
+  assert(Object.keys(q.highlightsAll()).every((k) => k.indexOf(":t") < 0),
+         "a comment with no fragments never gets a per-theme key");
+  // The key itself, which is what the original line got wrong for every record.
+  eq(q.hlKeyFor("Q1", plain, 0), q.markKeyFor("Q1", plain),
+     "no suffix for a comment with no fragments");
+  eq(q.hlKeyFor("Q3", recAll, WORKLOAD), q.markKeyFor("Q3", recAll),
+     "nor for an 'all' fragment, which is the same string on every page");
+  eq(q.hlKeyFor("Q3", recPay, PAY), q.markKeyFor("Q3", recPay),
+     "nor for a fragment that IS the comment's unscoped text");
+  // The same holds for a fragment whose text IS the comment's unscoped text.
   q.addHighlight("Q3", recPay, 0, 3, PAY);
-  eq(q.getHighlights("Q3", recPay, PAY).length, 1, "the Pay fragment carries the mark");
-  eq(q.getHighlights("Q3", recPay, WORKLOAD).length, 0, "the Workload page does not");
-  eq(q.getHighlights("Q3", recPay).length, 0, "nor does the unscoped text");
-  // The base key format is untouched, so a mark made before extracts existed still loads.
-  q.addHighlight("Q3", recAll, 0, 4);
-  eq(q.getHighlights("Q3", recAll).length, 1, "an unscoped mark still keys the old way");
-  assert(Object.keys(q.highlightsAll()).some((k) => k.indexOf(":t" + PAY) > 0),
-         "a themed mark carries its theme in the key");
+  eq(q.getHighlights("Q3", recPay).length, 1, "one mark, reachable from both views");
+  eq(q.getHighlights("Q3", recPay, PAY).length, 1, "because it is the same string");
 });
 
 run("14. one comment pools once, however many fragments carry marks", () => {
   const q = load();
-  q.addHighlight("Q3", recPay, 0, 3, PAY);
-  q.addHighlight("Q3", recPay, 4, 7, WORKLOAD);
+  q.addHighlight("Q3", recTwo, 0, 3, PAY);
+  q.addHighlight("Q3", recTwo, 4, 7, WORKLOAD);
   const pool = q.collectPool(ISLAND, {}, q.highlightsAll(), {});
   eq(pool.items.length, 1, "the collection holds the comment once, not once per fragment");
   eq(pool.items[0].highlighted, true, "and knows it is marked up");
@@ -199,34 +293,39 @@ run("14. one comment pools once, however many fragments carry marks", () => {
 
 run("15. clearing a comment's marks clears every fragment's marks", () => {
   const q = load();
-  q.addHighlight("Q3", recPay, 0, 3, PAY);
-  q.addHighlight("Q3", recPay, 4, 7, WORKLOAD);
-  q.clearHighlights("Q3", recPay);
-  eq(q.getHighlights("Q3", recPay, PAY).length, 0, "Pay cleared");
-  eq(q.getHighlights("Q3", recPay, WORKLOAD).length, 0, "Workload cleared");
+  q.addHighlight("Q3", recTwo, 0, 3, PAY);
+  q.addHighlight("Q3", recTwo, 4, 7, WORKLOAD);
+  q.clearHighlights("Q3", recTwo);
+  eq(q.getHighlights("Q3", recTwo, PAY).length, 0, "Pay cleared");
+  eq(q.getHighlights("Q3", recTwo, WORKLOAD).length, 0, "Workload cleared");
 });
 
 run("16. splitMark reads a themed key back, and keeps the bare ref", () => {
   const q = load();
-  const themed = q.hlKeyFor("Q3", recPay, WORKLOAD);
+  const themed = q.hlKeyFor("Q3", recTwo, WORKLOAD);
   const m = q.splitMark(themed);
   eq(m.qcode, "Q3", "question");
   eq(m.theme, WORKLOAD, "theme");
-  eq(m.ref, q.splitMark(q.markKeyFor("Q3", recPay)).ref, "the ref is the comment's, not the fragment's");
-  eq(q.splitMark(q.markKeyFor("Q3", recPay)).theme, null, "an unscoped key has no theme");
-  eq(q.bareMark(themed), q.markKeyFor("Q3", recPay), "bareMark strips the suffix");
+  eq(m.ref, q.splitMark(q.markKeyFor("Q3", recTwo)).ref, "the ref is the comment's, not the fragment's");
+  eq(q.splitMark(q.markKeyFor("Q3", recTwo)).theme, null, "an unscoped key has no theme");
+  eq(q.bareMark(themed), q.markKeyFor("Q3", recTwo), "bareMark strips the suffix");
   eq(q.bareMark("Q3#@abc"), "Q3#@abc", "and leaves a key that never had one");
 });
 
 run("17. the drawer card keys its marks to the fragment it is showing", () => {
   const q = load();
-  const onWorkload = q._quoteCard(recAll, "Q3", WORKLOAD);
-  const onPay = q._quoteCard(recAll, "Q3", PAY);
-  const unscoped = q._quoteCard(recAll, "Q3", null);
+  const onWorkload = q._quoteCard(recTwo, "Q3", WORKLOAD, Q3);
+  const onPay = q._quoteCard(recTwo, "Q3", PAY, Q3);
+  const unscoped = q._quoteCard(recTwo, "Q3", null, Q3);
   assert(onWorkload.indexOf('data-hl-key="Q3#') >= 0, "the card carries a highlight key");
-  assert(onWorkload.indexOf(":t" + WORKLOAD + '"') >= 0, "keyed to the theme on screen");
-  assert(onPay.indexOf(":t" + PAY + '"') >= 0, "a different theme, a different key");
+  assert(onWorkload.indexOf(":t" + WORKLOAD + '"') >= 0,
+         "the Workload fragment is a different string, so it is keyed to the theme");
+  assert(onPay.indexOf(":t") < 0,
+         "the Pay fragment IS this comment's unscoped text, so it keeps the bare key");
   assert(unscoped.indexOf(":t") < 0, "and no suffix at all away from a theme page");
+  // A comment with no fragments must never get a per-theme key (review C2).
+  assert(q._quoteCard(ISLAND.questions[0].records[0], "Q1", 0, ISLAND.questions[0])
+           .indexOf(":t") < 0, "a comment with no fragments keeps its old key");
   // The shortlist is deliberately NOT per theme: a comment is starred once.
   const save = /data-qual-save="([^"]+)"/.exec(onWorkload);
   assert(save && save[1].indexOf(":t") < 0, "the shortlist key stays the comment's own");
@@ -257,11 +356,72 @@ run("19. the theme page says how many comments it counts but does not quote", ()
   const chip = q.elsewhereChip(Q3, { theme: WORKLOAD }, Q3.records);
   assert(chip.indexOf("1 counted here, quoted elsewhere") >= 0,
          "Workload counts a comment it cannot quote: " + chip);
-  assert(chip.indexOf("counted in every number on this page") >= 0, "and says why");
+  assert(chip.indexOf("counted in this theme") >= 0, "and says they are still counted");
+  assert(chip.indexOf("describe the comments quoted here") >= 0,
+         "and that the list and its filters describe what is quoted here (review C13)");
   eq(q.elsewhereChip(Q3, { theme: PAY }, Q3.records), "",
      "Pay quotes everything it counts, so it says nothing");
   eq(q.elsewhereChip(Q3, { theme: null }, Q3.records), "",
      "and the all-comments list is not a theme page");
+});
+
+run("19c. the chip never counts a comment the filter already removed", () => {
+  // The reviewer's case: a tier-0 comment with a fragment for another theme. The
+  // old chip counted it even on a Priority-only view, so the page claimed a
+  // comment the filter had excluded for an unrelated reason (review C5).
+  const q = load();
+  const hand = {
+    code: "QH", title: "Why?", type: "themed",
+    themes: [{ id: 0, label: "Pay" }, { id: 1, label: "Workload" }],
+    records: [
+      { idx: 0, tier: 3, sentiment: 3, themeVals: { "0": 3, "1": 3 },
+        text: "pay half", hasExtracts: true, extracts: { "0": "pay half" } },
+      { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3, "1": 3 },
+        text: "other pay half", hasExtracts: true, extracts: { "0": "other pay half" } },
+      { idx: 2, tier: 3, sentiment: 3, themeVals: { "1": 3 }, text: "a plain comment" }
+    ]
+  };
+  const all = q.elsewhereChip(hand, { tier: "all", sentiment: null, theme: 1 }, hand.records);
+  assert(all.indexOf("2 counted here") >= 0, "both are counted with no filter: " + all);
+  const prio = q.elsewhereChip(hand, { tier: "priority", sentiment: null, theme: 1 },
+                               hand.records);
+  assert(prio.indexOf("1 counted here") >= 0,
+         "and only the priority one on a Priority view: " + prio);
+  eq(q.visibleRecords(hand, { tier: "priority", sentiment: null, theme: 1 },
+                      hand.records).length, 1, "which reconciles with the list's own count");
+});
+
+run("19b. the chip counts the same comments the list counted, under any filter", () => {
+  // It used to count over every comment coded to the theme, so a tier filter that
+  // excluded a comment for an unrelated reason still had the chip claiming it
+  // (review C5). recPay is tier 3, recTwo tier 2, recAll tier 1.
+  const q = load();
+  const state = { tier: "priority", sentiment: null, theme: WORKLOAD };
+  const visible = q.visibleRecords(Q3, state, Q3.records);
+  const chip = q.elsewhereChip(Q3, state, Q3.records);
+  eq(visible.length, 0, "no priority comment can be quoted under Workload");
+  assert(chip.indexOf("1 counted here") >= 0,
+         "and exactly the one priority comment is reported as quoted elsewhere: " + chip);
+  // With the filter off, the same chip counts only the one comment the list dropped
+  // for the extracts reason, not the hide-marked or scope-withheld ones.
+  const openChip = q.elsewhereChip(Q3, { tier: "all", sentiment: null, theme: WORKLOAD },
+                                   Q3.records);
+  assert(openChip.indexOf("1 counted here") >= 0, "one, with no filter on: " + openChip);
+});
+
+run("19d. a pinned quote, the priority block and the deck all say 'extract'", () => {
+  const q = load();
+  const quotes = q.priorityQuotesFor(Q3, "What would you change?");
+  assert(quotes.length > 0, "Q3 has a priority comment to lead with");
+  const frag = quotes.filter((x) => x.text === "the pay half of the comment")[0];
+  assert(frag, "the priority comment's fragment is in the payload");
+  eq(frag.extract, "extract on Pay", "and the payload carries the note, which a pin freezes");
+  // The screen renders from that payload, so the block shows it too.
+  assert(q.priorityBlockHtml(quotes).indexOf("extract on Pay") >= 0,
+         "the priority block shows it");
+  // A comment quoted in full must not be labelled.
+  const plainQuotes = q.priorityQuotesFor(ISLAND.questions[0], "Why that score?");
+  assert(plainQuotes.every((x) => !x.extract), "a full verbatim carries no note");
 });
 
 run("20. the question says once that some comments are quoted by extract", () => {
@@ -290,22 +450,44 @@ run("21. the cards carry the label the reader needs", () => {
          "and a collected comment names the theme its fragment speaks to");
 });
 
-run("22. STATIC GATE: every record-text read goes through the accessor", () => {
-  const src = readFileSync(SRC, "utf8").split("\n");
-  const READ = /\b(r|rec|recs\[[^\]]*\])\.text\b/;
-  // The accessor itself is the one place allowed to read the raw field.
-  const accessorStart = src.findIndex((l) => l.indexOf("qual.textFor = function") >= 0);
+run("25. STATIC GATE: every record-text read goes through the accessor", () => {
+  // The gate exists because the fix works by having ONE reader, so any new raw read
+  // is a place the bug can come back. The first version matched three spellings and
+  // missed seven the review planted, including `record.text`, `records[i].text` and
+  // `it.record.text`, all of which this module already uses (review 2026-09-17, C4).
+  // This version matches ANY receiver, allows the known payload objects by name, and
+  // reads the whole file rather than line by line so a read split over two lines is
+  // still caught.
+  const src = readFileSync(SRC, "utf8");
+  const lines = src.split("\n");
+  const RE = /([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\[[^\]]*\])*)\s*(?:\.\s*text\b|\[\s*["']text["']\s*\])/g;
+  // Receivers that are NOT island records: the quote payload a pin or a slide carries.
+  const PAYLOAD = { qt: 1, sl: 1, ins: 1, spec: 1 };
+  const accessorStart = lines.findIndex((l) => l.indexOf("qual.textFor = function") >= 0);
   assert(accessorStart > 0, "the accessor is still here");
   let accessorEnd = accessorStart;
-  while (accessorEnd < src.length && src[accessorEnd].indexOf("  };") !== 0) accessorEnd++;
+  while (accessorEnd < lines.length && lines[accessorEnd].indexOf("  };") !== 0) accessorEnd++;
+
   const offenders = [];
-  src.forEach((line, i) => {
-    if (!READ.test(line)) return;
-    if (i >= accessorStart && i <= accessorEnd) return;      // inside qual.textFor
-    if (line.indexOf("unscoped-text") >= 0) return;          // a considered read, marked
-    if (/^\s*(\*|\/\/)/.test(line)) return;                  // prose, not code
-    offenders.push((i + 1) + ": " + line.trim());
-  });
+  const flag = (index, note) => {
+    const lineNo = src.slice(0, index).split("\n").length;
+    const line = lines[lineNo - 1];
+    if (lineNo - 1 >= accessorStart && lineNo - 1 <= accessorEnd) return;
+    if (line.indexOf("unscoped-text") >= 0) return;
+    if (/^\s*(\*|\/\/)/.test(line)) return;
+    offenders.push(lineNo + ": " + line.trim() + (note ? "   [" + note + "]" : ""));
+  };
+  // A parenthesised receiver, e.g. (rec).text, has no name to allowlist, so any
+  // such read is flagged outright.
+  const PAREN = /\)\s*\.\s*text\b/g;
+  let pm;
+  while ((pm = PAREN.exec(src))) flag(pm.index, "parenthesised receiver");
+  let m;
+  while ((m = RE.exec(src))) {
+    const receiver = m[1].split(/[.[]/)[0];
+    if (PAYLOAD[receiver] || PAYLOAD[m[1]]) continue;
+    flag(m.index, "");
+  }
   assert(offenders.length === 0,
     "a record's text is read outside qual.textFor without an 'unscoped-text' marker. " +
     "Use qual.textFor(rec, themeId), or mark the line if the context really has no theme:\n    " +

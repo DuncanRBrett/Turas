@@ -577,3 +577,60 @@ test_that("blank padding rows and a stacked second header are not entries", {
     ), "Engagement Extracts")
   expect_length(parsed$entries, 2L)
 })
+
+# ------------------------------------------------------------------------------
+# Independent review 2026-09-17: the fixes for C6, C9, C10 and C12
+# ------------------------------------------------------------------------------
+
+test_that("the join is literally ' ... ', which is a fabrication guard not a style", {
+  # Setting the separator to "" would splice two non-adjacent halves of a comment
+  # into one continuous sentence the respondent never said (review C10).
+  expect_equal(QUAL_EXTRACTS_JOIN, " ... ")
+  res <- attach_for(
+    c("213", "Unfairness", "first bit", ""),
+    c("213", "Unfairness", "second bit", "")
+  )
+  expect_equal(find_record(res$question, "213")$extracts$Unfairness,
+               "first bit ... second bit")
+})
+
+test_that("an extract row with no ID refuses instead of attaching in silence", {
+  # A blank ID used to match a blank-ID coded record, which never joins the host
+  # survey, so the fragment vanished from the report with nothing said (review C6).
+  res <- attach_for(c("", "Unfairness", "whose comment is this?", ""))
+  expect_length(res$problems, 1L)
+  expect_match(res$problems[[1]], "no ID in the ID column")
+})
+
+test_that("a Lead-ish header still reads the Lead marks", {
+  # "Lead?" and "Lead fragment" silently dropped every mark, and an absent Lead
+  # column is legal, so nothing said a word (review C9).
+  for (header in c("Lead", "Lead?", "Lead fragment", "LEAD")) {
+    q <- extracts_coded_sheet()
+    parsed <- qual_classify_extracts_sheet(
+      make_sheet(c("ID", "Theme", "Extract", header),
+                 c("213", "Unfairness", "the unfairness bit", "x")),
+      "Engagement Extracts")
+    res <- qual_attach_extracts(q, parsed$entries, "Engagement Extracts")
+    expect_equal(find_record(res$question, "213")$extract_lead, "the unfairness bit",
+                 info = header)
+  }
+})
+
+test_that("a theme label matches across a non-breaking space", {
+  # An Excel header pasted from Word carries U+00A0 where it looks like a space, so
+  # the analyst's normal space could never match it and the refusal listed a valid
+  # label visually identical to the one it had just rejected (review C12).
+  nbsp_label <- paste0("Job", " ", "Clarity")
+  q <- qual_classify_sheet(make_sheet(
+    c("ID", "Noteworthy", "Comment", "Overall Sentiment", nbsp_label),
+    c("213", "", "a comment", "2", "3")
+  ), "Engagement")
+  parsed <- qual_classify_extracts_sheet(
+    extracts_sheet_rows(c("213", "Job Clarity", "the fragment", "")),
+    "Engagement Extracts")
+  res <- qual_attach_extracts(q, parsed$entries, "Engagement Extracts")
+  expect_equal(res$problems, character(0))
+  # Stored under the CODED spelling, so the island's theme lookup still resolves it.
+  expect_equal(names(find_record(res$question, "213")$extracts), nbsp_label)
+})

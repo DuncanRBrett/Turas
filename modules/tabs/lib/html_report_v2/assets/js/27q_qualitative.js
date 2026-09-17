@@ -140,13 +140,19 @@
    * @param q The island question (for theme labels).
    * @return An HTML chip, or "" for a comment quoted in full.
    */
-  qual.extractLabel = function (rec, themeId, q) {
+  qual.extractNoteText = function (rec, themeId, q) {
     if (!rec || !rec.hasExtracts || qual.textFor(rec, themeId) == null) return "";
     var named = (themeId == null && rec.textTheme != null)
       ? qual.themeLabel(q, rec.textTheme) : "";
+    return "extract" + (named ? " on " + named : "");
+  };
+
+  qual.extractLabel = function (rec, themeId, q) {
+    var note = qual.extractNoteText(rec, themeId, q);
+    if (!note) return "";
     return '<span class="ql-hint" title="An extract from a longer comment. ' +
       'The themes on this comment were coded on the whole comment, not on this extract.">' +
-      "extract" + (named ? " on " + esc(named) : "") + "</span>";
+      esc(note) + "</span>";
   };
 
   /**
@@ -165,16 +171,23 @@
    * @return An HTML chip, or "" when every counted comment is also quoted here.
    */
   qual.elsewhereChip = function (q, st, audience) {
-    var theme = qual.drawerTheme(q, st || {});
+    st = st || {};
+    var theme = qual.drawerTheme(q, st);
     if (theme == null) return "";
-    var here = qual.recordsForTheme(
-      qual.bandFilter(q, qual.shown(audience), (st || {}).band), theme);
-    var n = here.filter(function (r) { return !qual.quotableUnder(r, theme); }).length;
+    // The SAME chain the count beside it comes from, minus the extracts rule, so the
+    // chip describes exactly the comments this list dropped for that reason and no
+    // others. Counting over a wider pool made it over-claim under a tier filter
+    // (review 2026-09-17, C5).
+    var pool = poolChain(q, st, audience, false);
+    if (qual.hasSentiment(q)) pool = qual.sentimentFilter(pool, st.sentiment);
+    var n = pool.filter(function (r) { return !qual.quotableUnder(r, theme); }).length;
     if (!n) return "";
-    return '<span class="ql-scopechip hide" title="' + n + " comment" + (n === 1 ? "" : "s") +
-      " raised this theme and " + (n === 1 ? "is" : "are") + " counted in every number on " +
-      "this page. The extract each one carries speaks to another theme the same comment " +
-      'raised, so it is quoted there instead.">' + n +
+    return '<span class="ql-scopechip hide" title="' + n + " more comment" +
+      (n === 1 ? "" : "s") + " in this selection raised this theme. " +
+      (n === 1 ? "It is" : "They are") + " counted in this theme\u2019s figures, and the " +
+      "extract " + (n === 1 ? "it carries speaks" : "each carries speaks") + " to another " +
+      "theme the same comment raised, so it is quoted there instead. The list, its " +
+      'counts and the sentiment filter describe the comments quoted here.">' + n +
       " counted here, quoted elsewhere</span>";
   };
 
@@ -626,6 +639,7 @@
       return {
         text: r.text,   /* unscoped-text */
         q: title,
+        extract: qual.extractNoteText(r, null, q),
         band: r.band || "",
         tags: (tagsOk && r.demos)
           ? Object.keys(r.demos).filter(function (k) { return r.demos[k] != null; })
@@ -675,7 +689,8 @@
     var banded = groups.length > 1;   // one band only -> no sub-heads, as before
     var quoteHtml = function (qt) {
       // band leads the attribution. It is the axis the reader is reading by
-      var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
+      var chip = [qt.q, qt.band].concat(qt.tags || [])
+        .concat([qt.extract || null]).filter(Boolean).join(" · ");
       return '<blockquote class="si-q ' + (qt.sentiment || "neu") + '">' +
         esc(qt.text) + (chip ? "<cite>" + esc(chip) + "</cite>" : "") +
         "</blockquote>";
@@ -924,12 +939,19 @@
     });
     return out;
   }
-  /** The highlight key. Ranges are offsets into the text ACTUALLY SHOWN, and a
-   *  comment can show a different fragment on each of its theme pages, so a themed
-   *  fragment's marks are keyed per theme. The base format is untouched, so marks
-   *  in a saved copy made before extracts existed still load. */
+  /** The highlight key. Ranges are offsets into the text ACTUALLY SHOWN, so a
+   *  fragment that differs from the comment's unscoped text needs its own key, per
+   *  theme. A comment that shows the SAME string here as everywhere else keeps the
+   *  bare key: keeping the base format was never enough on its own, because what
+   *  matters is the key the drawer READS, and suffixing every card's key retired
+   *  every mark in every saved copy the moment a theme was selected
+   *  (review 2026-09-17, C2). */
   function hlKeyFor(qcode, rec, themeId) {
-    return markKeyFor(qcode, rec) + (themeId == null ? "" : ":t" + themeId);
+    var base = markKeyFor(qcode, rec);
+    if (themeId == null || !rec || !rec.hasExtracts) return base;
+    var shown = qual.textFor(rec, themeId);
+    if (shown == null || shown === rec.text) return base;   /* unscoped-text */
+    return base + ":t" + themeId;
   }
   qual.hlKeyFor = hlKeyFor;
 
@@ -1038,19 +1060,26 @@
    *  "if I click this, N comments". Withheld verbatims drop out first so the list and
    *  its counts reflect only readable comments; the band narrows next so every
    *  downstream count is per-band. */
-  qual.poolBeforeSentiment = function (q, st, audience) {
-    var theme = (q.type === "themed" && st.theme != null) ? st.theme : null;
+  function poolChain(q, st, audience, applyExtracts) {
+    // The theme SELECTION may be the "everything else" sentinel, which recordsForTheme
+    // understands and the extracts rule does not, so the two are read separately.
+    var selected = (q.type === "themed" && st.theme != null) ? st.theme : null;
     var base = qual.bandFilter(q, qual.shown(audience), st.band);
-    var pool = theme != null ? qual.recordsForTheme(base, theme) : base;
+    var pool = selected != null ? qual.recordsForTheme(base, selected) : base;
     // The extracts rule runs AFTER the theme is known, because it is a question
     // about THIS theme: a comment whose fragments speak to other themes shows no
     // text here, and drops out of the list while still counting in the numbers.
-    if (theme != null) {
+    var theme = qual.drawerTheme(q, st);
+    if (applyExtracts && theme != null) {
       pool = pool.filter(function (r) { return qual.quotableUnder(r, theme); });
     }
     var records = qual.tierFilter(pool, st.tier);
     if (st.savedOnly) records = qual.savedFilter(records, q.code);
     return records;
+  }
+
+  qual.poolBeforeSentiment = function (q, st, audience) {
+    return poolChain(q, st, audience, true);
   };
 
   /** The records the drawer is currently showing: theme -> tier -> sentiment ->
@@ -1182,7 +1211,7 @@
     // keepText: verbatims, IDs and demographic values are prose / identifiers,
     // never coerce them to numbers (a "50%" comment or an 007 code would mangle).
     TR.xlsx.download(base + "_comments", "Comments",
-      qual.exportRows(island, q, records, safeDemos), { keepText: true });
+      qual.exportRows(island, q, records, safeDemos, themeId), { keepText: true });
   };
 
   // ---- collection: the pool (all marks) aggregated across questions ----------
@@ -1537,7 +1566,9 @@
     var qhtml = shown.map(function (it) {
       var r = it.record, sent = SENT[r.sentiment] || "neu";
       var txt = r.text == null ? "[quote hidden]" : r.text;   /* unscoped-text */
-      var code = demoCode(r), cite = esc(it.question.title) + (code ? " · " + esc(code) : "");
+      var note = qual.extractNoteText(r, null, it.question);
+      var code = demoCode(r), cite = esc(it.question.title) + (code ? " · " + esc(code) : "") +
+        (note ? " · " + esc(note) : "");
       return '<blockquote class="ql-exq ' + sent + '">' + esc(txt) + "<cite>" + cite + "</cite></blockquote>";
     }).join("");
     var html = '<div class="ql-exhibit" data-exhibit="hub"><div class="ql-exhead">' +
@@ -1557,8 +1588,10 @@
       var r = it.record;
       if (r.text == null) return;   // hidden text stays hidden, never pinned   /* unscoped-text */
       var code = demoCode(r);
-      lines.push("“" + r.text + "”, " + it.question.title + (code ? " (" + code + ")" : ""));   /* unscoped-text */
-      quotes.push({ text: r.text, q: it.question.title,   /* unscoped-text */
+      var note = qual.extractNoteText(r, null, it.question);
+      lines.push("“" + r.text + "”, " + it.question.title +   /* unscoped-text */
+                 (code ? " (" + code + ")" : "") + (note ? " [" + note + "]" : ""));
+      quotes.push({ text: r.text, q: it.question.title, extract: note,   /* unscoped-text */
         tags: demoTags(r), sentiment: SENT[r.sentiment] || "neu" });
     });
     if (moreN > 0) lines.push("+ " + moreN + " more");
