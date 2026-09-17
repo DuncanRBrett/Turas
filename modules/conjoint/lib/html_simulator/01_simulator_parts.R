@@ -516,12 +516,76 @@ build_conjoint_css <- function(brand, accent) {
 # PANEL HELPERS
 # ==============================================================================
 
-#' Callout box, using the shared design system when it is loaded
+#' Where the shared callout registry lives, or NULL
+#'
+#' Resolved from this file's own directory when the simulator module set one,
+#' then from TURAS_ROOT / TURAS_HOME, then by walking up from the working
+#' directory: the same three routes 99_simulator_main.R uses to find its parts.
+#'
+#' @keywords internal
+.cj_sim_callout_dir <- function() {
+  cands <- character(0)
+  if (exists(".cj_sim_dir") && is.character(.cj_sim_dir) && length(.cj_sim_dir) == 1) {
+    cands <- c(cands, file.path(.cj_sim_dir, "..", "..", "..", "shared", "lib", "callouts"))
+  }
+  roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+  roots <- roots[nzchar(roots)]
+  w <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  for (i in 1:10) {
+    roots <- c(roots, w)
+    parent <- dirname(w)
+    if (identical(parent, w)) break
+    w <- parent
+  }
+  cands <- c(cands, file.path(roots, "modules", "shared", "lib", "callouts"))
+  hits <- cands[file.exists(file.path(cands, "callout_registry.R"))]
+  if (length(hits) > 0) normalizePath(hits[[1L]], winslash = "/", mustWork = FALSE) else NULL
+}
+
+#' Load the shared callout registry if it is not already loaded
+#'
+#' The simulator used to test `exists("turas_callout_html")` and never load it.
+#' Nothing on the conjoint production route does load it, so every shipped
+#' simulator got the fallback box while the seven other modules that build a
+#' report locate the registry themselves and got the designed callout. Worse,
+#' the page's content depended on whether something else in the session had
+#' loaded it, which made a test pass alone and fail after the shared suite.
+#'
+#' @return TRUE when `turas_callout_html()` is available afterwards.
+#' @keywords internal
+.cj_sim_ensure_callouts <- function() {
+  if (exists("turas_callout_html", mode = "function")) return(TRUE)
+  dir <- .cj_sim_callout_dir()
+  if (is.null(dir)) return(FALSE)
+  tryCatch(
+    source(file.path(dir, "callout_registry.R"), local = FALSE),
+    error = function(e) message("[CJ SIM] Callout registry load failed: ", e$message)
+  )
+  exists("turas_callout_html", mode = "function")
+}
+
+#' Callout box, using the shared design system
+#'
+#' The registry is located and loaded rather than assumed, so the page is the
+#' same whatever else the session happens to have sourced. The plain box below
+#' is for a genuinely standalone checkout where the shared library is absent,
+#' and it says so on the console rather than degrading silently.
 #'
 #' @keywords internal
 .build_callout <- function(title, body_html, collapsed = FALSE) {
-  if (exists("turas_callout_html", mode = "function")) {
+  if (.cj_sim_ensure_callouts()) {
     return(turas_callout_html(title = title, body = body_html, collapsed = collapsed))
+  }
+  if (!isTRUE(getOption("cj.sim.callout.warned", FALSE))) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Conjoint standalone simulator\n")
+    cat("│ Code: IO_CALLOUT_REGISTRY_MISSING\n")
+    cat("│ Message: modules/shared/lib/callouts/callout_registry.R was not\n")
+    cat("│          found, so the simulator's callouts are plain boxes\n")
+    cat("│          rather than the platform's collapsible ones.\n")
+    cat("│ How to fix: run from the Turas project root, or set TURAS_ROOT\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    options(cj.sim.callout.warned = TRUE)
   }
   sprintf(
     '<div class="t-callout"><div class="t-callout-body"><strong>%s</strong> %s</div></div>',
