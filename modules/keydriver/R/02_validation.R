@@ -113,8 +113,18 @@ load_keydriver_data <- function(data_file, config) {
   } else {
     character(0)
   }
-  # Only include segment vars that exist in data (don't refuse if missing — optional)
+  # A configured segment variable that is not in the data used to be dropped
+  # here without a word, so the Segments sheet named a variable, the segment
+  # comparison never ran on it, and the run closed at PASS (review C2). It is
+  # named now and the caller degrades the run.
+  missing_segment_vars <- setdiff(segment_vars, names(data))
   segment_vars <- intersect(segment_vars, names(data))
+  if (length(missing_segment_vars) > 0) {
+    cat(sprintf(paste0(
+      "   [WARNING] Segments sheet names %d variable(s) the data does not have: %s. ",
+      "No segment comparison will be produced for them.\n"),
+      length(missing_segment_vars), paste(missing_segment_vars, collapse = ", ")))
+  }
   all_vars <- unique(c(base_vars, weight_var, segment_vars))
 
   # Validate required variables exist
@@ -256,6 +266,9 @@ load_keydriver_data <- function(data_file, config) {
     data = data,
     n_respondents = nrow(data),
     n_complete = n_complete,
-    n_missing = n_missing
+    n_missing = n_missing,
+    # Named, so the pipeline can degrade the run rather than closing at PASS
+    # with a segment comparison the config asked for and never got (review C2).
+    missing_segment_vars = missing_segment_vars
   )
 }

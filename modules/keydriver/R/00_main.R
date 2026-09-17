@@ -382,6 +382,42 @@ handle_optional_feature <- function(feature_name, feature_fn, on_fail_policy,
        degraded_reasons = degraded_reasons, affected_outputs = affected_outputs)
 }
 
+#' The Segments sheet as named groups, one entry per segment variable
+#'
+#' A row is a named segment: segment_name, segment_variable, and the
+#' segment_values that belong to it. Several rows on the same variable are
+#' several segments of that variable. An empty segment_values means "whatever
+#' levels the data has", which is the old behaviour for a single-row sheet.
+#'
+#' @param segments The Segments data frame from the config.
+#' @return A named list, variable -> named list of value vectors (possibly
+#'   empty, meaning let the data decide).
+#' @keywords internal
+.kd_segment_definitions <- function(segments) {
+  if (is.null(segments) || !is.data.frame(segments) || nrow(segments) == 0) return(list())
+  out <- list()
+  for (i in seq_len(nrow(segments))) {
+    var <- as.character(segments$segment_variable[i])
+    if (is.na(var) || !nzchar(trimws(var))) next
+    var <- trimws(var)
+    nm <- as.character(segments$segment_name[i] %||% NA)
+    raw <- as.character(segments$segment_values[i] %||% NA)
+    vals <- if (is.na(raw) || !nzchar(trimws(raw))) {
+      character(0)
+    } else {
+      trimws(unlist(strsplit(raw, "[;,|]")))
+    }
+    vals <- vals[nzchar(vals)]
+    if (is.null(out[[var]])) out[[var]] <- list()
+    if (length(vals) > 0) {
+      label <- if (is.na(nm) || !nzchar(trimws(nm))) paste(vals, collapse = " / ") else trimws(nm)
+      out[[var]][[label]] <- vals
+    }
+  }
+  out
+}
+
+
 #' Determine final TRS run status (PASS or PARTIAL) from degraded reasons.
 #' @param degraded_reasons Character vector of degradation reasons.
 #' @param affected_outputs Character vector of affected output names.
@@ -676,26 +712,71 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
 
     source(file.path(turas_root, "modules/keydriver/R/07_segment_comparison.R"), local = FALSE)
 
-    segment_result <- tryCatch({
-      seg_var <- config$segments$segment_variable[1]
-      # Use raw_data (pre-filtering) since segment variable may not be in analysis variables
-      seg_data <- if (!is.null(config$raw_data)) config$raw_data else data$data
-      run_segment_importance_comparison(
-        data = seg_data,
-        outcome = config$outcome_var,
-        drivers = config$driver_vars,
-        segment_var = seg_var,
-        config = list(top_n = 3, rank_diff_threshold = 3, min_segment_n = 30)
-      )
-    }, error = function(e) {
-      cat(sprintf("   [WARN] Segment comparison failed: %s\n", e$message))
-      NULL
-    })
+    # Every row of the Segments sheet, not just the first. The call read
+    # segment_variable[1] and nothing else, so a sheet defining segments on two
+    # variables analysed one of them, and the segment_values column, which is
+    # what groups levels into a named segment, was never read at all. The
+    # console then reported "complete (n segments)" counting the sheet's rows
+    # rather than what ran (review C2).
+    seg_data <- if (!is.null(config$raw_data)) config$raw_data else data$data
+    # A segment variable the data does not have was dropped silently in
+    # validation; it degrades the run now (review C2).
+    if (length(data$missing_segment_vars %||% character(0)) > 0) {
+      degraded_reasons <- c(degraded_reasons, sprintf(
+        "Segments sheet names variable(s) absent from the data: %s",
+        paste(data$missing_segment_vars, collapse = ", ")))
+      affected_outputs <- c(affected_outputs, "segment_comparison")
+    }
+    seg_defs <- .kd_segment_definitions(config$segments)
+    min_seg_n <- suppressWarnings(as.numeric(
+      config$settings$min_segment_n %||% config$min_segment_n %||% 30))
+    if (!is.finite(min_seg_n) || min_seg_n < 2) min_seg_n <- 30
 
-    if (!is.null(segment_result)) {
-      results$segment_comparison <- segment_result
-      cat(sprintf("   [OK] Segment comparison complete (%d segments)\n",
-                  nrow(config$segments)))
+    segment_results <- list()
+    for (seg_var in names(seg_defs)) {
+      groups <- seg_defs[[seg_var]]
+      one <- tryCatch(
+        run_segment_importance_comparison(
+          data = seg_data,
+          outcome = config$outcome_var,
+          drivers = config$driver_vars,
+          segment_var = seg_var,
+          segment_values = if (length(groups)) groups else NULL,
+          config = list(top_n = 3, rank_diff_threshold = 3, min_segment_n = min_seg_n),
+          weight_var = config$weight_var
+        ),
+        turas_refusal = function(e) {
+          cat(sprintf("   ! Segment comparison on '%s' refused: %s\n",
+                      seg_var, e$code %||% "refused"))
+          structure(list(error = e$problem %||% conditionMessage(e),
+                         code = e$code %||% "KD_SEGMENT_REFUSED"), class = "kd_segment_failure")
+        },
+        error = function(e) {
+          cat(sprintf("   ! Segment comparison on '%s' failed: %s\n",
+                      seg_var, conditionMessage(e)))
+          structure(list(error = conditionMessage(e), code = "KD_SEGMENT_FAILED"),
+                    class = "kd_segment_failure")
+        }
+      )
+      if (inherits(one, "kd_segment_failure")) {
+        # A deliverable that was asked for and not produced is a degraded run,
+        # not a clean one. The bare tryCatch here returned NULL and the run
+        # closed at PASS with no segment comparison in it (review C2).
+        degraded_reasons <- c(degraded_reasons, sprintf(
+          "Segment comparison on '%s' not produced (%s)", seg_var, one$code))
+        affected_outputs <- c(affected_outputs, "segment_comparison")
+      } else {
+        segment_results[[seg_var]] <- one
+      }
+    }
+
+    if (length(segment_results) > 0) {
+      # The report reads the singular slot; Session B widens it to all
+      # variables. Both are populated so nothing downstream changes shape yet.
+      results$segment_comparison <- segment_results[[1]]
+      results$segment_comparisons <- segment_results
+      cat(sprintf("   [OK] Segment comparison complete on %d variable(s): %s\n",
+                  length(segment_results), paste(names(segment_results), collapse = ", ")))
     }
   }
 

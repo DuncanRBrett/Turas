@@ -100,3 +100,76 @@ test_that("segment_values groups the levels it is given (C2)", {
   expect_gt(younger[cm$Driver == "X1"], younger[cm$Driver == "X2"])
   expect_gt(older[cm$Driver == "X2"], older[cm$Driver == "X1"])
 })
+
+# ------------------------------------------------------------------------------
+# C2, the call site: every Segments row is read, and a failure degrades the run
+# ------------------------------------------------------------------------------
+
+test_that("the Segments sheet becomes named groups, per variable (C2)", {
+  # Not a skip: the helper IS the fix, so its absence is a failure.
+  expect_true(exists(".kd_segment_definitions", mode = "function"))
+  segs <- data.frame(
+    segment_name = c("Younger", "Older", "Metro", "Non-metro"),
+    segment_variable = c("Age", "Age", "Area", "Area"),
+    segment_values = c("18-24; 25-34", "35-49; 50+", "Urban", "Rural, Peri-urban"),
+    stringsAsFactors = FALSE
+  )
+  defs <- .kd_segment_definitions(segs)
+  # Two variables, not one: the call site read segment_variable[1] only.
+  expect_equal(sort(names(defs)), c("Age", "Area"))
+  expect_equal(sort(names(defs$Age)), c("Older", "Younger"))
+  expect_equal(defs$Age$Younger, c("18-24", "25-34"))
+  expect_equal(defs$Area$`Non-metro`, c("Rural", "Peri-urban"))
+
+  # A row with no values falls back to whatever the data has, which is the old
+  # single-row behaviour.
+  bare <- data.frame(segment_name = "All", segment_variable = "Age",
+                     segment_values = NA_character_, stringsAsFactors = FALSE)
+  expect_equal(length(.kd_segment_definitions(bare)$Age), 0)
+
+  # A blank variable is not a segment.
+  blank <- data.frame(segment_name = "x", segment_variable = "",
+                      segment_values = "a; b", stringsAsFactors = FALSE)
+  expect_equal(length(.kd_segment_definitions(blank)), 0)
+})
+
+test_that("an unnamed grouping list refuses rather than guessing a label (C2)", {
+  d <- seg_fixture(n = 120)
+  err <- tryCatch(
+    suppressWarnings(capture.output(
+      run_segment_importance_comparison(d, "Y", c("X1", "X2"), "Seg",
+                                        segment_values = list(c("A"), c("B")),
+                                        config = list(min_segment_n = 30)))),
+    error = function(e) conditionMessage(e))
+  expect_true(is.character(err))
+  expect_match(err, "CFG_SEGMENT_GROUPS_UNNAMED")
+})
+
+test_that("a named weight column that is not in the data refuses (C2)", {
+  d <- seg_fixture(n = 120)
+  err <- tryCatch(
+    suppressWarnings(capture.output(
+      run_segment_importance_comparison(d, "Y", c("X1", "X2"), "Seg",
+                                        config = list(min_segment_n = 30),
+                                        weight_var = "NotThere"))),
+    error = function(e) conditionMessage(e))
+  expect_true(is.character(err))
+  expect_match(err, "DATA_SEGMENT_WEIGHT_NOT_FOUND")
+  # Silently reverting to an unweighted fit is the failure mode this replaces.
+  expect_match(err, "unweighted")
+})
+
+test_that("validation names a segment variable the data does not have (C2)", {
+  src <- readLines(file.path(module_dir, "R", "02_validation.R"))
+  # The old line dropped it with a comment saying not to refuse; nothing said so.
+  expect_false(any(grepl("don't refuse if missing", src, fixed = TRUE)))
+  expect_true(any(grepl("missing_segment_vars", src, fixed = TRUE)))
+  expect_true(any(grepl("the data does not have", src, fixed = TRUE)))
+
+  main <- readLines(file.path(module_dir, "R", "00_main.R"))
+  # And the pipeline turns that into a degraded run rather than a clean PASS.
+  idx <- grep("missing_segment_vars", main)
+  expect_gt(length(idx), 0)
+  window <- main[seq(min(idx), min(min(idx) + 6, length(main)))]
+  expect_true(any(grepl("degraded_reasons", window)))
+})
