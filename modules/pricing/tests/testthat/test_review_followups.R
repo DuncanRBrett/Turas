@@ -296,3 +296,68 @@ test_that("01_config.R finds the shared saver from its own location (F12)", {
   expect_match(out, "FOUND")
   expect_false(grepl("IO_SAVER_NOT_FOUND", out, fixed = TRUE))
 })
+
+# ------------------------------------------------------------------------------
+# F16: a deliverable refused after the run result was taken still changes it
+# ------------------------------------------------------------------------------
+
+test_that("a refused late deliverable is not reported as a clean PASS (F16)", {
+  skip_if(!exists("run_pricing_analysis", mode = "function"), "pipeline not available")
+  skip_if(!file.exists(example_script), "example generator not present")
+
+  old <- getOption("turas.example.no_run")
+  options(turas.example.no_run = TRUE)
+  source(example_script, local = FALSE)
+  options(turas.example.no_run = old)
+  skip_if(!exists("write_pricing_config", mode = "function"), "config writer not available")
+
+  out_dir <- file.path(tempdir(), "karoo_pricing_f16")
+  unlink(out_dir, recursive = TRUE)
+  capture.output(ex <- build_pricing_example(TURAS_ROOT, out_dir, verbose = FALSE,
+                                             bootstrap_iterations = 20))
+
+  # A Van Westendorp-only run has no demand curve, so step 9 refuses
+  # DATA_SIMULATOR_NO_CURVE and writes nothing. The analysis itself is fine, so
+  # before this fix the run closed at PASS with the refusal on the console and
+  # nothing in run_result to show for it.
+  cfg_path <- file.path(out_dir, "Karoo_VWonly_Sim.xlsx")
+  capture.output(write_pricing_config(
+    cfg_path, method = "van_westendorp",
+    data_file = basename(ex$data_file),
+    output_file = "Output/Karoo_VWonly_Results.xlsx",
+    simulator = TRUE, stats_pack = FALSE, bootstrap_iterations = 20))
+
+  capture.output(r <- run_pricing_analysis(cfg_path))
+  expect_equal(r$run_result$status, "PARTIAL")
+  events <- r$run_result$events %||% list()
+  expect_gt(length(events), 0)
+  codes <- vapply(events, function(e) as.character(e$code %||% ""), character(1))
+  expect_true(any(grepl("SIMULATOR", codes)))
+  # No simulator file was written, which is what the event is about.
+  expect_null(r$simulator_path)
+
+  # The control: the shipped both-methods config writes everything it promises
+  # and still closes clean.
+  capture.output(ok <- run_pricing_analysis(ex$config))
+  expect_equal(ok$run_result$status, "PASS")
+  expect_length(ok$run_result$events %||% list(), 0)
+})
+
+test_that("the simulator's own refusal reaches the run state (F16)", {
+  skip_if(!exists("run_pricing_analysis", mode = "function"), "pipeline not available")
+  # A Van Westendorp-only run asked for a simulator: step 9 refuses
+  # DATA_SIMULATOR_NO_CURVE. Before the fix that reached the console only.
+  src <- readLines(file.path(TURAS_ROOT, "modules", "pricing", "R", "00_main.R"))
+  sim_block <- src[grep("^  sim_note <- function", src):length(src)]
+  stop_at <- grep("^  simulator_path <- NULL", sim_block)[1]
+  expect_true(length(stop_at) == 1 && stop_at > 1)
+  expect_true(any(grepl("turas_run_state_partial", sim_block[seq_len(stop_at)])))
+
+  # And the run result is rebuilt after the late steps, not before them.
+  rebuild <- grep("run_result <- turas_run_state_result\\(trs_state\\)", src)
+  snapshot <- grep("TRS: Get run result \\(before output generation\\)", src)
+  step9 <- grep("9\\. Building the standalone simulator", src)
+  expect_true(length(rebuild) >= 1)
+  expect_true(any(rebuild > step9))
+  expect_true(all(snapshot < step9))
+})

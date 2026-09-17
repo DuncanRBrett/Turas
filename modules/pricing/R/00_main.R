@@ -655,6 +655,19 @@ run_pricing_analysis_from_config <- function(config) {
   # migration rule tabs set on 2026-08-05 and conjoint and maxdiff followed.
   # The simulator survives the retirement as what it always was, a tool: one
   # self-contained file the Pricing tab links to (programme decision D2).
+  # The simulator's refusals reached the console and nothing else, so a run
+  # that was asked for a simulator and did not write one still closed at
+  # [TRS PASS] (review F16). The island and the tabs export already record
+  # themselves; this step now does too, and the run result is rebuilt below so
+  # the banner, the GUI and the returned object all read the same state.
+  sim_note <- function(code, text) {
+    message(sprintf("[TRS PARTIAL] %s: %s", code, text))
+    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+      turas_run_state_partial(trs_state, code, "Simulator not produced", problem = text)
+    }
+    invisible(NULL)
+  }
+
   simulator_path <- NULL
   if (isTRUE(config$generate_simulator)) {
     cat("\n9. Building the standalone simulator...\n")
@@ -669,6 +682,8 @@ run_pricing_analysis_from_config <- function(config) {
 
     if (is.null(sim_main)) {
       cat("   ! Simulator not found beside the module, skipping\n")
+      sim_note("PRICE_SIMULATOR_NOT_FOUND",
+               "The simulator library was not found beside the module, so no simulator was written.")
     } else {
       tryCatch({
         source(sim_main)
@@ -687,15 +702,28 @@ run_pricing_analysis_from_config <- function(config) {
           }
         } else {
           cat(sprintf("   ! Simulator not written: %s\n", sim_result$message))
-          message(sprintf("[TRS PARTIAL] %s: %s",
-                          sim_result$code %||% "PRICE_SIMULATOR_REFUSED",
-                          sim_result$message %||% "refused"))
+          sim_note(sim_result$code %||% "PRICE_SIMULATOR_REFUSED",
+                   sim_result$message %||% "refused")
         }
       }, error = function(e) {
-        message(sprintf("[TRS PARTIAL] PRICE_SIMULATOR_FAILED: %s", conditionMessage(e)))
         cat(sprintf("   ! Simulator failed: %s\n", conditionMessage(e)))
+        sim_note("PRICE_SIMULATOR_FAILED", conditionMessage(e))
       })
     }
+  }
+
+  # ==========================================================================
+  # TRS: rebuild the run result after the late steps
+  # ==========================================================================
+  # It was taken before step 8 so the Excel writer could stamp a Run_Status
+  # sheet. Steps 8b, 8c and 9 can all refuse afterwards, and they record
+  # themselves on trs_state, but nothing re-read it: the banner, the stats
+  # pack, the GUI and the returned object all carried the stale snapshot, so a
+  # run that produced no island, no export and no simulator still closed at
+  # [TRS PASS] (review F16). The Run_Status sheet inside the workbook was
+  # written earlier and is not rewritten; it says so on the sheet.
+  if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    run_result <- turas_run_state_result(trs_state)
   }
 
   # --------------------------------------------------------------------------
