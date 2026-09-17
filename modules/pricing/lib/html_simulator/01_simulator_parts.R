@@ -148,44 +148,8 @@ build_simulator_config_json <- function(config, scenarios = NULL) {
     currency = as.character(config$currency_symbol %||% ""),
     brand_colour = as.character(config$brand_colour %||% "#323367"),
     unit_cost = unit_cost,
-    project_name = as.character(config$project_name %||% "Pricing"),
-    scenarios = build_scenarios_list(scenarios %||% config$simulator$scenarios)
+    project_name = as.character(config$project_name %||% "Pricing")
   ))
-}
-
-
-#' Preset Scenarios, From A Data Frame Or A List
-#' @keywords internal
-build_scenarios_list <- function(scenarios) {
-  if (is.null(scenarios) || length(scenarios) == 0) return(list())
-
-  one <- function(name, price, description) {
-    price <- suppressWarnings(as.numeric(price))
-    if (!is.finite(price)) return(NULL)
-    list(name = as.character(name), price = price,
-         description = as.character(description %||% ""))
-  }
-
-  if (is.data.frame(scenarios)) {
-    pick <- function(row, a, b) {
-      if (a %in% names(scenarios)) return(scenarios[[a]][row])
-      if (b %in% names(scenarios)) return(scenarios[[b]][row])
-      NULL
-    }
-    out <- lapply(seq_len(nrow(scenarios)), function(i) {
-      one(pick(i, "name", "Scenario_Name") %||% paste("Scenario", i),
-          pick(i, "price", "Price") %||% NA,
-          pick(i, "description", "Description"))
-    })
-    return(Filter(Negate(is.null), out))
-  }
-
-  out <- lapply(scenarios, function(sc) {
-    one(sc$name %||% sc$Scenario_Name %||% "Scenario",
-        sc$price %||% sc$Price %||% NA,
-        sc$description %||% sc$Description)
-  })
-  Filter(Negate(is.null), out)
 }
 
 
@@ -274,10 +238,7 @@ build_simulator_panel <- function(has_segments = FALSE, has_unit_cost = FALSE) {
         </div>
       </div>
 
-      <div id="sim-scenarios-section" class="sim-scenarios">
-        <h3>Preset scenarios</h3>
-        <div class="sim-scenario-grid" id="sim-scenario-cards"></div>
-      </div>
+
 
       <div class="sim-control-group" style="margin-top:18px;">
         <div class="sim-control-label"><span>Unit cost</span></div>

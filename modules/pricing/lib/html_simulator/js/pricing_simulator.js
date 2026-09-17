@@ -50,7 +50,6 @@ var PricingSimulator = (function() {
     state.currentPrice = data.optimal_price || data.price_range[Math.floor(data.price_range.length / 2)];
 
     setupSlider();
-    setupScenarios();
     setupSegmentToggle();
     setupUnitCostInput();
     setupScenarioComparison();
@@ -186,7 +185,6 @@ var PricingSimulator = (function() {
       renderComparisonTable();
     }
 
-    deselectScenarios(price);
   }
 
   function setDelta(id, pct) {
@@ -291,55 +289,11 @@ var PricingSimulator = (function() {
   // UI: SCENARIOS
   // =========================================================================
 
-  function setupScenarios() {
-    if (!config.scenarios || config.scenarios.length === 0) {
-      hideEl("sim-scenarios-section");
-      return;
-    }
-
-    var container = document.getElementById("sim-scenario-cards");
-    if (!container) return;
-
-    var html = "";
-    for (var i = 0; i < config.scenarios.length; i++) {
-      var sc = config.scenarios[i];
-      html += '<div class="sim-scenario-card" data-price="' + sc.price + '">';
-      html += '<div class="sim-scenario-name">' + escHTML(sc.name) + '</div>';
-      html += '<div class="sim-scenario-price">' + config.currency + formatNum(sc.price) + '</div>';
-      if (sc.description) html += '<div class="sim-scenario-desc">' + escHTML(sc.description) + '</div>';
-      html += '</div>';
-    }
-    container.innerHTML = html;
-
-    var cards = container.querySelectorAll(".sim-scenario-card");
-    for (var c = 0; c < cards.length; c++) {
-      cards[c].addEventListener("click", function() {
-        var p = parseFloat(this.getAttribute("data-price"));
-        state.currentPrice = p;
-        document.getElementById("sim-price-slider").value = p;
-        selectScenarioCard(this);
-        updateAll();
-      });
-    }
-  }
-
-  function selectScenarioCard(card) {
-    var all = document.querySelectorAll(".sim-scenario-card");
-    for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
-    card.classList.add("active");
-  }
-
-  function deselectScenarios(price) {
-    var cards = document.querySelectorAll(".sim-scenario-card");
-    for (var i = 0; i < cards.length; i++) {
-      var cp = parseFloat(cards[i].getAttribute("data-price"));
-      if (Math.abs(cp - price) < 0.01) {
-        cards[i].classList.add("active");
-      } else {
-        cards[i].classList.remove("active");
-      }
-    }
-  }
+  // Preset scenario cards fed from the config's Simulator sheet are withdrawn
+  // (review F12): the sheet was read under one name and looked for under
+  // another, so nothing an analyst typed on it ever arrived here. The live
+  // comparison below, built with "+ Add scenario", is a different feature and
+  // stays.
 
   // =========================================================================
   // UI: SEGMENTS

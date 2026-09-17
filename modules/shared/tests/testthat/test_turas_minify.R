@@ -1798,3 +1798,60 @@ test_that("a client-safe build with no audit refuses instead of shipping", {
   expect_true(min(refuse_at) > call_at)
   expect_true(min(refuse_at) - call_at < 30)
 })
+
+# ==============================================================================
+# THE AUDIT LOADER MUST WORK UNDER THE CONDITIONS A GUI CREATES
+# ==============================================================================
+#
+# SACS 2026-09-17: a client-safe build through the tabs GUI refused with
+# CFG_RELEASE_AUDIT_UNAVAILABLE and wrote no deliverable, on a checkout where
+# turas_release_audit.R was present the whole time. Three reasons at once:
+# `ofile` was looked for in frame 1 only, and a GUI sources this file inside a
+# Shiny observer; TURAS_HOME is an R variable in the GUIs, not an environment
+# variable; and the tabs GUI setwd()s into modules/tabs/lib for the run, so
+# getwd() is not the Turas root. Every client-safe GUI build was therefore
+# refusing, which is a gate that never opens rather than one that never closes.
+#
+# This runs in a SEPARATE R process, because the loader short-circuits when the
+# audit is already defined, and every other test in this file has defined it.
+# ------------------------------------------------------------------------------
+
+test_that("the release audit loads when sourced deep, from another directory", {
+  rscript <- Sys.which("Rscript")
+  skip_if(!nzchar(rscript), "Rscript not on the path")
+  root <- normalizePath(file.path(shared_lib, "..", "..", ".."), mustWork = FALSE)
+  skip_if(!dir.exists(file.path(root, "modules", "shared", "lib")),
+          "cannot locate the Turas root from the shared lib path")
+
+  script <- tempfile(fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    # the GUI's conditions: a working directory that is not the root, no
+    # TURAS_HOME / TURAS_ROOT in the environment, and source() called several
+    # frames deep rather than at the top level.
+    sprintf('root <- "%s"', root),
+    'Sys.unsetenv("TURAS_HOME"); Sys.unsetenv("TURAS_ROOT")',
+    'setwd(file.path(root, "modules", "tabs", "lib"))',
+    'observer <- function() { inner <- function() {',
+    '  for (f in c("trs_refusal.R", "turas_minify_verify.R",',
+    '              "turas_minify_watermark.R", "turas_minify.R"))',
+    '    source(file.path(root, "modules/shared/lib", f), local = FALSE)',
+    '} ; inner() }',
+    'observer()',
+    'cat(if (exists("turas_release_audit", mode = "function")) "LOADED" else "MISSING")'
+  ), script)
+  out <- suppressWarnings(system2(rscript, shQuote(script), stdout = TRUE, stderr = TRUE))
+  expect_true(any(grepl("LOADED", out, fixed = TRUE)),
+              info = paste(utils::tail(out, 8), collapse = "\n"))
+})
+
+test_that("the Turas root is found by walking up from a deep working directory", {
+  root <- normalizePath(file.path(shared_lib, "..", "..", ".."), mustWork = FALSE)
+  skip_if(!dir.exists(file.path(root, "modules", "tabs", "lib")), "no tabs lib here")
+  old <- getwd(); on.exit(setwd(old), add = TRUE)
+  setwd(file.path(root, "modules", "tabs", "lib"))
+  cands <- .minify_root_candidates()
+  expect_true(normalizePath(root, mustWork = FALSE) %in% cands)
+  expect_true(any(file.exists(file.path(cands, "modules", "shared", "lib",
+                                        "turas_release_audit.R"))))
+})

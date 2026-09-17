@@ -159,7 +159,6 @@ Create an Excel workbook (.xlsx) with the following sheets:
 4. **Validation**: Data quality rules
 5. **Segmentation**: Customer segment analysis
 6. **PriceLadder**: Tier structure settings
-7. **Simulator**: Preset scenarios, competitor prices, cost assumptions
 
 ## Output
 
@@ -188,7 +187,7 @@ The module generates:
 3. **Standalone price simulator** (if `Generate_Simulator = TRUE`):
    - `{output}_simulator.html`, a self-contained file, no Turas needed
    - Price slider with live purchase intent, revenue and profit
-   - Preset scenario cards (configured via the Simulator sheet)
+   - A comparison table the reader builds themselves with "+ Add scenario"
    - Scenario comparison table
    - Segment toggle, each segment drawn on its own prices
    - PNG export for presentations

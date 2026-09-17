@@ -44,28 +44,6 @@ test_that("JSON builder handles non-ASCII currency", {
   expect_equal(length(parsed$price_range), 3)
 })
 
-test_that("scenario presets handle special characters in names", {
-  scenarios <- data.frame(
-    name = c("Budget & Value", "Premium (Top)"),
-    price = c(10, 50),
-    description = c("Low-cost < $20", "High-end > $40"),
-    stringsAsFactors = FALSE
-  )
-  out <- build_scenarios_list(scenarios)
-
-  expect_equal(length(out), 2)
-  expect_equal(out[[1]]$name, "Budget & Value")
-  # A "<" in a description cannot close the script tag it is inlined into.
-  json <- jsonlite::toJSON(out, auto_unbox = TRUE)
-  expect_true(grepl("Low-cost", json, fixed = TRUE))
-})
-
-
-# ── Elasticity Edge Cases ────────────────────────────────────────────────────
-
-
-# ── Empty Segment Results ────────────────────────────────────────────────────
-
 test_that("extract_segment_demand handles empty segment_results", {
   empty_results <- list(segment_results = list())
   seg_data <- extract_segment_demand(empty_results, "gabor_granger")

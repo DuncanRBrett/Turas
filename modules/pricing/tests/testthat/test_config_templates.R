@@ -86,24 +86,22 @@ test_that("pricing config template excludes Monadic when disabled", {
   expect_false("Monadic" %in% sheets)
 })
 
-test_that("pricing config template includes Simulator sheet by default", {
+test_that("the config template has no Simulator sheet (review F12)", {
+  # Preset scenario cards are withdrawn: the sheet was read under one name and
+  # the simulator looked for another, so nothing typed on it ever reached the
+  # page. The simulator's own "+ Add scenario" comparison is unaffected.
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
-
-  generate_pricing_config_template(tmp, include_simulator = TRUE)
+  generate_pricing_config_template(tmp)
   sheets <- openxlsx::getSheetNames(tmp)
-
-  expect_true("Simulator" %in% sheets)
-})
-
-test_that("pricing config template excludes Simulator when disabled", {
-  tmp <- tempfile(fileext = ".xlsx")
-  on.exit(unlink(tmp), add = TRUE)
-
-  generate_pricing_config_template(tmp, include_simulator = FALSE)
-  sheets <- openxlsx::getSheetNames(tmp)
-
   expect_false("Simulator" %in% sheets)
+  expect_true(all(c("Settings", "VanWestendorp", "Validation") %in% sheets))
+
+  # And the shipped template, which is what an analyst actually opens.
+  shipped <- file.path(TURAS_ROOT, "modules", "pricing", "docs", "templates",
+                       "Pricing_Config_Template.xlsx")
+  skip_if(!file.exists(shipped), "shipped template not present")
+  expect_false("Simulator" %in% openxlsx::getSheetNames(shipped))
 })
 
 test_that("pricing config template includes Reference sheet", {

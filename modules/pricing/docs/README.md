@@ -18,7 +18,7 @@ All methods work seamlessly together to provide complete pricing insights from a
 - **Three Methodologies**: Run Van Westendorp, Gabor-Granger, Monadic, or any combination
 - **Excel Configuration**: User-friendly spreadsheet-based setup requiring no coding
 - **A Pricing tab in the interactive report**: the run writes `{output}_pr_island.json`; name it in a tabs config's `pricing_island` setting and the client's own report gains a Pricing tab
-- **Interactive Simulator Dashboard**: Self-contained HTML dashboard with price sliders, scenario cards, battle mode, and PNG export for client presentations
+- **Interactive Simulator Dashboard**: Self-contained HTML dashboard with a price slider, a comparison table the reader builds, battle mode, and PNG export for client presentations
 - **Advanced Analysis**:
   - NMS Extension (Newton-Miller-Smith) for Van Westendorp purchase intent calibration
   - Segment Analysis across customer groups
@@ -159,7 +159,6 @@ Create an Excel workbook (.xlsx) with the following sheets:
 4. **Validation**: Data quality rules
 5. **Segmentation**: Customer segment analysis
 6. **PriceLadder**: Tier structure settings
-7. **Simulator**: Preset scenarios, competitor prices, cost assumptions
 
 ## Output
 
@@ -186,7 +185,7 @@ The module generates:
 3. **Interactive Simulator Dashboard** (if `generate_simulator = TRUE`):
    - Self-contained HTML file — no Turas installation needed
    - Price sliders with real-time demand/revenue/profit updates
-   - Preset scenario cards (configured via Simulator sheet)
+   - A comparison table the reader builds themselves with "+ Add scenario"
    - Battle mode for side-by-side scenario comparison
    - Segment toggle for total vs segment-specific views
    - PNG export for presentations

@@ -85,8 +85,9 @@ test_that("the generated template loads and every VW/GG key is lowercase (H1 rou
   gg <- load_gabor_granger_config(tmp)
   expect_true(all(c("data_format", "response_type", "smoothing_method", "binary_coding") %in% names(gg)))
   expect_false("Interpolation_Method" %in% openxlsx::read.xlsx(tmp, "VanWestendorp", skipEmptyRows = FALSE)[[1]])
-  # The example rows never load as content (M11).
-  expect_length(load_simulator_config(tmp), 0)
+  # The example rows never load as content (M11). The Simulator sheet is gone
+  # entirely (review F12), so there is nothing left to load from it.
+  expect_false(exists("load_simulator_config", mode = "function"))
   expect_null(load_added_slides(tmp))
 })
 

@@ -487,7 +487,6 @@ self-contained file, no Turas needed.
 
 - A price slider, with purchase intent, revenue index, volume and profit
   updating as it moves
-- Preset scenario cards from the Simulator sheet
 - A scenario comparison table: the raw Revenue and Profit indices, and each as a
   percentage of the revenue-maximising price on its own row
 - A segment toggle, where each segment is drawn on its own prices
@@ -499,13 +498,17 @@ tool shows the shape of demand rather than a forecast.
 The Pricing tab links to the simulator by file name, so keep the two files
 beside each other when you send them.
 
-### 9.2 Simulator configuration (Simulator sheet)
+### 9.2 Comparing prices in the simulator
 
-| Setting | Description | Example |
-|---------|-------------|---------|
-| scenario_name | Scenario identifier | `Budget Launcher` |
-| scenario_price | Price for this scenario | `29.99` |
-| cost_assumption | Unit cost for profit calculation | `15` |
+There is no Simulator sheet to fill in. Preset scenario cards were withdrawn on
+2026-09-17: the sheet was read into the config under one name and the simulator
+looked for another, so nothing typed on it ever reached the page, in this
+version or in the retired report it came from.
+
+Comparison is built in the page instead. Move the slider to a price, press
+"+ Add scenario", and it joins a comparison table showing demand, revenue and
+profit side by side. Up to eight at once. Nothing needs configuring, and the
+reader can do it themselves after the presentation.
 
 ### 9.3 The crosstab export
 
