@@ -354,8 +354,11 @@ build_keydriver_settings_def <- function() {
           required = FALSE,
           default = "auto",
           description = "Source of derived importance scores for quadrant placement",
-          valid_values_text = "auto, shapley, relative, beta, or shap",
-          dropdown = c("auto", "shapley", "relative", "beta", "shap"),
+          # These are the values the engine actually handles. The dropdown used
+          # to offer shapley, relative and beta, none of which it understood,
+          # so choosing one silently fell back to auto (review H11).
+          valid_values_text = "auto, shap, relative_weights, regression, or correlation",
+          dropdown = c("auto", "shap", "relative_weights", "regression", "correlation"),
           numeric_range = NULL,
           integer_range = NULL
         ),

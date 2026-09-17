@@ -492,7 +492,7 @@ Section 6 for a full guide to the HTML report.
 | Setting              | Default | Description                                      | Valid Values                       |
 |----------------------|---------|--------------------------------------------------|------------------------------------|
 | `enable_quadrant`    | FALSE   | Enable Importance-Performance Analysis            | TRUE, FALSE                        |
-| `importance_source`  | auto    | Which importance method to use for the IPA chart  | auto, shap, relative_weights, shapley, beta |
+| `importance_source`  | auto    | Which importance method to use for the IPA chart  | auto, shap, relative_weights, regression, correlation |
 | `threshold_method`   | mean    | How to set the quadrant boundary lines            | mean, median, midpoint             |
 | `normalize_axes`     | TRUE    | Normalize importance and performance to 0--100    | TRUE, FALSE                        |
 | `shade_quadrants`    | TRUE    | Apply colour shading to quadrant regions          | TRUE, FALSE                        |
@@ -2302,7 +2302,7 @@ drivers.
 | importance_top_n       | No        | 15            | 1--30                              |
 | shap_on_fail           | No        | refuse        | refuse, continue_with_flag         |
 | enable_quadrant        | No        | FALSE         | TRUE, FALSE                        |
-| importance_source      | No        | auto          | auto, shap, relative_weights, shapley, beta |
+| importance_source      | No        | auto          | auto, shap, relative_weights, regression, correlation |
 | threshold_method       | No        | mean          | mean, median, midpoint             |
 | normalize_axes         | No        | TRUE          | TRUE, FALSE                        |
 | shade_quadrants        | No        | TRUE          | TRUE, FALSE                        |
