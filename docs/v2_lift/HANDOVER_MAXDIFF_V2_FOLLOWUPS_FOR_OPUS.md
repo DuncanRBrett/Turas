@@ -1,5 +1,17 @@
 # Handover: maxdiff v2 follow-ups after the independent review
 
+> **STATUS 2026-09-17.** Everything in sections 2 and 3 is BUILT on
+> `fix/maxdiff-v2-followups`, a worktree off `main` at `6d0995db`, in five
+> commits. R1, R2 and R3 were taken on the reviewer's recommendation, which
+> Duncan had still not ruled on; each commit says so. Item 7 (M4) is left
+> open, because the handover makes it Duncan's call. Items 8 and 10 were
+> already done before this session started. Section 6, the classic report
+> going to v2, has NOT been started and is not part of this branch.
+>
+> The branch is committed, NOT merged and NOT pushed. Suites from the repo
+> root: maxdiff 1171/0/1 skip, tabs 6151/0/1 skip, conjoint 991/0 with the
+> two known coxph warnings, node gate 48/0 across four files.
+
 Written 2026-09-03 by the Fable session that reviewed `feature/maxdiff-v2-report`
 and fixed its F1 to F5. For an Opus session at high effort (Sonnet would do for the
 mechanical items). Everything here is small and specified to file and line; if a
@@ -32,6 +44,7 @@ at the start of the session; note in the commit that it was the recommended
 option.
 
 ### R1. F6: a divergent or non-converged Stan fit exports unstamped
+**DONE 2026-09-17** (069ddd33), on the recommendation below.
 `12_tabs_export.R` gate keys on `model_fit$method == "cmdstanr"` alone.
 `07_hb.R` computes `n_divergences`, `max_treedepth_exceeded`, `mean_rhat`,
 `min_ess` into `hb$diagnostics` and only logs them; `check_hb_convergence_auto()`
@@ -46,6 +59,9 @@ rows on a `cmdstanr` fixture with `diagnostics` set; island `meta` carries the
 three numbers; node gate renders the sentence; both absent on the EB path.
 
 ### R2. M3: the reference item shows Spread 0.00, Mean SE 0.000, class Low Priority
+**DONE 2026-09-17** (069ddd33), on the recommendation below. The reference
+item is read from `model_fit$reference_item`, which 07_hb.R now records as
+`stan_data$item_ids[stan_data$J]`.
 The Stan model fixes the last item (REWARDS on Karoo when no anchor is
 designated) at zero for every respondent, so its spread across respondents and
 its Mean SE are exactly 0, and `classify_item_discrimination()` files it from
@@ -61,6 +77,10 @@ config". Tests: island nulls exactly one item on Stan and none on EB; view shows
 the dash and the note; discrimination block omits or dashes it.
 
 ### R3. The shipped Karoo config keeps `Allow_Approx_Utilities_Export = YES`
+**DONE 2026-09-17** (f8e467d7). Edited in openpyxl, one cell; all five sheets
+keep their declared dimension and Duncan's other edits are untouched. Note
+that openpyxl cannot write a cell holding an empty string, so 15 such cells
+are gone; openxlsx reads every affected sheet identically before and after.
 Inert under Stan (the export was unstamped because the fit was genuine). On a
 machine without cmdstanr it lets the stamped export through.
 **Recommendation:** set it to NO so the shipped example shows the gate refusing
@@ -73,7 +93,7 @@ a binary Duncan hand-edited in Excel: edit the one cell in Excel or openpyxl, ne
 
 ## 3. The rest, in a sensible order
 
-4. **F7, demo refuses when source()d.** Observed both ways: `Rscript demo.R`
+4. **DONE 2026-09-17** (29da7a21). **F7, demo refuses when source()d.** Observed both ways: `Rscript demo.R`
    passes; `Rscript -e 'source("demo.R")'` refuses at the conjoint step with
    `CONJ_ANALYSIS_FAILED: could not find function "validate_hb_config"`. Cause is
    in `modules/conjoint/R/00_main.R`: `.get_guard_dir()` at line 31 takes
@@ -84,16 +104,24 @@ a binary Duncan hand-edited in Excel: edit the one cell in Excel or openpyxl, ne
    Test: the maxdiff suite's "guard is loaded when 00_main.R is sourced from
    another script" pattern, ported to conjoint, with the caller sourced rather
    than run.
-5. **M1, maxdiff resolver walks outermost-first.** `modules/maxdiff/R/00_main.R`
+5. **DONE 2026-09-17** (29da7a21), plus a fourth site the handover did not
+   list: `.source_turf_engine()` path 3 in `modules/maxdiff/R/11_turf.R` read
+   `sys.frame(1)$ofile` the same way, and the M1 test could not pass without
+   it. Six resolvers in all.
+   **M1, maxdiff resolver walks outermost-first.** `modules/maxdiff/R/00_main.R`
    `.get_script_dir_for_guard()`: `for (i in seq_len(sys.nframe()))` becomes
    `rev(...)`, and match `maxdiff/R/00_main[.]R$`. A caller itself named
    `00_main.R` that sources the module currently loses the guard. Same shape in
    `modules/tabs/run_tabs.R:19-34`. Test: a caller named `00_main.R`.
-6. **M2, documentation drift.** `examples/integrated_demo/README.md` and the
+6. **DONE 2026-09-17** (f8e467d7). The integrated demo README had already
+   been corrected by a later session; `build_integrated_demo.R`'s own header
+   had not. The "run with Rscript, do not source() it" line is no longer
+   needed, because item 4 makes source() work.
+   **M2, documentation drift.** `examples/integrated_demo/README.md` and the
    header of `build_integrated_demo.R` say "a couple of minutes"; with cmdstanr
    the maxdiff step alone is 12 to 15 minutes. `examples/maxdiff/README.md` says
    the example "is configured for that world" (no cmdstanr); rewrite with R3.
-7. **M4, optional.** The tabs export returns `status = "PARTIAL"` when respondents
+7. **OPEN, Duncan's call.** **M4, optional.** The tabs export returns `status = "PARTIAL"` when respondents
    with all-NA utilities are dropped; `00_main.R` step 11b never reads it. Fold
    into `note_late()` only if Duncan wants an excluded respondent to be an event.
 8. **DONE 2026-09-03.** Conjoint suite run from the repo root on main at
@@ -101,14 +129,15 @@ a binary Duncan hand-edited in Excel: edit the one cell in Excel or openpyxl, ne
    `survival::coxph` "ran out of iterations and did not converge" from
    `test_utilities.R:265` and `:398`, the second of which is the deliberate
    "Handle perfect separation case" fixture. Neither is a regression. No action.
-9. **Stats pack checkbox vs config.** `run_maxdiff_gui.R:286-288` defaults the
+9. **DONE 2026-09-17** (ae21abb2). **Stats pack checkbox vs config.** `run_maxdiff_gui.R:286-288` defaults the
    "Generate stats pack" checkbox to unticked and `00_main.R` treats the option
    the GUI sets as the toggle, so a config saying `Generate_Stats_Pack = YES`
    silently produces no pack from the GUI (Session A's M11 made the option win on
    purpose). Duncan hit this on 2026-09-03. Recommendation: default the checkbox
    from the loaded config's value, and print one console line when the GUI's
    choice differs from the config. Keep the option as the toggle.
-10. **Reader template is gitignored.** `modules/tabs/lib/reader_report/assets/template.html`
+10. **ALREADY DONE** before this session: `.gitignore` carries the negation
+    and the file is tracked. **Reader template is gitignored.** `modules/tabs/lib/reader_report/assets/template.html`
     is matched by `.gitignore:69` (`*.html`) with no negation, unlike the v2
     template on line 73. Six tests in `test_reader_report.R` fail in any fresh
     clone with `IO_READER_ASSET_MISSING`. One negation line, then `git add` the
@@ -172,9 +201,13 @@ first, retirement second, never the reverse.
    its header comment says so and would need rewriting. Add blocks for head to
    head, segments and diagnostics. Watch the F2 lesson: per-row fields are
    vectors, scalars in a block stay unboxed, or the panel silently vanishes.
-2. Widen the tab. `27y_maxdiff.js` grows from four panels to seven. Charts are
-   the open sub-question: the classic report has its own chart builder (767
-   lines) and v2 has its own charting, so this is a port, not a copy.
+2. Widen the tab. `27y_maxdiff.js` grows from four panels to seven.
+   **Charts: Duncan ruled on 2026-09-17 that they are REDRAWN in the v2
+   report's own charting, not ported from the classic chart builder.** The
+   classic `04_chart_builder.R` (767 lines) is therefore reference material
+   for what each chart shows, not code to carry across, and it goes when the
+   rest of `lib/html_report/` goes at step 4. The reason for the ruling was
+   that one charting system is worth more than the time saved by a port.
 3. Prove parity on a real config before anything is deleted. The shipped Karoo
    example runs both paths today, so run it with `Generate_HTML_Report = YES`
    and read the classic report and the widened tab side by side, panel by panel.
@@ -188,3 +221,12 @@ first, retirement second, never the reverse.
    save.
 
 Step 4 does not start until Duncan has done step 3.
+
+**Scope, as it stands on 2026-09-17.** The charting question is answered, so
+the session that takes this on starts with no open decisions. It is larger than
+the whole of sections 2 and 3, which took one session: three new island blocks
+(head to head, segments, diagnostics), three new panels, and every chart
+redrawn. Watch the F2 lesson throughout: per-row fields in a block are vectors,
+scalars in a block stay unboxed, or the panel silently vanishes. The node gate
+`modules/tabs/tests/js/test_maxdiff_provenance.mjs`, added on 2026-09-17,
+renders the tab in a vm and is the place to add a check per new panel.

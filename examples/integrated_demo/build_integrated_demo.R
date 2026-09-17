@@ -18,7 +18,9 @@
 # module exports join to the survey data by respondent id. Everything is
 # synthetic; no client data is involved at any point.
 #
-# Usage, from the Turas root (about two minutes; HB estimation is the slow part):
+# Usage, from the Turas root. It takes a while: the conjoint's hierarchical
+# Bayes estimation and the MaxDiff Stan model are the slow parts, and with
+# cmdstanr installed the whole build can run to half an hour.
 #   Rscript examples/integrated_demo/build_integrated_demo.R [turas_root] [out_dir]
 #
 # Writes into <out_dir> (default examples/integrated_demo/Output):

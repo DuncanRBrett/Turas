@@ -16,16 +16,26 @@
 # it knows; the Rscript --file argument knows only where the CALLER is, so a
 # script that does source("modules/tabs/run_tabs.R") from somewhere else used
 # to resolve lib/ beside itself and fail with "cannot change working directory".
+# Frame 1 is the OUTERMOST source(), so walking forwards matched a CALLER named
+# run_tabs.R before this file's own frame. Walk innermost-first, and require
+# lib/run_crosstabs.R beside the candidate so a match has to be the real tabs
+# directory.
 .tabs_runner_dir <- local({
-  for (i in seq_len(sys.nframe())) {
+  .accept <- function(path) {
+    d <- dirname(normalizePath(path, mustWork = FALSE))
+    if (file.exists(file.path(d, "lib", "run_crosstabs.R"))) d else NULL
+  }
+  for (i in rev(seq_len(sys.nframe()))) {
     ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
     if (is.character(ofile) && length(ofile) == 1 && grepl("run_tabs[.]R$", ofile)) {
-      return(dirname(normalizePath(ofile, mustWork = FALSE)))
+      d <- .accept(ofile)
+      if (!is.null(d)) return(d)
     }
     srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
     if (is.list(srcfile) && is.character(srcfile$filename) &&
         grepl("run_tabs[.]R$", srcfile$filename)) {
-      return(dirname(normalizePath(srcfile$filename, mustWork = FALSE)))
+      d <- .accept(srcfile$filename)
+      if (!is.null(d)) return(d)
     }
   }
   args <- commandArgs(trailingOnly = FALSE)

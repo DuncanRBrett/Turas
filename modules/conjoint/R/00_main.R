@@ -28,7 +28,28 @@
 
 # Source TRS guard layer for refusal handling
 .get_guard_dir <- function() {
-  dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) "")
+  # sys.frame(1) is the OUTERMOST frame, which is this file's own source() only
+  # when nothing sourced it in turn. Under a caller (Rscript -e 'source("demo.R")',
+  # or any module 00_main.R that sources this one) it was the CALLER's file, the
+  # guard was looked for beside the caller and never loaded, and the first
+  # refusal died with "could not find function". Walk innermost-first, and
+  # require 00_guard.R beside the candidate so a match has to be a module R
+  # directory and not merely a file with the right name.
+  dir <- ""
+  for (i in rev(seq_len(sys.nframe()))) {
+    cand <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (is.null(cand) || !is.character(cand) || length(cand) != 1) {
+      srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+      cand <- if (is.list(srcfile) && is.character(srcfile$filename)) srcfile$filename else NULL
+    }
+    if (is.character(cand) && length(cand) == 1 && grepl("00_main\\.R$", cand)) {
+      d <- dirname(normalizePath(cand, mustWork = FALSE))
+      if (file.exists(file.path(d, "00_guard.R"))) {
+        dir <- d
+        break
+      }
+    }
+  }
   if (is.null(dir) || length(dir) == 0 || dir == "") {
     wd <- getwd()
     if (file.exists(file.path(wd, "modules/conjoint/R/00_guard.R"))) {
@@ -147,12 +168,20 @@ suppressPackageStartupMessages({
 
   # Strategy: walk the source frame stack to find the frame that sourced THIS file.
   # This is robust even when called via nested source() (e.g., run_demo.R → 00_main.R).
+  # Innermost-first: frame 1 is the OUTERMOST source(), so an outermost-first
+  # walk found a CALLER named 00_main.R before this file's own frame. The
+  # 99_helpers.R check makes a match prove it is really the conjoint R
+  # directory.
   dir <- ""
-  for (i in seq_len(sys.nframe())) {
+  for (i in rev(seq_len(sys.nframe()))) {
     ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
-    if (!is.null(ofile) && grepl("00_main\\.R$", ofile)) {
-      dir <- dirname(ofile)
-      break
+    if (!is.null(ofile) && is.character(ofile) && length(ofile) == 1 &&
+        grepl("00_main\\.R$", ofile)) {
+      d <- dirname(normalizePath(ofile, mustWork = FALSE))
+      if (file.exists(file.path(d, "99_helpers.R"))) {
+        dir <- d
+        break
+      }
     }
   }
 

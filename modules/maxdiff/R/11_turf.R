@@ -41,9 +41,33 @@ TURF_VERSION <- "11.2"
       file.path(find_turas_root(), "modules", "shared", "lib", "turf_engine.R"))
   }
 
-  # Path 3: relative to this file (when sourced normally)
-  if (exists("sys.frame") && !is.null(tryCatch(sys.frame(1)$ofile, error = function(e) NULL))) {
-    this_dir <- dirname(sys.frame(1)$ofile)
+  # Path 3: relative to this file (when sourced normally).
+  # sys.frame(1) is the OUTERMOST frame, which is this module's own source()
+  # only when nothing sourced the module in turn. Under a caller it was the
+  # CALLER's file, and the engine was looked for two directories above the
+  # caller. Walk innermost-first for a frame that really is a maxdiff R file.
+  .turf_frame_file <- function() {
+    for (i in rev(seq_len(sys.nframe()))) {
+      ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+      if (is.character(ofile) && length(ofile) == 1 &&
+          grepl("maxdiff[/\\\\]R[/\\\\][^/\\\\]+[.]R$", ofile)) {
+        return(ofile)
+      }
+      srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+      if (is.list(srcfile) && is.character(srcfile$filename) &&
+          grepl("maxdiff[/\\\\]R[/\\\\][^/\\\\]+[.]R$", srcfile$filename)) {
+        return(srcfile$filename)
+      }
+    }
+    NULL
+  }
+  if (exists("get_script_dir", mode = "function")) {
+    candidates <- c(candidates,
+      file.path(get_script_dir(), "..", "..", "shared", "lib", "turf_engine.R"))
+  }
+  .this_file <- .turf_frame_file()
+  if (!is.null(.this_file)) {
+    this_dir <- dirname(normalizePath(.this_file, mustWork = FALSE))
     candidates <- c(candidates,
       file.path(this_dir, "..", "..", "shared", "lib", "turf_engine.R"))
   }

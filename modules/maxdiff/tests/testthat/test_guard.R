@@ -103,3 +103,36 @@ test_that("the guard is loaded when 00_main.R is sourced from another script", {
   expect_false(any(grepl("could not find function", out, fixed = TRUE)))
   unlink(caller_dir, recursive = TRUE)
 })
+
+# ------------------------------------------------------------------------------
+# M1 from the v2 independent review: the resolvers walked the call stack
+# outermost-first and matched any file named 00_main.R, so a CALLER itself named
+# 00_main.R (every Turas module has one) was found before the module's own frame.
+# Both the guard lookup and the module-file lookup then pointed at the caller's
+# directory, and the run died with "could not find function maxdiff_refuse".
+# ------------------------------------------------------------------------------
+
+test_that("the guard is loaded when the caller is itself named 00_main.R", {
+  rscript <- file.path(R.home("bin"), "Rscript")
+  skip_if(!file.exists(rscript), "Rscript not found")
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  caller_dir <- tempfile("md_caller_00main_")
+  dir.create(caller_dir)
+  caller <- file.path(caller_dir, "00_main.R")
+  writeLines(c(
+    sprintf('setwd("%s")', tempdir()),
+    sprintf('source("%s")', main),
+    'cat("GUARD:", exists("maxdiff_refuse", mode = "function"), "\\n")',
+    'cat("MODULE:", exists("run_maxdiff", mode = "function"), "\\n")'
+  ), caller)
+  # source()d, not run: an Rscript --file= caller never reaches the frame walk.
+  out <- suppressWarnings(system2(
+    rscript, c("-e", shQuote(sprintf('source("%s")', caller))),
+    stdout = TRUE, stderr = TRUE
+  ))
+  expect_true(any(grepl("GUARD: TRUE", out, fixed = TRUE)), info = paste(out, collapse = "\n"))
+  expect_true(any(grepl("MODULE: TRUE", out, fixed = TRUE)), info = paste(out, collapse = "\n"))
+  expect_false(any(grepl("could not find function", out, fixed = TRUE)),
+               info = paste(out, collapse = "\n"))
+  unlink(caller_dir, recursive = TRUE)
+})

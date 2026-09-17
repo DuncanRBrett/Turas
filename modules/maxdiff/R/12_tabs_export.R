@@ -332,8 +332,22 @@ export_maxdiff_shares_for_tabs <- function(results, config, output_file = NULL,
     df <- add(df, "HB chains / iterations / warmup",
               sprintf("%s / %s / %s", os$HB_Chains %||% "?", os$HB_Iterations %||% "?",
                       os$HB_Warmup %||% "?"))
+    # The gate that let this export through keys on the estimator alone, so a
+    # divergent or non-converged fit shipped with nothing on its face to say
+    # so (review F6). 07_hb.R computes all four of these and only logged them.
+    # No refusal threshold yet: the numbers are stamped, the reader judges.
     if (!is.null(hb$diagnostics$mean_rhat)) {
       df <- add(df, "Mean R-hat", sprintf("%.3f", hb$diagnostics$mean_rhat))
+    }
+    if (!is.null(hb$diagnostics$n_divergences)) {
+      df <- add(df, "Divergences", sprintf("%d", as.integer(hb$diagnostics$n_divergences)))
+    }
+    if (!is.null(hb$diagnostics$max_treedepth_exceeded)) {
+      df <- add(df, "Max treedepth exceeded",
+                sprintf("%d", as.integer(hb$diagnostics$max_treedepth_exceeded)))
+    }
+    if (!is.null(hb$diagnostics$min_ess)) {
+      df <- add(df, "Min ESS", sprintf("%.0f", hb$diagnostics$min_ess))
     }
   }
   df <- add(df, "Respondents exported", n_exported)
