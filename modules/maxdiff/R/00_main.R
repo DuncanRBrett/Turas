@@ -468,12 +468,31 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
     # OUTPUT_SETTINGS value (where the template puts it) wins over the
     # legacy PROJECT_SETTINGS spelling.
     .sp_opt <- getOption("turas.generate_stats_pack", NULL)
+    .sp_config <- if (!is.null(config$output_settings$Generate_Stats_Pack)) {
+      isTRUE(config$output_settings$Generate_Stats_Pack)
+    } else if (!is.null(config$project_settings$Generate_Stats_Pack)) {
+      isTRUE(toupper(config$project_settings$Generate_Stats_Pack) == "Y")
+    } else {
+      NULL
+    }
     generate_stats_pack_flag <- if (!is.null(.sp_opt)) {
       isTRUE(.sp_opt)
-    } else if (!is.null(config$output_settings$Generate_Stats_Pack)) {
-      isTRUE(config$output_settings$Generate_Stats_Pack)
+    } else if (!is.null(.sp_config)) {
+      .sp_config
     } else {
-      isTRUE(toupper(config$project_settings$Generate_Stats_Pack %||% "Y") == "Y")
+      TRUE
+    }
+
+    # The GUI checkbox is defaulted from the config now, so the two agree unless
+    # the operator changed the box for this run. When they disagree, say so:
+    # the override used to be silent, and a config asking for a pack produced
+    # none with no console trace of why.
+    if (!is.null(.sp_opt) && !is.null(.sp_config) && !identical(isTRUE(.sp_opt), .sp_config)) {
+      cat(sprintf(
+        "\n[TURAS] Stats pack: the run is using the GUI setting (%s), which differs from the config (Generate_Stats_Pack = %s). The GUI setting wins.\n",
+        if (isTRUE(.sp_opt)) "on" else "off",
+        if (.sp_config) "YES" else "NO"
+      ))
     }
 
     if (generate_stats_pack_flag) {

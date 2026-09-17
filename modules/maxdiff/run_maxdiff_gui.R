@@ -6,6 +6,42 @@
 # Usage: source("modules/maxdiff/run_maxdiff_gui.R") then run_maxdiff_gui()
 # ==============================================================================
 
+# The config's Generate_Stats_Pack value, or NULL when the workbook does not
+# say. The stats pack checkbox below is defaulted from this: it used to ship
+# unticked, and because the GUI's choice IS the toggle (Session A, M11), a
+# config asking for a pack silently produced none. Reads the two sheets the
+# headless path reads, in the same order of precedence.
+maxdiff_config_stats_pack <- function(config_path) {
+  if (is.null(config_path) || !file.exists(config_path)) return(NULL)
+  sheets <- tryCatch(openxlsx::getSheetNames(config_path), error = function(e) character(0))
+  from_sheet <- function(sheet, name_cols, value_cols) {
+    if (!(sheet %in% sheets)) return(NULL)
+    df <- tryCatch(
+      openxlsx::read.xlsx(config_path, sheet = sheet, colNames = TRUE,
+                          skipEmptyRows = FALSE),
+      error = function(e) NULL
+    )
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    nc <- intersect(name_cols, names(df))[1]
+    vc <- intersect(value_cols, names(df))[1]
+    if (is.na(nc) || is.na(vc)) return(NULL)
+    hit <- which(toupper(trimws(as.character(df[[nc]]))) == "GENERATE_STATS_PACK")
+    if (length(hit) == 0) return(NULL)
+    val <- trimws(as.character(df[[vc]][hit[1]]))
+    # "NA" is the config workbook's empty placeholder, and readxl/openxlsx
+    # keep it as text, so an empty cell must not read as a value.
+    if (is.na(val) || !nzchar(val) || toupper(val) == "NA") return(NULL)
+    toupper(substr(val, 1, 1)) %in% c("Y", "T", "1")
+  }
+  v <- from_sheet("OUTPUT_SETTINGS",
+                  c("Option_Name", "Setting_Name", "Option"),
+                  c("Value", "Setting_Value"))
+  if (!is.null(v)) return(v)
+  from_sheet("PROJECT_SETTINGS",
+             c("Setting_Name", "Setting"),
+             c("Value", "Setting_Value"))
+}
+
 run_maxdiff_gui <- function() {
 
   # Required packages - check availability (TRS v1.0: no auto-install)
@@ -283,9 +319,15 @@ run_maxdiff_gui <- function() {
             icon("exclamation-triangle"), " Please select a valid configuration file to continue"
           )
         },
-        checkboxInput("generate_stats_pack",
-                      "Generate stats pack (diagnostic workbook for advanced review)",
-                      value = FALSE),
+        # Defaulted from the config, not hard-coded off: the value this box
+        # carries is the toggle the run obeys, so an unticked default silently
+        # overrode a config that asked for a pack.
+        local({
+          .cfg_sp <- maxdiff_config_stats_pack(rv$config_path)
+          checkboxInput("generate_stats_pack",
+                        "Generate stats pack (diagnostic workbook for advanced review)",
+                        value = isTRUE(.cfg_sp))
+        }),
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       "RUN MAXDIFF ANALYSIS",
