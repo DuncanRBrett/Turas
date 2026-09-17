@@ -109,11 +109,56 @@ STEPS_RUNBOOK_PROVENANCE_KEYS <- c(
 
 #' Trim a cell to a single string, treating NA as blank
 #' @keywords internal
+#' Undo the XML escaping openxlsx leaves on an inline string
+#'
+#' openpyxl writes every string as an INLINE string and escapes the XML special
+#' characters, and openxlsx 4.2.x reads inline strings without unescaping them.
+#' So a runbook written or edited by any Python tool comes back into R with
+#' "&lt;", "&gt;" and "&amp;" in place of the characters the author typed. Found
+#' 17 Sep 2026 on the SACS runbook, where a note reading "'<question sheet>
+#' Extracts'" displayed as "'&lt;question sheet&gt; Extracts'". It matters
+#' beyond notes: an argument value carrying an ampersand would be handed to the
+#' tool with "&amp;" in it. Excel-saved workbooks use shared strings and are
+#' unaffected, so this is a no-op on them.
+#'
+#' The comment reader carries the same repair for the same reason
+#' (`qual_clean_inline_artefacts` in modules/tabs/lib/qual_workbook_reader.R);
+#' the two are deliberately independent so this module does not depend on tabs.
+#' @keywords internal
+.steps_unescape_xml <- function(x) {
+  if (!grepl("&", x, fixed = TRUE)) return(x)
+  # Numeric references first (openpyxl escapes every non-ASCII character that
+  # way, so an ellipsis arrives as "&#8230;"), then the named ones, with &amp;
+  # LAST so an escaped entity ("&amp;lt;") decodes to the literal text and not
+  # one step past it.
+  m <- gregexpr("&#x?[0-9A-Fa-f]+;", x, perl = TRUE)[[1]]
+  if (m[1] != -1L) {
+    starts <- as.integer(m); lens <- attr(m, "match.length")
+    out <- ""; pos <- 1L
+    for (i in seq_along(starts)) {
+      out <- paste0(out, substr(x, pos, starts[i] - 1L))
+      tok <- substr(x, starts[i], starts[i] + lens[i] - 1L)
+      body <- sub(";$", "", sub("^&#", "", tok))
+      cp <- suppressWarnings(if (grepl("^x", body, ignore.case = TRUE))
+        strtoi(sub("^x", "", body, ignore.case = TRUE), 16L) else as.integer(body))
+      # An unusable codepoint stays exactly as written rather than being guessed.
+      out <- paste0(out, if (!is.na(cp) && cp > 0L && cp <= 1114111L) intToUtf8(cp) else tok)
+      pos <- starts[i] + lens[i]
+    }
+    x <- paste0(out, substr(x, pos, nchar(x)))
+  }
+  x <- gsub("&lt;", "<", x, fixed = TRUE)
+  x <- gsub("&gt;", ">", x, fixed = TRUE)
+  x <- gsub("&quot;", "\"", x, fixed = TRUE)
+  x <- gsub("&apos;", "'", x, fixed = TRUE)
+  gsub("&amp;", "&", x, fixed = TRUE)
+}
+
 .steps_cell <- function(x) {
   if (is.null(x) || length(x) == 0) return("")
   x <- x[1]
   if (is.na(x)) return("")
-  trimws(as.character(x))
+  .steps_unescape_xml(trimws(as.character(x)))
 }
 
 

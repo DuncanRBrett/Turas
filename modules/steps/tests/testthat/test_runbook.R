@@ -340,3 +340,55 @@ test_that("writing into a folder that does not exist refuses rather than throwin
   expect_equal(res$status, "REFUSED")
   expect_equal(res$code, "IO_RUNBOOK_WRITE_FAILED")
 })
+
+# ==============================================================================
+# openpyxl-written cells (17 Sep 2026)
+# ==============================================================================
+#
+# openpyxl writes every string as an inline string and escapes the XML special
+# characters; openxlsx 4.2.x reads inline strings without unescaping them. So a
+# runbook written or edited by a Python tool reached R with "&lt;", "&gt;" and
+# "&amp;" in place of what the author typed. Found on the SACS runbook, where a
+# note reading "'<question sheet> Extracts'" displayed as the entities. It is
+# not only cosmetic: an argument value carrying an ampersand would be handed to
+# the tool with "&amp;" in it.
+# ------------------------------------------------------------------------------
+
+test_that("a cell keeps the characters the author typed, entities and all", {
+  expect_equal(.steps_cell("a &lt;sheet&gt; name"), "a <sheet> name")
+  expect_equal(.steps_cell("path/with &amp; in it"), "path/with & in it")
+  expect_equal(.steps_cell("&quot;quoted&quot; and &apos;single&apos;"),
+               "\"quoted\" and 'single'")
+  # openpyxl escapes every non-ASCII character as a numeric reference.
+  expect_equal(.steps_cell("an ellipsis &#8230; here"), "an ellipsis … here")
+  expect_equal(.steps_cell("hex &#x2026; here"), "hex … here")
+  # An already-escaped entity decodes one step, not past it.
+  expect_equal(.steps_cell("&amp;lt; stays literal"), "&lt; stays literal")
+  # An unusable codepoint is left exactly as written rather than guessed at.
+  expect_equal(.steps_cell("&#0; unusable"), "&#0; unusable")
+  # Text with no ampersand is returned untouched, and blanks still collapse.
+  expect_equal(.steps_cell("  plain text  "), "plain text")
+  expect_equal(.steps_cell(NA), "")
+})
+
+test_that("a runbook written by openpyxl reads back what was written", {
+  skip_if_not_installed("openxlsx")
+  py <- Sys.which("python3")
+  skip_if(!nzchar(py), "python3 not on the path")
+  path <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(path), add = TRUE)
+  script <- tempfile(fileext = ".py")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "import openpyxl",
+    "wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Steps'",
+    "ws.append(['Order','Step','Type','Tool','Notes'])",
+    "ws.append([1, 'probe', 'manual', None, \"a sheet named '<x> Extracts' with a & b\"])",
+    sprintf("wb.save(r'%s')", path)
+  ), script)
+  status <- suppressWarnings(system2(py, shQuote(script), stdout = FALSE, stderr = FALSE))
+  skip_if(!identical(as.integer(status), 0L), "openpyxl not available")
+  res <- steps_runbook_read(path)
+  expect_equal(res$status, "PASS")
+  expect_equal(res$result$steps[[1]]$notes, "a sheet named '<x> Extracts' with a & b")
+})

@@ -108,6 +108,22 @@ run_steps_gui <- function() {
 
   ui <- fluidPage(
     theme$head,
+    # Open sits beside a step near the top of a long checklist, and the form it
+    # fills renders below the whole list AND below the tools card, so the page
+    # did not appear to react at all (Duncan, 17 Sep 2026: "if i click open for
+    # 13 nothing happened"). The form does not exist yet when the click
+    # happens, so this polls briefly for it rather than scrolling immediately.
+    tags$script(HTML(paste(
+      "function turasOpenStep(i) {",
+      "  Shiny.setInputValue('open_runbook_step', i, {priority: 'event'});",
+      "  var tries = 0;",
+      "  var look = setInterval(function () {",
+      "    var el = document.getElementById('turas-tool-form');",
+      "    if (el) { clearInterval(look);",
+      "      el.scrollIntoView({behavior: 'smooth', block: 'start'}); }",
+      "    else if (++tries > 40) { clearInterval(look); }",   # ~4 seconds, then give up
+      "  }, 100);",
+      "}", sep = "\n"))),
     theme$header,
 
     div(class = "turas-content",
@@ -357,8 +373,7 @@ run_steps_gui <- function() {
             div(style = "flex-shrink:0;",
               if (runnable) {
                 tags$button(class = "btn btn-default btn-sm",
-                  onclick = sprintf(
-                    "Shiny.setInputValue('open_runbook_step', %d, {priority: 'event'})", i),
+                  onclick = sprintf("turasOpenStep(%d)", i),
                   "Open")
               } else {
                 tags$button(class = "btn btn-default btn-sm",
@@ -543,7 +558,7 @@ run_steps_gui <- function() {
       args <- m$args
       if (is.null(args)) args <- list()
 
-      div(class = "turas-card",
+      div(class = "turas-card", id = "turas-tool-form",
         h3(class = "turas-card-title", m$name),
         p(class = "turas-help-text", m$description),
         div(class = "turas-help-text",
