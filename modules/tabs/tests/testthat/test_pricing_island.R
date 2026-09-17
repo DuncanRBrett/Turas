@@ -164,7 +164,7 @@ test_that("the shell shows the tab only when there is a contribution", {
 test_that("the view has a stylesheet block of its own", {
   css <- paste(readLines(file.path(v2_dir, "assets", "styles.css"), warn = FALSE),
                collapse = "\n")
-  for (sel in c(".pr-view", ".pr-panel", ".pr-table", ".pr-chart", ".pr-stamp")) {
+  for (sel in c(".prc-view", ".prc-panel", ".prc-table", ".prc-chart", ".prc-stamp")) {
     expect_true(grepl(sel, css, fixed = TRUE), info = sel)
   }
 })

@@ -262,7 +262,7 @@ run("the monadic panel keeps the cells apart from the fitted curve, with the cav
   has(h, "Monadic cells", "panel");
   has(h, "72.1%", "an observed cell");
   has(h, "the dots are what they said", "the note tells them apart");
-  has(h, 'class="pr-stamp"', "the weighted p-value caveat is stamped, not footnoted");
+  has(h, 'class="prc-stamp"', "the weighted p-value caveat is stamped, not footnoted");
   has(h, "overstates significance", "verbatim from the island");
   has(h, "below 0.001", "a tiny p-value is described, not printed as 0.000");
   lacks(h, "Van Westendorp price points", "no VW panel on a monadic run");
@@ -307,6 +307,30 @@ run("no em dash reaches the reader from this view", () => {
   const src = readFileSync(path.join(JS_DIR, "27z_pricing.js"), "utf8");
   lacks(src, "—", "em dash in the view source");
   lacks(src, "&mdash;", "named em dash");
+});
+
+run("the view's class names belong to it alone", () => {
+  // The tab shipped as .pr-* and Present mode had been using .pr-note,
+  // .pr-table and .pr-chart unscoped since August. Both live in one
+  // stylesheet, the tab's block comes later, so the tab was restyling
+  // Present mode in every report. The names are .prc-* now; this keeps any
+  // future name in this block from colliding with anything above it.
+  const css = readFileSync(path.join(HERE, "..", "assets", "styles.css"), "utf8");
+  const marker = css.indexOf("Pricing tab (27z_pricing.js)");
+  assert(marker > 0, "the pricing block's comment header is missing");
+  const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ");
+  const names = (block) => new Set(
+    [...strip(block).matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]));
+  const mine = names(css.slice(marker));
+  const theirs = names(css.slice(0, marker));
+  const shared = [...mine].filter((c) => theirs.has(c));
+  assert(shared.length === 0,
+    "class names defined both inside and outside the pricing block: " + shared.join(", "));
+
+  // And the view only ever writes its own prefix.
+  const src = readFileSync(path.join(JS_DIR, "27z_pricing.js"), "utf8");
+  const stray = [...src.matchAll(/(?<![-\w])pr-[a-z][a-z-]*/g)].map((m) => m[0]);
+  assert(stray.length === 0, "the view still writes Present mode's prefix: " + stray.join(", "));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
