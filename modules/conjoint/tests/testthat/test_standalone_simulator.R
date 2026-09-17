@@ -195,9 +195,15 @@ test_that("every inline handler in the page has a definition in the page", {
   expect_equal(res$status, "PASS")
 
   html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  # Only an identifier that is actually CALLED counts as a handler. The old
+  # pattern took the first identifier in the attribute whatever followed it, so
+  # the shared callout's onclick="this.parentElement.classList.toggle(...)"
+  # yielded "this" and the test demanded a function called this. That made the
+  # result depend on whether the callout registry happened to be loaded, so the
+  # suite passed alone and failed after the shared suite had run.
   handlers <- unique(gsub(
-    '^onclick="([A-Za-z_$][A-Za-z0-9_$]*).*$', "\\1",
-    regmatches(html, gregexpr('onclick="[A-Za-z_$][A-Za-z0-9_$]*',
+    '^onclick="([A-Za-z_$][A-Za-z0-9_$]*)[[:space:]]*\\($', "\\1",
+    regmatches(html, gregexpr('onclick="[A-Za-z_$][A-Za-z0-9_$]*[[:space:]]*\\(',
                               html))[[1]]
   ))
   expect_true(length(handlers) > 0)
@@ -211,5 +217,100 @@ test_that("every inline handler in the page has a definition in the page", {
       grepl(paste0("\\b", fn, "\\s*=\\s*function"), html)
     expect_true(defined, info = paste0("onclick handler '", fn,
                                        "' has no definition in the page"))
+  }
+})
+
+# ------------------------------------------------------------------------------
+# The page does not depend on what else the session happened to load
+#
+# .build_callout() used to test exists("turas_callout_html") and never load it.
+# Nothing on the conjoint production route loads it, so every shipped simulator
+# got the plain fallback box while the seven other modules that build a report
+# locate the registry themselves and got the designed collapsible callout. It
+# also made this file's own handler test pass alone and fail after the shared
+# suite had run, because the shared callout's inline onclick only appeared in
+# the page when the registry happened to be in the global environment.
+#
+# Both shapes are pinned here, each in its own process so neither can inherit
+# the other's global environment.
+# ------------------------------------------------------------------------------
+
+run_sim_probe <- function(extra = "") {
+  rscript <- file.path(R.home("bin"), "Rscript")
+  if (!file.exists(rscript)) return(NULL)
+  script <- tempfile(fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    sprintf('setwd("%s")', root),
+    sprintf('Sys.setenv(TURAS_ROOT = "%s")', root),
+    'e <- new.env(parent = globalenv()); e$test_that <- function(...) invisible(NULL)',
+    sprintf('sys.source("%s", envir = e)',
+            file.path(root, "modules", "conjoint", "tests", "testthat",
+                      "test_standalone_simulator.R")),
+    sprintf('source("%s")', sim_main),
+    extra,
+    'out <- tempfile(fileext = ".html")',
+    'r <- generate_conjoint_simulator(e$make_sim_results(), out, verbose = FALSE)',
+    'cat("STATUS:", r$status, "\\n")',
+    'h <- paste(readLines(out, warn = FALSE), collapse = "\\n")',
+    'cat("DESIGNED:", grepl("t-callout-header", h, fixed = TRUE), "\\n")',
+    'cat("CHEVRON:", grepl("t-callout-chevron", h, fixed = TRUE), "\\n")',
+    'cat("PLAINBOX:", grepl("<div class=\\"t-callout\\"><div class=\\"t-callout-body\\">", h, fixed = TRUE), "\\n")',
+    'unlink(out)'
+  ), script)
+  suppressWarnings(system2(rscript, shQuote(script), stdout = TRUE, stderr = TRUE))
+}
+
+flag <- function(out, key) {
+  line <- grep(paste0("^", key, ":"), out, value = TRUE)
+  if (!length(line)) return(NA)
+  identical(trimws(sub(paste0("^", key, ":"), "", line[1])), "TRUE")
+}
+
+test_that("a fresh process builds the designed callout, without anything preloading the registry", {
+  out <- run_sim_probe()
+  skip_if(is.null(out), "Rscript not found")
+  expect_true(any(grepl("STATUS: PASS", out, fixed = TRUE)),
+              info = paste(out, collapse = "\n"))
+  # This is the regression: before the fix a fresh process got the plain box,
+  # because nothing on the production route loads the registry.
+  expect_true(flag(out, "DESIGNED"), info = paste(out, collapse = "\n"))
+  expect_true(flag(out, "CHEVRON"), info = paste(out, collapse = "\n"))
+})
+
+test_that("preloading the registry gives exactly the same shape, so the page is deterministic", {
+  out <- run_sim_probe(extra = sprintf(
+    'source("%s")', file.path(root, "modules", "shared", "lib", "callouts",
+                              "callout_registry.R")))
+  skip_if(is.null(out), "Rscript not found")
+  expect_true(any(grepl("STATUS: PASS", out, fixed = TRUE)),
+              info = paste(out, collapse = "\n"))
+  expect_true(flag(out, "DESIGNED"), info = paste(out, collapse = "\n"))
+  expect_true(flag(out, "CHEVRON"), info = paste(out, collapse = "\n"))
+})
+
+test_that("with the registry genuinely unreachable the page still builds, and says so", {
+  # A standalone checkout with no shared library. The fallback is legitimate
+  # there; what is not legitimate is degrading silently.
+  out <- run_sim_probe(extra = '.cj_sim_callout_dir <- function() NULL')
+  skip_if(is.null(out), "Rscript not found")
+  expect_true(any(grepl("STATUS: PASS", out, fixed = TRUE)),
+              info = paste(out, collapse = "\n"))
+  expect_false(flag(out, "DESIGNED"), info = paste(out, collapse = "\n"))
+  expect_true(flag(out, "PLAINBOX"), info = paste(out, collapse = "\n"))
+  expect_true(any(grepl("IO_CALLOUT_REGISTRY_MISSING", out, fixed = TRUE)),
+              info = "the fallback must announce itself on the console")
+})
+
+test_that("the handler check is not affected by whether the registry is loaded", {
+  # The inline onclick the shared callout carries is not a handler, and must
+  # not be read as one. Both shapes are checked, in separate processes.
+  for (extra in list("", sprintf('source("%s")',
+                                 file.path(root, "modules", "shared", "lib",
+                                           "callouts", "callout_registry.R")))) {
+    out <- run_sim_probe(extra = extra)
+    skip_if(is.null(out), "Rscript not found")
+    expect_false(any(grepl("handler 'this'", out, fixed = TRUE)),
+                 info = paste(out, collapse = "\n"))
   }
 })
