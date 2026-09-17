@@ -100,6 +100,35 @@ export_pricing_for_tabs <- function(results, config, output_file = NULL,
     )
   }
 
+  # --- Gate 1b: the export needs one row per respondent -------------------------
+  # A long-format study has one row per respondent per rung, so the id repeats
+  # by design. The id gate below would then refuse and tell the analyst to give
+  # every respondent a unique id, which is advice to break data that is already
+  # correct (review F15). Refuse for the real reason instead, and say what to do.
+  if (identical(tolower(config$gabor_granger$data_format %||% "wide"), "long")) {
+    pricing_refuse(
+      code = "CFG_TABS_EXPORT_LONG_FORMAT",
+      title = "The Tabs Export Needs One Row Per Respondent",
+      problem = paste0(
+        "Data_Format on the GaborGranger sheet is 'long', so the survey file ",
+        "holds one row per respondent per rung."),
+      why_it_matters = paste0(
+        "A crosstab counts respondents, so tabs reads one row each. Collapsing ",
+        "a long file here would mean choosing a single value for every other ",
+        "column, and any column that differs between a respondent's rows would ",
+        "quietly lose all but one of its values. A wrong number is worse than a ",
+        "missing file."),
+      how_to_fix = c(
+        paste0("Reshape the survey file to wide, one response column per rung, and set ",
+               "Data_Format = wide with Response_Columns naming those columns. The ",
+               "analysis is identical either way; only this export needs the wide shape."),
+        paste0("Or set Generate_Tabs_Export = N. The Results workbook, the stats pack, ",
+               "the standalone simulator and the Pricing tab are all produced from long ",
+               "data without it; the export only adds the crosstab.")
+      )
+    )
+  }
+
   ids <- as.character(data[[id_var]])
   if (any(is.na(ids) | !nzchar(ids)) || anyDuplicated(ids) > 0) {
     dupes <- unique(ids[duplicated(ids)])
