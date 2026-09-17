@@ -141,8 +141,10 @@ test_that("the workbook is written with three sheets and the column contract", {
   expect_match(basename(res$output_file), "_tabs_pricing[.]xlsx$")
   expect_setequal(openxlsx::getSheetNames(res$output_file),
                   c("DATA", "QUESTIONMAP_SNIPPET", "METHOD"))
+  # GGACC_4 is the rejecters' own column: without it tabs drops them from the
+  # Multi_Mention base and every rung reads higher than the module (review F1).
   expect_equal(res$columns,
-               c("RespID", "GGACC_1", "GGACC_2", "GGACC_3", "pricing_valid"))
+               c("RespID", "GGACC_1", "GGACC_2", "GGACC_3", "GGACC_4", "pricing_valid"))
 })
 
 test_that("a cell holds the rung's label where the respondent would buy, and is empty otherwise", {
@@ -154,8 +156,12 @@ test_that("a cell holds the rung's label where the respondent would buy, and is 
   expect_equal(sum(sheet$GGACC_1 == "R60.00", na.rm = TRUE), 10)
   expect_equal(sum(sheet$GGACC_2 == "R80.00", na.rm = TRUE), 8)
   expect_equal(sum(sheet$GGACC_3 == "R100.00", na.rm = TRUE), 4)
+  # Rows 11 and 12 would not buy at any rung, so they carry the rejecters'
+  # answer rather than an empty row (review F1).
+  expect_equal(sum(sheet$GGACC_4 == "Would not buy at any price", na.rm = TRUE), 2)
+  expect_true(all(is.na(sheet$GGACC_4[1:10])))
   # And the Options rows carry exactly those labels.
-  expect_equal(res$options$OptionText, c("R60.00", "R80.00", "R100.00"))
+  expect_equal(res$options$OptionText, c("R60.00", "R80.00", "R100.00", "Would not buy at any price"))
 })
 
 test_that("the Options rows are keyed by column, which is how Multi_Mention looks them up", {
@@ -165,11 +171,11 @@ test_that("the Options rows are keyed by column, which is how Multi_Mention look
   # answer is reported unmatched and the question is dropped from the report.
   # The integrated demo caught exactly that.
   res <- run_export(base_results(), export_config())
-  expect_equal(res$options$QuestionCode, c("GGACC_1", "GGACC_2", "GGACC_3"))
+  expect_equal(res$options$QuestionCode, c("GGACC_1", "GGACC_2", "GGACC_3", "GGACC_4"))
   expect_true(all(grepl("^GGACC_[0-9]+$", res$options$QuestionCode)))
   expect_equal(res$options$DisplayText, res$options$OptionText)
   expect_true(all(res$options$ShowInOutput == "Y"))
-  expect_equal(res$options$DisplayOrder, 1:3)
+  expect_equal(res$options$DisplayOrder, 1:4)
   # The data columns and the option keys are the same set, in the same order.
   grid_cols <- grep("^GGACC_[0-9]+$", res$columns, value = TRUE)
   expect_equal(grid_cols, res$options$QuestionCode)
@@ -229,7 +235,7 @@ test_that("QUESTIONMAP_SNIPPET writes the grid row and documents what tabs reads
   grid <- qm[qm$QuestionCode == "GGACC", ]
   expect_equal(nrow(grid), 1)
   expect_equal(grid$Variable_Type, "Multi_Mention")
-  expect_equal(grid$Columns, 3)
+  expect_equal(grid$Columns, 4)   # three rungs plus the rejecters' column (F1)
   expect_match(grid$Data_Source, "DATA sheet")
   # The VW and monadic rows point at the survey file, not at this export.
   vw_row <- qm[qm$QuestionCode == "Cheap", ]
@@ -246,7 +252,12 @@ test_that("METHOD states the base difference, the weighting and what is NOT expo
   expect_match(get_row("Cell contract"), "OptionText")
   expect_match(get_row("Cell contract"), "zero at every price")
   expect_match(get_row("Coding rule"), "1 = would buy")
-  expect_match(get_row("pricing_valid"), "reproduce the pricing report's base")
+  # This row used to say "filter on it to reproduce the pricing report's base",
+  # which review F1 showed to be false: an excluded respondent has every
+  # acceptance column blank, so a Multi_Mention table has already left them out.
+  expect_match(get_row("pricing_valid"), "will not change it")
+  expect_false(grepl("reproduce the pricing report's base", get_row("pricing_valid"), fixed = TRUE))
+  expect_match(get_row("Base agreement"), "equals the pricing report's analysed base")
   expect_match(get_row("Weighting"), "tabs weights them again")
   expect_match(get_row("What is NOT here"), "differences of exactly zero")
   expect_match(get_row("Id column"), "RespID")
@@ -299,14 +310,14 @@ test_that("tabs counts the exported grid correctly, and would count 0/1 flags as
 
   res <- run_export(base_results(), export_config())
   sheet <- openxlsx::read.xlsx(res$output_file, sheet = "DATA", skipEmptyRows = FALSE)
-  cols <- paste0("GGACC_", 1:3)
+  cols <- paste0("GGACC_", 1:4)
   idx <- list(`TOTAL::Total` = seq_len(nrow(sheet)))
   w <- rep(1, nrow(sheet))
 
   got <- vapply(res$options$OptionText, function(opt) {
     unname(counts(sheet, idx, opt, "GGACC", TRUE, cols, names(idx), w))
   }, numeric(1))
-  expect_equal(unname(got), c(10, 8, 4))
+  expect_equal(unname(got), c(10, 8, 4, 2))
 
   # And the option keys select exactly the columns the processor builds from
   # Columns = k, so tabs finds every rung.
@@ -322,7 +333,7 @@ test_that("tabs counts the exported grid correctly, and would count 0/1 flags as
   got_flags <- vapply(res$options$OptionText, function(opt) {
     unname(counts(flags, idx, opt, "GGACC", TRUE, cols, names(idx), w))
   }, numeric(1))
-  expect_equal(unname(got_flags), c(0, 0, 0))
+  expect_equal(unname(got_flags), c(0, 0, 0, 0))
 })
 
 # ---------------------------------------------------------------------------
@@ -386,4 +397,148 @@ test_that("pricing_valid drops the ladders the completeness rule excluded (F4)",
   # The exported base is the module's own analysed base, not the whole file.
   expect_equal(sum(data_sheet$pricing_valid == 1), g$diagnostics$n_respondents)
   expect_equal(sum(data_sheet$pricing_valid == 0), n_excluded)
+})
+
+# ------------------------------------------------------------------------------
+# F1: the rejecters keep their place in the tabs base
+# ------------------------------------------------------------------------------
+
+# tabs' own base rule, sourced rather than reimplemented.
+tabs_mm_base <- function(df, code, n_cols) {
+  root <- TURAS_ROOT
+  if (!exists("calculate_multimention_base", mode = "function")) {
+    source(file.path(root, "modules", "tabs", "lib", "weighting.R"))
+  }
+  calculate_multimention_base(df, code, n_cols, rep(1, nrow(df)))$unweighted
+}
+
+f1_export <- function(d, config, tag) {
+  invisible(capture.output(v <- validate_pricing_data(d, config)))
+  invisible(capture.output(g <- run_gabor_granger(v$clean_data, config)))
+  out <- file.path(tempdir(), paste0("pricing_f1_", tag, ".xlsx"))
+  unlink(out)
+  invisible(capture.output(export_pricing_for_tabs(
+    list(data = d, validation = v, gabor_granger = g), config, out, verbose = FALSE)))
+  list(path = out, gg = g,
+       data = openxlsx::read.xlsx(out, sheet = "DATA", skipEmptyRows = FALSE))
+}
+
+f1_cfg <- function(prices, cols, imputation = "NONE") {
+  list(
+    analysis_method = "gabor_granger", weight_var = NA_character_, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    gg_monotonicity_behavior = "diagnostic_only", gg_stop_early_imputation = imputation,
+    generate_tabs_export = TRUE, tabs_question_code = "GGACC", export_wtp = FALSE,
+    gabor_granger = list(data_format = "wide", price_sequence = prices,
+                         response_columns = cols, response_type = "binary",
+                         binary_coding = "ZERO_ONE", smoothing_method = "isotonic",
+                         check_monotonicity = FALSE, calculate_elasticity = FALSE,
+                         revenue_optimization = TRUE, confidence_intervals = FALSE,
+                         bootstrap_iterations = 10, confidence_level = 0.95),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000))
+}
+
+test_that("a respondent who would not buy at any rung gets an answer of their own (F1)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  prices <- c(20, 40, 60)
+  cols <- paste0("p", prices)
+  # Six respondents: four accept something, two accept nothing.
+  d <- data.frame(respondent_id = 1:6,
+                  p20 = c(1, 1, 1, 1, 0, 0),
+                  p40 = c(1, 1, 0, 0, 0, 0),
+                  p60 = c(1, 0, 0, 0, 0, 0))
+  ex <- f1_export(d, f1_cfg(prices, cols), "small")
+  last <- paste0("GGACC_", length(prices) + 1)
+  expect_true(last %in% names(ex$data))
+  expect_equal(sum(!is.na(ex$data[[last]])), 2)
+  expect_equal(unique(ex$data[[last]][!is.na(ex$data[[last]])]), "Would not buy at any price")
+  # It never lands on a respondent who accepted something.
+  accepted <- rowSums(!is.na(ex$data[, paste0("GGACC_", seq_along(prices))])) > 0
+  expect_true(all(is.na(ex$data[[last]][accepted])))
+
+  # The Options rows carry it, keyed by column like every rung.
+  opts <- openxlsx::read.xlsx(ex$path, sheet = "QUESTIONMAP_SNIPPET",
+                              skipEmptyRows = FALSE, colNames = FALSE)
+  flat <- as.character(unlist(opts))
+  expect_true(any(grepl(paste0("GGACC_", length(prices) + 1), flat, fixed = TRUE)))
+  expect_true(any(grepl("Would not buy at any price", flat, fixed = TRUE)))
+})
+
+test_that("the tabs base now equals the module's analysed base (F1)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  skip_if(!file.exists(file.path(TURAS_ROOT, "modules", "tabs", "lib", "weighting.R")),
+          "tabs weighting not present")
+  prices <- c(20, 40, 60, 80, 100)
+  cols <- paste0("p", prices)
+  set.seed(31)
+  n <- 200
+  ceiling <- runif(n, 15, 105)
+  d <- as.data.frame(sapply(prices, function(p) as.integer(p <= ceiling)))
+  names(d) <- cols
+  d$respondent_id <- seq_len(n)
+  ex <- f1_export(d, f1_cfg(prices, cols), "base")
+  n_cols <- length(prices) + 1
+  expect_equal(tabs_mm_base(ex$data, "GGACC", n_cols),
+               ex$gg$diagnostics$n_respondents)
+  # Without the last column tabs drops whoever accepted nothing.
+  rungs_only <- ex$data[, c("respondent_id", paste0("GGACC_", seq_along(prices)))]
+  expect_lt(tabs_mm_base(rungs_only, "GGACC", length(prices)),
+            ex$gg$diagnostics$n_respondents)
+})
+
+test_that("a stop-early ladder's cheapest rung no longer reads 100% in tabs (F1)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  skip_if(!file.exists(file.path(TURAS_ROOT, "modules", "tabs", "lib", "weighting.R")),
+          "tabs weighting not present")
+  prices <- c(20, 40, 60, 80)
+  cols <- paste0("p", prices)
+  set.seed(5)
+  n <- 150
+  ceiling <- runif(n, 10, 90)
+  m <- sapply(prices, function(p) as.integer(p <= ceiling))
+  for (i in seq_len(n)) {
+    fn <- which(m[i, ] == 0L)
+    if (length(fn) && fn[1] < length(prices)) m[i, (fn[1] + 1):length(prices)] <- NA
+  }
+  d <- as.data.frame(m)
+  names(d) <- cols
+  d$respondent_id <- seq_len(n)
+  ex <- f1_export(d, f1_cfg(prices, cols, imputation = "NO_AFTER_STOP"), "stop")
+
+  n_cols <- length(prices) + 1
+  base <- tabs_mm_base(ex$data, "GGACC", n_cols)
+  mentions <- sum(!is.na(ex$data[["GGACC_1"]]))
+  tabs_pct <- 100 * mentions / base
+  report_pct <- 100 * ex$gg$demand_curve$purchase_intent[1]
+  # Under NO_AFTER_STOP a No at the first rung blanks the whole row, so the
+  # old export made the bottom rung 100% by construction.
+  expect_lt(tabs_pct, 100)
+  expect_equal(tabs_pct, report_pct, tolerance = 0.01)
+
+  old_base <- tabs_mm_base(ex$data[, c("respondent_id", paste0("GGACC_", seq_along(prices)))],
+                           "GGACC", length(prices))
+  expect_equal(100 * mentions / old_base, 100)
+})
+
+test_that("an excluded respondent is never given the rejecters' answer (F1)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  prices <- c(20, 40, 60, 80, 100)
+  cols <- paste0("p", prices)
+  set.seed(21)
+  n <- 120
+  ceiling <- runif(n, 15, 105)
+  m <- sapply(prices, function(p) as.integer(p <= ceiling))
+  m[matrix(runif(n * length(prices)) < 0.05, nrow = n)] <- NA_integer_
+  d <- as.data.frame(m)
+  names(d) <- cols
+  d$respondent_id <- seq_len(n)
+  ex <- f1_export(d, f1_cfg(prices, cols), "excluded")
+  last <- paste0("GGACC_", length(prices) + 1)
+  # The column must exist, or the rest of this test passes vacuously.
+  expect_true(last %in% names(ex$data))
+  expect_gt(sum(ex$data$pricing_valid == 0), 0)
+  expect_true(all(is.na(ex$data[[last]][ex$data$pricing_valid == 0])))
+  # It does land on the analysed respondents who accepted nothing.
+  expect_gt(sum(!is.na(ex$data[[last]])), 0)
+  expect_true(all(ex$data$pricing_valid[!is.na(ex$data[[last]])] == 1))
 })
