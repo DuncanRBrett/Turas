@@ -605,16 +605,38 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
 }
 
 
+#' Does This Run Have A Curve A Simulator Could Move Along?
+#'
+#' `generate_pricing_simulator()` refuses `DATA_SIMULATOR_NO_CURVE` when the
+#' run produced no demand curve with at least two price points, which is every
+#' Van Westendorp-only study: it measures price perceptions, not demand at a
+#' price. The island is written before the simulator step runs, so it has to
+#' answer the same question for itself (review F11).
+#'
+#' @keywords internal
+.pricing_island_has_curve <- function(results) {
+  n_points <- function(curve) {
+    if (!is.data.frame(curve) || !"price" %in% names(curve)) return(0L)
+    length(unique(curve$price[!is.na(curve$price)]))
+  }
+  max(n_points(results$gabor_granger$demand_curve),
+      n_points(results$monadic$demand_curve)) >= 2
+}
+
+
 #' The standalone simulator's file name, when this run wrote one
 #'
-#' Naming a file that was never written would put a dead link on the tab, so
-#' this follows the same condition step 9 uses. The classic HTML report the
-#' simulator used to be embedded in is retired, so `Generate_Simulator` alone
-#' decides.
+#' Naming a file that was never written puts a dead link on the Pricing tab,
+#' which is what a Van Westendorp-only run with `Generate_Simulator = TRUE`
+#' did: the island named the file at step 8b and step 9 then refused to write
+#' it (review F11). Two conditions, both of step 9's: the setting is on, and
+#' the run has a curve to simulate against. The classic HTML report the
+#' simulator used to be embedded in is retired, so nothing else decides.
 #'
 #' @keywords internal
 .pricing_island_simulator_file <- function(results, config) {
   if (!isTRUE(config$generate_simulator) || is.null(results$output_path)) return(NULL)
+  if (!.pricing_island_has_curve(results)) return(NULL)
   basename(sub("[.]xlsx$", "_simulator.html", results$output_path))
 }
 

@@ -309,12 +309,28 @@ test_that("the frozen note tells the reader where a filtered cut lives", {
 })
 
 test_that("the simulator is named only when a standalone file was written", {
-  base <- list(van_westendorp = fake_vw(), validation = fake_validation(),
+  # A curve to simulate against, so the simulator step will write the file.
+  base <- list(van_westendorp = fake_vw(), gabor_granger = fake_gg(),
+               validation = fake_validation(),
                output_path = "/tmp/Study_Results.xlsx")
   off <- quiet_island(base, fake_config(simulator = FALSE))
   expect_false("simulatorFile" %in% names(off$meta))
   standalone <- quiet_island(base, fake_config(simulator = TRUE))
   expect_equal(standalone$meta$simulatorFile, "Study_Results_simulator.html")
+
+  # A Van Westendorp-only run has no demand curve, so step 9 refuses
+  # DATA_SIMULATOR_NO_CURVE and writes nothing. Naming the file anyway put a
+  # dead link on the tab (review F11).
+  vw_only <- list(van_westendorp = fake_vw(), validation = fake_validation(),
+                  output_path = "/tmp/Study_Results.xlsx")
+  dead <- quiet_island(vw_only, fake_config(simulator = TRUE))
+  expect_false("simulatorFile" %in% names(dead$meta))
+
+  # A monadic run has one, and keeps the link.
+  mon <- list(monadic = fake_monadic(), validation = fake_validation(),
+              output_path = "/tmp/Study_Results.xlsx")
+  expect_equal(quiet_island(mon, fake_config(simulator = TRUE))$meta$simulatorFile,
+               "Study_Results_simulator.html")
   # No output path, so no file was written and none is named.
   nameless <- quiet_island(list(van_westendorp = fake_vw(), validation = fake_validation()),
                            fake_config(simulator = TRUE))
