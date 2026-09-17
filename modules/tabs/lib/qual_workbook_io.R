@@ -38,11 +38,20 @@ qual_read_sheet_rows <- function(path, sheet) {
 qual_classify_all_sheets <- function(path, sheets) {
   questions <- list()
   skipped <- list()
+  extracts <- list()
   for (sheet in sheets) {
     rows <- tryCatch(qual_read_sheet_rows(path, sheet),
                      error = function(e) NULL)
     if (is.null(rows)) {
       skipped[[length(skipped) + 1L]] <- list(sheet = sheet, reason = "read_error")
+      next
+    }
+    # Routing by NAME happens before classification, and must: an extracts sheet
+    # is ID-anchored, so the question classifier would otherwise read it as a
+    # question and refuse it for duplicated ResponseIDs (one comment, several
+    # fragments) before the extracts parser ever saw it.
+    if (qual_is_extracts_sheet(sheet)) {
+      extracts[[length(extracts) + 1L]] <- qual_classify_extracts_sheet(rows, sheet)
       next
     }
     question <- qual_classify_sheet(rows, sheet)
@@ -52,7 +61,7 @@ qual_classify_all_sheets <- function(path, sheets) {
       questions[[length(questions) + 1L]] <- question
     }
   }
-  list(questions = questions, skipped = skipped)
+  list(questions = questions, skipped = skipped, extracts = extracts)
 }
 
 #' Print a one-line console summary of what was read (Shiny visibility).
@@ -112,6 +121,96 @@ qual_refuse_no_questions <- function(path, sheets, module) {
   )
 }
 
+#' Refuse: the extracts layer could not be attached as written.
+#'
+#' Every problem across every extracts sheet is listed, because each one either
+#' places a quote beside a theme the respondent did not speak to, or loses a
+#' fragment the analyst wrote. Both are silent in the finished report.
+qual_refuse_extracts_invalid <- function(path, problems, module) {
+  turas_refuse(
+    code = "DATA_QUAL_EXTRACTS_INVALID",
+    title = "Comment extracts could not be attached",
+    problem = sprintf(
+      "%d issue(s) in the extracts sheet(s) of '%s'. EVERY issue is listed below - one pass fixes them all.",
+      length(problems), basename(path)),
+    why_it_matters = paste(
+      "An extract decides which fragment of a long comment may be quoted beside a theme.",
+      "A wrong theme quotes a respondent as evidence for something they did not say, and a",
+      "wrong ID or a stray sheet silently drops the fragment instead."),
+    how_to_fix = c(
+      "Work through the list in Details. Each line names the sheet, the row, the ID and the fix.",
+      "A Theme cell holds theme labels separated by ';', or the single word 'all', or nothing at all.",
+      "Blank Theme = the general comment list only. 'all' = every theme the comment is coded on.",
+      "An extracts sheet must be named '<question sheet> Extracts' and carry ID, Theme and Extract columns."),
+    details = paste(problems, collapse = "\n  "),
+    module = module
+  )
+}
+
+#' Attach every extracts sheet to its coded question, refusing on any problem.
+#'
+#' @param path Workbook path (for messages).
+#' @param parsed The `qual_classify_all_sheets()` result.
+#' @param module Module label for refusal display.
+#' @return The parsed list with `questions` carrying their extracts.
+qual_attach_workbook_extracts <- function(path, parsed, module = "TABS") {
+  if (!length(parsed$extracts)) return(parsed)
+  problems <- character(0)
+  sheet_names <- vapply(parsed$questions, function(q) trimws(q$sheet), character(1))
+  # A coded sheet name long enough that Excel cannot hold the derived extracts
+  # name is the likeliest reason a sheet failed to match, so say so.
+  long_names <- sheet_names[nchar(sheet_names) + nchar(" Extracts") > QUAL_SHEET_NAME_MAX]
+  n_attached <- 0L; n_blank <- 0L; n_sheets <- 0L
+
+  for (ex in parsed$extracts) {
+    if (isTRUE(ex$skip)) {
+      if (identical(ex$reason, "empty")) {
+        cat(sprintf("[TABS/qual] %s: empty, no extracts read.\n", ex$sheet))
+      } else if (identical(ex$reason, "columns_missing")) {
+        problems <- c(problems, sprintf(
+          "%s: missing the %s column(s). Observed headers: %s",
+          ex$sheet, paste(ex$missing, collapse = " and "),
+          paste(ex$observed, collapse = " | ")))
+      } else {
+        problems <- c(problems, sprintf(
+          "%s: no header row beginning with 'ID' or 'Response ID' - add one above the extract rows",
+          ex$sheet))
+      }
+      next
+    }
+    if (!nzchar(ex$base)) {
+      problems <- c(problems, sprintf(
+        "%s: names no question sheet - rename it '<question sheet> Extracts'", ex$sheet))
+      next
+    }
+    at <- match(tolower(ex$base), tolower(sheet_names))
+    if (is.na(at)) {
+      hint <- if (length(long_names)) sprintf(
+        " Note that Excel caps a sheet name at %d characters, so a long question sheet (%s) cannot carry a derived extracts name.",
+        QUAL_SHEET_NAME_MAX, paste(long_names, collapse = ", ")) else ""
+      problems <- c(problems, sprintf(
+        "%s: no question sheet named '%s' in this workbook (found: %s).%s",
+        ex$sheet, ex$base, paste(sheet_names, collapse = ", "), hint))
+      next
+    }
+    res <- qual_attach_extracts(parsed$questions[[at]], ex$entries, ex$sheet)
+    parsed$questions[[at]] <- res$question
+    problems <- c(problems, res$problems)
+    n_attached <- n_attached + res$n_attached
+    n_blank <- n_blank + res$n_blank
+    n_sheets <- n_sheets + 1L
+  }
+
+  if (length(problems)) qual_refuse_extracts_invalid(path, problems, module)
+  if (n_sheets) {
+    cat(sprintf(
+      "[TABS/qual] extracts: %d comment(s) quoted by fragment across %d sheet(s)%s.\n",
+      n_attached, n_sheets,
+      if (n_blank) sprintf(", %d blank extract row(s) skipped", n_blank) else ""))
+  }
+  parsed
+}
+
 #' Read and classify a coded-comment workbook into qual questions.
 #'
 #' Opens the workbook, classifies every sheet, and returns the usable open-end
@@ -141,6 +240,10 @@ qual_read_workbook <- function(path, module = "TABS") {
   if (!length(parsed$questions)) {
     qual_refuse_no_questions(path, sheets, module)
   }
+  # Extracts are attached only once the questions are known, because every entry
+  # is validated against its coded row: the ID must exist and the theme must
+  # actually be coded there.
+  parsed <- qual_attach_workbook_extracts(path, parsed, module)
   qual_log_workbook_summary(path, parsed$questions, parsed$skipped)
   list(status = "PASS", path = path, n_sheets = length(sheets),
        questions = parsed$questions, skipped = parsed$skipped)

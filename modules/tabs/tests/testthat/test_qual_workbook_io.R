@@ -235,3 +235,148 @@ test_that("ALL integrity problems across ALL sheets report in ONE refusal", {
   expect_match(msg, "hide-LIKE", fixed = TRUE)
   expect_match(msg, "4 issue\\(s\\) across 3 sheet\\(s\\)")
 })
+
+# ==============================================================================
+# EXTRACTS. Routed by sheet name, validated against the coded row
+# ==============================================================================
+
+# Fixture: one themed question plus an extracts sheet for it. The coded row for
+# ID 1 is coded on two themes, which is the shape that produced the bug.
+write_extracts_workbook <- function(sheets) {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  for (nm in names(sheets)) {
+    openxlsx::addWorksheet(wb, nm)
+    openxlsx::writeData(wb, nm, as.data.frame(sheets[[nm]]), colNames = FALSE)
+  }
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  path
+}
+
+coded_culture <- rbind(
+  c("ID", "Noteworthy", "Comment", "Overall Sentiment", "Service", "Price"),
+  c("1", NA, "a long comment about service and about price", "2", "2", "3"),
+  c("2", NA, "only about service", "1", "1", NA)
+)
+
+test_that("an extracts sheet attaches its fragments and is never read as a question", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Culture Extracts` = rbind(
+      c("ID", "Theme", "Extract", "Lead"),
+      c("1", "Service", "the service half", "x"),
+      c("1", "Price", "the price half", NA)
+    )))
+  on.exit(unlink(path), add = TRUE)
+  res <- qual_read_workbook(path)
+
+  # Routed away: one question, and the extracts sheet is not in the skipped log
+  # either (it was handled, not ignored).
+  expect_length(res$questions, 1L)
+  expect_equal(res$questions[[1]]$sheet, "Culture")
+  expect_false(any(vapply(res$skipped, function(s) grepl("Extracts", s$sheet), logical(1))))
+
+  rec <- res$questions[[1]]$records[[1]]
+  expect_equal(rec$extracts, list(Service = "the service half", Price = "the price half"))
+  expect_equal(rec$extract_lead, "the service half")
+  expect_true(rec$has_extracts)
+  # The coding is untouched, so every base and distribution is unchanged.
+  expect_equal(rec$themeVals, list(Service = 2L, Price = 3L))
+  # A comment with no extract carries no extract fields at all.
+  expect_null(res$questions[[1]]$records[[2]]$has_extracts)
+})
+
+test_that("several fragments of ONE comment do not trip the duplicated-ID refusal", {
+  # The routing exists for this: an extracts sheet is ID-anchored, so the question
+  # classifier would read it as a question and refuse three rows for ID 1 as
+  # duplicated ResponseIDs before the extracts parser ever saw them.
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Culture Extracts` = rbind(
+      c("ID", "Theme", "Extract"),
+      c("1", "Service", "one"),
+      c("1", "Price", "two"),
+      c("1", "all", NA)
+    )))
+  on.exit(unlink(path), add = TRUE)
+  res <- qual_read_workbook(path)
+  expect_equal(res$status, "PASS")
+  rec <- res$questions[[1]]$records[[1]]
+  expect_equal(rec$extracts, list(Service = "one", Price = "two"))
+  # The blank-text "all" row is skipped, so it claims nothing.
+  expect_null(rec$extract_all)
+})
+
+test_that("an extracts sheet naming no question in the workbook refuses", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Values Extracts` = rbind(c("ID", "Theme", "Extract"), c("1", "Service", "orphan"))
+  ))
+  on.exit(unlink(path), add = TRUE)
+  err <- tryCatch(qual_read_workbook(path), turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_match(paste(unlist(err), collapse = " "), "no question sheet named 'Values'")
+})
+
+test_that("a bare 'Extracts' sheet refuses and says what to rename it to", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    Extracts = rbind(c("ID", "Theme", "Extract"), c("1", "Service", "unattributable"))
+  ))
+  on.exit(unlink(path), add = TRUE)
+  err <- tryCatch(qual_read_workbook(path), turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_match(paste(unlist(err), collapse = " "), "names no question sheet")
+})
+
+test_that("an extracts sheet missing the Extract column refuses, naming the column", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Culture Extracts` = rbind(c("ID", "Theme", "Quote"), c("1", "Service", "wrong header"))
+  ))
+  on.exit(unlink(path), add = TRUE)
+  err <- tryCatch(qual_read_workbook(path), turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_match(paste(unlist(err), collapse = " "), "missing the Extract column")
+})
+
+test_that("an extracts tab created but not yet filled is reported, not refused", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Culture Extracts` = rbind(c(NA, NA, NA))
+  ))
+  on.exit(unlink(path), add = TRUE)
+  out <- capture.output(res <- qual_read_workbook(path))
+  expect_length(res$questions, 1L)
+  expect_true(any(grepl("empty, no extracts read", out)))
+})
+
+test_that("EVERY extracts problem across the workbook reports in ONE refusal", {
+  path <- write_extracts_workbook(list(
+    Culture = coded_culture,
+    `Culture Extracts` = rbind(
+      c("ID", "Theme", "Extract"),
+      c("99", "Service", "bad id"),
+      c("2", "Price", "not coded on that row"),
+      c("1", "Comfort", "not a theme column")
+    )))
+  on.exit(unlink(path), add = TRUE)
+  err <- tryCatch(qual_read_workbook(path), turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  msg <- paste(unlist(err), collapse = " ")
+  expect_match(msg, "3 issue")
+  expect_match(msg, "no comment with that ID")
+  expect_match(msg, "not coded 'Price'")
+  expect_match(msg, "not a theme column")
+})
+
+test_that("a workbook with no extracts sheet reads exactly as it did before", {
+  path <- write_extracts_workbook(list(Culture = coded_culture))
+  on.exit(unlink(path), add = TRUE)
+  res <- qual_read_workbook(path)
+  for (rec in res$questions[[1]]$records) {
+    expect_null(rec$has_extracts)
+    expect_null(rec$extracts)
+    expect_null(rec$extract_general)
+  }
+})

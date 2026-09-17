@@ -379,3 +379,194 @@ test_that("qual_id_norm expands scientific notation so the join key matches (I19
   expect_equal(qual_id_norm(" R-42 "), "R-42")
   expect_equal(qual_id_norm("e5"), "e5")   # not a number - untouched
 })
+
+# ==============================================================================
+# EXTRACTS. Quoting a fragment while counting the whole comment
+# ==============================================================================
+#
+# Fixture: one coded sheet whose comment 213 is coded on THREE themes, which is
+# the shape that produces the bug (one fragment shown under all three).
+# ------------------------------------------------------------------------------
+
+extracts_coded_sheet <- function() {
+  qual_classify_sheet(make_sheet(
+    c("Why do you feel that way?"),
+    c("ID", "Noteworthy", "Comment", "Overall Sentiment",
+      "Unfairness", "Recognition", "Workload & Burnout"),
+    c("213", "n", "a long comment about several things", "2", "3", "2", "3"),
+    c("214", "", "a one-theme comment", "1", "", "1", ""),
+    c("215", "hide", "-", "3", "3", "", "")
+  ), "Engagement")
+}
+
+extracts_sheet_rows <- function(...) {
+  make_sheet(c("ID", "Theme", "Extract", "Lead"), ...)
+}
+
+attach_for <- function(...) {
+  q <- extracts_coded_sheet()
+  parsed <- qual_classify_extracts_sheet(extracts_sheet_rows(...), "Engagement Extracts")
+  qual_attach_extracts(q, parsed$entries, "Engagement Extracts")
+}
+
+test_that("an extracts sheet is recognised by name, and names its coded sheet", {
+  expect_true(qual_is_extracts_sheet("Engagement Extracts"))
+  expect_true(qual_is_extracts_sheet("  engagement extracts  "))
+  expect_true(qual_is_extracts_sheet("Extracts"))            # bare: earns a refusal later
+  expect_false(qual_is_extracts_sheet("Engagement"))
+  expect_false(qual_is_extracts_sheet("Extracts Engagement"))
+  expect_equal(qual_extracts_base_name("Engagement Other Extracts"), "Engagement Other")
+  expect_equal(qual_extracts_base_name("Extracts"), "")
+})
+
+test_that("the Theme cell has exactly three states", {
+  expect_equal(qual_parse_theme_claim("")$kind, "general")
+  expect_equal(qual_parse_theme_claim("   ")$kind, "general")
+  expect_equal(qual_parse_theme_claim("all")$kind, "all")
+  expect_equal(qual_parse_theme_claim(" ALL ")$kind, "all")
+  named <- qual_parse_theme_claim(" Unfairness ; Workload & Burnout ")
+  expect_equal(named$kind, "named")
+  expect_equal(named$labels, c("Unfairness", "Workload & Burnout"))
+})
+
+test_that("a named fragment attaches to those themes only, and nothing else", {
+  res <- attach_for(c("213", "Unfairness", "the unfairness bit", ""))
+  expect_equal(res$problems, character(0))
+  expect_equal(res$n_attached, 1L)
+  rec <- find_record(res$question, "213")
+  expect_equal(rec$extracts, list(Unfairness = "the unfairness bit"))
+  expect_null(rec$extract_all)
+  expect_null(rec$extract_general)
+  expect_true(rec$has_extracts)
+  # The codes are untouched: all three themes still count this comment.
+  expect_equal(length(rec$themeVals), 3L)
+  # And a comment with no extract is left exactly as it was.
+  expect_null(find_record(res$question, "214")$has_extracts)
+})
+
+test_that("blank Theme is the general list only, and 'all' claims every coded theme", {
+  blank <- attach_for(c("213", "", "trimmed for length", ""))
+  rec <- find_record(blank$question, "213")
+  expect_equal(rec$extract_general, "trimmed for length")
+  expect_null(rec$extract_all)
+
+  every <- attach_for(c("213", "all", "trimmed for length", ""))
+  rec2 <- find_record(every$question, "213")
+  expect_equal(rec2$extract_all, "trimmed for length")
+  expect_null(rec2$extract_general)
+})
+
+test_that("several fragments for one theme join the way an analyst joins them", {
+  res <- attach_for(
+    c("213", "Unfairness", "first bit", ""),
+    c("213", "Unfairness", "second bit", "")
+  )
+  expect_equal(res$problems, character(0))
+  expect_equal(find_record(res$question, "213")$extracts$Unfairness,
+               paste0("first bit", QUAL_EXTRACTS_JOIN, "second bit"))
+})
+
+test_that("one fragment may serve two themes, and each gets it", {
+  res <- attach_for(c("213", "Unfairness; Recognition", "covers both", ""))
+  rec <- find_record(res$question, "213")
+  expect_equal(rec$extracts, list(Unfairness = "covers both", Recognition = "covers both"))
+})
+
+test_that("a theme the comment was never coded REFUSES, which is the bug inverted", {
+  res <- attach_for(c("214", "Unfairness", "not coded that", ""))
+  expect_length(res$problems, 1L)
+  expect_match(res$problems[[1]], "not coded 'Unfairness'")
+  expect_null(find_record(res$question, "214")$extracts)
+})
+
+test_that("a theme label that is not on the sheet refuses and lists the valid ones", {
+  res <- attach_for(c("213", "Compensation", "typo or wrong sheet", ""))
+  expect_length(res$problems, 1L)
+  expect_match(res$problems[[1]], "not a theme column")
+  expect_match(res$problems[[1]], "Workload & Burnout", fixed = TRUE)
+})
+
+test_that("an ID that is not on the coded sheet refuses", {
+  res <- attach_for(c("999", "Unfairness", "nobody", ""))
+  expect_length(res$problems, 1L)
+  expect_match(res$problems[[1]], "no comment with that ID")
+})
+
+test_that("an extract on a hide-marked comment refuses", {
+  res <- attach_for(c("215", "Unfairness", "would ship withheld text", ""))
+  expect_length(res$problems, 1L)
+  expect_match(res$problems[[1]], "hide-marked")
+  expect_null(find_record(res$question, "215")$extracts)
+})
+
+test_that("a blank-Theme row and an 'all' row for one comment refuse", {
+  res <- attach_for(
+    c("213", "", "general one", ""),
+    c("213", "all", "claims everything", "")
+  )
+  expect_length(res$problems, 1L)
+  expect_match(res$problems[[1]], "both a blank-Theme extract and an 'all' extract")
+})
+
+test_that("a blank Extract cell is skipped and counted, never attached", {
+  res <- attach_for(c("213", "Unfairness", "", ""))
+  expect_equal(res$problems, character(0))
+  expect_equal(res$n_blank, 1L)
+  expect_equal(res$n_attached, 0L)
+})
+
+test_that("the Lead mark names one fragment, and a second mark refuses", {
+  ok <- attach_for(
+    c("213", "Unfairness", "the unfairness bit", "x"),
+    c("213", "Recognition", "the recognition bit", "")
+  )
+  expect_equal(ok$problems, character(0))
+  expect_equal(find_record(ok$question, "213")$extract_lead, "the unfairness bit")
+
+  two <- attach_for(
+    c("213", "Unfairness", "one", "x"),
+    c("213", "Recognition", "two", "x")
+  )
+  expect_length(two$problems, 1L)
+  expect_match(two$problems[[1]], "also marked Lead")
+})
+
+test_that("every problem on the sheet is collected, so one pass fixes them all", {
+  res <- attach_for(
+    c("999", "Unfairness", "bad id", ""),
+    c("214", "Unfairness", "not coded", ""),
+    c("213", "Compensation", "bad label", "")
+  )
+  expect_length(res$problems, 3L)
+})
+
+test_that("the Lead column is optional, and columns are found by name not position", {
+  parsed <- qual_classify_extracts_sheet(
+    make_sheet(c("Response ID", "Extract", "Theme"),
+               c("213", "reordered columns", "Unfairness")),
+    "Engagement Extracts")
+  expect_false(parsed$skip)
+  expect_length(parsed$entries, 1L)
+  expect_equal(parsed$entries[[1]]$text, "reordered columns")
+  expect_equal(parsed$entries[[1]]$claim$labels, "Unfairness")
+  expect_false(parsed$entries[[1]]$lead)
+})
+
+test_that("a sheet missing Theme or Extract skips with the column named", {
+  parsed <- qual_classify_extracts_sheet(
+    make_sheet(c("ID", "Comment"), c("213", "wrong shape")), "Engagement Extracts")
+  expect_true(parsed$skip)
+  expect_equal(parsed$reason, "columns_missing")
+  expect_equal(parsed$missing, c("Theme", "Extract"))
+})
+
+test_that("blank padding rows and a stacked second header are not entries", {
+  parsed <- qual_classify_extracts_sheet(
+    extracts_sheet_rows(
+      c("213", "Unfairness", "real", ""),
+      c("", "", "", ""),
+      c("ID", "Theme", "Extract", "Lead"),
+      c("214", "Recognition", "also real", "")
+    ), "Engagement Extracts")
+  expect_length(parsed$entries, 2L)
+})

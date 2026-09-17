@@ -492,3 +492,250 @@ qual_classify_sheet <- function(rows, sheet_name) {
                    n_records = length(extracted$records),
                    n_themes = length(roles$themes), n_demos = length(roles$demos)))
 }
+
+# ==============================================================================
+# EXTRACTS: quoting a fragment while counting the whole comment
+# ==============================================================================
+#
+# A coded row carries one verbatim and N theme codes, so a verbatim shortened for
+# length or anonymity is shown under every theme the WHOLE comment was coded to.
+# An extracts sheet separates the two judgements: the coded row keeps all its
+# codes (so every base and distribution is unchanged), while the extracts sheet
+# says which fragment may be quoted beside which theme.
+#
+# One optional sheet per coded sheet, named "<CommentSheet> Extracts", with
+# columns ID | Theme | Extract | Lead (Lead optional). The Theme cell has three
+# states, and the difference matters:
+#   blank        the fragment stands in for the comment in the GENERAL comment
+#                list only, and never reaches a theme page. This is the default
+#                because a forgotten theme list then fails VISIBLY (a quote
+#                missing from a page) instead of silently mis-placing a quote,
+#                which is the bug this whole mechanism exists to remove.
+#   "all"        the fragment stands in everywhere, including every theme the row
+#                is coded on. One word, and an explicit claim rather than an
+#                omission.
+#   "A; B"       the fragment is quotable beside those themes only.
+# Several rows for one ID and theme are joined, which mirrors the ellipsis
+# practice a hand-built appendix already uses.
+#
+# This layer is PURE: it parses and validates, and returns problems as strings.
+# The TRS refusal that shows them lives in the I/O wrapper.
+# Design + decisions: modules/tabs/docs/QUALITATIVE_EXTRACTS_PLAN.md
+
+# A sheet is an extracts sheet when its name ends in " Extracts"; the part before
+# names the coded sheet it belongs to. A bare "Extracts" sheet matches too, with
+# no base name, so it earns a refusal that says what to rename rather than being
+# quietly read as a question.
+QUAL_EXTRACTS_SHEET_PATTERN <- "^(.*)\\bextracts$"
+QUAL_EXTRACTS_THEME_PATTERN <- "^themes?$"
+QUAL_EXTRACTS_TEXT_PATTERN  <- "^extract$"
+QUAL_EXTRACTS_LEAD_PATTERN  <- "^lead$"
+# The Theme cell token claiming every theme the row is coded on.
+QUAL_EXTRACTS_ALL_TOKEN <- "all"
+# Several fragments for one theme read as one quote, joined the way an analyst
+# joins them by hand.
+QUAL_EXTRACTS_JOIN <- " ... "
+# Excel's worksheet-name limit. A long coded sheet name cannot carry a derived
+# extracts name, and the operator needs to be told that rather than left guessing
+# why their sheet was ignored.
+QUAL_SHEET_NAME_MAX <- 31L
+
+#' Whether a worksheet name is an extracts sheet.
+#' @param sheet_name A worksheet name.
+#' @return TRUE for "Engagement Extracts" and for a bare "Extracts".
+qual_is_extracts_sheet <- function(sheet_name) {
+  grepl(QUAL_EXTRACTS_SHEET_PATTERN, tolower(trimws(sheet_name)))
+}
+
+#' The coded sheet an extracts sheet belongs to.
+#' @param sheet_name An extracts sheet name.
+#' @return The base sheet name, or "" when the name carries none.
+qual_extracts_base_name <- function(sheet_name) {
+  trimws(sub(QUAL_EXTRACTS_SHEET_PATTERN, "\\1", trimws(sheet_name), ignore.case = TRUE))
+}
+
+#' Parse a Theme cell into its claim.
+#'
+#' @param value A raw Theme cell.
+#' @return list(kind, labels): kind is "general" (blank), "all", or "named";
+#'   `labels` holds the named theme labels, trimmed, blanks dropped.
+qual_parse_theme_claim <- function(value) {
+  v <- trimws(as.character(value))
+  if (!nzchar(v) || is.na(v)) return(list(kind = "general", labels = character(0)))
+  if (identical(tolower(v), QUAL_EXTRACTS_ALL_TOKEN)) {
+    return(list(kind = "all", labels = character(0)))
+  }
+  parts <- trimws(strsplit(v, ";", fixed = TRUE)[[1]])
+  parts <- parts[nzchar(parts)]
+  if (!length(parts)) return(list(kind = "general", labels = character(0)))
+  list(kind = "named", labels = parts)
+}
+
+#' Classify one extracts worksheet into parsed entries (pure).
+#'
+#' Columns are found by NAME, never by position, so an analyst may add a working
+#' column without breaking the read. The header row floats and is anchored on the
+#' ID cell, exactly as a coded sheet's is.
+#'
+#' @param rows A list of normalised character rows (see `qual_norm_cells`).
+#' @param sheet_name The worksheet name.
+#' @return list(skip = FALSE, sheet, base, entries) where each entry is
+#'   list(row, id, claim, text, lead); or list(skip = TRUE, reason, ...) when the
+#'   sheet has no ID-anchored header or is missing a required column.
+qual_classify_extracts_sheet <- function(rows, sheet_name) {
+  base <- qual_extracts_base_name(sheet_name)
+  # An extracts tab created but not yet filled is work in progress, not an error:
+  # it is reported on the console and skipped. A tab with content but no
+  # ID-anchored header IS an error, because its rows would vanish in silence.
+  if (!length(rows) || !any(vapply(rows, function(r) any(nzchar(r)), logical(1)))) {
+    return(list(skip = TRUE, reason = "empty", sheet = sheet_name, base = base))
+  }
+  header_row <- qual_find_header_row(rows)
+  if (header_row == 0L) {
+    return(list(skip = TRUE, reason = "no_header", sheet = sheet_name, base = base))
+  }
+  header <- rows[[header_row]]
+  id_col    <- qual_first_match(header, QUAL_ID_PATTERN)
+  theme_col <- qual_first_match(header, QUAL_EXTRACTS_THEME_PATTERN)
+  text_col  <- qual_first_match(header, QUAL_EXTRACTS_TEXT_PATTERN)
+  lead_col  <- qual_first_match(header, QUAL_EXTRACTS_LEAD_PATTERN)
+  missing <- character(0)
+  if (is.na(theme_col)) missing <- c(missing, "Theme")
+  if (is.na(text_col))  missing <- c(missing, "Extract")
+  if (length(missing)) {
+    return(list(skip = TRUE, reason = "columns_missing", sheet = sheet_name,
+                base = base, missing = missing, observed = header[nzchar(header)]))
+  }
+  entries <- list()
+  n <- length(rows)
+  if (header_row < n) {
+    for (i in seq.int(header_row + 1L, n)) {
+      r <- rows[[i]]
+      cell <- function(c) if (!is.na(c) && length(r) >= c) r[[c]] else ""
+      id <- qual_id_norm(cell(id_col))
+      raw_theme <- cell(theme_col)
+      text <- cell(text_col)
+      lead <- nzchar(trimws(cell(lead_col)))
+      # A fully blank row is spreadsheet padding, not an entry. A repeated header
+      # row (some analysts stack a second block) is not an entry either.
+      if (!nzchar(id) && !nzchar(raw_theme) && !nzchar(text)) next
+      if (grepl(QUAL_ID_PATTERN, id, ignore.case = TRUE)) next
+      entries[[length(entries) + 1L]] <- list(
+        row = i, id = id, claim = qual_parse_theme_claim(raw_theme),
+        raw_theme = trimws(raw_theme), text = text, lead = lead)
+    }
+  }
+  list(skip = FALSE, sheet = sheet_name, base = base, entries = entries)
+}
+
+#' Attach parsed extracts to a coded question's records, validating every entry.
+#'
+#' Validation is deliberately strict, and every failure is a problem rather than a
+#' warning, because each one would place a quote where a reader would read it as
+#' evidence for something the respondent did not say. Problems are collected for
+#' the whole sheet so one pass over the workbook fixes them all.
+#'
+#' Each record gains, only where the workbook supplies them:
+#'   extracts        named list of theme label -> fragment (joined)
+#'   extract_all     the fragment claiming every coded theme
+#'   extract_general the fragment for the general comment list only
+#'   extract_lead    the fragment marked to lead a slide or a pin
+#'   has_extracts    TRUE when the record carries any of the above
+#'
+#' @param question A question from `qual_classify_sheet`.
+#' @param entries Parsed entries from `qual_classify_extracts_sheet`.
+#' @param sheet_name The extracts sheet name, for problem messages.
+#' @return list(question, problems, n_attached, n_blank).
+qual_attach_extracts <- function(question, entries, sheet_name) {
+  problems <- character(0)
+  n_blank <- 0L
+  labels <- vapply(question$roles$themes, function(t) t$label, character(1))
+  ids <- vapply(question$records, function(r) r$id, character(1))
+  # Per record index: themed fragments, the general/all fragment, the lead mark.
+  themed <- list(); general <- list(); leads <- list()
+  where <- function(e) sprintf("%s row %d (ID %s)", sheet_name, e$row,
+                               if (nzchar(e$id)) e$id else "blank")
+
+  for (e in entries) {
+    if (!nzchar(trimws(e$text))) { n_blank <- n_blank + 1L; next }
+    at <- match(e$id, ids)
+    if (is.na(at)) {
+      problems <- c(problems, sprintf(
+        "%s: no comment with that ID on sheet '%s' - check the ID, or delete the extract",
+        where(e), question$sheet))
+      next
+    }
+    rec <- question$records[[at]]
+    if (isTRUE(rec$hidden)) {
+      problems <- c(problems, sprintf(
+        "%s: that comment is hide-marked, so it ships no text - remove the hide mark or the extract",
+        where(e)))
+      next
+    }
+    key <- as.character(at)
+    if (identical(e$claim$kind, "named")) {
+      ok <- TRUE
+      for (label in e$claim$labels) {
+        if (!(label %in% labels)) {
+          problems <- c(problems, sprintf(
+            "%s: theme '%s' is not a theme column on sheet '%s'. Valid: %s",
+            where(e), label, question$sheet, paste(labels, collapse = "; ")))
+          ok <- FALSE
+          next
+        }
+        if (is.null(rec$themeVals[[label]])) {
+          problems <- c(problems, sprintf(
+            paste0("%s: that comment is not coded '%s', so the fragment would be quoted ",
+                   "under a theme the comment was never given - code the theme, or drop it from the extract"),
+            where(e), label))
+          ok <- FALSE
+        }
+      }
+      if (!ok) next
+      for (label in e$claim$labels) {
+        prior <- themed[[key]][[label]]
+        themed[[key]][[label]] <- if (is.null(prior)) e$text else
+          paste0(prior, QUAL_EXTRACTS_JOIN, e$text)
+      }
+    } else {
+      prior <- general[[key]]
+      if (!is.null(prior) && !identical(prior$kind, e$claim$kind)) {
+        problems <- c(problems, sprintf(
+          paste0("%s: this comment has both a blank-Theme extract and an 'all' extract, ",
+                 "which claim different things - keep one"),
+          where(e)))
+        next
+      }
+      general[[key]] <- list(
+        kind = e$claim$kind,
+        text = if (is.null(prior)) e$text else paste0(prior$text, QUAL_EXTRACTS_JOIN, e$text))
+    }
+    if (isTRUE(e$lead)) {
+      if (!is.null(leads[[key]])) {
+        problems <- c(problems, sprintf(
+          "%s: a second fragment of this comment is also marked Lead - mark exactly one",
+          where(e)))
+      } else {
+        leads[[key]] <- e$text
+      }
+    }
+  }
+
+  n_attached <- 0L
+  touched <- unique(c(names(themed), names(general), names(leads)))
+  for (key in touched) {
+    at <- as.integer(key)
+    rec <- question$records[[at]]
+    if (!is.null(themed[[key]])) rec$extracts <- themed[[key]]
+    g <- general[[key]]
+    if (!is.null(g)) {
+      if (identical(g$kind, "all")) rec$extract_all <- g$text else rec$extract_general <- g$text
+    }
+    if (!is.null(leads[[key]])) rec$extract_lead <- leads[[key]]
+    rec$has_extracts <- TRUE
+    question$records[[at]] <- rec
+    n_attached <- n_attached + 1L
+  }
+  list(question = question, problems = problems,
+       n_attached = n_attached, n_blank = n_blank)
+}
