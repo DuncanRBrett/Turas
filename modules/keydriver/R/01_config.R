@@ -236,8 +236,17 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
         )
       }
     )
-    validate_segments_sheet(seg_df)  # Will refuse on validation failure
-    segments <- seg_df
+    # A sheet with headers and no rows is not an invalid sheet, it is an
+    # unused one, and it is exactly what the template ships now that the
+    # activating example rows are gone (review M12). Refusing it made an
+    # untouched template impossible to run. Only a sheet carrying rows is
+    # validated.
+    if (nrow(seg_df) == 0) {
+      cat("   [NOTE] The Segments sheet is empty, so no segment comparison will run.\n")
+    } else {
+      validate_segments_sheet(seg_df)  # Will refuse on validation failure
+      segments <- seg_df
+    }
   }
 
   # -----------------------------------------------------------------
@@ -263,8 +272,14 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
         )
       }
     )
-    si_df <- validate_stated_importance_sheet(si_df)  # Will refuse on validation failure, or return renamed df
-    stated_importance <- si_df
+    # Empty means unused, not invalid (review M12), as for Segments above.
+    if (nrow(si_df) == 0) {
+      cat(paste0("   [NOTE] The StatedImportance sheet is empty. The quadrant ",
+                 "will still run, on derived importance and driver means.\n"))
+    } else {
+      si_df <- validate_stated_importance_sheet(si_df)  # Will refuse on validation failure, or return renamed df
+      stated_importance <- si_df
+    }
   }
 
   # -----------------------------------------------------------------

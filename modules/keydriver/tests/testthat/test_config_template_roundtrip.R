@@ -96,10 +96,79 @@ test_that("load_keydriver_config accepts the template it generates", {
 
   expect_type(cfg, "list")
   expect_true("settings" %in% names(cfg))
-  # The template's StatedImportance ratings must come back as numbers. The help
-  # row above them used to type the whole column character, and the module
-  # refused with CFG_STATED_IMPORTANCE_NO_NUMERIC.
+  # The two optional sheets ship empty, so an untouched template asks for
+  # neither a segment comparison nor a stated-importance comparison, and the
+  # loader says so rather than refusing (review M12).
+  expect_null(cfg$segments)
+  expect_null(cfg$stated_importance)
+})
+
+test_that("a StatedImportance rating survives the template's help row as a number", {
+  # The help row above the data used to type the whole column character, and
+  # the module refused with CFG_STATED_IMPORTANCE_NO_NUMERIC. The template no
+  # longer ships example rows, so the guard is built here from the template's
+  # own column definitions and the same writer, which is where the bug lived.
+  p <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(p), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  write_table_sheet(
+    wb = wb,
+    sheet_name = "StatedImportance",
+    columns_def = build_stated_importance_columns(),
+    title = "TURAS Key Driver Analysis - Stated Importance",
+    subtitle = "Round-trip guard",
+    example_rows = list(
+      list(driver = "digital_banking", stated_importance = 8.2),
+      list(driver = "fees_clarity", stated_importance = 7.5)
+    ),
+    num_blank_rows = 5
+  )
+  if (exists("turas_saveWorkbook", mode = "function")) {
+    turas_saveWorkbook(wb, p, overwrite = TRUE)
+  } else {
+    openxlsx::saveWorkbook(wb, p, overwrite = TRUE)
+  }
+
   si <- as.data.frame(load_config_table_sheet(p, "StatedImportance",
                                               required_cols = "driver"))
   expect_true(is.numeric(si$stated_importance))
+  expect_equal(si$stated_importance[!is.na(si$stated_importance)], c(8.2, 7.5))
+})
+
+test_that("the template offers every sheet the loader reads (M11)", {
+  p <- generated_template()
+  on.exit(unlink(p), add = TRUE)
+  sheets <- readxl::excel_sheets(p)
+  # CustomSlides and Insights have been read by the loader since v10.4 and
+  # the template never offered them, so the feature was undiscoverable from
+  # the file an analyst actually opens.
+  expect_true(all(c("Settings", "Variables", "Segments", "StatedImportance",
+                    "CustomSlides", "Insights") %in% sheets))
+})
+
+test_that("the template offers every Setting the code reads (M11)", {
+  p <- generated_template()
+  on.exit(unlink(p), add = TRUE)
+  settings <- as.data.frame(load_config_table_sheet(
+    p, "Settings", required_cols = c("Setting", "Value")))
+  keys <- settings$Setting[!is.na(settings$Setting)]
+
+  # Read out of the code, not invented: the v10.4 method gates and their
+  # tuning knobs, the display modes, the seed, and the report's own keys.
+  needed <- c(
+    "enable_elastic_net", "enable_nca", "enable_dominance", "enable_gam",
+    "elastic_net_alpha", "elastic_net_nfolds", "gam_k", "nca_test_reps",
+    "min_segment_n", "correlation_display", "bootstrap_display", "random_seed",
+    "vif_moderate_threshold", "vif_high_threshold",
+    "company_name", "client_name", "researcher_name",
+    "researcher_logo_path", "client_logo_path",
+    paste0("html_show_", c("exec_summary", "importance", "methods",
+                           "effect_sizes", "correlations", "diagnostics",
+                           "segments", "shap", "quadrant", "bootstrap", "guide")))
+  expect_equal(setdiff(needed, keys), character(0))
+
+  # One bootstrap default everywhere, including here (review M8).
+  expect_equal(trimws(as.character(
+    settings$Value[settings$Setting == "bootstrap_iterations"])), "1000")
 })
