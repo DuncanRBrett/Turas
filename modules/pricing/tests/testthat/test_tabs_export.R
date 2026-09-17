@@ -542,3 +542,52 @@ test_that("an excluded respondent is never given the rejecters' answer (F1)", {
   expect_gt(sum(!is.na(ex$data[[last]])), 0)
   expect_true(all(ex$data$pricing_valid[!is.na(ex$data[[last]])] == 1))
 })
+
+# ------------------------------------------------------------------------------
+# F15: a long-format study is refused for the real reason
+# ------------------------------------------------------------------------------
+
+test_that("a long-format study is told the export needs one row per respondent (F15)", {
+  skip_if(!exists("export_pricing_for_tabs", mode = "function"), "exporter not available")
+  prices <- c(20, 40, 60)
+  n <- 20
+  # One row per respondent per rung, which is what Data_Format = long means.
+  d <- do.call(rbind, lapply(prices, function(p) data.frame(
+    respondent_id = sprintf("R%03d", seq_len(n)),
+    price = p,
+    buy = as.integer(p <= 40),
+    stringsAsFactors = FALSE)))
+  config <- list(
+    analysis_method = "gabor_granger", weight_var = NA_character_, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    gg_monotonicity_behavior = "diagnostic_only", gg_stop_early_imputation = "NONE",
+    generate_tabs_export = TRUE, tabs_question_code = "GGACC", export_wtp = FALSE,
+    gabor_granger = list(data_format = "long", price_column = "price",
+                         response_column = "buy", respondent_column = "respondent_id",
+                         response_type = "binary", binary_coding = "ZERO_ONE",
+                         smoothing_method = "isotonic", check_monotonicity = FALSE,
+                         calculate_elasticity = FALSE, revenue_optimization = TRUE,
+                         confidence_intervals = FALSE, bootstrap_iterations = 10,
+                         confidence_level = 0.95),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000))
+
+  invisible(capture.output(v <- validate_pricing_data(d, config)))
+  invisible(capture.output(g <- run_gabor_granger(v$clean_data, config)))
+  out <- file.path(tempdir(), "pricing_f15.xlsx")
+  unlink(out)
+  on.exit(unlink(out), add = TRUE)
+  err <- tryCatch({
+    invisible(capture.output(export_pricing_for_tabs(
+      list(data = d, validation = v, gabor_granger = g), config, out, verbose = FALSE)))
+    "NO REFUSAL"
+  }, error = function(e) conditionMessage(e))
+
+  expect_match(err, "CFG_TABS_EXPORT_LONG_FORMAT")
+  expect_match(err, "one row per respondent")
+  expect_match(err, "Data_Format = wide")
+  # And it no longer blames ids that are perfectly correct.
+  expect_false(grepl("DATA_TABS_EXPORT_ID_NOT_UNIQUE", err, fixed = TRUE))
+  expect_false(grepl("Give every respondent one unique id", err, fixed = TRUE))
+  # The analysis itself was fine; only the export is refused.
+  expect_equal(length(unique(g$gg_data$respondent_id)), n)
+})
