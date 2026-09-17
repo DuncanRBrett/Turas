@@ -108,8 +108,45 @@ qual_drop_na <- function(x) x[!is.na(x)]
 #' and this cleanup is a no-op on them. Verified 3 Sep 2026 with a probe workbook.
 #' @param x A character vector (NA preserved).
 #' @return `x` with the attribute artefact removed and the five XML entities unescaped.
+#' Decode XML numeric character references (&#8230; / &#x2026;) to their characters.
+#'
+#' openpyxl writes every string as an INLINE string and escapes each non-ASCII
+#' character as a numeric reference, and openxlsx 4.2.x reads inline strings without
+#' decoding references of any kind. So a comment containing an ellipsis, a curly
+#' quote, an en dash or an accent, written by any openpyxl tool
+#' (`scripts/build_comment_appendix.py`, `scripts/migrate_comment_extracts.py`),
+#' arrives as "&#8230;" and is six characters longer than the analyst typed. Proved
+#' with a probe workbook on 17 Sep 2026: openpyxl wrote `<t>an ellipsis &#8230;
+#' here</t>` and openxlsx read it back literally. Excel-saved workbooks use shared
+#' strings and are unaffected, so this cleanup is a no-op on them.
+#' @param x A character vector.
+#' @return `x` with numeric character references decoded.
+qual_decode_numeric_refs <- function(x) {
+  hit <- !is.na(x) & grepl("&#", x, fixed = TRUE)
+  if (!any(hit)) return(x)
+  x[hit] <- vapply(x[hit], function(s) {
+    m <- gregexpr("&#x?[0-9A-Fa-f]+;", s, perl = TRUE)[[1]]
+    if (m[[1]] == -1L) return(s)
+    starts <- as.integer(m); lens <- attr(m, "match.length")
+    out <- ""; pos <- 1L
+    for (i in seq_along(starts)) {
+      out <- paste0(out, substr(s, pos, starts[i] - 1L))
+      tok <- substr(s, starts[i], starts[i] + lens[i] - 1L)
+      body <- sub(";$", "", sub("^&#", "", tok))
+      cp <- suppressWarnings(if (grepl("^x", body, ignore.case = TRUE))
+        strtoi(sub("^x", "", body, ignore.case = TRUE), 16L) else as.integer(body))
+      # An unusable codepoint is left exactly as written rather than guessed at.
+      out <- paste0(out, if (!is.na(cp) && cp > 0L && cp <= 1114111L) intToUtf8(cp) else tok)
+      pos <- starts[i] + lens[i]
+    }
+    paste0(out, substr(s, pos, nchar(s)))
+  }, character(1), USE.NAMES = FALSE)
+  x
+}
+
 qual_clean_inline_artefacts <- function(x) {
   x <- sub('^.*?xml:space="preserve">', "", x, perl = TRUE)
+  x <- qual_decode_numeric_refs(x)
   x <- gsub("&lt;", "<", x, fixed = TRUE)
   x <- gsub("&gt;", ">", x, fixed = TRUE)
   x <- gsub("&quot;", "\"", x, fixed = TRUE)

@@ -286,7 +286,7 @@ that restores full verbatims into an appendix whose cells were hand-edited, and 
 
 ---
 
-## 11. SACS 2026 migration
+## 11. SACS 2026 migration (BUILT 17 Sep 2026: `scripts/migrate_comment_extracts.R`)
 
 Do not restore full verbatims for SACS. The appendix has hand-edited cells and the report
 is in flight.
@@ -587,8 +587,50 @@ rendering, because `textPublished` refuses a pin whose text the island no longer
 publishes. That is the designed behaviour for any change to what ships, and it applies
 equally to editing a verbatim by hand.
 
+### Stage 5, the migration script. BUILT 17 Sep 2026, not merged.
+
+`scripts/migrate_comment_extracts.R` (the proposal) and
+`scripts/migrate_comment_extracts.py` (the write). One command:
+
+```
+Rscript scripts/migrate_comment_extracts.R "<appendix.xlsx>" [--out <new.xlsx>] [--plan-only]
+```
+
+R proposes and Python writes, deliberately. The sheet classification lives in the R
+reader and is not re-implemented, because a divergence would key extracts to the wrong
+theme labels; the write is openpyxl because an openxlsx load-and-save round trip
+collapses each sheet's declared dimension.
+
+It refuses rather than guessing: an output path that exists, a workbook that already
+carries extracts (which would clobber pruning done by hand), and a derived sheet name
+over Excel's 31 characters. `--plan-only` prints the row counts and writes nothing.
+
+On the live SACS appendix it proposes 205 rows across the six sheets, which matches an
+independent count made by a different method before the script existed.
+
+**One real bug found by this stage, in the reader rather than the script.** The first
+migrated workbook disagreed with the original on 343 theme-fragment comparisons.
+openpyxl writes every string as an INLINE string and escapes each non-ASCII character
+as a numeric reference, and openxlsx 4.2.x reads inline strings without decoding
+references, so an ellipsis came back as `&#8230;`. The reader already decoded the five
+NAMED entities for exactly this openpyxl interaction and did not decode numeric ones.
+`qual_decode_numeric_refs()` now does, which also fixes rows appended by
+`build_comment_appendix.py`, where the same mangling was latent. Proved with a probe
+workbook, and the gotcha is recorded in CLAUDE.md.
+
+After that fix, the safety property holds on the real data: for all 205 migrated
+comments, every theme the comment is coded on carries a fragment identical to the text
+the report ships today. So an unpruned row is a no-op, a deleted row is a no-op, and the
+shipped set of quotes is a subset of today's by construction. The original appendix was
+never opened for writing.
+
+Tests: `modules/tabs/tests/testthat/test_migrate_comment_extracts.R` (the proposal rule,
+4 tests) and `scripts/test_migrate_comment_extracts.py` (the writer, 11 checks, including
+that the workbook it reads is byte-for-byte untouched and that it refuses to clobber
+pruning).
+
 ## The fix is complete
 
-Stages 1 to 4 plus the review fixes deliver the whole of it. What remains is stage 5 (the
-SACS migration script, section 11) and Duncan's own regeneration through
-`launch_turas()`.
+Stages 1 to 5 plus the review fixes deliver the whole of it. What remains is Duncan's own
+regeneration through `launch_turas()`, and his pruning of the 205 migrated rows, which is
+judgement and cannot be automated.

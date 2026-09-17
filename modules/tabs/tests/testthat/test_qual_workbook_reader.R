@@ -634,3 +634,23 @@ test_that("a theme label matches across a non-breaking space", {
   # Stored under the CODED spelling, so the island's theme lookup still resolves it.
   expect_equal(names(find_record(res$question, "213")$extracts), nbsp_label)
 })
+
+# ------------------------------------------------------------------------------
+# openpyxl inline strings: numeric character references (17 Sep 2026)
+# ------------------------------------------------------------------------------
+
+test_that("numeric character references from an openpyxl-written cell are decoded", {
+  # openpyxl escapes every non-ASCII character as a numeric reference and openxlsx
+  # reads inline strings without decoding any reference, so an ellipsis arrived as
+  # "&#8230;" and the text was six characters longer than the analyst typed. Found
+  # by comparing a migrated appendix against the original: 343 mismatches.
+  expect_equal(qual_decode_numeric_refs("an ellipsis &#8230; here"), "an ellipsis … here")
+  expect_equal(qual_decode_numeric_refs("hex too &#x2026; here"), "hex too … here")
+  expect_equal(qual_decode_numeric_refs(c("a &#8211; b", "plain", NA)),
+               c("a – b", "plain", NA))
+  # Several in one string, and an unusable codepoint left exactly as written.
+  expect_equal(qual_decode_numeric_refs("&#8220;quoted&#8221; and &#0;"),
+               "“quoted” and &#0;")
+  # It runs as part of the cell cleanup, before the named entities.
+  expect_equal(qual_norm_cells("  a &#8230; b &amp; c  "), "a … b & c")
+})

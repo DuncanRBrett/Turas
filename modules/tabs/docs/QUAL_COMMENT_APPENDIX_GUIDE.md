@@ -122,6 +122,20 @@ Leave column C as the archive and add a sheet named after the question sheet plu
 - The `Noteworthy` tier stays on the comment row, exactly as before. One comment,
   one tier.
 
+**Already shortened the cells on an existing project?** One command proposes the whole
+migration, without touching your workbook:
+
+```
+Rscript scripts/migrate_comment_extracts.R "<your appendix>.xlsx"
+```
+
+It writes a NEW workbook with the Extracts sheets filled in: one row per comment that
+ships text and carries more than one theme, holding that comment's current text and all
+of its coded theme labels. You then delete the labels each fragment does not speak to.
+A row you leave alone behaves exactly as the report does today, so you can stop half way
+and still ship, and undoing the whole thing is pointing the config back at the old file.
+Add `--plan-only` to see the row counts first.
+
 ---
 
 ## 3. Wire it into the crosstab config
