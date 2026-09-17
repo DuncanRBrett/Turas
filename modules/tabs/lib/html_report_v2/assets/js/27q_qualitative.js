@@ -81,6 +81,55 @@
     });
   };
 
+  /**
+   * The text a record may show in a given context, and the ONE place a comment's
+   * text is read for display. Every other read goes through here.
+   *
+   * A coded row carries one verbatim and N theme codes, so a fragment the analyst
+   * extracted for one theme would otherwise be quoted beside all N. The precedence
+   * under a theme (QUALITATIVE_EXTRACTS_PLAN.md section 4):
+   *   1. the fragment written for THIS theme;
+   *   2. else the fragment marked "all", which claims every coded theme;
+   *   3. else NOTHING, when the comment has any fragment at all. It stays counted
+   *      in the distribution and is quoted on the page its fragment speaks to;
+   *   4. else the verbatim, which is every comment nobody wrote a fragment for.
+   * With no theme in context (the general list, a pin, the collection) the record's
+   * own text is already the unscoped text the island chose.
+   *
+   * @param rec An island record.
+   * @param themeId A theme id, or null/undefined/OTHER_THEME for no theme context.
+   * @return The string to show, or null when this context shows nothing.
+   */
+  qual.textFor = function (rec, themeId) {
+    if (!rec || rec.text == null) return null;            // withheld by the build
+    if (themeId == null || themeId === qual.OTHER_THEME) return rec.text;
+    var ex = rec.extracts, key = String(themeId);
+    if (ex && ex[key] != null) return ex[key];
+    if (rec.extractAll != null) return rec.extractAll;
+    if (rec.hasExtracts) return null;                     // counted here, quoted elsewhere
+    return rec.text;
+  };
+
+  /** The theme whose fragments the drawer is currently showing, or null when the
+   *  drawer is not scoped to one (all comments, the shortlist, "everything else").
+   *  One definition, so the card, the export and focus reading cannot disagree. */
+  qual.drawerTheme = function (q, st) {
+    st = st || {};
+    if (!q || q.type !== "themed") return null;
+    if (st.theme == null || st.theme === qual.OTHER_THEME) return null;
+    return st.theme;
+  };
+
+  /** Whether a comment may be QUOTED under this theme, by the extracts rule alone.
+   *  True for every comment the analyst wrote no fragment for, which is the
+   *  overwhelming majority and the whole pre-extracts world. Whether the comment's
+   *  text ships at all is a separate question, and `qual.shown` still answers it. */
+  qual.quotableUnder = function (rec, themeId) {
+    if (!rec || !rec.hasExtracts) return true;
+    if (themeId == null || themeId === qual.OTHER_THEME) return true;
+    return qual.textFor(rec, themeId) != null;
+  };
+
   /** Records carrying no coded theme at all (every themeVals entry null/absent). */
   qual.unthemed = function (records) {
     return (records || []).filter(function (r) {
@@ -419,7 +468,7 @@
     for (var i = 0; i < island.questions.length; i++) {
       var recs = island.questions[i].records || [];
       for (var j = 0; j < recs.length; j++) {
-        if (recs[j].text === text) return true;
+        if (recs[j].text === text) return true;   /* unscoped-text */
       }
     }
     return false;
@@ -514,10 +563,10 @@
     var title = q.title || fallbackTitle || q.code;
     var bands = (q.split && q.split.bands) ? q.split.bands : [];
     var out = q.records.filter(function (r) {
-      return (r.tier || 0) >= 3 && r.text != null;
+      return (r.tier || 0) >= 3 && r.text != null;   /* unscoped-text */
     }).map(function (r) {
       return {
-        text: r.text,
+        text: r.text,   /* unscoped-text */
         q: title,
         band: r.band || "",
         tags: (tagsOk && r.demos)
@@ -817,22 +866,38 @@
     });
     return out;
   }
-  qual.getHighlights = function (qcode, rec) { return hlStore()[markKeyFor(qcode, rec)] || []; };
-  qual.addHighlight = function (qcode, rec, start, end) {
+  /** The highlight key. Ranges are offsets into the text ACTUALLY SHOWN, and a
+   *  comment can show a different fragment on each of its theme pages, so a themed
+   *  fragment's marks are keyed per theme. The base format is untouched, so marks
+   *  in a saved copy made before extracts existed still load. */
+  function hlKeyFor(qcode, rec, themeId) {
+    return markKeyFor(qcode, rec) + (themeId == null ? "" : ":t" + themeId);
+  }
+  qual.hlKeyFor = hlKeyFor;
+
+  qual.getHighlights = function (qcode, rec, themeId) {
+    return hlStore()[hlKeyFor(qcode, rec, themeId)] || [];
+  };
+  qual.addHighlight = function (qcode, rec, start, end, themeId) {
     if (!(end > start)) return;
-    var s = hlStore(), k = markKeyFor(qcode, rec);
+    var s = hlStore(), k = hlKeyFor(qcode, rec, themeId);
     s[k] = hlMerge((s[k] || []).concat([[start, end]]));
     hlPersist();
   };
-  qual.removeHighlight = function (qcode, rec, start) {
-    var s = hlStore(), k = markKeyFor(qcode, rec);
+  qual.removeHighlight = function (qcode, rec, start, themeId) {
+    var s = hlStore(), k = hlKeyFor(qcode, rec, themeId);
     var arr = (s[k] || []).filter(function (r) { return r[0] !== start; });
     if (arr.length) s[k] = arr; else delete s[k];
     hlPersist();
   };
+  /** Clears a comment's marks on every theme page as well as its unscoped ones:
+   *  the caller is dropping the comment from the collection, not one fragment. */
   qual.clearHighlights = function (qcode, rec) {
-    var s = hlStore(), k = markKeyFor(qcode, rec);
-    if (s[k]) { delete s[k]; hlPersist(); }
+    var s = hlStore(), base = markKeyFor(qcode, rec), gone = false;
+    Object.keys(s).forEach(function (k) {
+      if (k === base || k.indexOf(base + ":t") === 0) { delete s[k]; gone = true; }
+    });
+    if (gone) hlPersist();
   };
   qual.highlightsAll = function () { return hlStore(); };   // report.saveCopy embeds this
 
@@ -907,8 +972,15 @@
    *  its counts reflect only readable comments; the band narrows next so every
    *  downstream count is per-band. */
   qual.poolBeforeSentiment = function (q, st, audience) {
+    var theme = (q.type === "themed" && st.theme != null) ? st.theme : null;
     var base = qual.bandFilter(q, qual.shown(audience), st.band);
-    var pool = (q.type === "themed" && st.theme != null) ? qual.recordsForTheme(base, st.theme) : base;
+    var pool = theme != null ? qual.recordsForTheme(base, theme) : base;
+    // The extracts rule runs AFTER the theme is known, because it is a question
+    // about THIS theme: a comment whose fragments speak to other themes shows no
+    // text here, and drops out of the list while still counting in the numbers.
+    if (theme != null) {
+      pool = pool.filter(function (r) { return qual.quotableUnder(r, theme); });
+    }
     var records = qual.tierFilter(pool, st.tier);
     if (st.savedOnly) records = qual.savedFilter(records, q.code);
     return records;
@@ -929,10 +1001,11 @@
   /** Split records into the analyst's curated set (shortlisted or carrying a
    *  highlight) and the rest, order preserved. Curated-first rendering (C1).
    *  Presentation-only: both halves come from the SAME gated record pool. */
-  qual.curatedSplit = function (records, qcode) {
+  qual.curatedSplit = function (records, qcode, themeId) {
     var curated = [], rest = [];
     (records || []).forEach(function (r) {
-      var marked = qual.isSaved(qcode, r) || qual.getHighlights(qcode, r).length > 0;
+      var marked = qual.isSaved(qcode, r) ||
+        qual.getHighlights(qcode, r, themeId).length > 0;
       (marked ? curated : rest).push(r);
     });
     return { curated: curated, rest: rest };
@@ -951,7 +1024,7 @@
   qual.championQuotes = function (records, themeId, qcode, cap) {
     cap = cap > 0 ? cap : 2;
     var pool = qual.recordsForTheme(records, themeId)
-      .filter(function (r) { return r.text != null; });
+      .filter(function (r) { return r.text != null && qual.quotableUnder(r, themeId); });   /* unscoped-text */
     if (!pool.length) return [];
     var byTier = function (a, b) {
       if ((b.tier || 0) !== (a.tier || 0)) return (b.tier || 0) - (a.tier || 0);
@@ -1005,7 +1078,7 @@
    *  false (the audience is below the disclosure threshold) the demographic columns AND the
    *  verbatim text export as "[hidden]" too, so a small cut can't be exported with any
    *  identifying detail attached. */
-  qual.exportRows = function (island, q, records, safeDemos) {
+  qual.exportRows = function (island, q, records, safeDemos, themeId) {
     if (safeDemos === undefined) safeDemos = true;
     var dims = ((island && island.demographics) || []).map(function (d) { return d.label; });
     var byId = {};
@@ -1023,14 +1096,15 @@
       });
       var bandVal = bandCol.length ? [r.band || ""] : [];
       var themes = Object.keys(r.themeVals || {}).map(function (id) { return byId[id] || ("#" + id); }).join("; ");
-      var text = (!safeDemos || r.text == null) ? "[hidden]" : r.text;
+      var shown = qual.textFor(r, themeId);
+      var text = (!safeDemos || shown == null) ? "[hidden]" : shown;
       out.push([r.idx].concat(bandVal).concat(demos)
         .concat([TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes, text]));
     });
     return out;
   };
 
-  qual.exportXlsx = function (island, q, records) {
+  qual.exportXlsx = function (island, q, records, themeId) {
     if (!TR.xlsx || !TR.xlsx.download) return;
     // Below the disclosure threshold the drawer withholds the whole list (even the
     // count): the export must keep that promise: a row per comment (ID, tier,
@@ -1073,15 +1147,29 @@
    *  after the LAST '#' is the ref (a qcode itself never contains '#'): "@<token>"
    *  for a rid key, the trailing integer for a legacy idx key. `ref` is what the
    *  mark functions take; `idx` is null on a rid key (the position is not encoded). */
+  /** A highlight key with its ":t<theme>" suffix removed, so a fragment's marks
+   *  pool against the same comment as its unscoped ones. */
+  qual.bareMark = function (key) {
+    var s = key == null ? "" : String(key), at = s.lastIndexOf(":t");
+    if (at < 0) return s;
+    var tail = s.slice(at + 2);
+    return (tail !== "" && !isNaN(parseInt(tail, 10))) ? s.slice(0, at) : s;
+  };
+
   qual.splitMark = function (key) {
-    var s = key == null ? "" : String(key), at = s.lastIndexOf("#");
+    var raw = key == null ? "" : String(key);
+    var bare = qual.bareMark(raw);
+    var theme = bare === raw ? null : parseInt(raw.slice(bare.length + 2), 10);
+    var s = bare, at = s.lastIndexOf("#");
     if (at < 0) return null;
     var qcode = s.slice(0, at), ref = s.slice(at + 1);
     if (!qcode || !ref) return null;
-    if (ref.charAt(0) === "@") return { qcode: qcode, idx: null, rid: ref.slice(1), ref: ref };
+    if (ref.charAt(0) === "@") {
+      return { qcode: qcode, idx: null, rid: ref.slice(1), ref: ref, theme: theme };
+    }
     var idx = parseInt(ref, 10);
     if (isNaN(idx)) return null;
-    return { qcode: qcode, idx: idx, rid: null, ref: String(idx) };
+    return { qcode: qcode, idx: idx, rid: null, ref: String(idx), theme: theme };
   };
 
   /**
@@ -1101,7 +1189,14 @@
     savedMap = savedMap || {}; hlMap = hlMap || {}; hubMap = hubMap || {};
     var keys = {};
     Object.keys(savedMap).forEach(function (k) { if (savedMap[k]) keys[k] = 1; });
-    Object.keys(hlMap).forEach(function (k) { if (hlMap[k] && hlMap[k].length) keys[k] = 1; });
+    // A themed fragment's marks are keyed per theme, and they all belong to the one
+    // comment, so they pool against its bare key rather than making a second item.
+    var hlBare = {};
+    Object.keys(hlMap).forEach(function (k) {
+      if (!(hlMap[k] && hlMap[k].length)) return;
+      var b = qual.bareMark(k);
+      hlBare[b] = 1; keys[b] = 1;
+    });
     Object.keys(hubMap).forEach(function (k) { if (hubMap[k]) keys[k] = 1; });
     var items = [], orphans = 0, withheld = 0;
     Object.keys(keys).forEach(function (key) {
@@ -1113,11 +1208,11 @@
       // "theme all, show some". Themed and demographically tagged, text withheld)
       // has nothing to contribute to a collection of quotes. It used to render as
       // "[quote hidden in this copy]", which reads like a fault. Counted, not shown.
-      if (rec.text == null) { withheld++; return; }
+      if (rec.text == null) { withheld++; return; }   /* unscoped-text */
       // idx comes from the RECORD (the respondent's position in this run), key from
       // the store, in legacy mode they are the same two halves they always were.
       items.push({ qcode: m.qcode, idx: rec.idx, key: key, record: rec, question: slot.q,
-                   saved: !!savedMap[key], highlighted: !!(hlMap[key] && hlMap[key].length),
+                   saved: !!savedMap[key], highlighted: !!hlBare[key],
                    hubbed: !!hubMap[key] });
     });
     return { items: items, orphans: orphans, withheld: withheld };
@@ -1180,7 +1275,7 @@
       });
       var themes = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null; })
         .map(function (id) { return byId[id] || ("#" + id); }).join("; ");
-      var text = (!safeDemos || r.text == null) ? "[hidden]" : r.text;
+      var text = (!safeDemos || r.text == null) ? "[hidden]" : r.text;   /* unscoped-text */
       out.push([r.idx, q.title].concat(demos).concat(
         [TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes,
          it.saved ? "Yes" : "", it.highlighted ? "Yes" : "", text]));
@@ -1374,7 +1469,7 @@
     var demoCode = function (r) { return demoTags(r).join(" · "); };
     var qhtml = shown.map(function (it) {
       var r = it.record, sent = SENT[r.sentiment] || "neu";
-      var txt = r.text == null ? "[quote hidden]" : r.text;
+      var txt = r.text == null ? "[quote hidden]" : r.text;   /* unscoped-text */
       var code = demoCode(r), cite = esc(it.question.title) + (code ? " · " + esc(code) : "");
       return '<blockquote class="ql-exq ' + sent + '">' + esc(txt) + "<cite>" + cite + "</cite></blockquote>";
     }).join("");
@@ -1393,10 +1488,10 @@
     var quotes = [];
     shown.forEach(function (it) {
       var r = it.record;
-      if (r.text == null) return;   // hidden text stays hidden, never pinned
+      if (r.text == null) return;   // hidden text stays hidden, never pinned   /* unscoped-text */
       var code = demoCode(r);
-      lines.push("“" + r.text + "”, " + it.question.title + (code ? " (" + code + ")" : ""));
-      quotes.push({ text: r.text, q: it.question.title,
+      lines.push("“" + r.text + "”, " + it.question.title + (code ? " (" + code + ")" : ""));   /* unscoped-text */
+      quotes.push({ text: r.text, q: it.question.title,   /* unscoped-text */
         tags: demoTags(r), sentiment: SENT[r.sentiment] || "neu" });
     });
     if (moreN > 0) lines.push("+ " + moreN + " more");
@@ -1416,9 +1511,10 @@
   // focusHtml/focusNav are pure (node-testable); openFocus is the DOM shell.
 
   /** Normalise drawer records into focus entries { record, qcode, qtitle }. */
-  qual.focusEntries = function (records, q) {
+  qual.focusEntries = function (records, q, themeId) {
     return (records || []).map(function (r) {
-      return { record: r, qcode: q.code, qtitle: q.title };
+      return { record: r, qcode: q.code, qtitle: q.title,
+               theme: themeId == null ? null : themeId };
     });
   };
 
@@ -1437,9 +1533,10 @@
     var qst = qual._state || {};
     var blocks = entries.map(function (e, i) {
       var r = e.record, sent = SENT[r.sentiment] || "neu";
-      var text = r.text == null
+      var fshown = qual.textFor(r, e.theme);
+      var text = fshown == null
         ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-        : qual.renderHighlighted(r.text, qual.getHighlights(e.qcode, r));
+        : qual.renderHighlighted(fshown, qual.getHighlights(e.qcode, r, e.theme));
       var word = SENT_WORD[r.sentiment]
         ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
       // Tags honour opts.dropTags (below-k hub rule) AND the reader tag toggle, "Label: value".
@@ -2056,7 +2153,7 @@
       // comment can't blow out the card. Reached only ABOVE the disclosure gate.
       var champ = st.showChampions ? qual.championQuotes(audience, r.id, q.code, 2).map(function (c) {
         return '<div class="ql-champq ' + (SENT[c.sentiment] || "neu") + '">' +
-          '<span class="ql-champtext">“' + esc(c.text) + '”</span>' +
+          '<span class="ql-champtext">“' + esc(qual.textFor(c, r.id)) + '”</span>' +
           '<span class="ql-champid">#' + esc(c.idx) +
           (qual.isSaved(q.code, c) ? " · shortlisted" : "") + "</span></div>";
       }).join("") : "";
@@ -2260,8 +2357,10 @@
         ? "No shortlisted comments yet. Use ＋ Shortlist on a comment."
         : "No comments for this selection.") + "</p>";
     }
-    var cardOf = function (r) { return quoteCard(r, q.code); };
-    var split = st.savedOnly ? { curated: [], rest: records } : qual.curatedSplit(records, q.code);
+    var themeShown = qual.drawerTheme(q, st);
+    var cardOf = function (r) { return quoteCard(r, q.code, themeShown); };
+    var split = st.savedOnly ? { curated: [], rest: records }
+              : qual.curatedSplit(records, q.code, themeShown);
     if (!split.curated.length) return records.map(cardOf).join("");
     var html = '<div class="ql-curhd">★ Analyst’s selection <span class="ql-hint">(' +
       split.curated.length + ")</span></div>" + split.curated.map(cardOf).join("");
@@ -2279,12 +2378,14 @@
 
   // Reached only when the audience is at/above the disclosure threshold (drawerHtml gates
   // the whole list below k), so demographic tags are safe to show here.
-  function quoteCard(r, qcode) {
+  function quoteCard(r, qcode, themeId) {
     var sent = SENT[r.sentiment] || "neu";
     var key = markKeyFor(qcode, r);      // rid-keyed where the island carries one
-    var text = (r.text == null)
+    var hlKey = hlKeyFor(qcode, r, themeId);   // per-theme: marks belong to the fragment
+    var shown = qual.textFor(r, themeId);
+    var text = (shown == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r));   // select-to-highlight
+      : qual.renderHighlighted(shown, qual.getHighlights(qcode, r, themeId));   // select-to-highlight
     var star = r.tier >= 3 ? '<span class="ql-star priority" title="priority">★</span>'
              : r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
@@ -2303,7 +2404,7 @@
     // sentiment word beside the edge accent. The coding is never colour-only
     var sentWord = SENT_WORD[r.sentiment]
       ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
-    return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(key) + '">' + star +
+    return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(hlKey) + '">' + star +
       '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
       (tags ? '<div class="ql-tags">' + tags + '</div>' : '') +
       hubControlHtml(key) + '</div>' +
@@ -2414,9 +2515,9 @@
     var q = it.question, r = it.record, qcode = it.qcode;
     var key = it.key || markKeyFor(qcode, r);
     var sent = SENT[r.sentiment] || "neu";
-    var text = (r.text == null)
+    var text = (r.text == null)   /* unscoped-text */
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r));
+      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r));   /* unscoped-text */
     var byId = {}; (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
     var chips = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null && byId[id]; })
       .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
@@ -2445,6 +2546,7 @@
       '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
   qual._collectionCard = collectionCard;   // node gate
+  qual._quoteCard = quoteCard;             // node gate
 
   function collectionMain(island, st, cutFilters, pool) {
     var total = pool.items.length;
@@ -2676,7 +2778,8 @@
         if (!v) return;
         var id = themeAttr(b.getAttribute("data-theme-focus"));
         var stTheme = { tier: st.tier, sentiment: st.sentiment, savedOnly: st.savedOnly, theme: id };
-        qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, stTheme, v.audience), v.q),
+        qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, stTheme, v.audience), v.q,
+            id === qual.OTHER_THEME ? null : id),
           { title: focusThemeLabel(v.q, id) + ": " + v.q.title, trigger: b,
             onSave: function () { st.showRest = true; }, onClose: function () { qual.render(host); } });
       });
@@ -2684,7 +2787,8 @@
     var fb = host.querySelector("[data-qual-focus]");
     if (fb) fb.addEventListener("click", function () {
       var v = qual._view;
-      if (v) qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, st, v.audience), v.q),
+      if (v) qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, st, v.audience), v.q,
+          qual.drawerTheme(v.q, st)),
         { title: v.q.title, trigger: fb,
           onSave: function () { st.showRest = true; }, onClose: function () { qual.render(host); } });
     });
@@ -2781,7 +2885,8 @@
     var ex = host.querySelector("[data-qual-export]");
     if (ex) ex.addEventListener("click", function () {
       var v = qual._view;
-      if (v) qual.exportXlsx(v.island, v.q, qual.visibleRecords(v.q, st, v.audience));
+      if (v) qual.exportXlsx(v.island, v.q, qual.visibleRecords(v.q, st, v.audience),
+                             qual.drawerTheme(v.q, st));
     });
     var colEx = host.querySelector("[data-col-export]");
     if (colEx) colEx.addEventListener("click", function () {
@@ -2973,7 +3078,7 @@
       var m = qual.splitMark(card.getAttribute("data-hl-key"));
       if (!m) return;
       hlShowPop(range.getBoundingClientRect(), function () {
-        qual.addHighlight(m.qcode, m.ref, start, end);
+        qual.addHighlight(m.qcode, m.ref, start, end, m.theme);
         hlRemovePop();
         if (qual._state) qual._state.showRest = true;   // highlighting must not collapse the list either
         qual.render(host);
@@ -2989,7 +3094,7 @@
       if (!card) return;
       var mk = qual.splitMark(card.getAttribute("data-hl-key"));
       if (!mk) return;
-      qual.removeHighlight(mk.qcode, mk.ref, parseInt(m.getAttribute("data-s"), 10));
+      qual.removeHighlight(mk.qcode, mk.ref, parseInt(m.getAttribute("data-s"), 10), mk.theme);
       qual.render(host);
     });
   }

@@ -22,6 +22,8 @@
 #                                       that would otherwise have shipped)
 #   - `demos` on every record          (demographic_cuts = "allow", two dimensions)
 #   - themes, sentiment, all four tiers, and one respondent in both questions
+#   - Q3: per-theme EXTRACTS. One comment quotable under one of its two coded
+#     themes and counted-but-silent under the other, one carrying an "all" fragment
 #
 # REGENERATE WITH (from the Turas root):
 #   Rscript modules/tabs/tests/fixtures/qual_island/generate_qual_island.R
@@ -108,7 +110,27 @@ qual_fixture_island <- function(turas_root) {
       rec("5", "No further comment", 0L, NA, list(), demos = d("Finance", "1-4 yrs"))),
     meta = list(dropped_codes = 0L))
 
-  ids <- c("1", "2", "3", "4", "5")
+  # Q3. Extracts. Respondent 6 is coded on BOTH themes and carries a fragment for
+  # Pay only, which is the exact shape that used to quote a pay fragment under
+  # workload: it must be quotable under Pay, counted-but-silent under Workload,
+  # and its fragment must lead away from either page. Respondent 7 carries an
+  # "all" fragment, which stands in on both pages.
+  q3_rec_pay <- rec("6", "a long comment about pay and about workload", 3L, 3L,
+                    list(Pay = 3L, Workload = 3L), demos = d("Admin", "1-4 yrs"))
+  q3_rec_pay$extracts <- list(Pay = "the pay half of the comment")
+  q3_rec_pay$extract_lead <- "the pay half of the comment"
+  q3_rec_pay$extract_lead_theme <- "Pay"
+  q3_rec_pay$has_extracts <- TRUE
+  q3_rec_all <- rec("7", "another comment on both, trimmed for length", 1L, 2L,
+                    list(Pay = 2L, Workload = 2L), demos = d("Finance", "5+ yrs"))
+  q3_rec_all$extract_all <- "a trim that covers both"
+  q3_rec_all$has_extracts <- TRUE
+  q3 <- list(
+    code = "Q3", title = "What would you change?", type = "themed", sheet = "Q3",
+    roles = list(themes = list(theme("Pay"), theme("Workload"))),
+    records = list(q3_rec_pay, q3_rec_all), meta = list(dropped_codes = 0L))
+
+  ids <- c("1", "2", "3", "4", "5", "6", "7")
   master <- list(
     id_to_idx = stats::setNames(seq_along(ids) - 1L, ids), n = length(ids),
     banner_dims = list(list(label = "Dept",   values = c("Admin", "Finance")),
@@ -121,7 +143,7 @@ qual_fixture_island <- function(turas_root) {
     vapply(seq_along(ids), function(i) qual_mint_rid(character(0)), character(1)), ids)
 
   qual_build_data_qual(
-    questions = list(q1, q2), master = master,
+    questions = list(q1, q2, q3), master = master,
     config = list(text_mode = "full", demographic_cuts = "allow",
                   noteworthy_default = "all", verbatim_scope = "noteworthy"),
     rid_map = rid_map)

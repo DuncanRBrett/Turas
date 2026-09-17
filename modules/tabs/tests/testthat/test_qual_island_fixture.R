@@ -125,3 +125,29 @@ test_that("every record carries both demographic dimensions", {
     !is.null(r$demos) && all(c("Dept", "Tenure") %in% names(r$demos))
   }, logical(1))))
 })
+
+test_that("the fixture still carries the per-theme extracts shape (Q3)", {
+  # The JS extracts suite (qual_extracts_tests.mjs) asserts the whole quoting rule
+  # against Q3 of this fixture. A regeneration that quietly lost Q3, or lost the
+  # fields, would leave that suite green while testing nothing.
+  q3 <- Filter(function(q) identical(q$code, "Q3"), qif_island$questions)
+  expect_length(q3, 1L)
+  q3 <- q3[[1]]
+  expect_equal(vapply(q3$themes, function(t) t$label, character(1)), c("Pay", "Workload"))
+
+  # Respondent 6: coded on BOTH themes, with a fragment for Pay only. This is the
+  # shape the whole feature exists for.
+  pay <- q3$records[[1]]
+  expect_named(pay$extracts, "0")
+  expect_equal(pay$extracts[["0"]], "the pay half of the comment")
+  expect_true(pay$hasExtracts)
+  expect_equal(pay$textTheme, 0L)
+  expect_equal(pay$text, "the pay half of the comment")   # the verbatim never ships
+  expect_equal(length(pay$themeVals), 2L)                 # and both themes still count
+
+  # Respondent 7: an "all" fragment, shipped once rather than repeated per theme.
+  every <- q3$records[[2]]
+  expect_equal(every$extractAll, "a trim that covers both")
+  expect_null(every$extracts)
+  expect_true(every$hasExtracts)
+})

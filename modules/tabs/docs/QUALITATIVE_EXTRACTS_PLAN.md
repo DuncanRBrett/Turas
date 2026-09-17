@@ -464,3 +464,56 @@ JS baseline before stage 3, on this branch: 338 + 23 + 20 = 381 checks pass, 0 f
 across `qual_tests.mjs`, `qual_island_shape_tests.mjs` and `qual_rekey_tests.mjs`.
 Stage 3 should extend the committed island fixture with an extract-bearing record, so the
 JS suite exercises the real shape rather than a hand-authored one.
+
+### Stage 3, the accessor and the sweep. BUILT 17 Sep 2026, not merged.
+
+Files changed: `modules/tabs/lib/html_report_v2/assets/js/27q_qualitative.js`, the island
+fixture generator and its committed JSON, `test_qual_island_fixture.R`, and a new JS suite
+`modules/tabs/lib/html_report_v2/tests/qual_extracts_tests.mjs`. No other JS file needed a
+change, and `styles.css` was not touched.
+
+Three helpers now carry the whole rule:
+
+- `qual.textFor(rec, themeId)` is the ONE place a comment's text is read for display.
+- `qual.quotableUnder(rec, themeId)` is the extracts rule alone, used by the filters.
+- `qual.drawerTheme(q, st)` is the one definition of which theme is on screen, so the
+  card, the export and focus reading cannot disagree.
+
+Swept: the readable pool, champion quotes, the drawer card, the curated split, the drawer
+export, focus reading, the highlight store and the collection pool. The twelve remaining
+raw reads are the deliberately unscoped ones (a pin, a hub exhibit, the collection, the
+priority block) and each carries an `unscoped-text` marker on its line.
+
+The sweep turned out smaller than section 8 feared, because stage 2 made `record.text` the
+unscoped text: every context with no theme was already correct, so only the theme-scoped
+sites needed changing.
+
+Evidence: 866 checks pass, 0 fail, across the 13 R qual and client-safe files, and 1,182
+across all 50 JS suites, every suite exiting 0. The new JS suite's 18 checks run against
+Q3 of the committed island, which the R generator now builds with a real extract-bearing
+record, so nothing there can pass against a shape R does not emit.
+
+The static gate was tested by planting a forgotten raw read in `qual.sentimentCounts`. The
+gate failed, named the line and said what to do, and passed again once it was removed. A
+gate nobody has seen fail is decoration.
+
+Deviations and one gap the gate could not catch:
+
+1. The first version of the pool filter used `textFor(...) != null` to decide whether a
+   comment has readable text. That conflated two different questions, because
+   `qual.shown()` filters on `suppressed` rather than on text, and it dropped every
+   hand-authored test record (which carries no `text` field at all). Nine checks went red.
+   `quotableUnder` now expresses the extracts rule on its own and the withheld rule is left
+   exactly where it was.
+2. A static gate cannot see a mark KEY that is built in the wrong scope. The drawer card
+   emitted `data-hl-key` from the bare comment key, so a highlight made on a fragment
+   would have been stored against the comment and reappeared on its other fragments. Found
+   by reading the DOM plumbing, fixed, and now asserted (check 17).
+3. Highlight keys gain an optional `:t<themeId>` suffix. The base format is untouched, so
+   marks in a saved copy made before extracts existed still load. The shortlist key stays
+   bare, which is decision 3: a comment is starred once, not once per fragment.
+4. `clearHighlights` now clears a comment's marks on every theme as well as its unscoped
+   ones, because its caller is dropping the comment from the collection, not one fragment.
+
+Not done here, and it is stage 4's whole job: nothing on screen yet says a quote is an
+extract, and nothing tells a reader that a theme page counts comments it does not quote.
