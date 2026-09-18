@@ -91,6 +91,7 @@ snapshots, and 1280x720 PNG slide export.
 | `10_nca.R` | 253 | Necessary Condition Analysis (v10.4) | 88 | NCA package; CE-FDH method; bottleneck table with API validation; identifies hygiene factors |
 | `11_dominance.R` | 225 | Dominance Analysis (v10.4) | 89 | domir package; general/conditional/complete dominance; closure-safe weight handling; top-15 driver limit |
 | `12_gam.R` | 194 | GAM nonlinear effects (v10.4) | 89 | mgcv with REML; auto-reduces k when sample too small; classifies nonlinearity shape |
+| `13_v2_island.R` | 581 | The Turas report contribution (TR.KD island) | 90 | Serialises importance, intervals, fit, quadrant and segments as `{output}_kd_island.json`; a block the run did not produce is absent, not empty |
 
 ### SHAP Submodule -- `R/kda_shap/`
 
@@ -256,6 +257,7 @@ eyeballed.
         10_nca.R         (v10.4)
         11_dominance.R   (v10.4)
         12_gam.R         (v10.4)
+        13_v2_island.R   (TR.KD contribution)
              |
              v
         04_output.R

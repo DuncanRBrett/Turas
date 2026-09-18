@@ -159,6 +159,27 @@ keydriver/
 
 ## Output
 
+### The Turas report's Key drivers tab
+
+Every run also writes `{output}_kd_island.json`, its contribution to the
+interactive Turas report. Point a tabs config's `keydriver_island` setting at
+that file and the report gains a **Key drivers** tab: importance per driver
+with a method picker and bootstrap intervals, the importance-performance
+quadrant, the driver-by-segment matrix with every segment's base, and a
+diagnostics drawer carrying model fit, VIF and the base the whole thing rests
+on. Nothing else about the tabs report changes, and a project without a key
+driver study is unaffected.
+
+The tab is **frozen**: importance is a model estimate made once on the whole
+sample, so the report's audience filter cannot recompute it. The tab says so
+and the filter bar is hidden while it is open, the same contract as Conjoint,
+MaxDiff, Pricing and Tracking. The crosstab export is the filterable cut.
+
+Shapley carries no interval, because the bootstrap does not extend to it, and
+the tab stamps that rather than drawing an empty whisker. Schema and the full
+curated list of what travels and what stays in Excel:
+`modules/tabs/docs/11_DATA_CENTRIC_REPORT_V2.md`.
+
 ### Excel Workbook
 1. **Importance Summary** - All metrics in one view
 2. **Method Rankings** - Rank positions from each method

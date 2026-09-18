@@ -137,6 +137,7 @@ build_report_v2_html <- function(data_json, config_obj,
                                   generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z"),
                                   prev_json = NULL, micro_json = NULL, qual_json = NULL,
                                   cj_json = NULL, md_json = NULL, pr_json = NULL,
+                                  kd_json = NULL,
                                   cube_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
@@ -223,6 +224,11 @@ build_report_v2_html <- function(data_json, config_obj,
   pr_inlined <- if (!is.null(pr_json) && nzchar(pr_json) && pr_json != "null") {
     escape_island(pr_json)
   } else "null"
+  # A key driver contribution, the same way. The Key drivers tab only appears
+  # when TR.KD has content.
+  kd_inlined <- if (!is.null(kd_json) && nzchar(kd_json) && kd_json != "null") {
+    escape_island(kd_json)
+  } else "null"
 
   .report_v2_load_text_layer(assets_dir)
 
@@ -233,6 +239,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "27x_conjoint.js"    = has_island(cj_inlined),
     "27y_maxdiff.js"     = has_island(md_inlined),
     "27z_pricing.js"     = has_island(pr_inlined),
+    "27k_keydriver.js"   = has_island(kd_inlined),
     "27q_qualitative.js" = has_island(qual_inlined)
   )
   exclude <- names(renderer_for)[!vapply(renderer_for, isTRUE, logical(1))]
@@ -279,6 +286,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "{{DATA_CJ}}"     = cj_inlined,
     "{{DATA_MD}}"     = md_inlined,
     "{{DATA_PR}}"     = pr_inlined,
+    "{{DATA_KD}}"     = kd_inlined,
     "{{JS}}"          = js_bundle
   ))
 
@@ -311,6 +319,7 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
                                  assets_dir = report_v2_assets_dir(),
                                  prev_json = NULL, micro_json = NULL, qual_json = NULL,
                                  cj_json = NULL, md_json = NULL, pr_json = NULL,
+                                 kd_json = NULL,
                                  cube_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
@@ -332,6 +341,7 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
                          prev_json = prev_json, micro_json = micro_json,
                          qual_json = qual_json, cj_json = cj_json,
                          md_json = md_json, pr_json = pr_json,
+                         kd_json = kd_json,
                          cube_json = cube_json),
     error = function(e) e)
   if (inherits(html, "error")) {

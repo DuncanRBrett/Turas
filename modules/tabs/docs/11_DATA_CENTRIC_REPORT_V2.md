@@ -60,6 +60,9 @@ The v2 renderer carries three JSON islands:
   table from this. Absent → the report is published-only (no live filter/banner).
 - **`data-prev`** (`TR.PREV`): the **tracking** island (wave history). Present →
   the Tracking tab appears.
+- **`data-kd`** (`TR.KD`): the **key driver** island, written by the keydriver
+  module. Present → the Key drivers tab appears. Frozen, like the other module
+  contributions.
 
 Published figures are always the record; recomputed (filtered / custom-banner /
 historical) figures are badged as computed.
@@ -190,6 +193,95 @@ The renderer recomputes each wave's value + dispersion from its `scores` (no
 pre-baked numbers); waves are matched to the current questions by `match_key`.
 The `year` key is a unique x-axis order key. Give twice-yearly waves a decimal
 (e.g. `2025` and `2025.5`) so two same-calendar-year waves never collide.
+
+### The key driver island contract (`TR.KD`)
+
+Written by `modules/keydriver/R/13_v2_island.R` as `{output}_kd_island.json`;
+embedded when the tabs config's `keydriver_island` names the file. The same
+arrangement conjoint, maxdiff and pricing use.
+
+```jsonc
+{
+  "meta": {
+    "schema_version": 1, "kind": "keydriver",
+    "analysis_name": "Suiderland Bank customer satisfaction",
+    "outcome": { "var": "overall_satisfaction", "label": "Overall satisfaction" },
+    "run_status": "PASS", "primary_method": "shapley_r2_decomposition",
+    "random_seed": 2026,
+    "base": { "n": 900, "n_excluded": 0, "weighted": true, "weight_var": "weight",
+              "n_eff": 695.68, "design_effect": 1.29 },
+    "n_drivers": 5, "has_ci": true, "has_quadrant": true, "n_segment_vars": 2,
+    "frozen": true, "filter_note": "Report filters do not apply here. ..."
+  },
+  "importance": {
+    // interval = false is the reason the view stamps a method instead of
+    // drawing an empty whisker for it.
+    "methods": [ { "key": "shapley", "label": "Shapley value", "unit": "pct",
+                   "interval": false, "note": "no interval available" } ],
+    "drivers": [ { "driver": "digital_banking", "label": "Digital banking",
+                   "values": { "shapley": 45.8 }, "ranks": { "shapley": 1 },
+                   "direction": 1,          // sign of the coefficient, not of the share
+                   "avg_rank": 1 } ]
+  },
+  "ci": {
+    "rows": [ { "driver": "digital_banking", "method": "relative_weight",
+                "estimate": 45.5, "lo": 41.2, "hi": 49.9, "se": 2.2 } ],
+    "methods": ["correlation", "beta", "relative_weight"],
+    "no_interval": ["shapley"],
+    "iterations": 1000, "level": 0.95,
+    "note": "Point_Estimate is the mean of the bootstrap distribution ..."
+  },
+  "fit": { "r2": 0.743, "adj_r2": 0.741, "f": 515.8, "df1": 5, "df2": 894,
+           "p": 1.6e-260, "n_model": 900,
+           "vif": [ { "term": "digital_banking", "vif": 1.34 } ],
+           "vif_thresholds": { "moderate": 5, "high": 10 } },
+  "quadrant": {
+    "points": [ { "driver": "digital_banking", "label": "Digital banking",
+                  "x": 100, "y": 100, "quadrant": 2,
+                  "quadrant_label": "Keep Up Good Work", "gap": 0, "priority": 0 } ],
+    "thresholds": { "x": 24.3, "y": 34.2 },
+    "axes": { "x": "Performance", "y": "Importance" },
+    // What was asked for against what actually produced the points.
+    "importance_source": { "requested": "shap", "used": "auto (shap ... is absent)" }
+  },
+  "segments": [
+    { "variable": "age_band",
+      "segments": [ { "name": "Younger", "n": 412 }, { "name": "Older", "n": 488 } ],
+      "min_base": 60,          // a segment below this was never analysed
+      "rows": [ { "driver": "digital_banking", "label": "Digital banking",
+                  "values": { "Younger": 42.1 }, "ranks": { "Younger": 1 },
+                  "mean": 43.3, "classification": "Universal",
+                  "description": "..." } ],
+      "insights": ["digital_banking is the #1 driver across all 2 segments"] }
+  ]
+}
+```
+
+Rules this island keeps, and why:
+
+- **A block the run did not produce is ABSENT, not empty.** `jsonlite` writes a
+  NULL list element as `{}`, which is truthy in JavaScript, so an empty block
+  would light a panel with nothing in it.
+- **No interval is not a zero interval.** The bootstrap covers correlation,
+  beta and relative weights. It does not cover Shapley, which would need 2^k
+  refits per iteration. Shapley is named in `no_interval` and the view stamps
+  it. This is the review's decision 3, taken at its recommendation.
+- **The level travels with the interval.** The view never types "95%": a study
+  configured at 90% must not be labelled by a renderer that assumed one.
+- **Every segment carries its base**, and `min_base` says what a segment had to
+  reach to be analysed at all. A segment matrix without bases is not shippable.
+- **`n_eff` comes only from `calculate_effective_n`** (the shared Kish), never
+  from a second inline one. Cross-cutting must from V2_MIGRATION_PLAN section 5.
+- **Nothing here routes through the significance engine.** Importance is a
+  model estimate; the crosstab letters are proportion and Welch tests on counts.
+  The interval is the uncertainty statement, and the tab carries no letters.
+
+**Curated drop-list (logged against V2_MIGRATION_PLAN section 7).** These stay
+in the Excel deliverable and are deliberately not in the island: the v10.4
+sheets (elastic net, NCA, dominance, GAM), the effect sizes, and the
+method-comparison detail. They are opt-in analyses whose audience is the
+analyst, not the report reader. VIF, model fit and the bootstrap intervals go
+IN, because a reader needs them to judge what they are looking at.
 
 ---
 
