@@ -100,7 +100,11 @@ test_that("a weighted importance table differs from an unweighted one (A11)", {
   # The unweighted sample is dominated by D2; the weighted one by D1.
   expect_equal(un$Driver[which.max(un$Shapley_Value)], "D2")
   expect_equal(we$Driver[which.max(we$Shapley_Value)], "D1")
-  # And the standardised betas moved, which is M1.
+  # The standardised betas moved too, but note what that does NOT prove: a
+  # weighted lm returns different coefficients whatever the SDs do, so this
+  # assertion passed before M1 as well (review F19). The test that isolates
+  # the weighted SD is in test_engine_mediums.R, "the standardised beta uses
+  # the WEIGHTED spread".
   b_un <- un$Beta_Weight[match("D1", un$Driver)]
   b_we <- we$Beta_Weight[match("D1", we$Driver)]
   expect_gt(abs(b_we - b_un), 0.05)

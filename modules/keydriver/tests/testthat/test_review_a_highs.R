@@ -16,8 +16,7 @@ kd_ensure_module_loaded("all")
 test_that("SHAP produces a driver-level number for a categorical driver (F3)", {
   skip_if_not_installed("xgboost")
   skip_if_not_installed("shapviz")
-  skip_if(!exists("run_shap_analysis_internal", mode = "function"),
-          "pipeline not loaded")
+  expect_true(exists("run_shap_analysis_internal", mode = "function"))
 
   # shapviz's collapse takes driver -> its dummies. create_feature_map()
   # returns dummy -> driver, and it was passed through unchanged, so every
@@ -81,8 +80,7 @@ test_that("the collapse map is inverted for shapviz, not passed straight through
 })
 
 test_that("random_seed changes the intervals a RUN produces (F6)", {
-  skip_if(!exists("run_keydriver_analysis_impl", mode = "function"),
-          "pipeline not loaded")
+  expect_true(exists("run_keydriver_analysis_impl", mode = "function"))
   example_script <- file.path(project_root, "examples", "keydriver",
                               "create_keydriver_example.R")
   skip_if(!file.exists(example_script), "example generator not present")

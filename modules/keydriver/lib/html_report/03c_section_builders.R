@@ -448,6 +448,27 @@ build_kd_quadrant_section <- function(charts, tables, html_data, config = NULL) 
     )
   }
 
+  # Which importance measure placed these drivers, and whether it is the one
+  # the config asked for. The quadrant records both and this report showed
+  # neither, so a substituted source was invisible here while the workbook's
+  # Run_Status sheet and the Turas report both named it (handover A9).
+  qd <- html_data$quadrant_data
+  src_used <- qd$importance_source_used
+  src_req  <- qd$importance_source_requested
+  source_note <- if (!is.null(src_used) && nzchar(as.character(src_used)[1])) {
+    # The recorded source sometimes carries its own parenthetical, so the
+    # sentence is built around it rather than wrapped in more words.
+    txt <- sprintf("Drivers are placed by %s.", as.character(src_used)[1])
+    if (!is.null(src_req) && nzchar(as.character(src_req)[1]) &&
+        !identical(as.character(src_req)[1], as.character(src_used)[1])) {
+      txt <- paste0(txt, " The config asked for ", as.character(src_req)[1],
+                    ", which this run could not use.")
+    }
+    htmltools::tags$p(class = "kd-section-intro", txt)
+  } else {
+    NULL
+  }
+
   # Priority order callout (from shared registry)
   priority_callout <- htmltools::HTML(
     turas_callout("keydriver", "priority_quadrant", collapsed = TRUE)
@@ -493,7 +514,7 @@ build_kd_quadrant_section <- function(charts, tables, html_data, config = NULL) 
   htmltools::tags$div(
     class = "kd-section", id = "kd-quadrant",
     `data-kd-section` = "quadrant",
-    title_row, insight_area,
+    title_row, insight_area, source_note,
     htmltools::tags$p(
       class = "kd-section-intro",
       paste0(

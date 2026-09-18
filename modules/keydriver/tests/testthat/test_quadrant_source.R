@@ -104,8 +104,7 @@ test_that("the template dropdown and the engine agree (H11)", {
 # the two together so they cannot drift apart again.
 
 test_that("auto resolves to Shapley even when SHAP importance is present (F26)", {
-  skip_if(!exists("select_best_importance", mode = "function"),
-          "quadrant prep not loaded")
+  expect_true(exists("select_best_importance", mode = "function"))
   imp <- data.frame(
     Driver          = c("a", "b"),
     Shapley_Value   = c(60, 40),
@@ -120,8 +119,7 @@ test_that("auto resolves to Shapley even when SHAP importance is present (F26)",
 })
 
 test_that("auto falls through to SHAP only when Shapley is absent (F26)", {
-  skip_if(!exists("select_best_importance", mode = "function"),
-          "quadrant prep not loaded")
+  expect_true(exists("select_best_importance", mode = "function"))
   imp <- data.frame(Driver = c("a", "b"), SHAP_Importance = c(30, 70),
                     stringsAsFactors = FALSE)
   out <- suppressWarnings(utils::capture.output(res <- select_best_importance(imp)))
@@ -150,4 +148,51 @@ test_that("the docs describe what auto actually does (F26)", {
                          warn = FALSE), collapse = "\n")
   expect_true(grepl("'auto' means the Shapley decomposition", gen, fixed = TRUE))
   expect_true(grepl("set 'shap' explicitly", gen, fixed = TRUE))
+})
+
+
+test_that("the report says which importance source placed the drivers (A9)", {
+  # The quadrant records the source it was asked for and the one it used. The
+  # workbook's Run_Status sheet and the Turas report island both carry them;
+  # this report showed neither, so a substitution was invisible in the one
+  # place a reader looks at the chart.
+  builders <- paste(readLines(file.path(module_dir, "lib", "html_report",
+                                        "03c_section_builders.R"), warn = FALSE),
+                    collapse = "\n")
+  expect_true(grepl("importance_source_used", builders, fixed = TRUE))
+  expect_true(grepl("Drivers are placed by", builders, fixed = TRUE))
+  expect_true(grepl("which this run could not use", builders, fixed = TRUE))
+  # It goes into the section that actually renders, not the dead summary.
+  expect_true(grepl("title_row, insight_area, source_note,", builders, fixed = TRUE))
+
+  # And the transformer carries the attributes through rather than dropping
+  # them when it rebuilds the quadrant list.
+  tr <- paste(readLines(file.path(module_dir, "lib", "html_report",
+                                  "01_data_transformer.R"), warn = FALSE),
+              collapse = "\n")
+  expect_true(grepl('attr(quad_source, "importance_source_used")', tr, fixed = TRUE))
+  expect_true(grepl('attr(quad_source, "importance_source_requested")', tr, fixed = TRUE))
+})
+
+test_that("build_kd_quadrant_summary is dead and is labelled as such (A9)", {
+  # Found while placing the A9 stamp: this builder is defined and called by
+  # nothing. The stamp went into build_kd_quadrant_section() instead. Same
+  # shape as the kd_pinned_views.js fork removed under M24.
+  dir <- file.path(module_dir, "lib", "html_report")
+  srcs <- list.files(dir, pattern = "[.]R$", full.names = TRUE, recursive = TRUE)
+  calls <- 0
+  for (f in srcs) {
+    txt <- readLines(f, warn = FALSE)
+    txt <- txt[!grepl("^\\s*#", txt)]
+    calls <- calls + sum(grepl("build_kd_quadrant_summary(", txt, fixed = TRUE))
+  }
+  # Not one call anywhere, in any report file.
+  expect_equal(calls, 0L)
+  # While the definition is still there.
+  expect_true(any(grepl("build_kd_quadrant_summary <- function",
+                        readLines(file.path(dir, "06_quadrant_section.R"), warn = FALSE),
+                        fixed = TRUE)))
+  sec <- paste(readLines(file.path(dir, "06_quadrant_section.R"), warn = FALSE),
+               collapse = "\n")
+  expect_true(grepl("NOT CALLED BY ANY REPORT", sec, fixed = TRUE))
 })

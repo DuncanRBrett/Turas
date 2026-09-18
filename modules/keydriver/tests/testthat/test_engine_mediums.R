@@ -2,8 +2,13 @@
 # KEYDRIVER - ENGINE MEDIUMS (review M3, M6, M14)
 # ==============================================================================
 
+# Loaded, not skipped. This file used to guard every block with
+# skip_if(!exists(...)), so a run that had not loaded the module reported
+# success while testing nothing (reviews F17 and F19).
+kd_ensure_module_loaded("all")
+
 test_that("a config that says Yes enables the feature (M14)", {
-  skip_if(!exists("as_logical_setting", mode = "function"), "helper not loaded")
+  expect_true(exists("as_logical_setting", mode = "function"))
   # as.logical("Yes") is NA, so isTRUE(as.logical("Yes")) is FALSE: a config
   # written the way an analyst writes one switched the feature off in silence.
   expect_true(is.na(as.logical("Yes")))
@@ -38,7 +43,7 @@ test_that("every enable_ gate goes through the helper (M14)", {
 })
 
 test_that("one seed covers the whole run and is recoverable (M3)", {
-  skip_if(!exists("kd_seed_value", mode = "function"), "seed helper not loaded")
+  expect_true(exists("kd_seed_value", mode = "function"))
   # Nothing was seeded except a hard-coded 42 inside the SHAP path, so two runs
   # of one config gave different intervals and a different SHAP model.
   expect_equal(kd_seed_value(list()), KD_DEFAULT_SEED)
@@ -67,8 +72,7 @@ test_that("the randomised steps all ask for the seed (M3)", {
 })
 
 test_that("an all-categorical model runs, with an empty correlation column (M6, F2)", {
-  skip_if(!exists("calculate_importance_mixed", mode = "function"),
-          "mixed path not loaded")
+  expect_true(exists("calculate_importance_mixed", mode = "function"))
   set.seed(3)
   n <- 200
   d <- data.frame(
@@ -106,8 +110,7 @@ test_that("an all-categorical model runs, with an empty correlation column (M6, 
 })
 
 test_that("one numeric driver among categoricals does not kill the run (F1)", {
-  skip_if(!exists("calculate_correlations", mode = "function"),
-          "analysis not loaded")
+  expect_true(exists("calculate_correlations", mode = "function"))
   # stats::cor() on a frame with a factor column raises "'x' must be numeric".
   # The unweighted path handed it the whole driver list, so an unweighted
   # mixed study with one numeric driver died part-way through the importance
@@ -141,7 +144,7 @@ test_that("one numeric driver among categoricals does not kill the run (F1)", {
 })
 
 test_that("standardised betas use weighted SDs on a weighted study (M1)", {
-  skip_if(!exists("weighted_sd", mode = "function"), "helper not loaded")
+  expect_true(exists("weighted_sd", mode = "function"))
   # A standardised beta is b * (sd_x / sd_y). The coefficients came from a
   # weighted fit and the SDs did not, so the ratio mixed the model's weighted
   # population with the file's unweighted one.
@@ -164,7 +167,7 @@ test_that("the engine asks for a weighted SD when a weight is configured (M1)", 
 })
 
 test_that("the bootstrap says what its numbers are (M4)", {
-  skip_if(!exists("bootstrap_importance_ci", mode = "function"), "bootstrap not loaded")
+  expect_true(exists("bootstrap_importance_ci", mode = "function"))
   set.seed(5)
   n <- 150
   d <- data.frame(D1 = rnorm(n), D2 = rnorm(n), W = runif(n, 0.5, 2))
@@ -187,7 +190,7 @@ test_that("the bootstrap says what its numbers are (M4)", {
 })
 
 test_that("a weighted bootstrap names its resampling policy (M4)", {
-  skip_if(!exists("bootstrap_importance_ci", mode = "function"), "bootstrap not loaded")
+  expect_true(exists("bootstrap_importance_ci", mode = "function"))
   set.seed(6)
   n <- 150
   d <- data.frame(D1 = rnorm(n), D2 = rnorm(n), W = runif(n, 0.5, 2))
@@ -208,4 +211,51 @@ test_that("each facet gets its own quadrant lines (M5)", {
   expect_false(any(grepl("yintercept = all_segments$y_threshold[1]", src, fixed = TRUE)))
   expect_true(any(grepl("aes(xintercept = x_threshold)", src, fixed = TRUE)))
   expect_true(any(grepl("inherit.aes = FALSE", src, fixed = TRUE)))
+})
+
+
+test_that("the standardised beta uses the WEIGHTED spread, not the file's (M1, F19)", {
+  # The existing M1 tests check weighted_sd() on its own and count call sites
+  # in the source. Neither pins the engine: a weighted lm returns different
+  # coefficients whatever the SDs do, so a test that only says "weighted
+  # differs from unweighted" passes on the old code too (review F19).
+  #
+  # This holds the MODEL fixed and varies only which spread the engine uses.
+  # A standardised beta is b * (sd_x / sd_y), so on data where the weighted
+  # and unweighted spreads of a driver differ sharply, the engine's shares
+  # must match the weighted arithmetic and must not match the unweighted.
+  expect_true(exists("calculate_importance_scores", mode = "function"))
+  expect_true(exists("weighted_sd", mode = "function"))
+
+  set.seed(77)
+  n <- 1200
+  d <- data.frame(D1 = rnorm(n), D2 = rnorm(n))
+  # A tenth of the sample carries almost all the weight AND almost all of D1's
+  # spread, so weighting changes sd(D1) a great deal and sd(D2) very little.
+  heavy <- seq_len(n / 10)
+  d$D1[heavy] <- d$D1[heavy] * 6
+  d$W <- 1; d$W[heavy] <- 25
+  d$Y <- 0.6 * d$D1 + 0.9 * d$D2 + rnorm(n, sd = 0.7)
+
+  cfg <- list(outcome_var = "Y", driver_vars = c("D1", "D2"), weight_var = "W")
+  model <- lm(Y ~ D1 + D2, data = d, weights = d$W)
+  corr <- calculate_correlations(d, cfg)
+  got <- suppressWarnings(calculate_importance_scores(model, d, corr, cfg))
+
+  b <- stats::coef(model)[c("D1", "D2")]
+  share <- function(sd_x, sd_y) {
+    v <- abs(b * sd_x / sd_y)
+    unname(100 * v / sum(v))
+  }
+  w <- d$W
+  weighted_shares <- share(c(weighted_sd(d$D1, w), weighted_sd(d$D2, w)),
+                           weighted_sd(d$Y, w))
+  unweighted_shares <- share(c(stats::sd(d$D1), stats::sd(d$D2)), stats::sd(d$Y))
+
+  # The two arithmetics must actually disagree here, or the test proves nothing.
+  expect_gt(max(abs(weighted_shares - unweighted_shares)), 1)
+
+  engine <- got$Beta_Weight[match(c("D1", "D2"), got$Driver)]
+  expect_equal(unname(engine), weighted_shares, tolerance = 1e-6)
+  expect_false(isTRUE(all.equal(unname(engine), unweighted_shares, tolerance = 1e-3)))
 })

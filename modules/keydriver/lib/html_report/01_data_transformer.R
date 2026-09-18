@@ -195,7 +195,14 @@ transform_keydriver_for_html <- function(results, config) {
       data         = quad_source$data,
       action_table = quad_source$action_table,
       gap_analysis = quad_source$gap_analysis,
-      plots        = quad_source$plots
+      plots        = quad_source$plots,
+      config       = quad_source$config,
+      # Which importance source was asked for against the one that produced
+      # these points. Recorded on the quadrant result and dropped here, so the
+      # report never said when a requested source had been substituted
+      # (handover A9). It reaches the workbook and the Turas report already.
+      importance_source_requested = attr(quad_source, "importance_source_requested"),
+      importance_source_used      = attr(quad_source, "importance_source_used")
     )
   }
 
