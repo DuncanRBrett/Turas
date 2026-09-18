@@ -249,3 +249,411 @@ test_that("the output stage wires both contributions in and survives a refusal",
   # that aborts the Excel deliverable already written.
   expect_true(grepl("turas_refusal = function(e)", src, fixed = TRUE))
 })
+
+
+# ==============================================================================
+# DIAGNOSTICS BLOCK (section 6 parity)
+# ==============================================================================
+# The classic report's diagnostics panel shows four groups of stat cards. Two
+# of its groups were dead: transform_diagnostics_section() read the logit fit
+# from results$logit_results$fit_stats, but the module writes model_fit, and
+# build_diagnostics_table() was never called by any panel. The island reads
+# the key that exists.
+
+test_that("the diagnostics block carries the classic panel's statistics", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$diagnostics
+  expect_false(is.null(d))
+
+  # Population utility statistics, the classic panel's second card group.
+  for (f in c("utilityRange", "meanUtility", "utilitySd", "discrimination")) {
+    expect_true(f %in% names(d), info = f)
+    expect_length(d[[f]], 1L)
+    expect_true(is.finite(d[[f]]), info = f)
+  }
+  # Model quality indicators, its third group.
+  for (f in c("meanMaxShare", "chanceLevel", "sharpnessRatio", "entropyRatio",
+              "heterogeneity")) {
+    expect_true(f %in% names(d), info = f)
+    expect_length(d[[f]], 1L)
+  }
+  # Respondent utility distribution, its fourth group.
+  for (f in c("meanRespondentRange", "minRespondentRange", "maxRespondentRange")) {
+    expect_true(f %in% names(d), info = f)
+    expect_length(d[[f]], 1L)
+  }
+  # Chance level is one over the number of items, as a percentage.
+  expect_equal(d$chanceLevel, round(100 / 6, 1))
+  # Discrimination is the utility range divided by the item count.
+  expect_equal(d$discrimination, round(d$utilityRange / 6, 3))
+  # A range cannot be negative and the minimum cannot exceed the maximum.
+  expect_gte(d$utilityRange, 0)
+  expect_lte(d$minRespondentRange, d$maxRespondentRange)
+})
+
+test_that("model fit is read from model_fit, the key the module actually writes", {
+  fx <- make_island_fixture(with_hb = "eb", with_logit = TRUE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$diagnostics$logLikelihood, -120)
+  expect_equal(isl$diagnostics$aic, 250)
+
+  # The classic report read fit_stats. Nothing writes that key, so a fixture
+  # carrying only fit_stats must produce no fit numbers at all.
+  fx2 <- make_island_fixture(with_hb = "eb", with_logit = TRUE)
+  fx2$results$logit_results$model_fit <- NULL
+  fx2$results$logit_results$fit_stats <- list(log_likelihood = -99, aic = 1)
+  isl2 <- serialize_maxdiff_layer(fx2$results, fx2$config, verbose = FALSE)
+  expect_null(isl2$diagnostics$logLikelihood)
+  expect_null(isl2$diagnostics$aic)
+})
+
+test_that("the diagnostics block counts configured segments", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$diagnostics$nSegments, 0L)
+
+  fx$config$segment_settings <- data.frame(
+    Segment_ID = c("S1", "S2"), Segment_Label = c("Age", "Region"),
+    stringsAsFactors = FALSE
+  )
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$diagnostics$nSegments, 2L)
+})
+
+test_that("the diagnostics block is absent, not empty, with no utilities to describe", {
+  fx <- make_island_fixture(with_hb = "none", with_logit = FALSE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("diagnostics" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"diagnostics"', js, fixed = TRUE))
+})
+
+test_that("every diagnostics field serialises as a JSON scalar, not a one-element array", {
+  # .maxdiff_island_keep_arrays() is an INVERTED whitelist: it names the
+  # scalar fields of each block and wraps everything else in I(). A block
+  # missing from that list ships its scalars as [x], and the panel reads them
+  # wrong or vanishes.
+  fx <- make_island_fixture(with_hb = "eb")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  d <- back$diagnostics
+  expect_false(is.null(d))
+  for (f in names(d)) {
+    expect_length(d[[f]], 1L)
+    expect_false(is.list(d[[f]]), info = paste(f, "serialised as an array"))
+  }
+  unlink(fx$out_dir, recursive = TRUE)
+})
+
+
+# ==============================================================================
+# HEAD-TO-HEAD BLOCK (section 6 parity)
+# ==============================================================================
+# The classic report draws an n by n win-probability matrix. The island carries
+# the upper triangle only: P(j beats i) is exactly 1 - P(i beats j), so the
+# mirror is derived in the tab and the payload halves.
+
+test_that("head to head carries the upper triangle in island item order", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  h <- isl$headToHead
+  expect_false(is.null(h))
+
+  n <- length(isl$scores$itemId)
+  expect_equal(length(h$rowItem), n * (n - 1) / 2)
+  expect_equal(length(h$colItem), length(h$rowItem))
+  expect_equal(length(h$prob), length(h$rowItem))
+
+  # Every pair appears once, row before column in the island's item order.
+  ids <- isl$scores$itemId
+  expect_true(all(h$rowItem %in% ids))
+  expect_true(all(h$colItem %in% ids))
+  expect_equal(anyDuplicated(paste(h$rowItem, h$colItem)), 0L)
+  expect_true(all(match(h$rowItem, ids) < match(h$colItem, ids)))
+
+  # A probability is a percentage, and no pair compares an item with itself.
+  expect_true(all(h$prob >= 0 & h$prob <= 100))
+  expect_false(any(h$rowItem == h$colItem))
+})
+
+test_that("head to head agrees with compute_head_to_head, the classic report's own function", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  h <- isl$headToHead
+  indiv <- fx$results$hb_results$individual_utilities
+
+  for (k in seq_len(min(5L, length(h$prob)))) {
+    ref <- compute_head_to_head(indiv, h$rowItem[k], h$colItem[k])
+    expect_equal(h$prob[k], ref$prob_a, tolerance = 1e-8,
+                 info = paste(h$rowItem[k], "vs", h$colItem[k]))
+  }
+})
+
+test_that("head to head falls back to aggregate utilities and says so", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$headToHead$source, "individual")
+
+  # No individual utilities: the population means still support a comparison.
+  fx$results$hb_results$individual_utilities <- NULL
+  isl2 <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl2$headToHead$source, "aggregate")
+  expect_equal(length(isl2$headToHead$prob), length(isl$headToHead$prob))
+  expect_match(isl2$headToHead$note, "population", fixed = TRUE)
+
+  # Aggregate logit only.
+  fx3 <- make_island_fixture(with_hb = "none", with_logit = TRUE)
+  isl3 <- serialize_maxdiff_layer(fx3$results, fx3$config, verbose = FALSE)
+  expect_equal(isl3$headToHead$source, "aggregate")
+})
+
+test_that("head to head is absent when nothing can be compared", {
+  fx <- make_island_fixture(with_hb = "none", with_logit = FALSE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("headToHead" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"headToHead"', js, fixed = TRUE))
+})
+
+test_that("head to head keeps its per-pair fields as arrays and its scalars scalar", {
+  fx <- make_island_fixture(with_hb = "eb")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  h <- back$headToHead
+  expect_true(is.list(h$rowItem))
+  expect_true(is.list(h$colItem))
+  expect_true(is.list(h$prob))
+  expect_equal(length(h$prob), 15)          # 6 items, 6 * 5 / 2
+  expect_false(is.list(h$source))
+  expect_false(is.list(h$note))
+  unlink(fx$out_dir, recursive = TRUE)
+})
+
+test_that("head to head survives two items, the smallest matrix there is", {
+  fx <- make_island_fixture(with_hb = "eb")
+  fx$config$items$Include[3:6] <- 0
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  h <- isl$headToHead
+  expect_equal(length(h$prob), 1L)
+  expect_equal(h$rowItem, isl$scores$itemId[1])
+  expect_equal(h$colItem, isl$scores$itemId[2])
+})
+
+
+# ==============================================================================
+# SEGMENTS BLOCK (section 6 parity)
+# ==============================================================================
+# The classic Segments panel never worked: build_segment_table() prints the
+# internal list names as headings with Times_Shown and Rank as its columns, and
+# build_segment_chart() returns an empty string because it wants wide
+# BW_Score_<level> columns that 08_segments.R does not produce. Proved by
+# running both against the real shape, 18 Sep 2026. So this block is a build,
+# not a port.
+
+make_segment_results <- function(ids, levels = c("18-34", "35+"), base = 120L,
+                                 variable = "Age", segment_id = "S1") {
+  scores <- do.call(rbind, lapply(seq_along(levels), function(k) data.frame(
+    Item_ID = ids, Item_Label = paste("Item", seq_along(ids)),
+    Times_Shown = 30L,
+    Best_Pct = seq(50, 10, length.out = length(ids)) + k,
+    Worst_Pct = seq(5, 45, length.out = length(ids)) - k,
+    Net_Score = seq(45, -35, length.out = length(ids)) + k,
+    BW_Score = seq(.45, -.35, length.out = length(ids)),
+    Rank = seq_along(ids),
+    Segment_ID = segment_id, Segment_Label = variable,
+    Segment_Value = levels[k], Segment_N = base,
+    stringsAsFactors = FALSE
+  )))
+  list(
+    segment_scores = scores,
+    segment_summary = data.frame(
+      Segment_ID = segment_id, Segment_Label = variable,
+      Segment_Value = levels, N = base, stringsAsFactors = FALSE
+    )
+  )
+}
+
+test_that("segments travel as one row per item per level, in island item order", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  fx$results$segment_results <- make_segment_results(ids)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  s <- isl$segments
+  expect_false(is.null(s))
+
+  expect_equal(length(s$itemId), length(ids) * 2L)
+  for (f in c("variable", "level", "base", "itemId", "netScore", "bestPct", "worstPct")) {
+    expect_equal(length(s[[f]]), length(s$itemId), info = f)
+  }
+  expect_equal(unique(s$variable), "Age")
+  expect_equal(unique(s$level), c("18-34", "35+"))
+  # Item order inside each level follows the island, not the segment frame.
+  expect_equal(s$itemId[seq_along(ids)], isl$scores$itemId)
+})
+
+test_that("segments carry the base and the minimum the config set for it", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  fx$results$segment_results <- make_segment_results(ids, base = 30L)
+  fx$config$output_settings$Min_Respondents_Per_Segment <- 50
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_true(all(isl$segments$base == 30))
+  expect_equal(isl$segments$minBase, 50)
+  expect_length(isl$segments$minBase, 1L)
+})
+
+test_that("segments keep every configured variable apart", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  a <- make_segment_results(ids, levels = c("18-34", "35+"), variable = "Age",
+                            segment_id = "S1")
+  b <- make_segment_results(ids, levels = c("North", "South"), variable = "Region",
+                            segment_id = "S2", base = 200L)
+  fx$results$segment_results <- list(
+    segment_scores = rbind(a$segment_scores, b$segment_scores),
+    segment_summary = rbind(a$segment_summary, b$segment_summary)
+  )
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  s <- isl$segments
+  expect_equal(unique(s$variable), c("Age", "Region"))
+  expect_equal(length(s$itemId), length(ids) * 4L)
+  expect_true(all(s$base[s$variable == "Region"] == 200))
+})
+
+test_that("segments are absent when no segment analysis ran", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("segments" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"segments"', js, fixed = TRUE))
+
+  # An empty frame is nothing to show, not a block of empty arrays.
+  fx$results$segment_results <- list(
+    segment_scores = make_segment_results("I1")$segment_scores[0, ],
+    segment_summary = NULL
+  )
+  isl2 <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("segments" %in% names(isl2))
+})
+
+test_that("segments keep per-row fields as arrays and scalars scalar", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  fx$results$segment_results <- make_segment_results(ids)
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  s <- back$segments
+  for (f in c("variable", "level", "base", "itemId", "netScore", "bestPct", "worstPct")) {
+    expect_true(is.list(s[[f]]), info = paste(f, "must be a JSON array"))
+  }
+  expect_false(is.list(s$minBase))
+  expect_false(is.list(s$note))
+  unlink(fx$out_dir, recursive = TRUE)
+})
+
+test_that("a single level with a single item still ships as arrays, not scalars", {
+  # The F2 lesson: a length-1 per-row field that unboxes makes the panel
+  # vanish, and one small segment level is the case that produces it.
+  fx <- make_island_fixture(with_hb = "eb")
+  fx$config$items$Include[2:6] <- 0
+  ids <- as.character(fx$items$Item_ID[1])
+  fx$results$segment_results <- make_segment_results(ids, levels = "18-34")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  expect_true(is.list(back$segments$itemId))
+  expect_equal(length(back$segments$itemId), 1L)
+  expect_true(is.list(back$segments$netScore))
+  unlink(fx$out_dir, recursive = TRUE)
+})
+
+
+# ==============================================================================
+# DISTRIBUTIONS BLOCK (section 6 parity)
+# ==============================================================================
+# Feeds the raincloud/violin chart. The densities travel FLAT, two vectors of
+# nItems * nPoints with a stride, so every field in the block is a plain array
+# like every other block and no nested structure has to survive jsonlite.
+
+test_that("distributions carry per-item summary statistics in island item order", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$distributions
+  expect_false(is.null(d))
+
+  n <- length(isl$scores$itemId)
+  expect_equal(d$itemId, isl$scores$itemId)
+  for (f in c("mean", "median", "sd", "q25", "q75", "min", "max")) {
+    expect_equal(length(d[[f]]), n, info = f)
+  }
+  # A quartile range sits inside the observed range, and the median inside it.
+  ok <- is.finite(d$q25) & is.finite(d$q75)
+  expect_true(all(d$q25[ok] <= d$q75[ok]))
+  expect_true(all(d$min[ok] <= d$q25[ok]))
+  expect_true(all(d$q75[ok] <= d$max[ok]))
+})
+
+test_that("densities travel flat with a stride the tab can slice", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$distributions
+  n <- length(isl$scores$itemId)
+
+  expect_length(d$nPoints, 1L)
+  expect_equal(length(d$densityX), n * d$nPoints)
+  expect_equal(length(d$densityY), n * d$nPoints)
+
+  # Slice item 1 the way the tab will, and check it looks like a density.
+  k <- d$nPoints
+  x1 <- d$densityX[seq_len(k)]
+  y1 <- d$densityY[seq_len(k)]
+  expect_false(anyNA(x1))
+  expect_true(all(diff(x1) > 0))        # the grid ascends
+  expect_true(all(y1 >= 0))             # a density is never negative
+})
+
+test_that("the Stan reference item's flat distribution is blanked, not reported", {
+  # The model fixes the reference item at zero for every respondent, so its
+  # spread is structural. F6 blanks it in scores and discrimination; it is
+  # blanked here for the same reason rather than drawn as a spike.
+  fx <- make_island_fixture(with_hb = "stan")
+  ids <- as.character(fx$items$Item_ID)
+  ref <- ids[length(ids)]
+  fx$results$hb_results$model_fit$reference_item <- ref
+  fx$results$hb_results$individual_utilities[[ref]] <- 0
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$distributions
+
+  pos <- match(ref, d$itemId)
+  expect_false(is.na(pos))
+  expect_true(is.na(d$sd[pos]))
+  expect_true(is.na(d$q25[pos]))
+  k <- d$nPoints
+  expect_true(all(is.na(d$densityX[((pos - 1) * k + 1):(pos * k)])))
+
+  # Every other item is untouched.
+  others <- setdiff(seq_along(d$itemId), pos)
+  expect_false(any(is.na(d$sd[others])))
+})
+
+test_that("distributions are absent without individual utilities", {
+  fx <- make_island_fixture(with_hb = "none", with_logit = TRUE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("distributions" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"distributions"', js, fixed = TRUE))
+})
+
+test_that("distributions keep per-item fields as arrays and the stride scalar", {
+  fx <- make_island_fixture(with_hb = "eb")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  d <- back$distributions
+  for (f in c("itemId", "mean", "median", "sd", "q25", "q75", "min", "max",
+              "densityX", "densityY")) {
+    expect_true(is.list(d[[f]]), info = paste(f, "must be a JSON array"))
+  }
+  expect_false(is.list(d$nPoints))
+  expect_false(is.list(d$note))
+  unlink(fx$out_dir, recursive = TRUE)
+})

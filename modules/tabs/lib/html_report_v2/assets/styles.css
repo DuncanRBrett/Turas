@@ -1422,6 +1422,62 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 }
 .md-tag-must { background: #e2f3e6; color: #1f5b2d; }
 
+/* Parity panels (section 6): diagnostics stat cards and the head-to-head
+   matrix. The matrix scrolls sideways rather than squeezing its columns, so a
+   ten-item study stays readable on a laptop. Cell tints are inline, computed
+   from the value, for the same reason chart colours are literal: a rasterised
+   pin looks like the page. */
+.md-stat-head {
+  margin: 14px 0 6px; font-size: .78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: #667;
+}
+.md-stat-grid {
+  display: grid; gap: 10px; margin-bottom: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.md-stat {
+  border: 1px solid #e6e6e6; border-radius: 4px; padding: 9px 11px;
+  background: #fbfbfc;
+}
+.md-stat-value {
+  font-size: 1.3rem; font-weight: 600; color: var(--brand, #323367);
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.md-stat-label { font-size: .82rem; color: #333; margin-top: 2px; }
+.md-stat-sub { font-size: .74rem; color: #777; margin-top: 1px; }
+.md-matrix { overflow-x: auto; }
+.md-h2h { min-width: 520px; }
+.md-h2h th { white-space: nowrap; }
+.md-h2h tbody th { font-weight: 600; text-align: left; background: #fafafa; }
+.md-h2h-self { background: #f2f2f4; }
+.md-h2h-col { width: 46px; color: #667; }
+.md-h2h-n { color: #98a; font-weight: 400; }
+/* Numbered key under a chart whose points are numbered. */
+.md-key {
+  margin: 2px 0 0 20px; padding: 0; columns: 2; column-gap: 28px;
+  font-size: .8rem; color: #555;
+}
+.md-key li { margin: 0 0 2px; break-inside: avoid; }
+.md-chart { margin: 4px 0 12px; }
+.md-chart svg { width: 100%; height: auto; max-width: 720px; display: block; }
+.md-panel h4 { margin: 18px 0 4px; font-size: .95rem; font-weight: 600; }
+/* A segment level under Min_Respondents_Per_Segment is marked in the header
+   and down its column, so the reader cannot read one number out of context. */
+.md-base { display: block; font-weight: 400; font-size: .74rem; color: #777; }
+.md-thin-flag {
+  display: block; font-weight: 600; font-size: .7rem; color: #8a5a00;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.md-table th.md-thin, .md-table td.md-thin { background: #fffaf0; }
+.md-thin-note { color: #7a4b00; }
+/* The anchor bars run to 100% so the threshold marker lines up down the
+   column. The wrapper is the 0-100 track; the bar and the marker sit in it. */
+.md-barwrap { position: relative; display: block; width: 100%; height: 11px; }
+.md-barwrap .md-bar { position: absolute; left: 0; top: 0; height: 11px; }
+.md-threshold {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; background: #8a5a00;
+}
+
 /* ---------------------------------------------------------------------------
    Pricing tab (27z_pricing.js). The same shape as the Conjoint and MaxDiff
    tabs: frozen panels fed by the pricing module's island (14_v2_island.R).

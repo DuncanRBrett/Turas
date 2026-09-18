@@ -706,7 +706,8 @@ rank_utilities <- function(utilities) {
 #' @return The same table with only numeric item columns.
 #' @keywords internal
 strip_respondent_id_cols <- function(individual_utils,
-                                     id_names = c("resp_id", "respondent_id")) {
+                                     id_names = c("resp_id", "respondent_id",
+                                                  "Respondent_ID")) {
   if (is.data.frame(individual_utils)) {
     keep <- !(names(individual_utils) %in% id_names)
     individual_utils <- individual_utils[, keep, drop = FALSE]
