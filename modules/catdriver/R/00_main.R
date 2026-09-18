@@ -863,6 +863,35 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
   log_step(9, "Calculating variable importance...")
   importance_g <- calculate_importance(model_result_g, config)
 
+  # Provenance and honesty about what the importance table is (D5).
+  importance_degraded <- attr(importance_g, "cd_importance_degraded")
+  if (!is.null(importance_degraded)) {
+    cat(sprintf("   [PARTIAL] %s\n", importance_degraded))
+    local_degraded <- c(local_degraded, importance_degraded)
+    local_affected <- c(local_affected, "Driver importance", "Importance ranking")
+  }
+
+  missing_importance <- importance_g$variable[is.na(importance_g$chi_square)]
+  if (length(missing_importance) > 0) {
+    cat(sprintf("   [PARTIAL] No importance statistic for: %s\n",
+                paste(missing_importance, collapse = ", ")))
+    local_degraded <- c(local_degraded,
+      paste0("No importance statistic could be computed for: ",
+             paste(missing_importance, collapse = ", "),
+             ". Those drivers carry no share of the total and are not ranked against the others."))
+    local_affected <- c(local_affected, "Driver importance", "Importance ranking")
+  }
+
+  skipped_drivers <- setdiff(config$driver_vars, importance_g$variable)
+  if (length(skipped_drivers) > 0) {
+    cat(sprintf("   [PARTIAL] Drivers absent from the importance table: %s\n",
+                paste(skipped_drivers, collapse = ", ")))
+    local_degraded <- c(local_degraded,
+      paste0("Drivers configured but absent from the importance table: ",
+             paste(skipped_drivers, collapse = ", ")))
+    local_affected <- c(local_affected, "Driver importance")
+  }
+
   # Add stability flag column
   importance_g$stability_flag <- if (guard_status_g$use_with_caution) {
     "Use with caution"
@@ -1346,11 +1375,30 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
     paste(parts, collapse = ", ")
   }
 
+  # D5: the method stamp comes from the path that actually ran, recorded on the
+  # importance frame where it was computed. It used to be the hardcoded string
+  # "Type II Wald chi-square (car::Anova)", which was wrong for the multinomial
+  # likelihood-ratio path, wrong for the z-squared fallback, and wrong even for
+  # glm and clm: car::Anova(type = "II") reports LIKELIHOOD-RATIO chi-squares.
+  importance_method <- if (!is.null(importance) && is.data.frame(importance) &&
+                           "method" %in% names(importance) &&
+                           any(nzchar(as.character(importance$method)))) {
+    paste(unique(as.character(importance$method[nzchar(as.character(importance$method))])),
+          collapse = "; ")
+  } else {
+    "Not recorded"
+  }
+
+  weighting_stamp <- result$weight_diagnostics$inference_stamp %||%
+    catdriver_weighting_stamp(config$weight_var, result$weight_diagnostics,
+                              result$weight_diagnostics$normalisation)
+
   assumptions <- list(
     "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "—",
     "Drivers tested"     = as.character(n_drivers),
     "Model Type"         = model_type_label,
-    "Importance Method"  = "Type II Wald chi-square (car::Anova)",
+    "Importance Method"  = importance_method,
+    "Weighting"          = weighting_stamp,
     "Subgroup Analysis"  = if (n_subgroups > 0) sprintf("%d subgroups", n_subgroups) else "None",
     "TRS Status"         = run_result$status %||% "PASS",
     "TRS Events"         = trs_summary
@@ -1363,22 +1411,60 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
     questions_in_config = length(config$driver_vars)
   )
 
+  # Real counts, not zeros. n_excluded was hardcoded 0 whatever listwise
+  # deletion did, and `weighted` came from the config alone, so a typo'd weight
+  # variable shipped unweighted numbers stamped weighted.
+  rows_dropped_missing <- result$missing_report$summary$total_rows_dropped %||% 0L
+  n_analysed <- result$diagnostics$analysis_n %||%
+    (if (!is.null(result$prep_data$data)) nrow(result$prep_data$data) else NA_integer_)
+  # survey_data here is the frame the model saw, which is already post-deletion,
+  # so the original row count has to come from the diagnostics.
+  n_original <- result$diagnostics$original_n %||% nrow(survey_data)
+  n_excluded <- if (!is.na(n_analysed)) {
+    max(0L, as.integer(n_original - n_analysed))
+  } else {
+    as.integer(rows_dropped_missing)
+  }
+
+  analysed_drivers <- if (!is.null(importance) && is.data.frame(importance)) {
+    intersect(config$driver_vars, importance$variable)
+  } else {
+    character(0)
+  }
+  questions_skipped <- length(setdiff(config$driver_vars, analysed_drivers))
+
   data_used <- list(
-    n_respondents      = nrow(survey_data),
-    n_excluded         = 0L,
+    n_respondents      = as.integer(n_original),
+    n_excluded         = n_excluded,
     weight_variable    = config$weight_var %||% "",
-    weighted           = !is.null(config$weight_var) && nzchar(config$weight_var %||% ""),
-    questions_analysed = n_drivers,
-    questions_skipped  = 0L
+    # Weighted means weights were actually applied, which the diagnostics only
+    # exist for when they were.
+    weighted           = !is.null(result$weight_diagnostics),
+    questions_analysed = length(analysed_drivers),
+    questions_skipped  = questions_skipped
   )
 
   duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
+  # The Declaration read config$project_name and friends, which nothing ever
+  # populates: the loader keeps the sheet's own keys in config$settings, so the
+  # Declaration printed a dash for settings that were present all along.
+  setting_value <- function(...) {
+    for (key in c(...)) {
+      value <- config$settings[[key]]
+      if (!is.null(value) && !all(is.na(value)) && any(nzchar(as.character(value)))) {
+        return(as.character(value)[1])
+      }
+    }
+    NULL
+  }
+
   payload <- list(
     module           = "CATDRIVER",
-    project_name     = config$project_name   %||% NULL,
-    analyst_name     = config$analyst_name   %||% NULL,
-    research_house   = config$research_house %||% NULL,
+    project_name     = setting_value("Project_Name", "project_name") %||%
+                         config$analysis_name %||% NULL,
+    analyst_name     = setting_value("Analyst_Name", "analyst_name", "researcher_name") %||% NULL,
+    research_house   = setting_value("Research_House", "research_house") %||% NULL,
     run_timestamp    = start_time,
     turas_version    = CATDRIVER_VERSION,
     r_version        = R.version$version.string,

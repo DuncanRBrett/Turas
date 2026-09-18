@@ -305,6 +305,7 @@ guard_pre_analysis <- function(config, data) {
   guard <- guard_init()
 
   # Hard error checks (all use catdriver_refuse for clean exits)
+  guard_reserved_column_names(config, data)
   guard_require_outcome_type(config)
   guard_outcome_levels_match(data, config)
   guard_ordinal_outcome_order(config)      # Ordinal OUTCOME must declare its order

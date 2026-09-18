@@ -58,7 +58,10 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
                              details = NULL) {
 
   # Ensure reason has valid TRS prefix, add CFG_ if missing
-  if (!is.null(reason) && !grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", reason)) {
+  # CALC_ is the platform's prefix for calculation failures (project CLAUDE.md);
+  # without it here, a CALC_ code was silently rewritten to CFG_CALC_ and told
+  # the user to look at their configuration for a computation that failed.
+  if (!is.null(reason) && !grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", reason)) {
     reason <- paste0("CFG_", reason)
   }
   if (is.null(reason)) {
@@ -71,7 +74,7 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
     # why_it_matters is now MANDATORY per TRS governance
     turas_refuse(
       code = reason,
-      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", "", reason),
+      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", "", reason),
       problem = message,
       why_it_matters = if (!is.null(why_it_matters)) why_it_matters else "This issue prevents the analysis from producing valid results.",
       how_to_fix = if (!is.null(fix)) fix else "Review the error message above and correct your configuration or data.",
@@ -83,7 +86,7 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
     # why_it_matters is now MANDATORY per TRS governance
     turas_refuse(
       code = reason,
-      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", "", reason),
+      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", "", reason),
       problem = if (!is.null(problem)) problem else "An error occurred in CatDriver analysis.",
       why_it_matters = if (!is.null(why_it_matters)) why_it_matters else "This issue prevents the analysis from producing valid results.",
       how_to_fix = if (!is.null(fix)) fix else "Review the error details and correct your configuration or data.",

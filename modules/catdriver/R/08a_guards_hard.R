@@ -50,6 +50,50 @@ guard_require_outcome_type <- function(config) {
 }
 
 
+#' Guard: Reserved Internal Column Names
+#'
+#' REFUSES when an analysis variable is named like one of the columns the
+#' engines add to their own copy of the data to carry weights.
+#'
+#' The engines write \code{..catdriver_wt..} (multinomial, bootstrap) and
+#' \code{.wt} (binary, ordinal) into the fit frame. A user column of either
+#' name would be overwritten, and the importance refits decide whether a run is
+#' weighted by testing for that column, so a stray column would make an
+#' unweighted run behave as though it were weighted. Silent, and wrong.
+#'
+#' @param config Configuration list.
+#' @param data Data frame.
+#' @keywords internal
+guard_reserved_column_names <- function(config, data) {
+
+  reserved <- c("..catdriver_wt..", ".wt")
+  in_play <- unique(c(config$outcome_var, config$driver_vars, config$weight_var,
+                      config$subgroup_var))
+  in_play <- in_play[!is.na(in_play) & nzchar(in_play)]
+
+  clashes <- intersect(reserved, c(in_play, names(data)))
+
+  if (length(clashes) > 0) {
+    catdriver_refuse(
+      reason = "DATA_RESERVED_COLUMN_NAME",
+      title = "RESERVED COLUMN NAME IN DATA",
+      problem = paste0("The data contains the reserved column name(s): ",
+                       paste(clashes, collapse = ", "), "."),
+      why_it_matters = paste0(
+        "CatDriver adds these columns to its own copy of the data to carry survey weights. ",
+        "A column of the same name would be overwritten, and the module decides whether a fit ",
+        "was weighted by looking for it, so the run could report weighted results from an ",
+        "unweighted model."
+      ),
+      fix = paste0("Rename the column(s) ", paste(clashes, collapse = ", "),
+                   " in your data file. Any other name will do.")
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Guard: Ordinal Outcome Must Declare Its Order
 #'
 #' REFUSES when \code{outcome_type = "ordinal"} and the outcome variable has no

@@ -21,37 +21,59 @@ calculate_importance <- function(model_result, config) {
 
   model <- model_result$model
 
-  # Try car::Anova for Type II tests
-  anova_result <- tryCatch({
-    if (!requireNamespace("car", quietly = TRUE)) {
-      catdriver_refuse(
-        reason = "PKG_CAR_MISSING",
-        title = "REQUIRED PACKAGE MISSING",
-        problem = "Package 'car' is required for variable importance calculation but is not installed.",
-        why_it_matters = "Variable importance uses Type II Wald chi-square tests from car::Anova.",
-        fix = "Install the package with: install.packages('car')"
-      )
-    }
+  # The car dependency is checked OUTSIDE the fallback handler. It used to sit
+  # inside a tryCatch whose error branch called the z-squared fallback, and a
+  # TRS refusal is an error condition, so a missing package silently became a
+  # different statistic instead of a refusal. Every refusal raised anywhere
+  # below the car::Anova call had the same fate.
+  if (!requireNamespace("car", quietly = TRUE)) {
+    catdriver_refuse(
+      reason = "PKG_CAR_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'car' is required for variable importance calculation but is not installed.",
+      why_it_matters = "Variable importance uses likelihood-ratio chi-square tests from car::Anova.",
+      fix = "Install the package with: install.packages('car')"
+    )
+  }
 
-    if (model_result$model_type == "multinomial_logistic") {
-      # For multinomial, use custom approach
-      calculate_multinomial_importance(model_result, config)
-    } else {
-      # Binary and ordinal use car::Anova
-      car::Anova(model, type = "II")
-    }
-  }, error = function(e) {
-    cat(sprintf("   [WARNING] car::Anova failed: %s. Using fallback method.\n", e$message))
-    calculate_fallback_importance(model_result, config)
-  })
+  if (model_result$model_type == "multinomial_logistic") {
+    # Multinomial has its own likelihood-ratio path, and its refusals must
+    # travel, so it is called outside the fallback handler.
+    return(calculate_multinomial_importance(model_result, config))
+  }
 
-  # If already a data frame (from multinomial), return it
-  if (is.data.frame(anova_result) && "importance_pct" %in% names(anova_result)) {
-    return(anova_result)
+  anova_result <- tryCatch(
+    # car::Anova refits the model for each term, so a weighted binomial repeats
+    # the "non-integer #successes" warning once per driver. Same muffler, same
+    # reason as the fit sites.
+    cd_muffle_noninteger_successes(car::Anova(model, type = "II")),
+    turas_refusal = function(e) stop(e),   # a refusal is not a reason to fall back
+    error = function(e) {
+      cat(sprintf("   [WARNING] car::Anova failed: %s. Falling back to z-squared shares.\n",
+                  conditionMessage(e)))
+      structure(list(reason = conditionMessage(e)), class = "cd_anova_failed")
+    }
+  )
+
+  if (inherits(anova_result, "cd_anova_failed")) {
+    importance_df <- calculate_fallback_importance(model_result, config)
+    # D5: the output says which statistic produced it, and the run says so too.
+    importance_df$method <- "z-squared share (Wald, car::Anova unavailable)"
+    attr(importance_df, "cd_importance_degraded") <- paste0(
+      "Driver importance used a z-squared Wald share instead of likelihood-ratio ",
+      "chi-squares, because car::Anova failed: ", anova_result$reason,
+      ". The two statistics are not the same and the shares are not comparable with other runs."
+    )
+    return(importance_df)
   }
 
   # Process Anova results
   importance_df <- process_anova_results(anova_result, config)
+
+  # car::Anova(type = "II") on glm and clm reports LIKELIHOOD-RATIO chi-squares,
+  # not Wald ones, whatever the stats pack used to claim. Verified by running it
+  # against a manual deviance difference, 2026-09-18.
+  importance_df$method <- "LR chi-square share (car::Anova type II)"
 
   importance_df
 }
@@ -182,20 +204,23 @@ calculate_multinomial_importance <- function(model_result, config) {
   }
 
   if (is.null(data)) {
-    cat("   [WARN] Cannot extract data for multinomial importance — returning equal importance\n")
-    importance_df <- data.frame(
-      variable = config$driver_vars,
-      chi_square = rep(0, length(config$driver_vars)),
-      df = rep(NA, length(config$driver_vars)),
-      p_value = rep(NA, length(config$driver_vars)),
-      importance_pct = rep(round(100 / length(config$driver_vars), 1), length(config$driver_vars)),
-      label = sapply(config$driver_vars, function(v) get_var_label(config, v)),
-      significance = rep("", length(config$driver_vars)),
-      effect_size = rep("Unknown", length(config$driver_vars)),
-      rank = seq_along(config$driver_vars),
-      stringsAsFactors = FALSE
+    # This used to write every driver an equal share of 100 per cent, with ranks
+    # and "Unknown" effect sizes, behind a console [WARN]. Those numbers were
+    # invented: they describe no model and no data.
+    catdriver_refuse(
+      reason = "CALC_IMPORTANCE_DATA_UNAVAILABLE",
+      title = "MULTINOMIAL IMPORTANCE CANNOT BE COMPUTED",
+      problem = "The data the multinomial model was fitted on could not be recovered, so no reduced model can be refitted.",
+      why_it_matters = paste0(
+        "Importance for a multinomial model comes from refitting the model without each driver. ",
+        "Earlier versions filled the table with an equal share for every driver instead, which ",
+        "looked like a result and was not one."
+      ),
+      fix = paste0(
+        "Re-run the analysis. If it happens again, the multinomial fit did not return its ",
+        "estimation data: reduce the number of outcome levels or drivers and try again."
+      )
     )
-    return(importance_df)
   }
 
   weighted_refit <- !is.null(weight_col) && weight_col %in% names(data)
