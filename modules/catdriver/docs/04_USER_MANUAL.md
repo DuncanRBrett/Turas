@@ -1414,7 +1414,7 @@ fit, sample information, warnings
 | rare_level_policy | No | warn_only | warn_only, collapse_to_other, drop_level, error |
 | brand_colour | No | #323367 | Hex colour |
 | accent_colour | No | #CC9900 | Hex colour |
-| multinomial_mode | If multinomial | — | baseline_category (the only implemented mode) |
+| multinomial_mode | If multinomial | – | baseline_category (the only implemented mode) |
 | slide_image_dir | No | (none) | Directory path |
 | custom_disclaimer | No | (none) | Any text |
 | custom_footer | No | (none) | Any text |

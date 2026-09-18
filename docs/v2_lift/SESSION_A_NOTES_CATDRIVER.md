@@ -18,15 +18,19 @@ shared-loader fix from the keydriver sessions, which is the difference.
 
 | Item | State | Commit |
 |------|-------|--------|
-| A1 C3 refusal system | done, with a GUI-source-order test | `5b8147a6` |
-| A2 C1 + H1 + H2 + M6 weights | done | `5e6cd04c` |
-| A3 C2 subgroup comparison | in progress | |
-| A4 H3 + H4 ordinal safety | not started | |
-| A5 H5 + M1 bootstrap honesty | not started | |
-| A6 H6 multinomial_mode amputation | not started | |
-| A7 H11 + M5 provenance | not started | |
-| A8 M2/M3/M4 engine mediums | not started | |
-| A9 dead code + inventory + tests | not started | |
+| A1 C3 refusal system | done | `5b8147a6` |
+| A2 C1 + H1 + H2 + M6 weights | done | `5e6cd04c`, follow-ups `eee0ea2b` |
+| A3 C2 subgroup comparison | done | `88f08dea` |
+| A4 H3 + H4 ordinal safety | done | `fa993b39` |
+| A5 H5 + M1 bootstrap honesty | done | `62f79330` |
+| A6 H6 multinomial_mode amputation | done | `6455003f` |
+| A7 H11 + M5 provenance | done | `938aeddc` |
+| A8 M2 + M3 + M4 engine mediums | done | `e7d50246` |
+| A9 dead code, inventory, pipeline test | done | `86efc4e5` |
+
+Suite through the session: 227 tests / 673 passing at the start, **278 / 919 /
+0 failed / 1 skip** at the end. Shared suite after the callout edit: 469 / 1,330
+/ 0. Both run from the repo root.
 
 ## What each fix was proved against
 
@@ -86,7 +90,73 @@ Every fix was watched failing on the code before it.
 10. **Kish n_eff** now comes from the platform's shared `effective_n.R`
     (OPUS-0) rather than a local copy of the same formula.
 
+## Deviations and judgment calls, second half
+
+11. **CALC_ was missing from the module's TRS prefix list**, so a CALC_ code was
+    rewritten to CFG_CALC_ and pointed the user at their configuration for a
+    computation that had failed. Added, matching the project CLAUDE.md.
+12. **A reserved-column guard was added** (`..catdriver_wt..`, `.wt`). The
+    engines write those names into their own fit frames, and the importance
+    refits decide whether a run is weighted by looking for one, so a user column
+    of either name could make an unweighted run behave as weighted.
+13. **`target_outcome_level` left over in a config prints an INFO line, not a
+    degraded reason.** The setting changes no number now that one_vs_all is
+    refused; it is dead, and the line says so. If a reviewer wants it as a
+    PARTIAL, that is a one-line change.
+14. **H4 was checked against a working ordinal project before it shipped.** The
+    demo's ordinal config carries an Order and runs PARTIAL as it always did, so
+    the new refusal does not break configs that were already right.
+15. **`ordinal::nominal_test` needed its data in the call by value.** It refits
+    per predictor with update(), which re-evaluates the call in the FORMULA's
+    environment, and CatDriver builds its formulas in the caller. Without that
+    the refits came back blank and the test would have reported "the assumption
+    holds" having tested nothing. Same root cause as deviation 2.
+16. **The dead JS pair stays.** Locked decision 7 lists `cd_pinned_views.js` and
+    `cd_slide_export.js` for deletion, but the HTML startup guard
+    (`99_html_report_main.R`) requires both files, so deleting them here would
+    break every report until Session B fixes that list. Session B owns them,
+    with `generate_catdriver_comparison_report`.
+17. **Two dead-twin tests were retargeted rather than deleted.** The
+    `missing_as_level` and `error_if_missing` tests ran against
+    `prepare_analysis_data`; they run against `handle_missing_data` now, which
+    is what production calls. The live handler labels the level
+    "Missing / Not answered", not "Missing", which is what the dead twin used.
+18. **`n_excluded` is original minus analysed.** The stats pack receives
+    `prep_data$data`, which is already post-deletion, so counting from its own
+    row count would always give zero. The original count comes from the
+    diagnostics.
+19. **One of my own tests removed the shared stats pack writer from the global
+    environment** and left the next file skipping rather than failing, which
+    reads as success. It saves and restores now. That is the same trap the
+    keydriver review recorded as F19.
+20. **Placeholder em dashes in output strings became en dashes**, per the house
+    convention the tabs module set. The stats pack's "No events, ran cleanly"
+    string lost its em dash entirely.
+
+## What a reviewer should look at hardest
+
+- `05_importance.R`: the restructured `calculate_importance()`. A TRS refusal is
+  an error condition, so anything raised under a `tryCatch(error = ...)` fallback
+  becomes a fallback rather than a refusal. That was true of the whole importance
+  path and is the kind of thing that can come back.
+- `04b_multinomial.R` and `05_importance.R` together: the estimation frame and
+  its weights now travel from the fit to the refits. If either side moves, the
+  C1 defect returns silently.
+- `cd_estimation_rows()`: three separate places used to assume predictions and
+  the caller's frame had the same rows.
+- The EPP change flips three of the demo's subgroups into a low-EPP stability
+  flag. That is the gate working, not a regression.
+
 ## Not done, not verified
 
-- The Shiny GUI has not been executed end to end by this session.
-- No report has been regenerated; Duncan does that through `launch_turas()`.
+- **The Shiny GUI has not been executed end to end by this session.** The
+  pipeline is exercised by `test_pipeline_end_to_end.R` and by demo runs from a
+  script, both sourcing the files in the GUI's own order, but nobody has clicked
+  through `launch_turas()`.
+- No report was regenerated and no client project was touched.
+- The one surviving suite warning is a raw `glm()` call inside a mapper test
+  (`test_catdriver.R`, "weighted binary model produces valid results"), not the
+  engine.
+- Session B items met in passing and left alone: the HTML startup guard's file
+  list, the unified report's blank Overview, the OR narration ("more likely"),
+  `Generate_Stats_Pack` always-on, the loader's unrecognised-setting silence.

@@ -1350,7 +1350,7 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
   importance  <- result$importance
   n_drivers   <- if (!is.null(importance) && is.data.frame(importance)) nrow(importance) else length(config$driver_vars)
   n_subgroups <- if (!is.null(result$subgroup_results)) length(result$subgroup_results) else 0L
-  outcome_type <- result$prep_data$outcome_info$type %||% config$outcome_type %||% "—"
+  outcome_type <- result$prep_data$outcome_info$type %||% config$outcome_type %||% "–"
   model_type_label <- switch(outcome_type,
     binary      = "Binary logistic regression (base R glm())",
     ordinal     = "Ordinal logistic regression (ordinal::clm())",
@@ -1365,7 +1365,7 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
   n_partials <- sum(vapply(run_result$events %||% list(),
                            function(e) identical(e$level, "PARTIAL"), logical(1)))
   trs_summary <- if (n_events == 0) {
-    "No events — ran cleanly"
+    "No events; ran cleanly"
   } else {
     parts <- character(0)
     if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
@@ -1394,12 +1394,23 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
                               result$weight_diagnostics$normalisation)
 
   assumptions <- list(
-    "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "—",
+    "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "–",
     "Drivers tested"     = as.character(n_drivers),
     "Model Type"         = model_type_label,
     "Importance Method"  = importance_method,
     "Weighting"          = weighting_stamp,
-    "Subgroup Analysis"  = if (n_subgroups > 0) sprintf("%d subgroups", n_subgroups) else "None",
+    "Subgroup Analysis"  = if (n_subgroups > 0) {
+      n_failed <- sum(vapply(result$subgroup_results %||% list(),
+                             function(r) !isTRUE(r$status %in% c("PASS", "PARTIAL")),
+                             logical(1)))
+      if (n_failed > 0) {
+        sprintf("%d subgroups, %d of them failed", n_subgroups, n_failed)
+      } else {
+        sprintf("%d subgroups", n_subgroups)
+      }
+    } else {
+      "None"
+    },
     "TRS Status"         = run_result$status %||% "PASS",
     "TRS Events"         = trs_summary
   )

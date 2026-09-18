@@ -190,7 +190,7 @@ test_that("the importance refits use only the rows the full model used", {
 
   imp <- calculate_multinomial_importance(fit, config)
   # Dropping driver_weak from the formula would otherwise ADD 25 rows back and
-  # make the two log-likelihoods incomparable — the classic negative LR.
+  # make the two log-likelihoods incomparable: the classic negative LR.
   expect_true(all(imp$chi_square >= 0 | is.na(imp$chi_square)))
 })
 
