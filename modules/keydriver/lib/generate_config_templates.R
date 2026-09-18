@@ -393,7 +393,14 @@ build_keydriver_settings_def <- function() {
           name = "importance_source",
           required = FALSE,
           default = "auto",
-          description = "Source of derived importance scores for quadrant placement",
+          description = paste0(
+            "Source of derived importance scores for quadrant placement. ",
+            "'auto' means the Shapley decomposition, which is also what the ",
+            "importance table is ranked by, so the quadrant and the table ",
+            "agree about which driver is biggest. It stays Shapley even when ",
+            "SHAP has run: set 'shap' explicitly to plot SHAP importance. ",
+            "Whichever source is asked for, the one actually used is written ",
+            "to the Run_Status sheet and to the interactive report."),
           # These are the values the engine actually handles. The dropdown used
           # to offer shapley, relative and beta, none of which it understood,
           # so choosing one silently fell back to auto (review H11).

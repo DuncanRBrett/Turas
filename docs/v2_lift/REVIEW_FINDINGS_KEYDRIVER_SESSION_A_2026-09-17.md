@@ -196,6 +196,10 @@ Findings are numbered F1 to F29 with their severity; every C, H, M or A identifi
 >   which claimed "All 14 pre-flight checks passed", now counts from a
 >   constant so it cannot outlive a deleted check. There are thirteen.
 >
+> F26 is now CLOSED as well, as working as intended with its documentation
+> corrected: see the note under the finding itself. The only findings still
+> open are F18 and F19, the two test-quality mediums.
+>
 > One thing the fix went beyond the finding on: F1 was fixed at
 > `calculate_correlations()` rather than at either caller, so the weighted and
 > unweighted paths behave identically and no future caller can reintroduce it.
@@ -257,6 +261,29 @@ Findings are numbered F1 to F29 with their severity; every C, H, M or A identifi
 **F25 (LOW). Old template values refuse after merge.** Reading. Live configs with `importance_source = shapley/relative/beta` will stop at the quadrant step with a mapping in the message. Intended; flagged so the regeneration pass expects it.
 
 **F26 (LOW). The quadrant's `auto` path still prefers `Shapley_Value` over `SHAP_Importance`** (`quadrant_data_prep.R`, `select_best_importance`), so a SHAP-enabled study that leaves the source on `auto` still plots the regression decomposition. Reading (reader B). The `shap` branch is fixed; `auto` is where the template leaves it.
+
+> **CLOSED 18 September 2026, as working as intended and now documented.**
+> Duncan's decision, on this recommendation: the behaviour stays. The
+> importance table on the same tab is ranked by Shapley and the run stamps
+> `primary_method` as `shapley_r2_decomposition`, so an `auto` that switched to
+> SHAP would put a quadrant and a table in the same report that disagreed about
+> which driver is biggest, with nothing on the page explaining why. That is a
+> worse failure than the surprise F26 describes, and the surprise itself is
+> already closed: `importance_source = shap` works, it is in the template with
+> its real value list, and since F10 the source requested against the source
+> used is written to both the Run_Status sheet and the interactive report, so a
+> substitution is never silent.
+>
+> **What F26 did find was a documentation defect, and a real one.**
+> `06_TEMPLATE_REFERENCE.md` stated that `auto` "Uses SHAP if enabled,
+> otherwise Shapley". The code has never done that, so an analyst reading the
+> reference would have expected the opposite of what they got. Corrected there,
+> in `04_USER_MANUAL.md`, in `05_TECHNICAL_DOCS.md` and in the config template's
+> own description, and the shipped template is regenerated. Three tests in
+> `test_quadrant_source.R` now bind the documentation to the code: one proves
+> `auto` picks Shapley even when SHAP importance is present and is the larger
+> figure, one proves it falls through to SHAP only when Shapley is absent, and
+> one fails if any doc carries the old claim again.
 
 **F27 (LOW). `.kd_segment_definitions` cannot name a level containing a comma, semicolon or pipe.** Reading. Edge case; one line in the template reference.
 

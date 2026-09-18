@@ -148,7 +148,11 @@ Configure analysis parameters and file paths.
 - **Required:** No
 - **Default:** auto
 - **Valid Values:** anything else refuses, naming this list.
-  - `auto` - Uses SHAP if enabled, otherwise Shapley
+  - `auto` - The Shapley decomposition, always. It does NOT switch to SHAP
+    when SHAP is enabled: this entry used to say it did, and the code has
+    never done that. Shapley is also what the importance table is ranked by,
+    so the quadrant and the table agree about which driver is biggest. Set
+    `shap` explicitly to plot SHAP importance instead.
   - `shap` - TreeSHAP importance from the gradient-boosted model
   - `relative_weights` - Johnson method
   - `regression` - Beta weights
