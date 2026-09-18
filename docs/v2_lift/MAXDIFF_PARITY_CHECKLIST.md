@@ -97,12 +97,35 @@ DROP (deliberately not carried, with the reason).
 | Content | Status | Note |
 |---|---|---|
 | Model Summary: method, respondents, items, segments | HAVE in part | method, respondents and items are in `meta`. BUILD the segment count |
-| Sampler diagnostics: divergences, treedepth, R-hat, ESS | HAVE | added by F6 on 17 Sep, lives in `meta` |
-| Model fit: log-likelihood, AIC, BIC | BUILD | new `diagnostics` block |
+| Sampler diagnostics: divergences, treedepth, R-hat, ESS | HAVE | added by F6 on 17 Sep, lives in `meta`. The classic never renders these either |
+| Model fit: log-likelihood, AIC, BIC | ADDED | not parity. The classic never renders these, see the defects section |
 | Population utility statistics: range, mean, SD, discrimination | BUILD | new `diagnostics` block |
 | Model quality: mean max share, chance level, sharpness ratio, entropy ratio, heterogeneity | BUILD | new `diagnostics` block |
 | Respondent utility distribution: mean, min, max range | BUILD | new `diagnostics` block |
 | Item-level diagnostics table | HAVE | the scores and discrimination tables carry the per-item numbers |
+
+## Two defects in the classic report, found while mapping
+
+Neither is worth fixing in a report that is being retired, but both change
+what parity means, so they are recorded here.
+
+`transform_diagnostics_section()` at
+`modules/maxdiff/lib/html_report/01_data_transformer.R` reads the aggregate
+logit fit from `results$logit_results$fit_stats`. Nothing in the module writes
+that key; `modules/maxdiff/R/06_logit.R:170` writes `model_fit`. So `logit_fit`
+has always been NULL and the log-likelihood, AIC, BIC and pseudo R-squared have
+never reached the report. `fit_stats` appears nowhere in the module outside
+that file and one line of `docs/TECHNICAL_REFERENCE.md:295`.
+
+Separately, `build_diagnostics_table()` at `02_table_builder.R:246` is the only
+thing that would render `logit_fit` and `hb_diagnostics`, and no panel calls
+it. `build_diagnostics_panel()` builds stat cards instead and never references
+either. It also reads `hd$max_rhat`, which the Stan path never sets; `07_hb.R`
+writes `mean_rhat`, `n_divergences` and `min_ess`.
+
+The island therefore reads `model_fit`, and model fit is marked ADDED rather
+than BUILD above. The sampler diagnostics were already added to `meta` by F6
+on 17 Sep, from the field names that exist.
 
 ## What stays in the Excel deliverable
 

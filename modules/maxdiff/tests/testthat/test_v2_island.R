@@ -249,3 +249,99 @@ test_that("the output stage wires both contributions in and survives a refusal",
   # that aborts the Excel deliverable already written.
   expect_true(grepl("turas_refusal = function(e)", src, fixed = TRUE))
 })
+
+
+# ==============================================================================
+# DIAGNOSTICS BLOCK (section 6 parity)
+# ==============================================================================
+# The classic report's diagnostics panel shows four groups of stat cards. Two
+# of its groups were dead: transform_diagnostics_section() read the logit fit
+# from results$logit_results$fit_stats, but the module writes model_fit, and
+# build_diagnostics_table() was never called by any panel. The island reads
+# the key that exists.
+
+test_that("the diagnostics block carries the classic panel's statistics", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$diagnostics
+  expect_false(is.null(d))
+
+  # Population utility statistics, the classic panel's second card group.
+  for (f in c("utilityRange", "meanUtility", "utilitySd", "discrimination")) {
+    expect_true(f %in% names(d), info = f)
+    expect_length(d[[f]], 1L)
+    expect_true(is.finite(d[[f]]), info = f)
+  }
+  # Model quality indicators, its third group.
+  for (f in c("meanMaxShare", "chanceLevel", "sharpnessRatio", "entropyRatio",
+              "heterogeneity")) {
+    expect_true(f %in% names(d), info = f)
+    expect_length(d[[f]], 1L)
+  }
+  # Respondent utility distribution, its fourth group.
+  for (f in c("meanRespondentRange", "minRespondentRange", "maxRespondentRange")) {
+    expect_true(f %in% names(d), info = f)
+    expect_length(d[[f]], 1L)
+  }
+  # Chance level is one over the number of items, as a percentage.
+  expect_equal(d$chanceLevel, round(100 / 6, 1))
+  # Discrimination is the utility range divided by the item count.
+  expect_equal(d$discrimination, round(d$utilityRange / 6, 3))
+  # A range cannot be negative and the minimum cannot exceed the maximum.
+  expect_gte(d$utilityRange, 0)
+  expect_lte(d$minRespondentRange, d$maxRespondentRange)
+})
+
+test_that("model fit is read from model_fit, the key the module actually writes", {
+  fx <- make_island_fixture(with_hb = "eb", with_logit = TRUE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$diagnostics$logLikelihood, -120)
+  expect_equal(isl$diagnostics$aic, 250)
+
+  # The classic report read fit_stats. Nothing writes that key, so a fixture
+  # carrying only fit_stats must produce no fit numbers at all.
+  fx2 <- make_island_fixture(with_hb = "eb", with_logit = TRUE)
+  fx2$results$logit_results$model_fit <- NULL
+  fx2$results$logit_results$fit_stats <- list(log_likelihood = -99, aic = 1)
+  isl2 <- serialize_maxdiff_layer(fx2$results, fx2$config, verbose = FALSE)
+  expect_null(isl2$diagnostics$logLikelihood)
+  expect_null(isl2$diagnostics$aic)
+})
+
+test_that("the diagnostics block counts configured segments", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$diagnostics$nSegments, 0L)
+
+  fx$config$segment_settings <- data.frame(
+    Segment_ID = c("S1", "S2"), Segment_Label = c("Age", "Region"),
+    stringsAsFactors = FALSE
+  )
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$diagnostics$nSegments, 2L)
+})
+
+test_that("the diagnostics block is absent, not empty, with no utilities to describe", {
+  fx <- make_island_fixture(with_hb = "none", with_logit = FALSE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("diagnostics" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"diagnostics"', js, fixed = TRUE))
+})
+
+test_that("every diagnostics field serialises as a JSON scalar, not a one-element array", {
+  # .maxdiff_island_keep_arrays() is an INVERTED whitelist: it names the
+  # scalar fields of each block and wraps everything else in I(). A block
+  # missing from that list ships its scalars as [x], and the panel reads them
+  # wrong or vanishes.
+  fx <- make_island_fixture(with_hb = "eb")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  d <- back$diagnostics
+  expect_false(is.null(d))
+  for (f in names(d)) {
+    expect_length(d[[f]], 1L)
+    expect_false(is.list(d[[f]]), info = paste(f, "serialised as an array"))
+  }
+  unlink(fx$out_dir, recursive = TRUE)
+})

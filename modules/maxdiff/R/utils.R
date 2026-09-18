@@ -1009,3 +1009,26 @@ process_anchor_data <- function(raw_data, anchor_variable, items,
 # ==============================================================================
 
 message(sprintf("TURAS>MaxDiff utils module loaded (v%s)", MAXDIFF_UTILS_VERSION))
+
+
+#' Drop Respondent Identifier Columns
+#'
+#' The individual-utilities frame carries a respondent id alongside one numeric
+#' column per item. Anything that treats it as a matrix of utilities has to
+#' strip the id first, by NAME: an id column that happens to be numeric would
+#' otherwise be averaged in as if it were an item.
+#'
+#' @param x A data frame or matrix of individual utilities.
+#' @param id_names Character vector of column names to remove.
+#'
+#' @return `x` without the identifier columns.
+#'
+#' @export
+.md_drop_id_cols <- function(x, id_names = c("resp_id", "respondent_id", "Respondent_ID")) {
+  if (is.data.frame(x)) {
+    x <- x[, !(names(x) %in% id_names), drop = FALSE]
+  } else if (is.matrix(x) && !is.null(colnames(x))) {
+    x <- x[, !(colnames(x) %in% id_names), drop = FALSE]
+  }
+  x
+}

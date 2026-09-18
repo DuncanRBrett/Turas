@@ -38,6 +38,116 @@ MAXDIFF_ISLAND_VERSION <- "1.0.0"
 MAXDIFF_ISLAND_SCHEMA <- 1L
 
 
+#' Model Diagnostics For The Island
+#'
+#' The classic HTML report's diagnostics panel shows four groups of stat cards.
+#' Two of its groups never rendered: `transform_diagnostics_section()` read the
+#' logit fit from `results$logit_results$fit_stats`, a key nothing in the module
+#' writes (it writes `model_fit`), and `build_diagnostics_table()` was never
+#' called by any panel. This reads the key that exists.
+#'
+#' @param results The maxdiff results list.
+#' @param config The loaded configuration.
+#' @param n_items Integer, the number of items in the island.
+#'
+#' @return A flat list of scalars, or NULL when there is nothing to describe.
+#'
+#' @keywords internal
+.maxdiff_island_diagnostics <- function(results, config, n_items) {
+
+  # A single finite number or nothing. A fit statistic that arrived as NA, a
+  # vector or a character belongs out of the island, not in it as null.
+  num1 <- function(x) {
+    if (is.null(x) || length(x) != 1L) return(NULL)
+    x <- suppressWarnings(as.numeric(x))
+    if (!is.finite(x)) return(NULL)
+    x
+  }
+
+  n_segments <- if (is.data.frame(config$segment_settings)) {
+    nrow(config$segment_settings)
+  } else {
+    0L
+  }
+
+  mf <- results$logit_results$model_fit
+  fit <- list(
+    logLikelihood = num1(mf$log_likelihood),
+    aic = num1(mf$aic),
+    bic = num1(mf$bic),
+    pseudoR2 = num1(mf$mcfadden_r2 %||% mf$pseudo_r2)
+  )
+
+  util_stats <- list()
+  indiv <- results$hb_results$individual_utilities
+  if (!is.null(indiv)) {
+    indiv <- .md_drop_id_cols(indiv)
+    mat <- NULL
+    if (is.data.frame(indiv)) {
+      keep <- vapply(indiv, is.numeric, logical(1))
+      if (sum(keep) >= 2L) mat <- as.matrix(indiv[, keep, drop = FALSE])
+    } else if (is.matrix(indiv) && ncol(indiv) >= 2L) {
+      mat <- indiv
+    }
+
+    if (!is.null(mat) && nrow(mat) > 0L) {
+      k <- ncol(mat)
+      item_means <- colMeans(mat, na.rm = TRUE)
+      item_sds <- apply(mat, 2, stats::sd, na.rm = TRUE)
+      util_range <- max(item_means) - min(item_means)
+
+      # Softmax preference share per respondent. The rows are centred on their
+      # own maximum first: exp() of a large utility overflows to Inf and takes
+      # every share in that row with it. Centring cancels in the ratio, so the
+      # shares are identical to the uncentred form wherever that one survives.
+      centred <- mat - apply(mat, 1, max, na.rm = TRUE)
+      exp_mat <- exp(centred)
+      share_mat <- exp_mat / rowSums(exp_mat, na.rm = TRUE)
+      max_shares <- apply(share_mat, 1, max, na.rm = TRUE)
+      mean_max_share <- mean(max_shares, na.rm = TRUE)
+      chance <- 1 / k
+
+      # Entropy relative to a flat distribution: 0 is a respondent who wants
+      # one item, 1 is one who is indifferent across all of them.
+      row_entropy <- -rowSums(share_mat * log(share_mat + 1e-10), na.rm = TRUE)
+      resp_ranges <- apply(mat, 1, function(r) {
+        max(r, na.rm = TRUE) - min(r, na.rm = TRUE)
+      })
+
+      util_stats <- list(
+        utilityRange = round(util_range, 3),
+        meanUtility = round(mean(item_means, na.rm = TRUE), 3),
+        # utilitySd and heterogeneity are the same statistic, the mean of the
+        # per-item standard deviations. The classic report shows it twice,
+        # under "Population spread" and "Avg SD from population", in two
+        # different card groups. Both travel so the panel can keep both
+        # groups intact and so the two can diverge later without a schema
+        # change.
+        utilitySd = round(mean(item_sds, na.rm = TRUE), 3),
+        discrimination = if (n_items > 0L) round(util_range / n_items, 3) else NULL,
+        meanMaxShare = round(mean_max_share * 100, 1),
+        chanceLevel = round(chance * 100, 1),
+        sharpnessRatio = round(mean_max_share / chance, 1),
+        entropyRatio = round(mean(row_entropy, na.rm = TRUE) / log(k), 3),
+        heterogeneity = round(mean(item_sds, na.rm = TRUE), 3),
+        meanRespondentRange = round(mean(resp_ranges, na.rm = TRUE), 2),
+        minRespondentRange = round(min(resp_ranges, na.rm = TRUE), 2),
+        maxRespondentRange = round(max(resp_ranges, na.rm = TRUE), 2)
+      )
+    }
+  }
+
+  out <- Filter(
+    Negate(is.null),
+    c(list(nSegments = as.integer(n_segments)), fit, util_stats)
+  )
+  # Absent, not empty. A block holding only the segment count says nothing the
+  # meta block does not already say, and an empty object is truthy in the view.
+  if (length(out) <= 1L) return(NULL)
+  out
+}
+
+
 #' Serialise MaxDiff Results As A V2 Report Island
 #'
 #' @param results The results list built in `run_maxdiff_generate_outputs()`.
@@ -328,12 +438,15 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     generated = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   ))
 
+  diagnostics_block <- .maxdiff_island_diagnostics(results, config, n_items = length(ids))
+
   out <- drop_null(list(
     meta = meta,
     scores = scores,
     discrimination = disc_block,
     turf = turf_block,
-    anchor = anchor_block
+    anchor = anchor_block,
+    diagnostics = diagnostics_block
   ))
 
   if (verbose) cat(sprintf("  MaxDiff island: %d items, method %s\n", length(ids), method))
@@ -406,7 +519,16 @@ write_maxdiff_island <- function(results, config, output_file = NULL, verbose = 
     scores = "rescaleMethod",
     turf = c("thresholdMethod", "nRespondents", "maxItems", "note"),
     anchor = c("variable", "threshold"),
-    discrimination = "note"
+    discrimination = "note",
+    # Every diagnostics field is a single number. The list is inverted: a
+    # field NOT named here is wrapped in I() and ships as a one-element array.
+    diagnostics = c(
+      "nSegments", "logLikelihood", "aic", "bic", "pseudoR2",
+      "utilityRange", "meanUtility", "utilitySd", "discrimination",
+      "meanMaxShare", "chanceLevel", "sharpnessRatio", "entropyRatio",
+      "heterogeneity", "meanRespondentRange", "minRespondentRange",
+      "maxRespondentRange"
+    )
   )
   for (block in names(scalars)) {
     b <- island[[block]]
