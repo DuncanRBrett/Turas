@@ -345,3 +345,97 @@ test_that("every diagnostics field serialises as a JSON scalar, not a one-elemen
   }
   unlink(fx$out_dir, recursive = TRUE)
 })
+
+
+# ==============================================================================
+# HEAD-TO-HEAD BLOCK (section 6 parity)
+# ==============================================================================
+# The classic report draws an n by n win-probability matrix. The island carries
+# the upper triangle only: P(j beats i) is exactly 1 - P(i beats j), so the
+# mirror is derived in the tab and the payload halves.
+
+test_that("head to head carries the upper triangle in island item order", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  h <- isl$headToHead
+  expect_false(is.null(h))
+
+  n <- length(isl$scores$itemId)
+  expect_equal(length(h$rowItem), n * (n - 1) / 2)
+  expect_equal(length(h$colItem), length(h$rowItem))
+  expect_equal(length(h$prob), length(h$rowItem))
+
+  # Every pair appears once, row before column in the island's item order.
+  ids <- isl$scores$itemId
+  expect_true(all(h$rowItem %in% ids))
+  expect_true(all(h$colItem %in% ids))
+  expect_equal(anyDuplicated(paste(h$rowItem, h$colItem)), 0L)
+  expect_true(all(match(h$rowItem, ids) < match(h$colItem, ids)))
+
+  # A probability is a percentage, and no pair compares an item with itself.
+  expect_true(all(h$prob >= 0 & h$prob <= 100))
+  expect_false(any(h$rowItem == h$colItem))
+})
+
+test_that("head to head agrees with compute_head_to_head, the classic report's own function", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  h <- isl$headToHead
+  indiv <- fx$results$hb_results$individual_utilities
+
+  for (k in seq_len(min(5L, length(h$prob)))) {
+    ref <- compute_head_to_head(indiv, h$rowItem[k], h$colItem[k])
+    expect_equal(h$prob[k], ref$prob_a, tolerance = 1e-8,
+                 info = paste(h$rowItem[k], "vs", h$colItem[k]))
+  }
+})
+
+test_that("head to head falls back to aggregate utilities and says so", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$headToHead$source, "individual")
+
+  # No individual utilities: the population means still support a comparison.
+  fx$results$hb_results$individual_utilities <- NULL
+  isl2 <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl2$headToHead$source, "aggregate")
+  expect_equal(length(isl2$headToHead$prob), length(isl$headToHead$prob))
+  expect_match(isl2$headToHead$note, "population", fixed = TRUE)
+
+  # Aggregate logit only.
+  fx3 <- make_island_fixture(with_hb = "none", with_logit = TRUE)
+  isl3 <- serialize_maxdiff_layer(fx3$results, fx3$config, verbose = FALSE)
+  expect_equal(isl3$headToHead$source, "aggregate")
+})
+
+test_that("head to head is absent when nothing can be compared", {
+  fx <- make_island_fixture(with_hb = "none", with_logit = FALSE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("headToHead" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"headToHead"', js, fixed = TRUE))
+})
+
+test_that("head to head keeps its per-pair fields as arrays and its scalars scalar", {
+  fx <- make_island_fixture(with_hb = "eb")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  h <- back$headToHead
+  expect_true(is.list(h$rowItem))
+  expect_true(is.list(h$colItem))
+  expect_true(is.list(h$prob))
+  expect_equal(length(h$prob), 15)          # 6 items, 6 * 5 / 2
+  expect_false(is.list(h$source))
+  expect_false(is.list(h$note))
+  unlink(fx$out_dir, recursive = TRUE)
+})
+
+test_that("head to head survives two items, the smallest matrix there is", {
+  fx <- make_island_fixture(with_hb = "eb")
+  fx$config$items$Include[3:6] <- 0
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  h <- isl$headToHead
+  expect_equal(length(h$prob), 1L)
+  expect_equal(h$rowItem, isl$scores$itemId[1])
+  expect_equal(h$colItem, isl$scores$itemId[2])
+})

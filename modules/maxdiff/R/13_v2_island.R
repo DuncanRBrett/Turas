@@ -148,6 +148,100 @@ MAXDIFF_ISLAND_SCHEMA <- 1L
 }
 
 
+#' Head-To-Head Win Probabilities For The Island
+#'
+#' The classic report draws an n by n matrix of `compute_head_to_head()` calls,
+#' one per ordered pair. P(j beats i) is exactly 1 minus P(i beats j), so the
+#' island carries the UPPER TRIANGLE only, in island item order, and the tab
+#' derives the mirror. That halves the payload and guarantees a pair sums to
+#' 100, which two independently rounded cells do not.
+#'
+#' Computed in one vectorised pass rather than n squared calls, each of which
+#' re-strips and re-matrixes the whole utilities frame.
+#'
+#' @param results The maxdiff results list.
+#' @param ids Character vector of item ids, in island order.
+#'
+#' @return A list of parallel vectors plus two scalars, or NULL.
+#'
+#' @keywords internal
+.maxdiff_island_head_to_head <- function(results, ids) {
+
+  if (length(ids) < 2L) return(NULL)
+
+  # --- Preferred: one comparison per respondent, averaged ---------------------
+  mat <- NULL
+  indiv <- results$hb_results$individual_utilities
+  if (!is.null(indiv)) {
+    indiv <- .md_drop_id_cols(indiv)
+    if (is.data.frame(indiv)) {
+      keep <- vapply(indiv, is.numeric, logical(1))
+      if (any(keep)) mat <- as.matrix(indiv[, keep, drop = FALSE])
+    } else if (is.matrix(indiv)) {
+      mat <- indiv
+    }
+    if (!is.null(mat) && (is.null(colnames(mat)) || nrow(mat) == 0L)) mat <- NULL
+  }
+
+  # --- Fallback: the population utilities, one notional respondent ------------
+  agg <- NULL
+  if (is.null(mat)) {
+    pop <- results$hb_results$population_utilities
+    lu <- results$logit_results$utilities
+    if (is.data.frame(pop) && all(c("Item_ID", "HB_Utility_Mean") %in% names(pop))) {
+      agg <- stats::setNames(suppressWarnings(as.numeric(pop$HB_Utility_Mean)),
+                             as.character(pop$Item_ID))
+    } else if (is.data.frame(lu) && all(c("Item_ID", "Logit_Utility") %in% names(lu))) {
+      agg <- stats::setNames(suppressWarnings(as.numeric(lu$Logit_Utility)),
+                             as.character(lu$Item_ID))
+    }
+    if (is.null(agg)) return(NULL)
+  }
+
+  present <- if (is.null(mat)) ids[ids %in% names(agg)] else ids[ids %in% colnames(mat)]
+  present <- present[!is.na(present)]
+  if (length(present) < 2L) return(NULL)
+
+  n <- length(present)
+  pairs <- utils::combn(n, 2L)
+  row_item <- present[pairs[1L, ]]
+  col_item <- present[pairs[2L, ]]
+
+  prob <- vapply(seq_len(ncol(pairs)), function(k) {
+    a <- present[pairs[1L, k]]
+    b <- present[pairs[2L, k]]
+    if (is.null(mat)) {
+      p <- 1 / (1 + exp(-(agg[[a]] - agg[[b]])))
+    } else {
+      d <- mat[, a] - mat[, b]
+      p <- mean(1 / (1 + exp(-d)), na.rm = TRUE)
+    }
+    if (!is.finite(p)) return(NA_real_)
+    round(p * 100, 1)
+  }, numeric(1))
+
+  source <- if (is.null(mat)) "aggregate" else "individual"
+  note <- if (is.null(mat)) {
+    paste0("There are no individual utilities, so each win rate is computed ",
+           "from the population mean utilities as a single notional ",
+           "respondent. It answers what the average preference implies, not ",
+           "what share of people would choose the item.")
+  } else {
+    paste0("Each win rate is the average, across respondents, of the ",
+           "probability that this respondent would choose the row item over ",
+           "the column item.")
+  }
+
+  list(
+    rowItem = row_item,
+    colItem = col_item,
+    prob = prob,
+    source = source,
+    note = note
+  )
+}
+
+
 #' Serialise MaxDiff Results As A V2 Report Island
 #'
 #' @param results The results list built in `run_maxdiff_generate_outputs()`.
@@ -439,6 +533,7 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
   ))
 
   diagnostics_block <- .maxdiff_island_diagnostics(results, config, n_items = length(ids))
+  h2h_block <- .maxdiff_island_head_to_head(results, ids)
 
   out <- drop_null(list(
     meta = meta,
@@ -446,7 +541,8 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     discrimination = disc_block,
     turf = turf_block,
     anchor = anchor_block,
-    diagnostics = diagnostics_block
+    diagnostics = diagnostics_block,
+    headToHead = h2h_block
   ))
 
   if (verbose) cat(sprintf("  MaxDiff island: %d items, method %s\n", length(ids), method))
@@ -528,7 +624,8 @@ write_maxdiff_island <- function(results, config, output_file = NULL, verbose = 
       "meanMaxShare", "chanceLevel", "sharpnessRatio", "entropyRatio",
       "heterogeneity", "meanRespondentRange", "minRespondentRange",
       "maxRespondentRange"
-    )
+    ),
+    headToHead = c("source", "note")
   )
   for (block in names(scalars)) {
     b <- island[[block]]
