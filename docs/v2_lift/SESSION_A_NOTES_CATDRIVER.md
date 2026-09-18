@@ -133,6 +133,15 @@ Every fix was watched failing on the code before it.
     convention the tabs module set. The stats pack's "No events, ran cleanly"
     string lost its em dash entirely.
 
+## The pipeline test was checked for discrimination
+
+`test_pipeline_end_to_end.R` was written after the fixes, so it could not be
+watched failing on main the way the others were. It was checked another way: the
+column contract in `normalise_or_frame()` was temporarily reverted to the names
+the pre-fix consumer read, and the pipeline test failed at
+`expect_false(is.null(cmp))` with the comparison back to NULL. The file was
+restored from HEAD immediately afterwards. The test discriminates.
+
 ## What a reviewer should look at hardest
 
 - `05_importance.R`: the restructured `calculate_importance()`. A TRS refusal is
