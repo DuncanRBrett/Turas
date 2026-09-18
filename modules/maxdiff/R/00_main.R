@@ -1342,6 +1342,29 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
         NULL
       }
     )
+
+    # A respondent whose utilities are all missing has no share profile, so the
+    # exporter drops the row and returns PARTIAL. Only the exporter's own
+    # console line said so: the status came back here and nothing read it, so
+    # the run closed on [TRS PASS] COMPLETED SUCCESSFULLY over an export with a
+    # smaller base than the study (review M4). It is an event, because a tabs
+    # base built from this file will not match a base built from the data file,
+    # and the difference has to be explicable.
+    if (!is.null(results$tabs_export) &&
+        identical(results$tabs_export$status, "PARTIAL")) {
+      .n_ex <- results$tabs_export$n_excluded %||% 0L
+      .n_tot <- .n_ex + (results$tabs_export$n_exported %||% 0L)
+      note_late(
+        sprintf(paste0(
+          "Tabs export covers %d of %d respondents: %d were dropped because ",
+          "their utilities are missing, so they have no share profile. A tabs ",
+          "base built from this export will be %d lower than one built from ",
+          "the data file."),
+          .n_tot - .n_ex, .n_tot, .n_ex, .n_ex),
+        code = "MAXD_TABS_EXPORT_EXCLUDED",
+        title = "Respondents excluded from the tabs export"
+      )
+    }
   }
 
   # Step 11c: contribution to the interactive report. Always written when the

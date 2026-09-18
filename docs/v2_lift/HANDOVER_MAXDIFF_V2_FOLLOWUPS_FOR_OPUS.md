@@ -1,16 +1,25 @@
 # Handover: maxdiff v2 follow-ups after the independent review
 
-> **STATUS 2026-09-17.** Everything in sections 2 and 3 is BUILT on
-> `fix/maxdiff-v2-followups`, a worktree off `main` at `6d0995db`, in five
-> commits. R1, R2 and R3 were taken on the reviewer's recommendation, which
-> Duncan had still not ruled on; each commit says so. Item 7 (M4) is left
-> open, because the handover makes it Duncan's call. Items 8 and 10 were
-> already done before this session started. Section 6, the classic report
-> going to v2, has NOT been started and is not part of this branch.
+> **CLOSED 2026-09-18. Sections 2 and 3 are complete, every item done.**
+> R1, R2 and R3 were taken on the reviewer's recommendation, which Duncan had
+> not ruled on at the time; each commit says so. Items 8 and 10 were already
+> done before the work started. Item 7 (M4) was Duncan's call and he ruled on
+> 2026-09-18 that an excluded respondent IS an event; it is now built.
 >
-> The branch is committed, NOT merged and NOT pushed. Suites from the repo
-> root: maxdiff 1171/0/1 skip, tabs 6151/0/1 skip, conjoint 991/0 with the
-> two known coxph warnings, node gate 48/0 across four files.
+> Sections 2 and 3 MERGED and PUSHED: origin/main 491d4829 on 2026-09-17, plus
+> item 7 on `fix/maxdiff-tabs-export-partial`. Duncan eyeballed a full run
+> through `launch_turas()` on 2026-09-17: 534.8 s, TRS PASS, the stats pack
+> checkbox arrived ticked from the config and a pack was produced. R1 and R2
+> were additionally verified against a real Stan fit of the shipped Karoo
+> config: 0 divergences, mean R-hat 1.000215, min ESS 8674.67, reference item
+> REWARDS.
+>
+> **Section 6, the classic report going to v2, has NOT been started.** It is
+> the only MaxDiff work left. Its charting question was answered on
+> 2026-09-17: redraw, do not port.
+>
+> Suites at close: maxdiff 1195/0/1 skip. Full platform on the merge commit,
+> 13 modules: 21,667 pass, 0 fail, 0 error.
 
 Written 2026-09-03 by the Fable session that reviewed `feature/maxdiff-v2-report`
 and fixed its F1 to F5. For an Opus session at high effort (Sonnet would do for the
@@ -121,7 +130,13 @@ a binary Duncan hand-edited in Excel: edit the one cell in Excel or openpyxl, ne
    header of `build_integrated_demo.R` say "a couple of minutes"; with cmdstanr
    the maxdiff step alone is 12 to 15 minutes. `examples/maxdiff/README.md` says
    the example "is configured for that world" (no cmdstanr); rewrite with R3.
-7. **OPEN, Duncan's call.** **M4, optional.** The tabs export returns `status = "PARTIAL"` when respondents
+7. **DONE 2026-09-18.** Duncan ruled that an excluded respondent is an event.
+   Step 11b now reads the exporter's status: on PARTIAL it calls `note_late()`
+   with `MAXD_TABS_EXPORT_EXCLUDED`, naming how many respondents were dropped
+   and by how much a tabs base built from the export will differ from one built
+   from the data file. The run then closes PARTIAL rather than PASS. Tests in
+   `test_review_followups.R` beside the F4 and F5 gates, one positive and one
+   negative; 3 assertions fail on the code as found. **M4, optional.** The tabs export returns `status = "PARTIAL"` when respondents
    with all-NA utilities are dropped; `00_main.R` step 11b never reads it. Fold
    into `note_late()` only if Duncan wants an excluded respondent to be an event.
 8. **DONE 2026-09-03.** Conjoint suite run from the repo root on main at
