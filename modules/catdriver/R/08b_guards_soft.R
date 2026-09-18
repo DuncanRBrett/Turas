@@ -219,15 +219,24 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
   # If majority of checked comparisons mismatch, likely reversal — warn, don't hard refuse
   # This is a soft guard: the model may still be valid (e.g. confounding effects)
   if (checked > 2 && mismatches / checked > 0.5) {
-    guard_warn(guard, paste0(
+    # Guards are copy-on-modify. Both calls below used to discard their return
+    # value, so the only automated protection against a reversed ordinal outcome
+    # recorded nothing; and guard_flag_stability() takes two arguments, so the
+    # three-argument call threw "unused argument" the moment the check fired,
+    # which aborted the run.
+    message_text <- paste0(
       "OUTCOME ORDER MAY BE REVERSED: Odds ratio directions do not align with raw data patterns ",
       "for ", mismatches, "/", checked, " comparisons. ",
       "Check the 'Order' column for your outcome variable. ",
       "Ensure Low values are listed BEFORE High values (e.g. 'Dissatisfied;Neutral;Satisfied'). ",
       "Current order: ", paste(outcome_levels, collapse = " < ")
+    )
+    cat(sprintf("   [PARTIAL] %s\n", message_text))
+    guard <- guard_warn(guard, message_text, "direction_sanity")
+    guard <- guard_flag_stability(guard, paste0(
+      "OR direction mismatch in ", mismatches, "/", checked,
+      " comparisons: possible outcome order reversal"
     ))
-    guard_flag_stability(guard, "direction_sanity",
-      paste0("OR direction mismatch in ", mismatches, "/", checked, " comparisons — possible outcome order reversal"))
   }
 
   guard
@@ -298,6 +307,7 @@ guard_pre_analysis <- function(config, data) {
   # Hard error checks (all use catdriver_refuse for clean exits)
   guard_require_outcome_type(config)
   guard_outcome_levels_match(data, config)
+  guard_ordinal_outcome_order(config)      # Ordinal OUTCOME must declare its order
   guard_require_multinomial_mode(config)  # Only enforced for multinomial outcomes
 
   guard_require_driver_settings(config)   # Validates Driver_Settings exists and is complete

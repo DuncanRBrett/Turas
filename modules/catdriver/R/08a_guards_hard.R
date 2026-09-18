@@ -50,6 +50,53 @@ guard_require_outcome_type <- function(config) {
 }
 
 
+#' Guard: Ordinal Outcome Must Declare Its Order
+#'
+#' REFUSES when \code{outcome_type = "ordinal"} and the outcome variable has no
+#' Order in the Variables sheet.
+#'
+#' Without an Order, \code{detect_outcome_type()} sorts the categories
+#' alphabetically. Numeric scales survive that by luck. Text scales do not:
+#' "High" < "Low" < "Medium" fits a proportional-odds model to an order nobody
+#' intended, and every odds ratio and importance figure that follows is wrong
+#' while the run reports PASS. The equivalent guard for ordinal DRIVERS already
+#' exists (guard_ordinal_levels_order); the outcome had none.
+#'
+#' @param config Configuration list.
+#' @keywords internal
+guard_ordinal_outcome_order <- function(config) {
+
+  if (!identical(tolower(config$outcome_type %||% ""), "ordinal")) {
+    return(invisible(TRUE))
+  }
+
+  order_spec <- config$outcome_order
+  has_order <- !is.null(order_spec) && length(order_spec) > 0 &&
+    !all(is.na(order_spec)) && any(nzchar(as.character(order_spec)))
+
+  if (!has_order) {
+    catdriver_refuse(
+      reason = "CFG_OUTCOME_ORDER_MISSING",
+      title = "ORDINAL OUTCOME ORDER REQUIRED",
+      problem = paste0("Outcome '", config$outcome_var,
+                       "' is declared ordinal but the Variables sheet gives no Order for it."),
+      why_it_matters = paste0(
+        "An ordinal model needs to know which category is lowest. Without an Order the ",
+        "categories are sorted alphabetically, so a scale like Low/Medium/High is fitted as ",
+        "High < Low < Medium and every odds ratio and importance figure is wrong, silently."
+      ),
+      fix = paste0(
+        "Add an 'Order' for '", config$outcome_var, "' in the Variables sheet.\n",
+        "Format: semicolon-separated from lowest to highest ",
+        "(for example 'Dissatisfied;Neutral;Satisfied')."
+      )
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Guard: Validate Outcome Levels Match Config
 #'
 #' REFUSES if data outcome levels don't match config declaration.

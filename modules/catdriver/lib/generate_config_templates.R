@@ -595,7 +595,7 @@ build_catdriver_variables_columns <- function() {
       name = "Order",
       width = 40,
       required = FALSE,
-      description = "Semicolon-separated category order for ordinal variables (LOW to HIGH). Leave blank for nominal.",
+      description = "Semicolon-separated category order for ordinal variables (LOW to HIGH). REQUIRED for an ordinal outcome: without it the categories are sorted alphabetically and the model fits the wrong order. Leave blank for nominal.",
       dropdown = NULL,
       integer_range = NULL,
       numeric_range = NULL
