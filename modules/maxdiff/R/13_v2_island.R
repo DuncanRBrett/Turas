@@ -242,6 +242,85 @@ MAXDIFF_ISLAND_SCHEMA <- 1L
 }
 
 
+#' Per-Segment Item Scores For The Island
+#'
+#' `08_segments.R` returns long-format count scores, one row per item per
+#' segment level, carrying the level's base. The island carries that shape as
+#' parallel vectors, restricted to the island's items and ordered to match
+#' them inside each level so the tab can lay the levels out side by side.
+#'
+#' This is a build, not a port. The classic report's Segments panel never
+#' worked: `build_segment_table()` is handed the two-element results list and
+#' prints its internal names, "segment_scores" and "segment_summary", as the
+#' headings, with Times_Shown, Times_Best, Times_Worst, Rank, Segment_N and N
+#' as its columns and no segment level anywhere. `build_segment_chart()` looks
+#' for wide `BW_Score_<level>` columns, which nothing produces, and returns an
+#' empty string. Both were run against the real shape on 18 Sep 2026.
+#'
+#' @param results The maxdiff results list.
+#' @param config The loaded configuration.
+#' @param ids Character vector of item ids, in island order.
+#'
+#' @return A list of parallel vectors plus two scalars, or NULL.
+#'
+#' @keywords internal
+.maxdiff_island_segments <- function(results, config, ids) {
+
+  seg <- results$segment_results$segment_scores
+  if (!is.data.frame(seg) || nrow(seg) == 0L) return(NULL)
+
+  need <- c("Item_ID", "Segment_Label", "Segment_Value")
+  if (!all(need %in% names(seg))) return(NULL)
+
+  seg <- seg[as.character(seg$Item_ID) %in% ids, , drop = FALSE]
+  if (nrow(seg) == 0L) return(NULL)
+
+  num <- function(x) {
+    if (is.null(x)) return(rep(NA_real_, nrow(seg)))
+    x <- suppressWarnings(as.numeric(x))
+    x[!is.finite(x)] <- NA_real_
+    x
+  }
+
+  variable <- as.character(seg$Segment_Label)
+  level <- as.character(seg$Segment_Value)
+  # Order: variable, then level as the config listed it, then island item
+  # order inside the level. A level's items must line up with the scores
+  # table above them, not with whatever order the segment frame was built in.
+  ord <- order(
+    match(variable, unique(variable)),
+    match(level, unique(level)),
+    match(as.character(seg$Item_ID), ids)
+  )
+  seg <- seg[ord, , drop = FALSE]
+  variable <- variable[ord]
+  level <- level[ord]
+
+  min_base <- suppressWarnings(as.numeric(
+    config$output_settings$Min_Respondents_Per_Segment %||% NA
+  ))
+  if (length(min_base) != 1L || !is.finite(min_base)) min_base <- NULL
+
+  out <- list(
+    variable = variable,
+    segmentId = if ("Segment_ID" %in% names(seg)) as.character(seg$Segment_ID) else NULL,
+    level = level,
+    base = num(seg$Segment_N),
+    itemId = as.character(seg$Item_ID),
+    netScore = num(seg$Net_Score),
+    bestPct = num(seg$Best_Pct),
+    worstPct = num(seg$Worst_Pct),
+    minBase = min_base,
+    note = paste0(
+      "Segment scores are count-based: the share of times an item was picked ",
+      "best and worst within that group. They are not the model's utilities, ",
+      "which were estimated once on the whole sample."
+    )
+  )
+  Filter(Negate(is.null), out)
+}
+
+
 #' Serialise MaxDiff Results As A V2 Report Island
 #'
 #' @param results The results list built in `run_maxdiff_generate_outputs()`.
@@ -534,6 +613,7 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
 
   diagnostics_block <- .maxdiff_island_diagnostics(results, config, n_items = length(ids))
   h2h_block <- .maxdiff_island_head_to_head(results, ids)
+  segments_block <- .maxdiff_island_segments(results, config, ids)
 
   out <- drop_null(list(
     meta = meta,
@@ -542,7 +622,8 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     turf = turf_block,
     anchor = anchor_block,
     diagnostics = diagnostics_block,
-    headToHead = h2h_block
+    headToHead = h2h_block,
+    segments = segments_block
   ))
 
   if (verbose) cat(sprintf("  MaxDiff island: %d items, method %s\n", length(ids), method))
@@ -625,7 +706,8 @@ write_maxdiff_island <- function(results, config, output_file = NULL, verbose = 
       "heterogeneity", "meanRespondentRange", "minRespondentRange",
       "maxRespondentRange"
     ),
-    headToHead = c("source", "note")
+    headToHead = c("source", "note"),
+    segments = c("minBase", "note")
   )
   for (block in names(scalars)) {
     b <- island[[block]]

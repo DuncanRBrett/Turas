@@ -88,8 +88,8 @@ DROP (deliberately not carried, with the reason).
 
 | Content | Status | Note |
 |---|---|---|
-| Segment scores table | BUILD | new `segments` island block |
-| Segment grouped bar chart | BUILD | one chart per segment variable |
+| Segment scores table | BUILD | new `segments` island block. The classic table is broken, see the defects section |
+| Segment grouped bar chart | BUILD | one chart per segment variable. The classic chart draws nothing at all |
 | Segment base sizes | BUILD | carried as `base` so the tab can flag levels below `Min_Respondents_Per_Segment` |
 
 ### Panel 7, Diagnostics
@@ -104,7 +104,7 @@ DROP (deliberately not carried, with the reason).
 | Respondent utility distribution: mean, min, max range | BUILD | new `diagnostics` block |
 | Item-level diagnostics table | HAVE | the scores and discrimination tables carry the per-item numbers |
 
-## Two defects in the classic report, found while mapping
+## Three defects in the classic report, found while mapping
 
 Neither is worth fixing in a report that is being retired, but both change
 what parity means, so they are recorded here.
@@ -122,6 +122,26 @@ thing that would render `logit_fit` and `hb_diagnostics`, and no panel calls
 it. `build_diagnostics_panel()` builds stat cards instead and never references
 either. It also reads `hd$max_rhat`, which the Stan path never sets; `07_hb.R`
 writes `mean_rhat`, `n_divergences` and `min_ess`.
+
+Third, the whole Segments panel is broken. `transform_segments_section()`
+passes `results$segment_results` straight through, which is the two-element
+list `list(segment_scores, segment_summary)` that `08_segments.R` returns.
+`build_segment_table()` expects a named list of per-variable wide frames, so it
+iterates those two names and prints them as the client-facing headings,
+"segment_scores" and "segment_summary", with Times_Shown, Times_Best,
+Times_Worst, Rank, Segment_N and N as its columns. No segment level appears
+anywhere in it. `build_segment_chart()` looks for wide `BW_Score_<level>`
+columns, which nothing in the module produces, so it returns an empty string
+and no chart is drawn.
+
+Both were run against the real long-format shape on 18 Sep 2026 to confirm
+this rather than infer it. The per-segment variants inside the Preferences and
+Items panels are a different path and do work: they use
+`enrich_segment_scores()` on `html_data$segment_filter$segment_scores`. Those
+are the ones dropped above on the frozen-tab grounds.
+
+So the island's `segments` block is a build, not a port. There is no working
+classic behaviour to match.
 
 The island therefore reads `model_fit`, and model fit is marked ADDED rather
 than BUILD above. The sampler diagnostics were already added to `meta` by F6

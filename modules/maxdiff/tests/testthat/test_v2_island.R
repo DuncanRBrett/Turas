@@ -439,3 +439,130 @@ test_that("head to head survives two items, the smallest matrix there is", {
   expect_equal(h$rowItem, isl$scores$itemId[1])
   expect_equal(h$colItem, isl$scores$itemId[2])
 })
+
+
+# ==============================================================================
+# SEGMENTS BLOCK (section 6 parity)
+# ==============================================================================
+# The classic Segments panel never worked: build_segment_table() prints the
+# internal list names as headings with Times_Shown and Rank as its columns, and
+# build_segment_chart() returns an empty string because it wants wide
+# BW_Score_<level> columns that 08_segments.R does not produce. Proved by
+# running both against the real shape, 18 Sep 2026. So this block is a build,
+# not a port.
+
+make_segment_results <- function(ids, levels = c("18-34", "35+"), base = 120L,
+                                 variable = "Age", segment_id = "S1") {
+  scores <- do.call(rbind, lapply(seq_along(levels), function(k) data.frame(
+    Item_ID = ids, Item_Label = paste("Item", seq_along(ids)),
+    Times_Shown = 30L,
+    Best_Pct = seq(50, 10, length.out = length(ids)) + k,
+    Worst_Pct = seq(5, 45, length.out = length(ids)) - k,
+    Net_Score = seq(45, -35, length.out = length(ids)) + k,
+    BW_Score = seq(.45, -.35, length.out = length(ids)),
+    Rank = seq_along(ids),
+    Segment_ID = segment_id, Segment_Label = variable,
+    Segment_Value = levels[k], Segment_N = base,
+    stringsAsFactors = FALSE
+  )))
+  list(
+    segment_scores = scores,
+    segment_summary = data.frame(
+      Segment_ID = segment_id, Segment_Label = variable,
+      Segment_Value = levels, N = base, stringsAsFactors = FALSE
+    )
+  )
+}
+
+test_that("segments travel as one row per item per level, in island item order", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  fx$results$segment_results <- make_segment_results(ids)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  s <- isl$segments
+  expect_false(is.null(s))
+
+  expect_equal(length(s$itemId), length(ids) * 2L)
+  for (f in c("variable", "level", "base", "itemId", "netScore", "bestPct", "worstPct")) {
+    expect_equal(length(s[[f]]), length(s$itemId), info = f)
+  }
+  expect_equal(unique(s$variable), "Age")
+  expect_equal(unique(s$level), c("18-34", "35+"))
+  # Item order inside each level follows the island, not the segment frame.
+  expect_equal(s$itemId[seq_along(ids)], isl$scores$itemId)
+})
+
+test_that("segments carry the base and the minimum the config set for it", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  fx$results$segment_results <- make_segment_results(ids, base = 30L)
+  fx$config$output_settings$Min_Respondents_Per_Segment <- 50
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_true(all(isl$segments$base == 30))
+  expect_equal(isl$segments$minBase, 50)
+  expect_length(isl$segments$minBase, 1L)
+})
+
+test_that("segments keep every configured variable apart", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  a <- make_segment_results(ids, levels = c("18-34", "35+"), variable = "Age",
+                            segment_id = "S1")
+  b <- make_segment_results(ids, levels = c("North", "South"), variable = "Region",
+                            segment_id = "S2", base = 200L)
+  fx$results$segment_results <- list(
+    segment_scores = rbind(a$segment_scores, b$segment_scores),
+    segment_summary = rbind(a$segment_summary, b$segment_summary)
+  )
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  s <- isl$segments
+  expect_equal(unique(s$variable), c("Age", "Region"))
+  expect_equal(length(s$itemId), length(ids) * 4L)
+  expect_true(all(s$base[s$variable == "Region"] == 200))
+})
+
+test_that("segments are absent when no segment analysis ran", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("segments" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"segments"', js, fixed = TRUE))
+
+  # An empty frame is nothing to show, not a block of empty arrays.
+  fx$results$segment_results <- list(
+    segment_scores = make_segment_results("I1")$segment_scores[0, ],
+    segment_summary = NULL
+  )
+  isl2 <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("segments" %in% names(isl2))
+})
+
+test_that("segments keep per-row fields as arrays and scalars scalar", {
+  fx <- make_island_fixture(with_hb = "eb")
+  ids <- as.character(fx$items$Item_ID)
+  fx$results$segment_results <- make_segment_results(ids)
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  s <- back$segments
+  for (f in c("variable", "level", "base", "itemId", "netScore", "bestPct", "worstPct")) {
+    expect_true(is.list(s[[f]]), info = paste(f, "must be a JSON array"))
+  }
+  expect_false(is.list(s$minBase))
+  expect_false(is.list(s$note))
+  unlink(fx$out_dir, recursive = TRUE)
+})
+
+test_that("a single level with a single item still ships as arrays, not scalars", {
+  # The F2 lesson: a length-1 per-row field that unboxes makes the panel
+  # vanish, and one small segment level is the case that produces it.
+  fx <- make_island_fixture(with_hb = "eb")
+  fx$config$items$Include[2:6] <- 0
+  ids <- as.character(fx$items$Item_ID[1])
+  fx$results$segment_results <- make_segment_results(ids, levels = "18-34")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  expect_true(is.list(back$segments$itemId))
+  expect_equal(length(back$segments$itemId), 1L)
+  expect_true(is.list(back$segments$netScore))
+  unlink(fx$out_dir, recursive = TRUE)
+})
