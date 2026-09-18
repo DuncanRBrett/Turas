@@ -122,10 +122,12 @@ CatDriver uses `ordinal::clm()` as the primary engine, with `MASS::polr()` as fa
 
 For unordered outcomes with 3+ categories. Fits K-1 binary comparisons simultaneously (each category vs the reference category). Requires larger samples because each comparison has its own set of coefficients.
 
-CatDriver uses `nnet::multinom()`. Two modes are available:
-
--   **One-vs-rest:** Each category compared against all others combined
--   **One-vs-one:** Pairwise comparisons between specific categories
+CatDriver uses `nnet::multinom()` in one mode, baseline-category: every
+outcome level is compared with one reference level. One-vs-rest and pairwise
+reporting are not implemented, and a config asking for them is refused rather
+than quietly given baseline-category odds ratios. To compare one level against
+all others, recode the outcome as binary and run it with
+`outcome_type = binary`.
 
 ### Variable importance
 

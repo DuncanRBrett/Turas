@@ -480,8 +480,7 @@ If `outcome_type = multinomial`, you must also set:
 
 | Setting | Required | Description |
 |----|----|----|
-| `multinomial_mode` | **Yes** | One of: `baseline_category`, `per_outcome`, `all_pairwise`, `one_vs_all` |
-| `target_outcome_level` | Only if mode = `one_vs_all` | Which outcome level to focus on |
+| `multinomial_mode` | **Yes** | `baseline_category`, the only implemented mode: every level compared with one reference level. Any other value is refused with `CFG_MULTINOMIAL_MODE_NOT_IMPLEMENTED` |
 
 ### Sheet 2: Variables
 
@@ -1415,8 +1414,7 @@ fit, sample information, warnings
 | rare_level_policy | No | warn_only | warn_only, collapse_to_other, drop_level, error |
 | brand_colour | No | #323367 | Hex colour |
 | accent_colour | No | #CC9900 | Hex colour |
-| multinomial_mode | If multinomial | — | baseline_category, per_outcome, all_pairwise, one_vs_all |
-| target_outcome_level | If one_vs_all | — | Category value |
+| multinomial_mode | If multinomial | — | baseline_category (the only implemented mode) |
 | slide_image_dir | No | (none) | Directory path |
 | custom_disclaimer | No | (none) | Any text |
 | custom_footer | No | (none) | Any text |

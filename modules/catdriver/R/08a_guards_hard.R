@@ -187,36 +187,53 @@ guard_require_multinomial_mode <- function(config) {
   }
 
   multinomial_mode <- config$multinomial_mode
-  valid_modes <- c("baseline_category", "all_pairwise", "one_vs_all", "per_outcome")
 
-  if (is.null(multinomial_mode) || !nzchar(multinomial_mode) || !multinomial_mode %in% valid_modes) {
+  # Only one mode is implemented. The engine has always fitted the same
+  # baseline-category model whatever this setting said: all_pairwise and
+  # one_vs_all were accepted by the guard and then ignored, so a user who asked
+  # for one-vs-rest received baseline-category odds ratios believing otherwise,
+  # and per_outcome passed the guard only to be refused by the engine two steps
+  # later. Implementing the other three is a new statistical feature, not a fix,
+  # so they are refused honestly instead of pretended.
+  if (is.null(multinomial_mode) || !nzchar(multinomial_mode)) {
     catdriver_refuse(
       reason = "CFG_MULTINOMIAL_MODE_MISSING",
       title = "MULTINOMIAL MODE REQUIRED",
-      problem = "Outcome type is multinomial but multinomial_mode is missing or invalid.",
-      why_it_matters = "Multinomial models produce multiple sets of odds ratios. We refuse to guess which one you want.",
+      problem = "Outcome type is multinomial but multinomial_mode is missing.",
+      why_it_matters = "Multinomial models can be reported several ways. CatDriver refuses to guess which one you meant.",
       fix = paste0(
-        "Add 'multinomial_mode' to Settings sheet.\n",
-        "VALID VALUES:\n",
-        "  - 'baseline_category': Compare all levels to one reference (default)\n",
-        "  - 'per_outcome': Report ORs for each outcome level separately\n",
-        "  - 'all_pairwise': Compare every pair of levels\n",
-        "  - 'one_vs_all': Compare each level vs. all others (requires target_outcome_level)"
+        "Add 'multinomial_mode' to the Settings sheet with the value:\n",
+        "  - 'baseline_category': every level compared with one reference level\n\n",
+        "That is the only mode CatDriver implements."
       )
     )
   }
 
-  if (multinomial_mode == "one_vs_all") {
-    target_level <- config$target_outcome_level
-    if (is.null(target_level) || is.na(target_level) || !nzchar(target_level)) {
-      catdriver_refuse(
-        reason = "CFG_TARGET_OUTCOME_MISSING",
-        title = "TARGET OUTCOME LEVEL REQUIRED",
-        problem = "multinomial_mode is 'one_vs_all' but target_outcome_level is missing.",
-        why_it_matters = "one_vs_all mode needs to know which outcome category to treat as 'success'.",
-        fix = "Add 'target_outcome_level' to Settings sheet with the desired outcome category."
+  if (!identical(multinomial_mode, "baseline_category")) {
+    catdriver_refuse(
+      reason = "CFG_MULTINOMIAL_MODE_NOT_IMPLEMENTED",
+      title = "MULTINOMIAL MODE NOT IMPLEMENTED",
+      problem = paste0("multinomial_mode='", multinomial_mode,
+                       "' is not implemented in CatDriver."),
+      why_it_matters = paste0(
+        "Only 'baseline_category' exists. Earlier versions accepted this setting and then fitted ",
+        "the baseline-category model anyway, so the odds ratios did not answer the question the ",
+        "setting asked."
+      ),
+      fix = paste0(
+        "Set multinomial_mode to 'baseline_category' in the Settings sheet.\n",
+        "To compare one level against all others, recode the outcome into a binary variable ",
+        "and run it with outcome_type = 'binary'."
       )
-    }
+    )
+  }
+
+  # target_outcome_level only ever meant anything for one_vs_all. Say so rather
+  # than leaving a setting in the workbook that does nothing.
+  tgt <- config$target_outcome_level
+  if (!is.null(tgt) && !all(is.na(tgt)) && any(nzchar(as.character(tgt)))) {
+    cat(sprintf("   [INFO] Setting 'target_outcome_level' (%s) is ignored: it belonged to the one_vs_all mode, which is not implemented.\n",
+                paste(tgt, collapse = ", ")))
   }
 
   invisible(TRUE)

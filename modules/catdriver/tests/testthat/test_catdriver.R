@@ -426,16 +426,19 @@ test_that("H2a: multinomial without multinomial_mode refuses with CFG_MULTINOMIA
   )
 })
 
-test_that("H2b: one_vs_all without target refuses with CFG_TARGET_OUTCOME_MISSING", {
+test_that("H2b: one_vs_all is refused as not implemented", {
+  # Was: one_vs_all is accepted and only target_outcome_level is demanded. The
+  # engine never implemented the mode, so accepting it handed the user
+  # baseline-category odds ratios under another name. See test_multinomial_mode.R.
   config <- list(
     outcome_type = "multinomial",
     multinomial_mode = "one_vs_all",
-    target_outcome_level = NULL
+    target_outcome_level = "A"
   )
 
   expect_error(
     guard_require_multinomial_mode(config),
-    "CFG_TARGET_OUTCOME_MISSING|target_outcome_level"
+    "CFG_MULTINOMIAL_MODE_NOT_IMPLEMENTED|not implemented"
   )
 })
 
@@ -468,21 +471,21 @@ test_that("H2c: non-multinomial outcomes do not require multinomial settings", {
 })
 
 
-test_that("guard_require_multinomial_mode accepts valid modes", {
-  for (mode in c("baseline_category", "all_pairwise", "one_vs_all")) {
-    config <- list(
-      outcome_type = "multinomial",
-      multinomial_mode = mode,
-      target_outcome_level = if (mode == "one_vs_all") "A" else NULL
-    )
+test_that("guard_require_multinomial_mode accepts the one implemented mode", {
+  accepted <- tryCatch({
+    guard_require_multinomial_mode(list(outcome_type = "multinomial",
+                                        multinomial_mode = "baseline_category"))
+    TRUE
+  }, error = function(e) FALSE)
+  expect_true(accepted)
 
-    # Should not error
-    result <- tryCatch({
-      guard_require_multinomial_mode(config)
-      TRUE
-    }, error = function(e) FALSE)
-
-    expect_true(result, info = paste("Mode", mode, "should be accepted"))
+  for (mode in c("all_pairwise", "one_vs_all", "per_outcome")) {
+    rejected <- tryCatch({
+      guard_require_multinomial_mode(list(outcome_type = "multinomial",
+                                          multinomial_mode = mode))
+      FALSE
+    }, error = function(e) TRUE)
+    expect_true(rejected, info = paste("Mode", mode, "should be refused"))
   }
 })
 

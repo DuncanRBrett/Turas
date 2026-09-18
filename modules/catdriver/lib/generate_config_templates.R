@@ -176,20 +176,10 @@ build_catdriver_settings_def <- function() {
         list(
           name = "multinomial_mode",
           required = FALSE,
-          default = "",
-          description = "Required if outcome_type=multinomial. Determines how multinomial outcomes are modelled.",
-          valid_values_text = "baseline_category, all_pairwise, one_vs_all, or per_outcome",
-          dropdown = c("baseline_category", "all_pairwise", "one_vs_all", "per_outcome"),
-          numeric_range = NULL,
-          integer_range = NULL
-        ),
-        list(
-          name = "target_outcome_level",
-          required = FALSE,
-          default = "",
-          description = "Required if multinomial_mode=one_vs_all. The specific outcome level to compare against all others.",
-          valid_values_text = "A value that appears in the outcome variable",
-          dropdown = NULL,
+          default = "baseline_category",
+          description = "Required if outcome_type=multinomial. One mode is implemented: every outcome level is compared with one reference level.",
+          valid_values_text = "baseline_category",
+          dropdown = c("baseline_category"),
           numeric_range = NULL,
           integer_range = NULL
         )
