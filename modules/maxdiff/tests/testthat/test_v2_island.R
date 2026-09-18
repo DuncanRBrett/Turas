@@ -566,3 +566,94 @@ test_that("a single level with a single item still ships as arrays, not scalars"
   expect_true(is.list(back$segments$netScore))
   unlink(fx$out_dir, recursive = TRUE)
 })
+
+
+# ==============================================================================
+# DISTRIBUTIONS BLOCK (section 6 parity)
+# ==============================================================================
+# Feeds the raincloud/violin chart. The densities travel FLAT, two vectors of
+# nItems * nPoints with a stride, so every field in the block is a plain array
+# like every other block and no nested structure has to survive jsonlite.
+
+test_that("distributions carry per-item summary statistics in island item order", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$distributions
+  expect_false(is.null(d))
+
+  n <- length(isl$scores$itemId)
+  expect_equal(d$itemId, isl$scores$itemId)
+  for (f in c("mean", "median", "sd", "q25", "q75", "min", "max")) {
+    expect_equal(length(d[[f]]), n, info = f)
+  }
+  # A quartile range sits inside the observed range, and the median inside it.
+  ok <- is.finite(d$q25) & is.finite(d$q75)
+  expect_true(all(d$q25[ok] <= d$q75[ok]))
+  expect_true(all(d$min[ok] <= d$q25[ok]))
+  expect_true(all(d$q75[ok] <= d$max[ok]))
+})
+
+test_that("densities travel flat with a stride the tab can slice", {
+  fx <- make_island_fixture(with_hb = "eb")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$distributions
+  n <- length(isl$scores$itemId)
+
+  expect_length(d$nPoints, 1L)
+  expect_equal(length(d$densityX), n * d$nPoints)
+  expect_equal(length(d$densityY), n * d$nPoints)
+
+  # Slice item 1 the way the tab will, and check it looks like a density.
+  k <- d$nPoints
+  x1 <- d$densityX[seq_len(k)]
+  y1 <- d$densityY[seq_len(k)]
+  expect_false(anyNA(x1))
+  expect_true(all(diff(x1) > 0))        # the grid ascends
+  expect_true(all(y1 >= 0))             # a density is never negative
+})
+
+test_that("the Stan reference item's flat distribution is blanked, not reported", {
+  # The model fixes the reference item at zero for every respondent, so its
+  # spread is structural. F6 blanks it in scores and discrimination; it is
+  # blanked here for the same reason rather than drawn as a spike.
+  fx <- make_island_fixture(with_hb = "stan")
+  ids <- as.character(fx$items$Item_ID)
+  ref <- ids[length(ids)]
+  fx$results$hb_results$model_fit$reference_item <- ref
+  fx$results$hb_results$individual_utilities[[ref]] <- 0
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  d <- isl$distributions
+
+  pos <- match(ref, d$itemId)
+  expect_false(is.na(pos))
+  expect_true(is.na(d$sd[pos]))
+  expect_true(is.na(d$q25[pos]))
+  k <- d$nPoints
+  expect_true(all(is.na(d$densityX[((pos - 1) * k + 1):(pos * k)])))
+
+  # Every other item is untouched.
+  others <- setdiff(seq_along(d$itemId), pos)
+  expect_false(any(is.na(d$sd[others])))
+})
+
+test_that("distributions are absent without individual utilities", {
+  fx <- make_island_fixture(with_hb = "none", with_logit = TRUE)
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_false("distributions" %in% names(isl))
+  js <- as.character(jsonlite::toJSON(isl, auto_unbox = TRUE, na = "null"))
+  expect_false(grepl('"distributions"', js, fixed = TRUE))
+})
+
+test_that("distributions keep per-item fields as arrays and the stride scalar", {
+  fx <- make_island_fixture(with_hb = "eb")
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  d <- back$distributions
+  for (f in c("itemId", "mean", "median", "sd", "q25", "q75", "min", "max",
+              "densityX", "densityY")) {
+    expect_true(is.list(d[[f]]), info = paste(f, "must be a JSON array"))
+  }
+  expect_false(is.list(d$nPoints))
+  expect_false(is.list(d$note))
+  unlink(fx$out_dir, recursive = TRUE)
+})

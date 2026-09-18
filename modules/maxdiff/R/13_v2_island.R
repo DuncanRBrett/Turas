@@ -26,15 +26,31 @@
 #   the tabs export's job (12_tabs_export.R), where they become an Allocation
 #   question the reader CAN filter.
 #
-# CURATED (programme decision D1):
+# CURATED (programme decision D1, widened by section 6 on 18 Sep 2026):
 #   Item scores, preference shares, the estimator's provenance, TURF, anchor
-#   must-haves and the discrimination classes travel. HB diagnostics, the
-#   per-respondent utilities and the per-segment tables stay in the Excel
-#   deliverable. Segment cuts are the crosstab's job via the tabs export.
+#   must-haves, the discrimination classes, model diagnostics, head-to-head
+#   win rates, the per-segment item scores and the per-item utility
+#   distributions all travel. The tab is being brought to parity with the
+#   classic HTML report so that report can be retired; the checklist for that
+#   is docs/v2_lift/MAXDIFF_PARITY_CHECKLIST.md.
+#
+#   Only the PER-RESPONDENT utilities stay in the Excel deliverable. They are
+#   one row per respondent per item, which is what the Excel file is for and
+#   far too large for an island that ships inside a client's report. The
+#   distributions block carries their shape, not their rows.
+#
+#   An earlier version of this comment said HB diagnostics and the per-segment
+#   tables stayed in Excel on purpose. That stopped being true with section 6.
+#
+#   Segment cuts under an audience filter remain the crosstab's job via the
+#   tabs export. The per-segment scores here are the frozen ones the module
+#   estimated, not something the reader can re-cut.
 #
 # ==============================================================================
 
-MAXDIFF_ISLAND_VERSION <- "1.0.0"
+# 1.1.0 added the diagnostics, headToHead, segments and distributions blocks
+# (section 6). Purely additive, so the schema number does not move.
+MAXDIFF_ISLAND_VERSION <- "1.1.0"
 MAXDIFF_ISLAND_SCHEMA <- 1L
 
 
@@ -318,6 +334,97 @@ MAXDIFF_ISLAND_SCHEMA <- 1L
     )
   )
   Filter(Negate(is.null), out)
+}
+
+
+#' Per-Item Utility Distributions For The Island
+#'
+#' Feeds the violin the classic report draws from `density(vals, n = 32)`. The
+#' summary statistics and the density grid both travel as FLAT vectors in
+#' island item order: `densityX` and `densityY` hold nItems * nPoints values
+#' and the tab slices them with the `nPoints` stride. Nothing in the block is
+#' nested, so the whitelist treats it like every other block and there is no
+#' nested structure for jsonlite to serialise a way the view does not expect.
+#'
+#' @param results The maxdiff results list.
+#' @param ids Character vector of item ids, in island order.
+#' @param ref_pos Integer position of the reference item in `ids`, or NA.
+#' @param n_points Integer, points on the density grid.
+#'
+#' @return A list of parallel vectors plus two scalars, or NULL.
+#'
+#' @keywords internal
+.maxdiff_island_distributions <- function(results, ids, ref_pos = NA_integer_,
+                                          n_points = 32L) {
+
+  indiv <- results$hb_results$individual_utilities
+  if (is.null(indiv)) return(NULL)
+  indiv <- .md_drop_id_cols(indiv)
+
+  mat <- NULL
+  if (is.data.frame(indiv)) {
+    keep <- vapply(indiv, is.numeric, logical(1))
+    if (any(keep)) mat <- as.matrix(indiv[, keep, drop = FALSE])
+  } else if (is.matrix(indiv)) {
+    mat <- indiv
+  }
+  if (is.null(mat) || is.null(colnames(mat)) || nrow(mat) == 0L) return(NULL)
+  if (!any(ids %in% colnames(mat))) return(NULL)
+
+  n <- length(ids)
+  blank <- rep(NA_real_, n)
+  summ <- list(mean = blank, median = blank, sd = blank, q25 = blank,
+               q75 = blank, min = blank, max = blank)
+  dens_x <- rep(NA_real_, n * n_points)
+  dens_y <- rep(NA_real_, n * n_points)
+
+  for (i in seq_len(n)) {
+    # The reference item is fixed at zero for every respondent on the Stan
+    # path, so its distribution is a point mass the model imposed, not
+    # something the data showed. Blanked here for the same reason F6 blanks
+    # its spread in scores and discrimination.
+    if (!is.na(ref_pos) && i == ref_pos) next
+    if (!(ids[i] %in% colnames(mat))) next
+
+    v <- suppressWarnings(as.numeric(mat[, ids[i]]))
+    v <- v[is.finite(v)]
+    if (length(v) < 3L) next
+
+    q <- stats::quantile(v, c(0.25, 0.75), na.rm = TRUE, names = FALSE)
+    summ$mean[i] <- mean(v)
+    summ$median[i] <- stats::median(v)
+    summ$sd[i] <- stats::sd(v)
+    summ$q25[i] <- q[1L]
+    summ$q75[i] <- q[2L]
+    summ$min[i] <- min(v)
+    summ$max[i] <- max(v)
+
+    # density() needs spread to pick a bandwidth. An item every respondent
+    # scored identically has none, and a violin of it would be a lie anyway.
+    if (length(unique(v)) < 3L || !is.finite(stats::sd(v)) || stats::sd(v) <= 0) next
+    d <- tryCatch(stats::density(v, n = n_points), error = function(e) NULL)
+    if (is.null(d) || length(d$x) != n_points) next
+    span <- ((i - 1L) * n_points + 1L):(i * n_points)
+    dens_x[span] <- d$x
+    dens_y[span] <- d$y
+  }
+
+  if (all(is.na(summ$mean))) return(NULL)
+
+  c(
+    list(itemId = ids),
+    summ,
+    list(
+      nPoints = as.integer(n_points),
+      densityX = dens_x,
+      densityY = dens_y,
+      note = paste0(
+        "Each shape is the spread of one item's utility across respondents, ",
+        "estimated from the individual utilities. A wide shape means people ",
+        "disagreed about the item; a narrow one means they agreed."
+      )
+    )
+  )
 }
 
 
@@ -614,6 +721,7 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
   diagnostics_block <- .maxdiff_island_diagnostics(results, config, n_items = length(ids))
   h2h_block <- .maxdiff_island_head_to_head(results, ids)
   segments_block <- .maxdiff_island_segments(results, config, ids)
+  dist_block <- .maxdiff_island_distributions(results, ids, ref_pos)
 
   out <- drop_null(list(
     meta = meta,
@@ -623,7 +731,8 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     anchor = anchor_block,
     diagnostics = diagnostics_block,
     headToHead = h2h_block,
-    segments = segments_block
+    segments = segments_block,
+    distributions = dist_block
   ))
 
   if (verbose) cat(sprintf("  MaxDiff island: %d items, method %s\n", length(ids), method))
@@ -707,7 +816,8 @@ write_maxdiff_island <- function(results, config, output_file = NULL, verbose = 
       "maxRespondentRange"
     ),
     headToHead = c("source", "note"),
-    segments = c("minBase", "note")
+    segments = c("minBase", "note"),
+    distributions = c("nPoints", "note")
   )
   for (block in names(scalars)) {
     b <- island[[block]]
