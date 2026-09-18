@@ -580,6 +580,14 @@ add_interpretation_sheet <- function(wb, results, config, styles) {
       sample_notes <- c(sample_notes,
         "   WARNING: Extreme weights detected (max/min > 10). Results may be unstable.")
     }
+    if (!is.null(wd$normalisation) && isTRUE(wd$normalisation$rescaled)) {
+      sample_notes <- c(sample_notes,
+        sprintf("   Raw weights had mean %.4f and were rescaled to mean 1 before fitting",
+                wd$normalisation$raw_mean))
+    }
+    if (!is.null(wd$inference_stamp)) {
+      sample_notes <- c(sample_notes, "", "INFERENCE UNDER WEIGHTING:", paste0("   ", wd$inference_stamp))
+    }
   } else if (!is.null(config$weight_var) && config$weight_var != "") {
     sample_notes <- c(sample_notes, "", paste0("Weight variable specified: ", config$weight_var))
   } else {

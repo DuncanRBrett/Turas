@@ -86,7 +86,9 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   # ==========================================================================
 
   fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
-  model <- tryCatch({
+  # Non-integer frequency weights make glm warn on every fit; muffled at the fit
+  # site, with the reason recorded in cd_muffle_noninteger_successes().
+  model <- cd_muffle_noninteger_successes(tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
       if (all(abs(weights - 1) < 1e-10)) {
         glm(formula, data = fit_data, family = binomial(link = "logit"))
@@ -99,7 +101,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
     }
   }, error = function(e) {
     list(error = TRUE, message = e$message)
-  })
+  }))
 
   # ==========================================================================
   # CHECK FOR SEPARATION / CONVERGENCE ISSUES
@@ -234,7 +236,9 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   rownames(coef_df) <- NULL
 
   # Calculate odds ratios and CIs
-  conf_level <- config$confidence_level
+  # A config without confidence_level used to give qnorm(numeric(0)) and a
+  # zero-length CI column, which surfaces as an unrelated data.frame error.
+  conf_level <- config$confidence_level %||% CATDRIVER_DEFAULTS$confidence_level %||% 0.95
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
   coef_df$odds_ratio <- exp(coef_df$estimate)
@@ -255,8 +259,8 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   # Get predicted probabilities
   pred_probs <- predict(model, type = "response")
 
-  # Classification metrics
-  outcome_actual <- data[[config$outcome_var]]
+  # Classification metrics, on the rows the model fitted (see cd_fitted_outcome)
+  outcome_actual <- cd_fitted_outcome(model, data, config$outcome_var)
   pred_class <- factor(ifelse(pred_probs >= 0.5,
                               levels(outcome_actual)[2],
                               levels(outcome_actual)[1]),

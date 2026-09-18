@@ -164,11 +164,22 @@ calculate_multinomial_importance <- function(model_result, config) {
 
   model <- model_result$model
 
-  # Extract data safely - model$model may be NULL for multinom
-  # Priority: analysis_data (explicit from 04b) > model.frame > model$model
-  data <- model_result$analysis_data
-  if (is.null(data)) data <- tryCatch(model.frame(model), error = function(e) NULL)
-  if (is.null(data)) data <- model$model
+  # The reduced models must be refitted on exactly the rows the full model used
+  # and with exactly the same weights. 04b stores that frame as estimation_data
+  # (with the weight column ..catdriver_wt.. when the run is weighted).
+  #
+  # This used to refit on analysis_data, the raw frame with no weight column,
+  # so a weighted full log-likelihood was compared with an unweighted reduced
+  # one. Coordinator-verified in the July 2026 review: chi-square of -282.1 for
+  # a real driver, which then divided into importance_pct as a NEGATIVE share.
+  data <- model_result$estimation_data
+  weight_col <- model_result$weight_column
+  if (is.null(data)) {
+    data <- model_result$analysis_data
+    if (is.null(data)) data <- tryCatch(model.frame(model), error = function(e) NULL)
+    if (is.null(data)) data <- model$model
+    weight_col <- NULL
+  }
 
   if (is.null(data)) {
     cat("   [WARN] Cannot extract data for multinomial importance — returning equal importance\n")
@@ -187,9 +198,15 @@ calculate_multinomial_importance <- function(model_result, config) {
     return(importance_df)
   }
 
-  # Strip internal weight column if present (prevents refit issues)
-  if (".wt" %in% names(data)) {
-    data[[".wt"]] <- NULL
+  weighted_refit <- !is.null(weight_col) && weight_col %in% names(data)
+  if (weighted_refit && !identical(weight_col, "..catdriver_wt..")) {
+    data[["..catdriver_wt.."]] <- data[[weight_col]]
+  }
+
+  importance_method <- if (weighted_refit) {
+    "LR-test share (weighted multinomial refits)"
+  } else {
+    "LR-test share (multinomial refits)"
   }
 
   # Get full model log-likelihood
@@ -209,18 +226,34 @@ calculate_multinomial_importance <- function(model_result, config) {
       reduced_formula <- as.formula(paste(config$outcome_var, "~ 1"))
     }
 
-    # Fit reduced model
+    # Fit reduced model on the same rows, with the same weights
     reduced_model <- tryCatch({
-      nnet::multinom(reduced_formula, data = data, trace = FALSE, maxit = 500)
+      if (weighted_refit) {
+        nnet::multinom(reduced_formula, data = data, weights = ..catdriver_wt..,
+                       trace = FALSE, maxit = 500)
+      } else {
+        nnet::multinom(reduced_formula, data = data, trace = FALSE, maxit = 500)
+      }
     }, error = function(e) NULL)
 
     if (!is.null(reduced_model)) {
       ll_reduced <- logLik(reduced_model)
 
-      # Likelihood ratio test
+      # Likelihood ratio test. A correctly nested pair cannot give a negative
+      # statistic; if one appears the two fits are not comparable and the value
+      # must not reach an importance share.
       lr_stat <- -2 * (as.numeric(ll_reduced) - as.numeric(ll_full))
       lr_df <- attr(ll_full, "df") - attr(ll_reduced, "df")
-      lr_pvalue <- pchisq(lr_stat, abs(lr_df), lower.tail = FALSE)
+      if (is.finite(lr_stat) && lr_stat < 0) {
+        if (lr_stat < -1e-6) {
+          cat(sprintf("   [WARN] Reduced model for '%s' fitted better than the full model (LR = %.3f); importance for this driver is not available\n",
+                      var_name, lr_stat))
+          lr_stat <- NA_real_
+        } else {
+          lr_stat <- 0  # numerical noise around a driver that adds nothing
+        }
+      }
+      lr_pvalue <- if (is.na(lr_stat)) NA_real_ else pchisq(lr_stat, abs(lr_df), lower.tail = FALSE)
 
       importance_list[[var_name]] <- data.frame(
         variable = var_name,
@@ -260,6 +293,9 @@ calculate_multinomial_importance <- function(model_result, config) {
 
   importance_df$effect_size <- vapply(importance_df$importance_pct,
     classify_importance_effect, character(1))
+
+  # D5: every importance row says how it was computed.
+  importance_df$method <- importance_method
 
   # Sort and rank
   importance_df <- importance_df[order(-importance_df$importance_pct), ]

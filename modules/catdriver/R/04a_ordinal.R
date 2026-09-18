@@ -89,7 +89,10 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
       if (!is.null(weights) && length(weights) == nrow(data)) {
         if (!all(abs(weights - 1) < 1e-10)) {
           fit_data$.wt <- weights
-          MASS::polr(formula, data = fit_data, weights = .wt, Hess = TRUE, method = "logistic")
+          # polr fits a binomial glm for starting values, so weighted runs raise
+          # the same "non-integer #successes" warning as the binary engine.
+          cd_muffle_noninteger_successes(
+            MASS::polr(formula, data = fit_data, weights = .wt, Hess = TRUE, method = "logistic"))
         } else {
           MASS::polr(formula, data = fit_data, Hess = TRUE, method = "logistic")
         }
@@ -218,8 +221,19 @@ extract_clm_results <- function(model, config, guard) {
 
   # Null model for comparison
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  # The null model must be fitted on the SAME rows and with the SAME weights as
+  # the full model. model$model holds the rows clm actually used and carries the
+  # weights under the non-syntactic name "(weights)"; refitting without them
+  # compared a weighted full model to an unweighted null and produced negative
+  # McFadden R-squared values under PASS.
   null_model <- tryCatch({
-    ordinal::clm(null_formula, data = model$model, link = "logit")
+    null_data <- model$model
+    if ("(weights)" %in% names(null_data)) {
+      null_data[["..catdriver_wt.."]] <- as.numeric(null_data[["(weights)"]])
+      ordinal::clm(null_formula, data = null_data, weights = ..catdriver_wt.., link = "logit")
+    } else {
+      ordinal::clm(null_formula, data = null_data, link = "logit")
+    }
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {
@@ -328,8 +342,16 @@ extract_polr_results <- function(model, config, guard) {
   ll_full <- logLik(model)
 
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  # Same rows, same weights as the full fit (see the clm path above).
   null_model <- tryCatch({
-    MASS::polr(null_formula, data = model$model, Hess = TRUE, method = "logistic")
+    null_data <- model$model
+    if ("(weights)" %in% names(null_data)) {
+      null_data[["..catdriver_wt.."]] <- as.numeric(null_data[["(weights)"]])
+      MASS::polr(null_formula, data = null_data, weights = ..catdriver_wt..,
+                 Hess = TRUE, method = "logistic")
+    } else {
+      MASS::polr(null_formula, data = null_data, Hess = TRUE, method = "logistic")
+    }
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {

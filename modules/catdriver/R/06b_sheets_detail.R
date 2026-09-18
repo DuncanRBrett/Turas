@@ -108,6 +108,24 @@ add_model_summary_sheet <- function(wb, results, config, styles) {
     Interpretation = if (model_result$convergence) "Model converged normally" else "Check results carefully"
   ))
 
+  # D5: what the weighting did, and what it did not do, on the face of the sheet
+  weighting_stamp <- results$weight_diagnostics$inference_stamp
+  if (is.null(weighting_stamp)) {
+    weighting_stamp <- catdriver_weighting_stamp(config$weight_var,
+                                                 results$weight_diagnostics,
+                                                 results$weight_diagnostics$normalisation)
+  }
+  summary_data <- rbind(summary_data, data.frame(
+    Metric = "Weighting and inference",
+    Value = if (!is.null(results$weight_diagnostics)) {
+      sprintf("Weighted (%s), effective n = %.0f",
+              config$weight_var %||% "weight", results$weight_diagnostics$effective_n)
+    } else {
+      "Unweighted"
+    },
+    Interpretation = weighting_stamp
+  ))
+
   # Write to sheet
   openxlsx::writeData(wb, "Model Summary", summary_data,
                       startRow = 1, startCol = 1,

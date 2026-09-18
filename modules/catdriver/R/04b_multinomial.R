@@ -166,7 +166,7 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
       z_val <- if (!is.na(se) && se > 0) est / se else NA
       p_val <- if (!is.na(z_val)) 2 * pnorm(-abs(z_val)) else NA
 
-      conf_level <- config$confidence_level
+      conf_level <- config$confidence_level %||% CATDRIVER_DEFAULTS$confidence_level %||% 0.95
       z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
       coef_list[[length(coef_list) + 1]] <- data.frame(
@@ -192,8 +192,30 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   ll_full <- logLik(model)
 
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  # The null model must see the same rows and the same weights as the full fit.
+  # It used to be refitted on the caller's raw frame with no weights, which
+  # compared a weighted full model to an unweighted null (negative McFadden
+  # R-squared and an invalid LR test, under PASS) and, where a predictor had
+  # missing values, on more rows than the full model ever used.
+  estimation_rows <- cd_estimation_rows(model, nrow(fit_data))
+  estimation_data <- if (!is.null(estimation_rows)) {
+    fit_data[estimation_rows, , drop = FALSE]
+  } else {
+    fit_data
+  }
+  weights_used <- if ("..catdriver_wt.." %in% names(estimation_data)) {
+    estimation_data[["..catdriver_wt.."]]
+  } else {
+    NULL
+  }
+
   null_model <- tryCatch({
-    nnet::multinom(null_formula, data = data, trace = FALSE)
+    if (!is.null(weights_used)) {
+      nnet::multinom(null_formula, data = estimation_data, weights = ..catdriver_wt..,
+                     trace = FALSE)
+    } else {
+      nnet::multinom(null_formula, data = estimation_data, trace = FALSE)
+    }
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {
@@ -215,13 +237,22 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   pred_probs <- predict(model, type = "probs")
   pred_class <- predict(model, type = "class")
 
-  confusion <- table(Actual = data[[config$outcome_var]], Predicted = pred_class)
+  # Predictions cover only the rows the model fitted; the caller's frame may
+  # hold more (a predictor with missing values). Cross like with like.
+  confusion <- table(Actual = cd_fitted_outcome(model, data, config$outcome_var),
+                     Predicted = pred_class)
   total_obs <- sum(confusion)
   accuracy <- if (total_obs > 0) sum(diag(confusion)) / total_obs else NA_real_
 
   list(
     model = model,
     analysis_data = data,
+    # The rows and weights the full model actually used. Importance refits
+    # every reduced model and must use exactly these, or the likelihood-ratio
+    # statistics are not comparable.
+    estimation_data = estimation_data,
+    estimation_weights = weights_used,
+    weight_column = if (!is.null(weights_used)) "..catdriver_wt.." else NULL,
     model_type = "multinomial_logistic",
     engine_used = engine_used,
     fallback_used = fallback_used,

@@ -68,7 +68,11 @@ CATDRIVER_VERSION <- "1.1"
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "stats_pack_writer.R")
+  # effective_n.R is the platform's one Kish effective sample size (OPUS-0);
+  # without it the weight diagnostics fall back to a local copy of the same
+  # formula that does not filter non-finite weights.
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                 "stats_pack_writer.R", "effective_n.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -661,25 +665,72 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
 
   weights_g <- NULL
   weight_diagnostics_g <- NULL
+  weight_normalisation_g <- NULL
   if (!is.null(config$weight_var) && config$weight_var %in% names(data_g)) {
-    weights_g <- data_g[[config$weight_var]]
-    weights_g[is.na(weights_g)] <- 1
-    weights_g[weights_g < 0] <- 0
-    if (verbose) log_message(paste("Using weights from:", config$weight_var), "info")
+    # All four engines take weights as FREQUENCY weights, so standard errors
+    # follow the weight total rather than the sample size. Raw expansion
+    # weights therefore produced wildly overstated significance. Normalising to
+    # mean 1 at ingestion is the module's contract; the stamp below says so.
+    weight_normalisation_g <- normalise_catdriver_weights(data_g[[config$weight_var]],
+                                                          config$weight_var)
 
-    weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
-    if (!is.null(weight_diagnostics_g)) {
-      if (verbose) {
-        log_message(paste("Weight range:", round(weight_diagnostics_g$min_weight, 3),
-                          "-", round(weight_diagnostics_g$max_weight, 3)), "info")
-        log_message(paste("Effective n:", round(weight_diagnostics_g$effective_n, 0),
-                          "(design effect:", round(weight_diagnostics_g$design_effect, 2), ")"), "info")
+    if (!isTRUE(weight_normalisation_g$usable)) {
+      cat(sprintf("   [PARTIAL] Weight variable '%s' has no usable positive weights - proceeding UNWEIGHTED\n",
+                  config$weight_var))
+      local_degraded <- c(local_degraded,
+        paste0("Weight variable '", config$weight_var,
+               "' contained no usable positive weights; the analysis ran unweighted"))
+      local_affected <- c(local_affected, "All weighted estimates")
+      weight_normalisation_g <- NULL
+    } else {
+      weights_g <- weight_normalisation_g$weights
+      if (verbose) log_message(paste("Using weights from:", config$weight_var), "info")
+
+      # Every adjustment is reported, never silent.
+      for (note in weight_normalisation_g$notes) {
+        cat(sprintf("   [WEIGHTS] %s\n", note))
       }
-      if (weight_diagnostics_g$has_extreme_weights) {
-        cat("   [PARTIAL] Extreme weights detected (ratio > 10)\n")
+      if (weight_normalisation_g$n_na_imputed > 0 ||
+          weight_normalisation_g$n_negative_zeroed > 0 ||
+          (weight_normalisation_g$n_nonfinite_imputed %||% 0L) > 0) {
         local_degraded <- c(local_degraded,
-          paste0("Extreme weights detected (max/min = ", round(weight_diagnostics_g$weight_ratio, 1), ")"))
-        local_affected <- c(local_affected, "Standard errors", "Confidence intervals")
+          sprintf("Weight repairs in '%s': %d missing set to 1, %d non-finite set to 1, %d negative set to 0",
+                  config$weight_var, weight_normalisation_g$n_na_imputed,
+                  weight_normalisation_g$n_nonfinite_imputed %||% 0L,
+                  weight_normalisation_g$n_negative_zeroed))
+        local_affected <- c(local_affected, "All weighted estimates")
+      }
+      if (isTRUE(weight_normalisation_g$rescaled)) {
+        local_degraded <- c(local_degraded,
+          sprintf("Weights rescaled to mean 1 (raw mean %.4f); inference is a frequency-weight approximation and the design effect is not applied",
+                  weight_normalisation_g$raw_mean))
+        local_affected <- c(local_affected, "Standard errors", "Confidence intervals", "P-values")
+      }
+      if (weight_normalisation_g$n_zero > 0) {
+        cat(sprintf("   [WEIGHTS] %d respondent(s) carry zero weight and contribute nothing to the estimates, but still count in the reported sample size\n",
+                    weight_normalisation_g$n_zero))
+      }
+
+      weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
+      if (!is.null(weight_diagnostics_g)) {
+        weight_diagnostics_g$normalisation <- weight_normalisation_g
+        weight_diagnostics_g$inference_stamp <- catdriver_weighting_stamp(
+          config$weight_var, weight_diagnostics_g, weight_normalisation_g)
+
+        if (verbose) {
+          log_message(paste("Weight range:", round(weight_diagnostics_g$min_weight, 3),
+                            "-", round(weight_diagnostics_g$max_weight, 3)), "info")
+          log_message(paste("Effective n:", round(weight_diagnostics_g$effective_n, 0),
+                            "(design effect:", round(weight_diagnostics_g$design_effect, 2), ")"), "info")
+        }
+        cat(sprintf("   [WEIGHTS] %s\n", weight_diagnostics_g$inference_stamp))
+
+        if (weight_diagnostics_g$has_extreme_weights) {
+          cat("   [PARTIAL] Extreme weights detected (ratio > 10)\n")
+          local_degraded <- c(local_degraded,
+            paste0("Extreme weights detected (max/min = ", round(weight_diagnostics_g$weight_ratio, 1), ")"))
+          local_affected <- c(local_affected, "Standard errors", "Confidence intervals")
+        }
       }
     }
   }
