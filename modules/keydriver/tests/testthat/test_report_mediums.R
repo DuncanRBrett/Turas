@@ -7,6 +7,16 @@
 # a Print view full of literal markup.
 # ==============================================================================
 
+# The chart builders live in lib/html_report, which kd_ensure_module_loaded()
+# deliberately does not source (its orchestrator's guard reports every file
+# missing against a working directory of "."). This one file sources cleanly on
+# its own, so the chart tests below load it rather than skipping, which is what
+# they did at first and what review F19 is about.
+if (!exists("build_kd_correlation_heatmap", mode = "function")) {
+  try(source(file.path(module_dir, "lib", "html_report", "05_chart_builder.R")),
+      silent = TRUE)
+}
+
 js_dir <- file.path(module_dir, "lib", "html_report", "js")
 read_js <- function(name) paste(readLines(file.path(js_dir, name), warn = FALSE),
                                 collapse = "\n")
@@ -50,8 +60,7 @@ test_that("section visibility reads Yes as yes (M14, report layer)", {
 })
 
 test_that("the method agreement chart never draws a dot at NA (M19)", {
-  skip_if(!exists("build_kd_method_agreement_chart", mode = "function"),
-          "chart builder not loaded")
+  expect_true(exists("build_kd_method_agreement_chart", mode = "function"))
 
   # The grouped path sets one rank column and leaves the rest NA, which is
   # what produced cy="NA" and a column of circles the browser dropped.
@@ -90,8 +99,7 @@ test_that("the method agreement chart never draws a dot at NA (M19)", {
 })
 
 test_that("the bootstrap chart names the method it is showing (M20)", {
-  skip_if(!exists("build_kd_bootstrap_ci_chart", mode = "function"),
-          "chart builder not loaded")
+  expect_true(exists("build_kd_bootstrap_ci_chart", mode = "function"))
 
   # Three rows of Relative_Weight and one of Correlation. "First seen" gave
   # Correlation; the most common is Relative_Weight.
@@ -207,4 +215,63 @@ test_that("no em dash reaches a reader from the report layer", {
   for (ln in warn_lines) {
     expect_false(grepl(em, ln, fixed = TRUE), info = trimws(ln))
   }
+})
+
+
+# ==============================================================================
+# THE CORRELATION MATRIX (Duncan, 18 Sep 2026)
+# ==============================================================================
+# It drew the full symmetric matrix: every number twice, plus a diagonal of
+# 1.00 in the strongest colour, which put the eye on the only cells that carry
+# no information. The longest column label also ran past the viewBox, so
+# "product_range" rendered as "product_ran".
+
+test_that("the correlation heatmap draws each pair once (lower triangle)", {
+  expect_true(exists("build_kd_correlation_heatmap", mode = "function"))
+
+  vars <- c("outcome", "d1", "d2", "d3")
+  m <- matrix(c(1.00, 0.77, 0.61, 0.43,
+                0.77, 1.00, 0.41, 0.34,
+                0.61, 0.41, 1.00, 0.36,
+                0.43, 0.34, 0.36, 1.00), 4, 4,
+              dimnames = list(vars, vars))
+
+  svg <- as.character(build_kd_correlation_heatmap(m))
+
+  # Four variables: 6 pairs, so 6 cells. The full matrix drew 16.
+  n_cells <- length(gregexpr("<rect ", svg, fixed = TRUE)[[1]])
+  expect_equal(n_cells, 6L)
+
+  # Every off-diagonal value appears exactly once.
+  for (v in c("0.77", "0.61", "0.43", "0.41", "0.34", "0.36")) {
+    expect_equal(length(gregexpr(v, svg, fixed = TRUE)[[1]]), 1L, info = v)
+  }
+  # And the diagonal is gone: no 1.00 anywhere.
+  expect_false(grepl("1.00", svg, fixed = TRUE))
+})
+
+test_that("the heatmap's box is wide enough for its rotated labels", {
+  expect_true(exists("build_kd_correlation_heatmap", mode = "function"))
+
+  # A long name in the last labelled column is the case that used to clip.
+  vars <- c("outcome", "d1", "a_very_long_driver", "d3")
+  m <- diag(4); dimnames(m) <- list(vars, vars)
+  m[lower.tri(m)] <- 0.5; m[upper.tri(m)] <- 0.5
+
+  svg <- as.character(build_kd_correlation_heatmap(m))
+  vb <- regmatches(svg, regexpr('viewBox="0 0 [0-9]+ [0-9]+"', svg))
+  expect_true(length(vb) == 1)
+  dims <- as.numeric(regmatches(vb, gregexpr("[0-9]+", vb))[[1]])
+  width <- dims[3]
+
+  # The grid itself ends here; the rest of the width is for the labels that
+  # lean up and to the right of it.
+  grid_right <- 140 + (4 - 1) * 44
+  expect_gt(width, grid_right)
+  # Long labels must buy more room than short ones.
+  short <- as.character(build_kd_correlation_heatmap(
+    `dimnames<-`(m, list(c("o", "a", "b", "c"), c("o", "a", "b", "c")))))
+  vb2 <- regmatches(short, regexpr('viewBox="0 0 [0-9]+ [0-9]+"', short))
+  w2 <- as.numeric(regmatches(vb2, gregexpr("[0-9]+", vb2))[[1]])[3]
+  expect_gt(width, w2)
 })
