@@ -514,16 +514,45 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
     }
   }
 
-  # Build comparison
+  # Build comparison.
+  # A failure here used to print a console warning, return NULL and leave the
+  # run at PASS, so Excel sheets 9 to 11 said "No subgroup comparison data" and
+  # nothing else ever mentioned it. The whole feature was dead for years on that
+  # silence. A failure now degrades the run and names itself.
   subgroup_comparison <- NULL
   if (exists("build_subgroup_comparison", mode = "function")) {
     subgroup_comparison <- tryCatch(
       build_subgroup_comparison(subgroup_results, config),
       error = function(e) {
-        cat(sprintf("   [WARNING] Subgroup comparison generation failed: %s\n", e$message))
+        cat("\n┌─── TURAS ERROR ─────────────────────────────────┐
+")
+        cat("│ Context: CatDriver subgroup comparison
+")
+        cat(sprintf("│ Message: %s
+", e$message))
+        cat("│ Effect: the comparison sheets are empty and the run is PARTIAL
+")
+        cat("└────────────────────────────────────────────────────┘
+
+")
+        degraded_reasons <<- c(degraded_reasons,
+          sprintf("Subgroup comparison could not be built: %s", e$message))
+        affected_outputs <<- c(affected_outputs,
+          "Subgroup importance matrix", "Subgroup odds-ratio comparison",
+          "Subgroup model fit", "Subgroup insights")
         NULL
       }
     )
+
+    # A comparison that came back with nothing in it is also worth saying out
+    # loud; it means the groups produced no odds ratios to compare.
+    if (!is.null(subgroup_comparison) &&
+        is.null(subgroup_comparison$or_comparison) &&
+        is.null(subgroup_comparison$importance_matrix)) {
+      degraded_reasons <- c(degraded_reasons,
+        "Subgroup comparison is empty: fewer than two subgroups produced results")
+      affected_outputs <- c(affected_outputs, "Subgroup comparison")
+    }
   }
 
   # Select primary result

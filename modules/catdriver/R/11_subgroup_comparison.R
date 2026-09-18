@@ -237,6 +237,64 @@ classify_drivers <- function(importance_matrix, group_names) {
 # OR COMPARISON
 # ==============================================================================
 
+#' Read a Production Odds-Ratio Frame for Comparison
+#'
+#' The odds-ratio frame every CatDriver run produces comes from
+#' \code{extract_odds_ratios_mapped()} (09_mapper.R) and carries the columns
+#' \code{factor}, \code{comparison}, \code{factor_label}, \code{odds_ratio},
+#' \code{or_lower}, \code{or_upper} and \code{p_value}.
+#'
+#' The subgroup comparison used to read \code{driver}, \code{level},
+#' \code{or}, \code{or_ci_lower} and \code{or_ci_upper} instead: names the
+#' mapper has never produced. Every column came back NULL, the comparison threw
+#' "missing value where TRUE/FALSE needed", the error was swallowed to a console
+#' warning, and every subgroup-configured run since the schema changed shipped
+#' its comparison sheets empty under PASS.
+#'
+#' The rename lives here, at the consumer. 09_mapper.R is not touched.
+#'
+#' @param or_df Odds-ratio frame from a subgroup result.
+#' @param group_label Group name, used in the error message.
+#' @return Data frame with driver/label/level/or/or_ci_lower/or_ci_upper/p_value,
+#'   or NULL when the group has no odds ratios at all.
+#' @keywords internal
+normalise_or_frame <- function(or_df, group_label = "") {
+
+  if (!is.data.frame(or_df) || nrow(or_df) == 0) return(NULL)
+
+  required <- c("factor", "comparison", "odds_ratio", "or_lower", "or_upper")
+  missing_cols <- setdiff(required, names(or_df))
+  if (length(missing_cols) > 0) {
+    # Loud, not silent: a schema the comparison cannot read is a defect, and it
+    # degrades the run to PARTIAL through the caller's handler.
+    stop(sprintf(
+      "Subgroup '%s' odds-ratio table is missing the column(s) %s. Expected the mapper's schema (%s). Found: %s",
+      group_label, paste(missing_cols, collapse = ", "),
+      paste(required, collapse = ", "), paste(names(or_df), collapse = ", ")
+    ))
+  }
+
+  data.frame(
+    driver = as.character(or_df$factor),
+    label = if ("factor_label" %in% names(or_df)) {
+      as.character(or_df$factor_label)
+    } else {
+      as.character(or_df$factor)
+    },
+    level = as.character(or_df$comparison),
+    or = suppressWarnings(as.numeric(or_df$odds_ratio)),
+    or_ci_lower = suppressWarnings(as.numeric(or_df$or_lower)),
+    or_ci_upper = suppressWarnings(as.numeric(or_df$or_upper)),
+    p_value = if ("p_value" %in% names(or_df)) {
+      suppressWarnings(as.numeric(or_df$p_value))
+    } else {
+      NA_real_
+    },
+    stringsAsFactors = FALSE
+  )
+}
+
+
 #' Build Odds Ratio Comparison Across Subgroups
 #'
 #' For each driver-level combination present in any subgroup, collects the
@@ -246,8 +304,9 @@ classify_drivers <- function(importance_matrix, group_names) {
 #' effects first.
 #'
 #' @param successful Named list of successful subgroup result objects, each
-#'   containing an \code{odds_ratios} data frame with driver, label, level,
-#'   or, or_ci_lower, or_ci_upper, and p_value columns.
+#'   containing an \code{odds_ratios} data frame in the mapper's schema
+#'   (factor, comparison, factor_label, odds_ratio, or_lower, or_upper,
+#'   p_value), read through \code{normalise_or_frame()}.
 #' @return Data frame with columns: driver, label, level,
 #'   {group}_or (numeric), {group}_ci (character), {group}_p (numeric),
 #'   or_ratio (numeric, max/min OR), notable (character, "Yes"/"No"/"-").
@@ -259,8 +318,8 @@ build_or_comparison <- function(successful) {
   # Collect all driver-level combinations
   all_or <- list()
   for (grp in group_names) {
-    or_df <- successful[[grp]]$odds_ratios
-    if (!is.data.frame(or_df) || nrow(or_df) == 0) next
+    or_df <- normalise_or_frame(successful[[grp]]$odds_ratios, grp)
+    if (is.null(or_df) || nrow(or_df) == 0) next
 
     for (i in seq_len(nrow(or_df))) {
       driver <- or_df$driver[i]
@@ -270,7 +329,7 @@ build_or_comparison <- function(successful) {
       if (!key %in% names(all_or)) {
         all_or[[key]] <- list(
           driver = driver,
-          label = or_df$label[i] %||% driver,
+          label = or_df$label[i],
           level = level,
           ors = list(),
           cis = list(),
