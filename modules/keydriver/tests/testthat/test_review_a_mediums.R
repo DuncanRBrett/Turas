@@ -277,8 +277,7 @@ test_that("the loader's srcfile branch can actually fire (F23)", {
 })
 
 test_that("a mixed quadrant run does not warn about factors (F28)", {
-  skip_if(!exists("calculate_weighted_means", mode = "function"),
-          "quadrant prep not loaded")
+  expect_true(exists("calculate_weighted_means", mode = "function"))
   # weighted.mean() on a factor returned NA anyway, after printing
   # "'*' not meaningful for factors" once per categorical driver, so every
   # mixed run ended with warnings the analyst could do nothing about.

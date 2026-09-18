@@ -103,6 +103,11 @@ make_survey_data <- function(n = 100, seed = 42) {
 # CHECK 1: check_outcome_in_data
 # ==============================================================================
 
+# Loaded, not skipped. This file used to guard every block with
+# skip_if(!exists(...)), so a run that had not loaded the module reported
+# success while testing nothing (reviews F17 and F19).
+kd_ensure_module_loaded("all")
+
 test_that("Check 1 - outcome passes when present and numeric", {
   vars_df <- make_variables_df()
   data <- make_survey_data()
@@ -643,8 +648,8 @@ test_that("checks 12 to 14 read the config shape a real run has (H8)", {
   # The live pipeline stores these under config$settings. The checks read
   # config$enable_shap, which is NULL there, so each returned early and the
   # check never fired on a real run.
-  skip_if(!exists("check_shap_dependencies", mode = "function"), "check not loaded")
-  skip_if(!exists("check_feature_policies_valid", mode = "function"), "check not loaded")
+  expect_true(exists("check_shap_dependencies", mode = "function"))
+  expect_true(exists("check_feature_policies_valid", mode = "function"))
   log0 <- init_preflight_log()
 
   # Nested, which is what a loaded config looks like.
@@ -664,7 +669,7 @@ test_that("checks 12 to 14 read the config shape a real run has (H8)", {
 })
 
 test_that("a pre-flight Error would block a run, a Warning would not (H8)", {
-  skip_if(!exists("validate_keydriver_preflight", mode = "function"), "orchestrator not loaded")
+  expect_true(exists("validate_keydriver_preflight", mode = "function"))
   set.seed(2)
   n <- 60
   d <- data.frame(Y = rnorm(n), D1 = rnorm(n), D2 = rnorm(n))

@@ -549,6 +549,11 @@ build_kd_quadrant_action_table <- function(quadrant_data) {
 #'   \code{$action_table} data.frame
 #' @return \code{htmltools::tags$div()} block or NULL
 #' @keywords internal
+# NOT CALLED BY ANY REPORT. Nothing in lib/html_report references this: the
+# live section is build_kd_quadrant_section() in 03c_section_builders.R, which
+# is where the importance-source stamp went (handover A9). Left in place rather
+# than deleted in this pass, but it is dead and should go the way
+# kd_pinned_views.js went.
 build_kd_quadrant_summary <- function(quadrant_data) {
 
   if (is.null(quadrant_data)) return(NULL)

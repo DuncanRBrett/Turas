@@ -196,9 +196,37 @@ Findings are numbered F1 to F29 with their severity; every C, H, M or A identifi
 >   which claimed "All 14 pre-flight checks passed", now counts from a
 >   constant so it cannot outlive a deleted check. There are thirteen.
 >
-> F26 is now CLOSED as well, as working as intended with its documentation
-> corrected: see the note under the finding itself. The only findings still
-> open are F18 and F19, the two test-quality mediums.
+> **F18, F19 and F26 are now CLOSED as well, on 18 September 2026. Every
+> finding in this review is closed.**
+>
+> F18: the three sites that compute Johnson's weights are pinned by value.
+> The engine is compared against an independent computation on its own inputs
+> (agreement 3.6e-15) and against literal seeded goldens; the previously
+> unpinned bootstrap replicate and mixed term-level paths have value tests of
+> their own; the sum-to-R-squared identity is now asserted THROUGH the engine
+> rather than about the reference implementation; and
+> `CALC_RW_DOES_NOT_SUM_TO_R2`, which had no test at all, is exercised.
+> Proved by putting the PCA rotation back at all three sites: the two
+> previously unpinned ones now fail, where before they could not.
+>
+> The loose `tolerance = 0.06` comparison is gone. The review was right about
+> it: the engine returns 5.25 for driver 3 against an expected 4.14, a 27 per
+> cent error, and testthat's relative tolerance is dominated by the largest
+> element, so it passed.
+>
+> F19: the three helpers that skipped when a function was absent now fail
+> instead, and so do twenty more of the same shape found by looking; two files
+> that had relied on those skips never loaded the module at all and now do.
+> The M1 claim has a behaviour test that holds the model fixed and varies only
+> which spread the engine uses, which fails on the pre-M1 arithmetic where the
+> old test passes. `test_recovery.R`'s weaker assertion is annotated to say
+> what it does not prove.
+>
+> A9's remaining half is done: the quadrant section of keydriver's own report
+> now names the importance source that placed the drivers, and says so when
+> the config asked for one the run could not use. Placing it turned up another
+> dead builder, `build_kd_quadrant_summary()`, which is called by nothing; it
+> is labelled and covered by a test rather than removed in this pass.
 >
 > One thing the fix went beyond the finding on: F1 was fixed at
 > `calculate_correlations()` rather than at either caller, so the weighted and
