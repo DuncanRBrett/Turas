@@ -1450,8 +1450,33 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 .md-h2h th { white-space: nowrap; }
 .md-h2h tbody th { font-weight: 600; text-align: left; background: #fafafa; }
 .md-h2h-self { background: #f2f2f4; }
+.md-h2h-col { width: 46px; color: #667; }
+.md-h2h-n { color: #98a; font-weight: 400; }
+/* Numbered key under a chart whose points are numbered. */
+.md-key {
+  margin: 2px 0 0 20px; padding: 0; columns: 2; column-gap: 28px;
+  font-size: .8rem; color: #555;
+}
+.md-key li { margin: 0 0 2px; break-inside: avoid; }
 .md-chart { margin: 4px 0 12px; }
 .md-chart svg { width: 100%; height: auto; max-width: 720px; display: block; }
+.md-panel h4 { margin: 18px 0 4px; font-size: .95rem; font-weight: 600; }
+/* A segment level under Min_Respondents_Per_Segment is marked in the header
+   and down its column, so the reader cannot read one number out of context. */
+.md-base { display: block; font-weight: 400; font-size: .74rem; color: #777; }
+.md-thin-flag {
+  display: block; font-weight: 600; font-size: .7rem; color: #8a5a00;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.md-table th.md-thin, .md-table td.md-thin { background: #fffaf0; }
+.md-thin-note { color: #7a4b00; }
+/* The anchor bars run to 100% so the threshold marker lines up down the
+   column. The wrapper is the 0-100 track; the bar and the marker sit in it. */
+.md-barwrap { position: relative; display: block; width: 100%; height: 11px; }
+.md-barwrap .md-bar { position: absolute; left: 0; top: 0; height: 11px; }
+.md-threshold {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; background: #8a5a00;
+}
 
 /* ---------------------------------------------------------------------------
    Pricing tab (27z_pricing.js). The same shape as the Conjoint and MaxDiff

@@ -30,8 +30,10 @@ discrimination. The island carries five blocks: `meta`, `scores`,
 
 ## Content inventory
 
-Status values: HAVE (already in the tab), BUILD (this branch adds it),
-DROP (deliberately not carried, with the reason).
+Status values: HAVE (was already in the tab before this branch), DONE (this
+branch added it), DROP (deliberately not carried, with the reason). Everything
+marked DONE was built and gated on 18 Sep 2026; see the status section at the
+end.
 
 ### Panel 1, Overview
 
@@ -40,8 +42,8 @@ DROP (deliberately not carried, with the reason).
 | Method callout | HAVE | `provenanceHtml` |
 | Stat card: Items Tested | HAVE | `meta.nItems` |
 | Stat card: Respondents | HAVE | `meta.nRespondents` |
-| Stat card: Top Share + item name | BUILD | derivable in the tab from `scores` |
-| Stat card: Share Range, top minus bottom | BUILD | derivable in the tab from `scores` |
+| Stat card: Top Share + item name | DONE | derivable in the tab from `scores` |
+| Stat card: Share Range, top minus bottom | DONE | derivable in the tab from `scores` |
 | Top Items share bar chart | HAVE | the scores table draws share bars in `md-barcell` |
 
 ### Panel 2, Preferences
@@ -50,9 +52,9 @@ DROP (deliberately not carried, with the reason).
 |---|---|---|
 | Preference scores table | HAVE | `scoresHtml` |
 | Utility score bar chart | HAVE | the same table carries the utility column |
-| Anchor threshold chart | HAVE in part | `anchorHtml` draws essential-percent bars; the threshold line is not drawn. BUILD the threshold marker |
-| Utility distribution, raincloud per item | BUILD | needs a new `distributions` island block carrying per-item density x and y |
-| Per-segment preference share charts | BUILD | as a segment table plus one chart per segment variable, not a dropdown |
+| Anchor threshold chart | DONE | corrected 18 Sep: `anchorHtml` is a plain table with no bars at all. It gets bars and a threshold marker |
+| Utility distribution, raincloud per item | DONE | needs a new `distributions` island block carrying per-item density x and y |
+| Per-segment preference share charts | DONE | as a segment table plus one chart per segment variable, not a dropdown |
 | Per-segment utility charts | DROP | the same numbers as the segment table; one view per variable is enough |
 | Per-segment distribution charts | DROP | island size. Ten items times six segment levels is sixty densities |
 | Per-segment anchor charts | DROP | as above |
@@ -64,7 +66,7 @@ DROP (deliberately not carried, with the reason).
 |---|---|---|
 | Count scores table with discrimination | HAVE | `scoresHtml` plus `discriminationHtml` |
 | Diverging best versus worst chart | HAVE | the scores table draws the `md-bwcell` diverging bar |
-| Item strategy quadrant, mean against SD | BUILD | a scatter. Not covered by any existing table |
+| Item strategy quadrant, mean against SD | DONE | a scatter. Not covered by any existing table |
 | Per-segment diverging charts | DROP | covered by the segment table |
 | Per-segment quadrant charts | DROP | island size, and the aggregate quadrant carries the decision |
 
@@ -72,8 +74,8 @@ DROP (deliberately not carried, with the reason).
 
 | Content | Status | Note |
 |---|---|---|
-| n by n win-probability matrix | BUILD | new `headToHead` island block |
-| Callout | BUILD | rewritten as a plain note, the classic prose uses em dashes |
+| n by n win-probability matrix | DONE | new `headToHead` island block |
+| Callout | DONE | rewritten as a plain note, the classic prose uses em dashes |
 | Per-segment H2H matrices | DROP | n squared per segment level. The aggregate matrix is the decision view |
 | Segment dropdown | DROP | frozen tab |
 
@@ -82,15 +84,15 @@ DROP (deliberately not carried, with the reason).
 | Content | Status | Note |
 |---|---|---|
 | TURF step table | HAVE | `turfHtml` |
-| Reach curve chart | BUILD | the table shows reach bars but not the curve's shape and plateau |
+| Reach curve chart | DONE | the table shows reach bars but not the curve's shape and plateau |
 
 ### Panel 6, Segments
 
 | Content | Status | Note |
 |---|---|---|
-| Segment scores table | BUILD | new `segments` island block. The classic table is broken, see the defects section |
-| Segment grouped bar chart | BUILD | one chart per segment variable. The classic chart draws nothing at all |
-| Segment base sizes | BUILD | carried as `base` so the tab can flag levels below `Min_Respondents_Per_Segment` |
+| Segment scores table | DONE | new `segments` island block. The classic table is broken, see the defects section |
+| Segment grouped bar chart | DONE | one chart per segment variable. The classic chart draws nothing at all |
+| Segment base sizes | DONE | carried as `base` so the tab can flag levels below `Min_Respondents_Per_Segment` |
 
 ### Panel 7, Diagnostics
 
@@ -98,10 +100,10 @@ DROP (deliberately not carried, with the reason).
 |---|---|---|
 | Model Summary: method, respondents, items, segments | HAVE in part | method, respondents and items are in `meta`. BUILD the segment count |
 | Sampler diagnostics: divergences, treedepth, R-hat, ESS | HAVE | added by F6 on 17 Sep, lives in `meta`. The classic never renders these either |
-| Model fit: log-likelihood, AIC, BIC | ADDED | not parity. The classic never renders these, see the defects section |
-| Population utility statistics: range, mean, SD, discrimination | BUILD | new `diagnostics` block |
-| Model quality: mean max share, chance level, sharpness ratio, entropy ratio, heterogeneity | BUILD | new `diagnostics` block |
-| Respondent utility distribution: mean, min, max range | BUILD | new `diagnostics` block |
+| Model fit: log-likelihood, AIC, BIC | DONE (addition) | not parity. The classic never renders these, see the defects section |
+| Population utility statistics: range, mean, SD, discrimination | DONE | new `diagnostics` block |
+| Model quality: mean max share, chance level, sharpness ratio, entropy ratio, heterogeneity | DONE | new `diagnostics` block |
+| Respondent utility distribution: mean, min, max range | DONE | new `diagnostics` block |
 | Item-level diagnostics table | HAVE | the scores and discrimination tables carry the per-item numbers |
 
 ## Three defects in the classic report, found while mapping
@@ -168,11 +170,11 @@ and the `27z_pricing.js` inline-SVG pattern.
 |---|---|
 | `build_preference_chart` | covered by the scores table bars |
 | `build_diverging_chart` | covered by the scores table diverging bars |
-| `build_anchor_threshold_chart` | bars covered; add the threshold marker only |
-| `build_turf_chart` | REDRAW, reach curve |
-| `build_strategy_quadrant` | REDRAW, scatter |
-| `build_segment_chart` | REDRAW, grouped bars per segment variable |
-| `build_utility_distribution_chart` | REDRAW, violin from island densities |
+| `build_anchor_threshold_chart` | REDRAWN as bars with a threshold marker. An earlier line here said the bars were already covered; they were not |
+| `build_turf_chart` | REDRAWN, reach curve |
+| `build_strategy_quadrant` | REDRAWN, numbered scatter with a key |
+| `build_segment_chart` | REDRAWN, grouped bars per segment variable |
+| `build_utility_distribution_chart` | REDRAWN, violin from island densities |
 
 ## Dependency that dies at retirement
 
@@ -202,3 +204,45 @@ wrong. Every new block adds an entry naming its scalars.
 4. Only then retire: `Generate_HTML_Report` joins `MAXDIFF_RETIRED_SETTINGS`,
    `modules/maxdiff/lib/html_report/` and `test_html_report.R` are deleted,
    and the Karoo config cell is turned off in openpyxl, never `loadWorkbook()`.
+
+## Status, 18 Sep 2026
+
+Stages 1 and 2 are complete on `feature/maxdiff-tab-parity`. Stage 3 is
+Duncan's, and stage 4 waits on it.
+
+The island grew four blocks in `modules/maxdiff/R/13_v2_island.R`:
+`diagnostics`, `headToHead`, `segments` and `distributions`.
+`MAXDIFF_ISLAND_VERSION` is 1.1.0; the schema number did not move because the
+change is purely additive. Each block has its own tests in
+`modules/maxdiff/tests/testthat/test_v2_island.R`, including the F2 case of a
+length-1 per-row field, and every one of them failed on the code as found.
+
+The tab grew four panels in
+`modules/tabs/lib/html_report_v2/assets/js/27y_maxdiff.js`: item strategy,
+utility distributions, head-to-head and scores by segment, plus model
+diagnostics, and four charts drawn in `TR.svg`. The gate is
+`modules/tabs/tests/js/test_maxdiff_parity_panels.mjs`, 45 checks against the
+shipped JS in a vm.
+
+Three problems were found by rendering the tab to HTML and looking at it, not
+by the gate. The TURF chart clipped its last axis label. The quadrant
+truncated every item label to 22 characters, so an item read as a different
+item; it now numbers its points against a key. The head-to-head matrix used
+full item labels as column headers, which made a ten-item matrix several
+screens wide; columns are numbered to match the rows. Two smaller ones came
+from the same look: the diagnostics panel printed the same number twice, as
+"Utility spread" and "Heterogeneity", and the quadrant silently dropped the
+reference item, which has no spread to place. Both are fixed and gated.
+
+### What Duncan does next, stage 3
+
+Generate a MaxDiff project through `launch_turas()` with both
+`Generate_HTML_Report` and the v2 report on. Open the classic report and the
+MaxDiff tab of the v2 report side by side and walk the tables above. Anything
+marked DONE that is not there, or is there and wrong, comes back to a session.
+Anything marked DROP that you want after all is a scope decision, not a bug.
+
+Only after that does stage 4 run: `Generate_HTML_Report` joins
+`MAXDIFF_RETIRED_SETTINGS`, `modules/maxdiff/lib/html_report/` and
+`test_html_report.R` are deleted, and the Karoo config cell is turned off in
+openpyxl, never `loadWorkbook()`.

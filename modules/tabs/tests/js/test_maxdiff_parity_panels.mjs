@@ -74,6 +74,80 @@ function h2h() {
            note: "Each win rate is the average, across respondents, of the probability." };
 }
 
+/** Long form, the shape .maxdiff_island_segments() writes. */
+function segments(opts) {
+  const o = opts || {};
+  const spec = [
+    { variable: "Age", level: "18-34", base: 180 },
+    { variable: "Age", level: "35+", base: o.thinLevel ? 12 : 120 },
+    { variable: "Region", level: "North", base: 150 },
+    { variable: "Region", level: "South", base: 150 },
+  ];
+  const out = { variable: [], segmentId: [], level: [], base: [], itemId: [],
+                netScore: [], bestPct: [], worstPct: [],
+                minBase: 50, note: "Segment scores are count-based." };
+  spec.forEach(function (g, gi) {
+    IDS.forEach(function (id, i) {
+      out.variable.push(g.variable);
+      out.segmentId.push(g.variable === "Age" ? "S1" : "S2");
+      out.level.push(g.level);
+      out.base.push(g.base);
+      out.itemId.push(id);
+      out.netScore.push(46.7 - i * 15 + gi * 3);
+      out.bestPct.push(50 - i * 11 + gi);
+      out.worstPct.push(3.3 + i * 6);
+    });
+  });
+  return out;
+}
+
+/** Flat densities with a stride, the shape .maxdiff_island_distributions() writes. */
+function distributions(opts) {
+  const o = opts || {};
+  const K = 16;
+  const mean = [1.5, 1.0, 0.5, 0.2];
+  const sd = [0.81, 1.42, 0.63, 0.55];
+  const out = { itemId: IDS, nPoints: K, mean: [], median: [], sd: [],
+                q25: [], q75: [], min: [], max: [], densityX: [], densityY: [],
+                note: "Each shape is the spread of one item's utility across respondents." };
+  IDS.forEach(function (_, i) {
+    // The reference item is fixed at zero, so the island blanks its shape.
+    const blank = o.refBlank !== false && i === IDS.length - 1;
+    out.mean.push(blank ? null : mean[i]);
+    out.median.push(blank ? null : mean[i]);
+    out.sd.push(blank ? null : sd[i]);
+    out.q25.push(blank ? null : mean[i] - 0.67 * sd[i]);
+    out.q75.push(blank ? null : mean[i] + 0.67 * sd[i]);
+    out.min.push(blank ? null : mean[i] - 2.5 * sd[i]);
+    out.max.push(blank ? null : mean[i] + 2.5 * sd[i]);
+    for (let k = 0; k < K; k++) {
+      if (blank) { out.densityX.push(null); out.densityY.push(null); continue; }
+      const x = mean[i] - 3 * sd[i] + (6 * sd[i] * k) / (K - 1);
+      const z = (x - mean[i]) / sd[i];
+      out.densityX.push(x);
+      out.densityY.push(Math.exp(-0.5 * z * z) / (sd[i] * Math.sqrt(2 * Math.PI)));
+    }
+  });
+  return out;
+}
+
+function turf() {
+  return {
+    thresholdMethod: "ABOVE_MEAN", nRespondents: 300, maxItems: 4,
+    step: [1, 2, 3], itemId: IDS.slice(0, 3), label: ITEMS.slice(0, 3),
+    reachPct: [62.4, 81.9, 88.2], incrementalPct: [62.4, 19.5, 6.3],
+    note: "Reach is the share of respondents for whom at least one item appeals.",
+  };
+}
+
+function anchor() {
+  return {
+    variable: "MustHave", threshold: 0.5, itemId: IDS, label: ITEMS,
+    rate: [0.78, 0.61, 0.33, 0.12], count: [234, 183, 99, 36],
+    isMustHave: [true, true, false, false],
+  };
+}
+
 function island(opts) {
   const o = opts || {};
   const d = {
@@ -107,6 +181,10 @@ function island(opts) {
     }, o.diagnostics || {});
   }
   if (o.headToHead !== null) d.headToHead = o.headToHead || h2h();
+  if (o.segments !== null) d.segments = o.segments || segments();
+  if (o.distributions !== null) d.distributions = o.distributions || distributions();
+  if (o.turf !== null) d.turf = o.turf || turf();
+  if (o.anchor !== null) d.anchor = o.anchor || anchor();
   return d;
 }
 
@@ -159,6 +237,84 @@ const aggHtml = render({ headToHead: Object.assign(h2h(), {
 }) });
 ok(/notional respondent/.test(aggHtml),
    "the aggregate fallback says what it is, rather than passing as a per-respondent rate");
+
+// --- Segments panel -----------------------------------------------------------
+html = render();
+const segSection = (html.match(/<section[^>]*>(?:(?!<\/section>)[\s\S])*?Scores by segment[\s\S]*?<\/section>/i) || [""])[0];
+ok(segSection.length > 0, "the tab has a segments panel");
+ok(/>Age</.test(segSection) && /Region/.test(segSection),
+   "each configured segment variable gets its own heading");
+ok(/18-34/.test(segSection) && /35\+/.test(segSection),
+   "the levels of a variable appear as columns");
+ok(/n\s*=\s*180/.test(segSection), "each level states its base");
+ok(!/segment_scores|segment_summary/.test(segSection),
+   "the internal list names never reach the reader, as they do in the classic report");
+ok((segSection.match(/<svg/g) || []).length === 2,
+   "one grouped bar chart per segment variable");
+
+const thin = render({ segments: segments({ thinLevel: true }) });
+ok(/md-thin|too few|small base/i.test(thin),
+   "a level below the configured minimum is flagged, not printed as if it were solid");
+
+html = render({ segments: null });
+ok(!/Scores by segment/i.test(html), "no segments block means no segments panel");
+
+// --- Distributions panel ------------------------------------------------------
+html = render();
+const distSection = (html.match(/<section[^>]*>(?:(?!<\/section>)[\s\S])*?Utility distributions[\s\S]*?<\/section>/i) || [""])[0];
+ok(distSection.length > 0, "the tab has a utility distributions panel");
+ok(/<svg[^>]*viewBox=/.test(distSection), "it draws an SVG with a viewBox");
+ok((distSection.match(/class="md-violin"/g) || []).length === 3,
+   "one shape per item that has a density, and none for the blanked reference item");
+ok(/Strong/.test(distSection),
+   "the reference item is still named, it just has no shape to draw");
+
+html = render({ distributions: null });
+ok(!/Utility distributions/.test(html),
+   "no distributions block means no distributions panel");
+
+// --- Charts redrawn in the v2 report's own SVG --------------------------------
+html = render();
+const turfSection = (html.match(/<section[^>]*>(?:(?!<\/section>)[\s\S])*?Portfolio reach[\s\S]*?<\/section>/i) || [""])[0];
+ok(/<svg[^>]*viewBox=/.test(turfSection), "TURF draws a reach curve, not only a table");
+ok(/88\.2/.test(turfSection), "the curve's last reach value is the one the island carried");
+
+const quadSection = (html.match(/<section[^>]*>(?:(?!<\/section>)[\s\S])*?Item strategy[\s\S]*?<\/section>/i) || [""])[0];
+ok(quadSection.length > 0, "the tab has an item strategy quadrant");
+ok(/<svg[^>]*viewBox=/.test(quadSection), "the quadrant is drawn as an SVG");
+ok((quadSection.match(/<circle/g) || []).length === 4, "one point per item");
+ok(/<ol class="md-key">/.test(quadSection),
+   "points are numbered against a key, rather than carrying truncated labels");
+ok(!/items are not plotted/.test(quadSection),
+   "with every item placed, the panel makes no claim about missing ones");
+
+const noSpread = island();
+noSpread.scores.hbSpread = [0.81, 1.42, 0.63, null];
+sandbox.TR.MD = noSpread;
+const hostQ = { innerHTML: "" };
+sandbox.TR.maxdiff.render(hostQ);
+ok(/1 of 4 items are not plotted/.test(hostQ.innerHTML),
+   "an item the model fixed has no spread, and the quadrant says it is missing");
+
+ok(!/Heterogeneity/.test(diagSection),
+   "heterogeneity and the utility spread are the same statistic, so it is not printed twice");
+const split = island();
+split.diagnostics.heterogeneity = 0.611;
+sandbox.TR.MD = split;
+const hostH = { innerHTML: "" };
+sandbox.TR.maxdiff.render(hostH);
+ok(/Heterogeneity/.test(hostH.innerHTML) && /0\.611/.test(hostH.innerHTML),
+   "but it is printed when it genuinely differs from the spread");
+
+const anchorSection = (html.match(/<section[^>]*>(?:(?!<\/section>)[\s\S])*?Must-haves[\s\S]*?<\/section>/i) || [""])[0];
+ok(/md-threshold/.test(anchorSection),
+   "the anchor panel marks the must-have threshold against the bars");
+ok(/md-barcell/.test(anchorSection),
+   "and draws the essential share as a bar, not only as a number");
+
+// Every chart carries literal colours so a rasterised pin matches the page.
+ok(!/var\(--/.test(html.replace(/style="background:[^"]*"/g, "")),
+   "no chart reaches for a CSS variable, which would not survive rasterising");
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail === 0 ? 0 : 1);
