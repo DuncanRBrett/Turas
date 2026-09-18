@@ -128,3 +128,37 @@ test_that("an ordinal outcome with an Order passes, and other outcome types are 
   multi_config$outcome_type <- "multinomial"
   expect_true(guard_ordinal_outcome_order(multi_config))
 })
+
+test_that("the pipeline's pre-analysis guard refuses a text ordinal outcome with no Order", {
+  # The same check through the door the run actually uses (00_main.R calls
+  # guard_pre_analysis before anything is fitted), not just the function.
+  set.seed(11)
+  n <- 200
+  data <- data.frame(
+    satisfaction = sample(c("Low", "Medium", "High"), n, TRUE),
+    service = factor(sample(c("Poor", "Good"), n, TRUE)),
+    stringsAsFactors = FALSE
+  )
+  config <- list(
+    outcome_var = "satisfaction", outcome_type = "ordinal",
+    outcome_label = "Satisfaction", outcome_order = NULL,
+    driver_vars = "service",
+    driver_settings = data.frame(driver = "service", type = "categorical",
+                                 stringsAsFactors = FALSE),
+    variables = data.frame(VariableName = "service", Label = "Service",
+                           stringsAsFactors = FALSE)
+  )
+
+  err <- tryCatch({
+    guard_pre_analysis(config, data)
+    NULL
+  }, turas_refusal = function(e) e)
+
+  expect_false(is.null(err))
+  expect_equal(err$code, "CFG_OUTCOME_ORDER_MISSING")
+  expect_true(grepl("satisfaction", err$problem))
+
+  # With the Order declared, the same config clears every pre-analysis guard
+  config$outcome_order <- c("Low", "Medium", "High")
+  expect_silent(guard_pre_analysis(config, data))
+})

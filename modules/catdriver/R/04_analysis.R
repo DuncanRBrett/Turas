@@ -137,7 +137,9 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   if (needs_fallback) {
     # Try brglm2 for Firth correction
     if (requireNamespace("brglm2", quietly = TRUE)) {
-      model <- tryCatch({
+      # Same muffler as the primary fit: the Firth fallback is still a binomial
+      # glm and still says "non-integer #successes" about weighted data.
+      model <- cd_muffle_noninteger_successes(tryCatch({
         engine_used <- "brglm2 (Firth)"
         fallback_used <- TRUE
 
@@ -152,7 +154,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
         }
       }, error = function(e) {
         list(error = TRUE, message = e$message)
-      })
+      }))
     } else {
       # ========================================================================
       # HARD STOP: Separation detected but no fallback available

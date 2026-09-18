@@ -960,6 +960,7 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
       paste(config$driver_vars, collapse = " + ")
     ))
 
+    boot_failure_reported <- FALSE
     bootstrap_results_g <- tryCatch({
       run_bootstrap_or(
         data = prep_data_g$data,
@@ -974,13 +975,32 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
       cat("   [PARTIAL] Bootstrap failed:", e$message, "\n")
       local_degraded <<- c(local_degraded, paste0("Bootstrap CI failed: ", e$message))
       local_affected <<- c(local_affected, "bootstrap_ci")
+      boot_failure_reported <<- TRUE
       NULL
     })
+
+    # The user asked for bootstrap intervals. If none came back, that is a
+    # degraded run, not a quiet absence of columns: before this, a weighted
+    # binary study lost every interval and still reported PASS.
+    if (is.null(bootstrap_results_g) && !boot_failure_reported) {
+      cat("   [PARTIAL] Bootstrap confidence intervals were requested but could not be produced\n")
+      local_degraded <- c(local_degraded,
+        "Bootstrap confidence intervals were requested but could not be produced; the odds ratios carry Wald intervals only")
+      local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
+    }
 
     if (!is.null(bootstrap_results_g) && isTRUE(bootstrap_results_g$n_successful > 0)) {
       if (verbose) {
         log_message(paste0("Bootstrap complete (", bootstrap_results_g$n_successful, "/",
                            bootstrap_results_g$n_boot, " successful)"), "success")
+      }
+
+      # Survivorship is disclosed, not hidden: percentile intervals computed
+      # over the resamples that survived are narrow to exactly that extent.
+      if (isTRUE(bootstrap_results_g$n_discarded > 0)) {
+        local_degraded <- c(local_degraded,
+          paste0("Bootstrap survivorship: ", bootstrap_results_g$caveat))
+        local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
       }
 
       odds_ratios_g$boot_median_or <- NA_real_

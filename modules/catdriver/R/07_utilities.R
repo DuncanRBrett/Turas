@@ -1048,9 +1048,15 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
                              progress_callback = NULL) {
 
   # Get term names from initial fit
-  initial_model <- fit_model_for_bootstrap(data, formula, outcome_type, weights)
+  initial_fit <- fit_model_for_bootstrap(data, formula, outcome_type, weights)
+  initial_model <- initial_fit$model
   if (is.null(initial_model)) {
-    cat("   [WARNING] Initial model fit failed - cannot run bootstrap\n")
+    # This is where weighted binary bootstraps used to die in silence: the
+    # old handler treated the "non-integer #successes" warning, which every
+    # weighted binomial fit raises, as a failure. The user asked for bootstrap
+    # intervals, got none, and the run still said PASS.
+    cat(sprintf("   [WARNING] Initial model fit failed (%s) - cannot run bootstrap\n",
+                paste(c(initial_fit$status, initial_fit$flags), collapse = "; ")))
     return(NULL)
   }
 
@@ -1066,6 +1072,8 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
   colnames(boot_or) <- term_names
 
   successful_boots <- 0
+  discard_reasons <- character(0)
+  kept_flagged <- character(0)
 
   for (b in seq_len(n_boot)) {
     # Update progress every 10 iterations
@@ -1079,9 +1087,11 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
     boot_weights <- if (!is.null(weights)) weights[boot_idx] else NULL
 
     # Fit model to bootstrap sample
-    boot_model <- tryCatch({
+    boot_fit <- tryCatch({
       fit_model_for_bootstrap(boot_data, formula, outcome_type, boot_weights)
-    }, error = function(e) NULL)
+    }, error = function(e) list(model = NULL, status = "error", flags = conditionMessage(e)))
+
+    boot_model <- boot_fit$model
 
     if (!is.null(boot_model)) {
       # Extract coefficients
@@ -1093,17 +1103,52 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
         }
       }
       successful_boots <- successful_boots + 1
+      # A resample that converged but hit quasi-separation is kept; it is a real
+      # draw from a sparse region, and dropping it is what biased the old
+      # intervals narrow. It is counted so the caveat can say so.
+      if (length(boot_fit$flags) > 0) {
+        kept_flagged <- c(kept_flagged, boot_fit$flags)
+      }
+    } else {
+      discard_reasons <- c(discard_reasons, boot_fit$status %||% "error")
     }
   }
 
   # Calculate summary statistics
   alpha <- 1 - conf_level
+  discard_counts <- as.list(table(discard_reasons))
+  kept_flag_counts <- as.list(table(kept_flagged))
+
+  caveat <- if (length(discard_reasons) == 0) {
+    "All resamples were usable."
+  } else {
+    sprintf("%d of %d resamples were discarded (%s). Percentile intervals and sign stability describe the resamples that survived, so they are, to that extent, optimistic.",
+            length(discard_reasons), n_boot,
+            paste(sprintf("%s: %d", names(discard_counts), unlist(discard_counts)),
+                  collapse = ", "))
+  }
+  if (length(kept_flagged) > 0) {
+    caveat <- paste(caveat,
+      sprintf("%d resample(s) were kept despite a warning (%s); dropping them would bias the intervals narrow.",
+              length(kept_flagged),
+              paste(sprintf("%s: %d", names(kept_flag_counts), unlist(kept_flag_counts)),
+                    collapse = ", ")))
+  }
+
   results <- list(
     term = term_names,
     n_boot = n_boot,
     n_successful = successful_boots,
+    n_discarded = length(discard_reasons),
+    discard_counts = discard_counts,
+    kept_flag_counts = kept_flag_counts,
+    caveat = caveat,
     boot_or_matrix = boot_or
   )
+
+  if (length(discard_reasons) > 0) {
+    cat(sprintf("   [INFO] Bootstrap: %s\n", caveat))
+  }
 
   # For each term, calculate stats
   results$median_or <- apply(boot_or, 2, median, na.rm = TRUE)
@@ -1137,40 +1182,108 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
 #' @keywords internal
 fit_model_for_bootstrap <- function(data, formula, outcome_type, weights = NULL) {
 
-  model <- tryCatch({
-    if (outcome_type == "binary") {
-      if (!is.null(weights)) {
-        glm(formula, data = data, family = binomial(), weights = weights)
-      } else {
-        glm(formula, data = data, family = binomial())
-      }
-    } else if (outcome_type == "ordinal") {
-      if (requireNamespace("ordinal", quietly = TRUE)) {
+  warn_flags <- character(0)
+
+  classify <- function(msg) {
+    if (grepl("fitted probabilities numerically 0 or 1|separation", msg, ignore.case = TRUE)) {
+      "separation"
+    } else if (grepl("did not converge|convergence", msg, ignore.case = TRUE)) {
+      "non_convergence"
+    } else {
+      "other"
+    }
+  }
+
+  model <- withCallingHandlers(
+    tryCatch({
+      if (outcome_type == "binary") {
         if (!is.null(weights)) {
-          data$..catdriver_wt.. <- weights
-          ordinal::clm(formula, data = data, weights = ..catdriver_wt.., link = "logit")
+          fit_data <- data
+          fit_data$..catdriver_wt.. <- weights
+          glm(formula, data = fit_data, family = binomial(), weights = ..catdriver_wt..)
         } else {
-          ordinal::clm(formula, data = data, link = "logit")
+          glm(formula, data = data, family = binomial())
         }
-      } else if (requireNamespace("MASS", quietly = TRUE)) {
-        if (!is.null(weights)) {
-          MASS::polr(formula, data = data, weights = weights, Hess = TRUE)
+      } else if (outcome_type == "ordinal") {
+        if (requireNamespace("ordinal", quietly = TRUE)) {
+          if (!is.null(weights)) {
+            data$..catdriver_wt.. <- weights
+            ordinal::clm(formula, data = data, weights = ..catdriver_wt.., link = "logit")
+          } else {
+            ordinal::clm(formula, data = data, link = "logit")
+          }
+        } else if (requireNamespace("MASS", quietly = TRUE)) {
+          if (!is.null(weights)) {
+            data$..catdriver_wt.. <- weights
+            MASS::polr(formula, data = data, weights = ..catdriver_wt.., Hess = TRUE)
+          } else {
+            MASS::polr(formula, data = data, Hess = TRUE)
+          }
         } else {
-          MASS::polr(formula, data = data, Hess = TRUE)
+          NULL
         }
       } else {
+        # Multinomial - skip for bootstrap (too complex)
         NULL
       }
-    } else {
-      # Multinomial - skip for bootstrap (too complex)
+    }, error = function(e) {
+      warn_flags <<- c(warn_flags, paste0("error: ", conditionMessage(e)))
       NULL
+    }),
+    warning = function(w) {
+      msg <- conditionMessage(w)
+      # Non-integer successes is what every weighted binary fit says about its
+      # weights; it is not a fault in the resample. Everything else is counted
+      # and reported, but still muffled: 200 resamples would otherwise bury the
+      # Shiny console.
+      if (!grepl("non-integer #successes", msg, fixed = TRUE)) {
+        warn_flags <<- c(warn_flags, classify(msg))
+      }
+      invokeRestart("muffleWarning")
     }
-  }, error = function(e) NULL, warning = function(w) NULL)
+  )
+
+  status <- if (is.null(model)) {
+    "error"
+  } else if (!cd_fit_converged(model)) {
+    "non_convergence"
+  } else {
+    "ok"
+  }
 
   # For ordinal::clm, coefficients are in $beta
   if (!is.null(model) && inherits(model, "clm")) {
     model$coefficients <- model$beta
   }
 
-  model
+  list(
+    model = if (identical(status, "ok")) model else NULL,
+    status = status,
+    flags = unique(warn_flags)
+  )
+}
+
+
+#' Did This Fit Converge
+#'
+#' glm, clm and polr each report convergence differently. A resample that did
+#' not converge carries meaningless coefficients and must not enter a bootstrap
+#' distribution; a resample that merely warned about separation is a real draw
+#' from a sparse region and must, or the intervals come out falsely narrow
+#' exactly where the bootstrap was worth running.
+#'
+#' @param model A fitted model object.
+#' @return TRUE when the fit converged (or says nothing about it).
+#' @keywords internal
+cd_fit_converged <- function(model) {
+  if (is.null(model)) return(FALSE)
+  if (inherits(model, "glm")) return(isTRUE(model$converged))
+  if (inherits(model, "clm")) {
+    code <- model$convergence$code
+    return(is.null(code) || isTRUE(code == 0))
+  }
+  if (inherits(model, "polr")) {
+    return(is.null(model$convergence) || isTRUE(model$convergence == 0))
+  }
+  TRUE
 }
