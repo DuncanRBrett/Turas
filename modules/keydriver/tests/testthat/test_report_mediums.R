@@ -275,3 +275,23 @@ test_that("the heatmap's box is wide enough for its rotated labels", {
   w2 <- as.numeric(regmatches(vb2, gregexpr("[0-9]+", vb2))[[1]])[3]
   expect_gt(width, w2)
 })
+
+
+test_that("the correlations section says on what basis it was computed", {
+  # A weighted study's correlations ARE weighted, and the section said nothing,
+  # so checking a figure against the raw data gave a different number with no
+  # explanation. On the Suiderland example the outcome-to-fees_clarity cell is
+  # 0.61 weighted and 0.59 unweighted, which is exactly big enough to look
+  # like an error and small enough to be dismissed as rounding.
+  expect_true(exists("build_kd_correlation_section", mode = "function") ||
+                file.exists(file.path(module_dir, "lib", "html_report",
+                                      "03c_section_builders.R")))
+  src <- paste(readLines(file.path(module_dir, "lib", "html_report",
+                                   "03c_section_builders.R"), warn = FALSE),
+               collapse = "\n")
+  expect_true(grepl("Correlations are weighted by", src, fixed = TRUE))
+  expect_true(grepl("will not match an unweighted calculation", src, fixed = TRUE))
+  expect_true(grepl("Correlations are unweighted.", src, fixed = TRUE))
+  # Driven by the config, not typed per study.
+  expect_true(grepl("wv <- config$weight_var", src, fixed = TRUE))
+})

@@ -378,6 +378,19 @@ build_kd_correlation_section <- function(charts, tables,
   title_row    <- build_kd_section_title_row("Correlation Matrix", "correlations")
   insight_area <- build_kd_insight_area("correlations", config = config)
 
+  # On what basis. A weighted study's correlations ARE weighted, and this said
+  # nothing, so anyone checking a figure against the raw data got a different
+  # number and had every reason to think the report was wrong. Duncan asked
+  # exactly that question on 18 Sep 2026 and it took a weighted recomputation
+  # to answer it. The report answers it now.
+  wv <- config$weight_var
+  corr_basis <- if (!is.null(wv) && nzchar(as.character(wv)[1])) {
+    sprintf("Correlations are weighted by '%s'; they will not match an unweighted calculation on the raw data.",
+            as.character(wv)[1])
+  } else {
+    "Correlations are unweighted."
+  }
+
   chart_wrapper <- if (!is.null(charts$correlation_heatmap) &&
                        display_mode %in% c("heatmap", "both")) {
     htmltools::tags$div(
@@ -405,7 +418,11 @@ build_kd_correlation_section <- function(charts, tables,
     title_row, insight_area,
     htmltools::tags$p(
       class = "kd-section-intro",
-      "Bivariate correlations between all drivers and the outcome. High inter-driver correlations may indicate multicollinearity. See VIF diagnostics for formal assessment."
+      paste0(
+        "Bivariate correlations between all drivers and the outcome. Each pair ",
+        "appears once. High inter-driver correlations may indicate ",
+        "multicollinearity. See VIF diagnostics for formal assessment. ",
+        corr_basis)
     ),
     corr_callout,
     chart_wrapper, table_wrapper
