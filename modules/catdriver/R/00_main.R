@@ -1511,6 +1511,37 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
   data <- prep_data$data
   outcome_var <- config$outcome_var
 
+  # Predictions cover only the rows the model fitted, so the driver columns have
+  # to be cut to the same rows before they are crossed.
+  keep <- cd_estimation_rows(model_result$model, nrow(data))
+  if (!is.null(keep)) data <- data[keep, , drop = FALSE]
+
+  n_pred <- if (is.matrix(pred_probs)) nrow(pred_probs) else length(pred_probs)
+  if (n_pred != nrow(data)) {
+    cat(sprintf("   [INFO] Probability lift skipped: %d predictions for %d rows\n",
+                n_pred, nrow(data)))
+    return(NULL)
+  }
+
+  # Which outcome level the probabilities describe. This used to be the last
+  # column of the prediction matrix with nothing saying which level that was,
+  # so a multinomial table reported the alphabetically last level unlabelled.
+  outcome_levels <- levels(data[[outcome_var]])
+  target_level <- if (is.matrix(pred_probs)) {
+    cn <- colnames(pred_probs)
+    if (!is.null(cn) && nzchar(cn[ncol(pred_probs)])) {
+      cn[ncol(pred_probs)]
+    } else if (length(outcome_levels) >= ncol(pred_probs)) {
+      outcome_levels[ncol(pred_probs)]
+    } else {
+      "the highest outcome level"
+    }
+  } else if (length(outcome_levels) == 2) {
+    outcome_levels[2]
+  } else {
+    "the modelled outcome"
+  }
+
   lift_list <- list()
 
   for (driver_var in config$driver_vars) {
@@ -1524,15 +1555,13 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
     for (level in driver_levels) {
       level_mask <- driver_data == level
 
-      if (sum(level_mask) == 0) next
+      if (sum(level_mask, na.rm = TRUE) == 0) next
 
       # Get mean predicted probability for this level
       if (is.matrix(pred_probs)) {
-        # Binary or ordinal: use last column (highest outcome)
         mean_prob <- mean(pred_probs[level_mask, ncol(pred_probs)], na.rm = TRUE)
         ref_prob <- mean(pred_probs[driver_data == ref_level, ncol(pred_probs)], na.rm = TRUE)
       } else if (is.vector(pred_probs)) {
-        # Binary: direct
         mean_prob <- mean(pred_probs[level_mask], na.rm = TRUE)
         ref_prob <- mean(pred_probs[driver_data == ref_level], na.rm = TRUE)
       } else {
@@ -1543,6 +1572,7 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
         driver = driver_var,
         driver_label = get_var_label(config, driver_var),
         level = level,
+        outcome_level = target_level,
         is_reference = level == ref_level,
         mean_predicted_prob = round(mean_prob, 3),
         reference_prob = round(ref_prob, 3),

@@ -271,9 +271,140 @@ extract_clm_results <- function(model, config, guard) {
       lr_df = lr_df,
       lr_pvalue = lr_pvalue
     ),
-    proportional_odds = NULL,  # clm has built-in tests
+    # The comment here used to read "clm has built-in tests", and no test was
+    # ever run: guard_check_proportional_odds() skips on NULL, so the default
+    # engine's central assumption went unchecked while the docs implied it had
+    # been checked. ordinal::nominal_test() is the built-in test; it is run now,
+    # and when it cannot run the run says so rather than saying nothing.
+    proportional_odds = test_proportional_odds_clm(model),
     predicted_probs = pred_probs,
     convergence = convergence_ok
+  )
+}
+
+
+#' Test the Proportional Odds Assumption on a clm Fit
+#'
+#' Runs \code{ordinal::nominal_test()}, the likelihood-ratio test of whether
+#' each predictor's effect is constant across the outcome thresholds. A small
+#' p-value says the proportional-odds assumption does not hold for that
+#' predictor, so its single odds ratio is describing thresholds that behave
+#' differently.
+#'
+#' The test refits the model per predictor and can fail on sparse level
+#' combinations. That is disclosed, never fatal: the result says the assumption
+#' was not tested, which is what a reader needs to know.
+#'
+#' @param model A fitted \code{ordinal::clm} object.
+#' @return List in the shape \code{guard_check_proportional_odds()} expects:
+#'   checked, status, interpretation, plus the per-predictor p-values.
+#' @keywords internal
+test_proportional_odds_clm <- function(model) {
+
+  if (!requireNamespace("ordinal", quietly = TRUE) ||
+      !exists("nominal_test", where = asNamespace("ordinal"), mode = "function")) {
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = "Proportional odds assumption NOT tested: ordinal::nominal_test is unavailable."
+    ))
+  }
+
+  # nominal_test() refits the model per predictor, and a refit re-evaluates the
+  # original call in the FORMULA's environment. CatDriver builds its formulas in
+  # the caller, so the engine's local fit frame is not visible there and the
+  # refits come back empty: the test then reported "assumption holds" having
+  # tested nothing. Refit here, from the model's own frame, with a formula whose
+  # environment is this one, and test that.
+  res <- tryCatch({
+    mf <- model$model
+    if (is.null(mf)) stop("the fitted model kept no model frame")
+    link <- model$link %||% "logit"
+    model_formula <- formula(model)
+    w <- if ("(weights)" %in% names(mf)) as.numeric(mf[["(weights)"]]) else NULL
+
+    # The data and the weights go into the call BY VALUE. nominal_test refits
+    # per predictor with update(), which re-evaluates the call, and a call that
+    # only names its data frame is re-evaluated wherever the formula came from:
+    # the caller, where the engine's fit frame does not exist. The refits then
+    # come back blank and the test would report that the assumption holds having
+    # tested nothing. Verified both ways by running it, 2026-09-18.
+    refit_call <- if (is.null(w)) {
+      bquote(ordinal::clm(.(model_formula), data = .(mf), link = .(link)))
+    } else {
+      bquote(ordinal::clm(.(model_formula), data = .(mf), weights = .(w), link = .(link)))
+    }
+    ordinal::nominal_test(eval(refit_call))
+  }, error = function(e) e)
+
+  if (inherits(res, "error")) {
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = paste0(
+        "Proportional odds assumption NOT tested: ordinal::nominal_test could not run (",
+        conditionMessage(res), "). Read the odds ratios as an average across thresholds."
+      )
+    ))
+  }
+
+  res_df <- as.data.frame(res)
+  p_col <- grep("^Pr", names(res_df), value = TRUE)
+  if (length(p_col) == 0) {
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = "Proportional odds assumption NOT tested: nominal_test returned no p-values."
+    ))
+  }
+
+  p_values <- res_df[[p_col[1]]]
+  names(p_values) <- rownames(res_df)
+  p_values <- p_values[!is.na(p_values)]
+
+  if (length(p_values) == 0) {
+    # Every per-predictor refit failed. Saying "the assumption holds" here would
+    # be reporting a test that never ran.
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = paste0(
+        "Proportional odds assumption NOT tested: ordinal::nominal_test returned no usable ",
+        "p-values (the per-predictor refits did not converge). Read the odds ratios as an ",
+        "average across thresholds."
+      )
+    ))
+  }
+
+  violations <- names(p_values)[p_values < 0.05]
+
+  if (length(violations) > 0) {
+    status <- "WARNING"
+    interpretation <- paste0(
+      "Proportional odds assumption is rejected for: ", paste(violations, collapse = ", "),
+      " (ordinal::nominal_test, p < 0.05). Those drivers act differently at different points ",
+      "of the scale, so a single odds ratio averages effects that are not the same. ",
+      "Consider a multinomial model, or report those drivers threshold by threshold."
+    )
+  } else {
+    status <- "PASS"
+    interpretation <- paste0(
+      "Proportional odds assumption holds (ordinal::nominal_test, smallest p = ",
+      if (length(p_values) > 0) sprintf("%.3f", min(p_values)) else "n/a", ")."
+    )
+  }
+
+  list(
+    checked = TRUE,
+    status = status,
+    method = "ordinal::nominal_test",
+    p_values = p_values,
+    violations = violations,
+    interpretation = interpretation
   )
 }
 
@@ -404,6 +535,11 @@ extract_polr_results <- function(model, config, guard) {
 #' @keywords internal
 check_proportional_odds <- function(model, data, config) {
 
+  # NOTE: this is the polr fallback path's ad-hoc check (an odds-ratio ratio
+  # across thresholds, not a test). Its per-threshold refits below do not carry
+  # the study weights, so on a weighted study it describes the unweighted
+  # sample; the interpretation string says so. The clm path, which is the
+  # default engine, uses ordinal::nominal_test via test_proportional_odds_clm().
   outcome_var <- config$outcome_var
   outcome <- data[[outcome_var]]
   levels_vec <- levels(outcome)
@@ -471,12 +607,16 @@ check_proportional_odds <- function(model, data, config) {
     }
   }
 
+  unweighted_note <- " This heuristic compares odds ratios across thresholds on the UNWEIGHTED sample; it is not a statistical test."
+
   if (max_or_ratio < 1.25) {
     status <- "PASS"
-    interpretation <- "Proportional odds assumption appears reasonable (OR variation < 25% across thresholds)"
+    interpretation <- paste0("Proportional odds assumption appears reasonable (OR variation < 25% across thresholds).",
+                             unweighted_note)
   } else if (max_or_ratio < 1.5) {
     status <- "MARGINAL"
-    interpretation <- "Proportional odds assumption is marginally met. Results are likely still valid."
+    interpretation <- paste0("Proportional odds assumption is marginally met. Results are likely still valid.",
+                             unweighted_note)
   } else {
     status <- "WARNING"
     interpretation <- paste0("Proportional odds assumption may be violated for: ",

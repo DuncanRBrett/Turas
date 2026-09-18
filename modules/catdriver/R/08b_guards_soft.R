@@ -68,19 +68,41 @@ guard_check_collapsing <- function(guard, collapsed_levels) {
 #'
 #' SOFT FAILURE if sample size concerning.
 #'
+#' The events-per-parameter rule counts EVENTS, meaning respondents in the
+#' smallest outcome category, not respondents. This used to divide the total
+#' observation count by the parameter count, which at 10 per cent prevalence is
+#' roughly ten times too optimistic: a model with 40 events and 20 parameters
+#' passed a gate it fails by an order of magnitude. TECHNIQUE_GUIDE defined the
+#' rule correctly all along; only the code disagreed.
+#'
 #' @param guard Guard state object
 #' @param n_obs Number of observations
 #' @param n_params Number of parameters
 #' @param outcome_type Outcome type
+#' @param config Configuration list
+#' @param outcome_values Optional vector of the outcome values actually
+#'   modelled. When given, the gate uses the smallest category's count, for
+#'   every outcome type; without it, it falls back to observations and says so.
 #' @return Updated guard state
 #' @keywords internal
-guard_check_sample_size <- function(guard, n_obs, n_params, outcome_type, config = NULL) {
-  # Events per parameter rule
-  epp <- if (n_params > 0) n_obs / n_params else Inf
+guard_check_sample_size <- function(guard, n_obs, n_params, outcome_type, config = NULL,
+                                    outcome_values = NULL) {
+
+  n_events <- NULL
+  if (!is.null(outcome_values)) {
+    counts <- table(outcome_values[!is.na(outcome_values)])
+    counts <- counts[counts > 0]
+    if (length(counts) > 0) n_events <- as.integer(min(counts))
+  }
+
+  basis <- if (is.null(n_events)) "observations" else "minority-class events"
+  numerator <- if (is.null(n_events)) n_obs else n_events
+  epp <- if (n_params > 0) numerator / n_params else Inf
 
   if (epp < CATDRIVER_DEFAULTS$min_epp) {
     guard <- guard_warn(guard,
-      sprintf("Low events-per-parameter ratio (%.1f). Recommend >= %g for stable estimates.", epp, CATDRIVER_DEFAULTS$min_epp),
+      sprintf("Low events-per-parameter ratio (%.1f, from %d %s over %d parameters). Recommend >= %g for stable estimates.",
+              epp, numerator, basis, n_params, CATDRIVER_DEFAULTS$min_epp),
       "sample_size"
     )
     guard <- guard_flag_stability(guard, "Low events-per-parameter ratio")
@@ -344,7 +366,14 @@ guard_post_model <- function(guard, prep_data, model_result, config) {
   # Sample size checks
   n_obs <- nrow(prep_data$data)
   n_params <- prep_data$n_terms
-  guard <- guard_check_sample_size(guard, n_obs, n_params, config$outcome_type, config)
+  outcome_values <- if (!is.null(config$outcome_var) &&
+                        config$outcome_var %in% names(prep_data$data)) {
+    prep_data$data[[config$outcome_var]]
+  } else {
+    NULL
+  }
+  guard <- guard_check_sample_size(guard, n_obs, n_params, config$outcome_type, config,
+                                   outcome_values = outcome_values)
 
   # Proportional odds check (ordinal only)
   if (!is.null(model_result$proportional_odds)) {
