@@ -1515,3 +1515,81 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
   display: inline-block; width: 11px; height: 11px; border-radius: 2px;
   margin-right: 5px;
 }
+
+/* ================================================================ */
+/* KEY DRIVERS VIEW (27k_keydriver.js, TR.KD)                       */
+/* ================================================================ */
+/* The kd- prefix is free in this stylesheet. The keydriver module's */
+/* own standalone report uses kd- too, but it is a different         */
+/* document and the two never meet. Checked before choosing it,      */
+/* because the pricing view shipped a pr- collision with Present     */
+/* mode and had to be renamed afterwards.                            */
+
+.kd-view { max-width: 1100px; }
+.kd-view h2 { margin: 0 0 4px; }
+.kd-panel { margin: 22px 0; }
+.kd-panel h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.kd-panel h4 { margin: 14px 0 4px; font-size: .95rem; }
+.kd-note { margin: 0 0 10px; font-size: .85rem; color: #555; line-height: 1.45; }
+.kd-provenance p { margin: 2px 0 6px; font-size: .9rem; }
+.kd-frozen { font-style: italic; }
+
+.kd-stamp {
+  display: inline-block; margin: 6px 0 10px; padding: 4px 8px; border-radius: 3px;
+  background: #fff4e0; color: #7a4b00; font-size: .82rem; line-height: 1.4;
+}
+.kd-warn {
+  margin: 6px 0 10px; padding: 6px 9px; border-radius: 3px;
+  background: #fdecea; color: #8a1c12; font-size: .85rem; line-height: 1.45;
+}
+
+.kd-chips { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.kd-chip {
+  padding: 3px 10px; border: 1px solid #cfcfd6; border-radius: 999px;
+  background: #fff; font-size: .82rem; cursor: pointer; color: #333;
+}
+.kd-chip:hover { border-color: var(--brand, #323367); }
+.kd-chip.active {
+  background: var(--brand, #323367); border-color: var(--brand, #323367); color: #fff;
+}
+
+.kd-table { border-collapse: collapse; width: 100%; margin-bottom: 6px; }
+.kd-table th, .kd-table td {
+  padding: 5px 9px; border-bottom: 1px solid #e6e6e6; text-align: left;
+  font-size: .88rem;
+}
+.kd-table thead th { font-weight: 600; border-bottom: 1px solid #cfcfd6; }
+.kd-table td.kd-num, .kd-table th.kd-num { text-align: right; white-space: nowrap; }
+.kd-ci { white-space: nowrap; font-size: .82rem; color: #555; }
+.kd-class { font-size: .84rem; color: #444; }
+.kd-base { display: block; font-weight: 400; font-size: .76rem; color: #666; }
+.kd-rank { margin-left: 5px; font-size: .74rem; color: #888; }
+.kd-dir { color: #8a1c12; font-weight: 600; }
+
+/* The bar track. The bar is the estimate; the whisker is its interval, drawn
+   over the bar so a wide interval reads as uncertainty rather than as size. */
+.kd-track { position: relative; width: 38%; min-width: 150px; height: 20px; }
+.kd-bar {
+  position: absolute; top: 6px; height: 9px; border-radius: 2px;
+  background: var(--brand, #323367); opacity: .85;
+}
+.kd-whisker {
+  position: absolute; top: 9px; height: 3px; background: #1b1b1b; opacity: .55;
+  border-left: 2px solid #1b1b1b; border-right: 2px solid #1b1b1b;
+  box-sizing: border-box;
+}
+
+.kd-quadrant { width: 100%; max-width: 520px; height: auto; }
+.kd-quadrant .kd-axis { stroke: #9a9aa4; stroke-width: 1; }
+.kd-quadrant .kd-guide { stroke: #c9c9d2; stroke-width: 1; stroke-dasharray: 4 3; }
+.kd-quadrant .kd-qpt circle { fill: var(--brand, #323367); opacity: .85; }
+.kd-quadrant .kd-qpt text { font-size: 11px; fill: #333; }
+.kd-quadrant .kd-axis-label { font-size: 11px; fill: #666; }
+
+.kd-insights { margin: 8px 0 0; padding-left: 18px; font-size: .86rem; color: #444; }
+.kd-insights li { margin: 2px 0; }
+
+.kd-diag summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; }
+.kd-diag p { font-size: .88rem; margin: 4px 0 8px; }
+.kd-flag-moderate { color: #7a4b00; font-weight: 600; }
+.kd-flag-severe { color: #8a1c12; font-weight: 600; }

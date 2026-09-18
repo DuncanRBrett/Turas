@@ -395,6 +395,9 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # And for a pricing study ({output}_pr_island.json, written by the pricing
     # module): named, the report gains a Pricing tab.
     pricing_island = get_config_value(config, "pricing_island", ""),
+    # And for a key driver study ({output}_kd_island.json, written by the
+    # keydriver module): named, the report gains a Key drivers tab.
+    keydriver_island = get_config_value(config, "keydriver_island", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
     # Must be populated here. Config_obj is an explicit whitelist, not the raw settings.
     qual_tag_dimensions = get_config_value(config, "qual_tag_dimensions", ""),
@@ -1862,7 +1865,7 @@ announce_retired_settings <- function(config, retired = TABS_RETIRED_SETTINGS) {
 TABS_KNOWN_SETTINGS <- c(
   # Weighting
   # Module contributions
-  "conjoint_island", "maxdiff_island", "pricing_island",
+  "conjoint_island", "maxdiff_island", "pricing_island", "keydriver_island",
   # Weighting
   "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
   "show_weighted_base", "weight_label",

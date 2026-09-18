@@ -535,6 +535,7 @@ run_segment_importance_comparison <- function(data,
 
   # --- Run importance per segment ---
   results_by_segment <- list()
+  segment_bases <- list()
 
   for (seg_label in names(segment_groups)) {
     seg_levels <- segment_groups[[seg_label]]
@@ -652,6 +653,10 @@ run_segment_importance_comparison <- function(data,
     cat(sprintf("- Segment '%s': n=%d, top driver = %s\n",
                 seg_label, nrow(seg_data), top_driver))
 
+    # The base this segment's figures rest on. It was printed to the console
+    # and then dropped, so nothing downstream could show a base beside a
+    # segment's importance or gate a small one. The v2 island needs both.
+    segment_bases[[seg_label]] <- nrow(seg_data)
     results_by_segment[[seg_label]] <- seg_importance
   }
 
@@ -695,7 +700,12 @@ run_segment_importance_comparison <- function(data,
     comparison_matrix = comparison_matrix,
     classifications   = classifications,
     insights          = insights,
-    segment_results   = results_by_segment
+    segment_results   = results_by_segment,
+    # Named list, one base per analysed segment, plus the threshold a segment
+    # had to clear to be here at all. A segment matrix without its bases is
+    # not something to put in front of a client.
+    segment_bases     = segment_bases,
+    min_segment_n     = min_segment_n
   )
 }
 

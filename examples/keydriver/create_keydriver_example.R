@@ -108,8 +108,11 @@ write_keydriver_config <- function(path, data_file, output_file,
 
   settings <- data.frame(
     Setting = c(
+      # No outcome_variable or weight_variable here. The module reads both
+      # from the Variables sheet (Type = Outcome / Weight), so those two
+      # settings did nothing, and the config's own unknown-setting check now
+      # names them. An example must not ship a setting that is ignored.
       "data_file", "output_file", "analysis_name",
-      "outcome_variable", "weight_variable",
       "enable_shap", "enable_quadrant", "enable_bootstrap",
       "enable_dominance", "enable_nca", "enable_elastic_net", "enable_gam",
       "enable_html_report", "Generate_Stats_Pack",
@@ -118,7 +121,6 @@ write_keydriver_config <- function(path, data_file, output_file,
     ),
     Value = c(
       basename(data_file), output_file, "Suiderland Bank customer satisfaction",
-      "overall_satisfaction", "weight",
       # SHAP and the optional engines are off by default so the example runs in
       # seconds. Switch them on to exercise those paths.
       "No", "Yes", "Yes",

@@ -976,6 +976,39 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     run_status = results$run_status, status_details = status_out$status_details)
   cat(sprintf("   [OK] Results written to: %s\n", output_file))
 
+  # --- Contribution to the interactive report (TR.KD) ---
+  # A keydriver run writes its island; a later tabs run for the same project
+  # embeds it when its keydriver_island setting names the file. Wrapped,
+  # because a contribution that cannot be written must never cost a run that
+  # has already produced its workbook.
+  # The base the island reports. Computed here, through the shared Kish, so the
+  # island and the stats pack cannot disagree about what nEff this run had.
+  if (!is.null(config$weight_var) && nzchar(as.character(config$weight_var %||% ""))) {
+    w_isl <- suppressWarnings(as.numeric(data$data[[config$weight_var]]))
+    w_isl <- w_isl[!is.na(w_isl) & w_isl > 0]
+    if (length(w_isl) > 0 && exists("calculate_effective_n", mode = "function")) {
+      results$kd_effective_n <- calculate_effective_n(w_isl)
+      if (isTRUE(results$kd_effective_n > 0)) {
+        results$kd_design_effect <- length(w_isl) / results$kd_effective_n
+      }
+    }
+  }
+
+  tryCatch({
+    source(file.path(turas_root, "modules/keydriver/R/13_v2_island.R"), local = FALSE)
+    results$config <- results$config %||% config
+    kd_island <- write_keydriver_island(
+      results = results, config = config,
+      data_info = list(n_complete = data$n_complete, n_missing = data$n_missing),
+      verbose = TRUE)
+    if (identical(kd_island$status, "PASS")) {
+      results$v2_island_file <- kd_island$output_file
+    }
+  }, error = function(e) {
+    cat(sprintf("   [WARN] Interactive-report contribution failed: %s\n",
+                conditionMessage(e)))
+  })
+
   # --- Generate HTML Report (if enabled) ---
   # GUI parameter overrides config file setting
   enable_html <- if (!is.null(html_report)) {
@@ -1184,9 +1217,15 @@ generate_keydriver_stats_pack <- function(config, survey_data, result,
     if (!is.null(w) && is.numeric(w)) {
       w_valid <- w[!is.na(w) & w > 0]
       if (length(w_valid) > 0) {
-        sum_w  <- sum(w_valid)
-        sum_w2 <- sum(w_valid^2)
-        eff_n  <- (sum_w^2) / sum_w2
+        # One Kish, the shared one. This computed its own inline, which is the
+        # duplication OPUS-0 consolidated everywhere else in the platform
+        # (V2_MIGRATION_PLAN cross-cutting must: nEff only from
+        # calculate_effective_n).
+        eff_n <- if (exists("calculate_effective_n", mode = "function")) {
+          calculate_effective_n(w_valid)
+        } else {
+          (sum(w_valid)^2) / sum(w_valid^2)
+        }
         weight_info <- list(
           effective_n   = round(eff_n, 1),
           design_effect = round(length(w_valid) / eff_n, 3),
