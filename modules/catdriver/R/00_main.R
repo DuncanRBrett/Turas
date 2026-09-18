@@ -35,7 +35,7 @@ CATDRIVER_VERSION <- "1.1"
 # TRS GUARD LAYER (Must be first)
 # ==============================================================================
 
-# Source TRS guard layer for refusal handling
+# Locate this module's directory (used for shared-lib and report discovery).
 .get_script_dir_for_guard <- function() {
   if (exists("script_dir_override", envir = globalenv())) {
     return(get("script_dir_override", envir = globalenv()))
@@ -46,17 +46,11 @@ CATDRIVER_VERSION <- "1.1"
   return(getwd())
 }
 
-.guard_path <- file.path(.get_script_dir_for_guard(), "00_guard.R")
-if (!file.exists(.guard_path)) {
-  .guard_path <- file.path(.get_script_dir_for_guard(), "R", "00_guard.R")
-}
-if (!file.exists(.guard_path)) {
-  # Try modules path
-  .guard_path <- file.path(getwd(), "modules", "catdriver", "R", "00_guard.R")
-}
-if (file.exists(.guard_path)) {
-  source(.guard_path)
-}
+# The refusal machinery lives in 08_guard.R and is sourced by the caller (the
+# GUI sources it before this file). 00_guard.R used to be re-sourced here and
+# carried a second, incompatible catdriver_refuse() that clobbered the live one
+# in every production session, so every refusal surfaced as BUG_INTERNAL_ERROR.
+# That file is deleted; do not reintroduce a module-side source of a guard file.
 
 # ==============================================================================
 # TRS INFRASTRUCTURE (TRS v1.0)

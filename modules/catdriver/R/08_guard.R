@@ -7,12 +7,14 @@
 #   shared TRS infrastructure, maintaining module-specific naming.
 #
 # NOT TO BE CONFUSED WITH:
-#   - 00_guard.R: Validation gates (validate_catdriver_config, guard_validate_data_hard, etc.)
 #   - 08a_guards_hard.R: Hard error guards (require_* functions)
 #   - 08b_guards_soft.R: Soft warning guards (check_* functions)
 #
-# This file provides the MECHANISM for refusals (how to refuse).
-# 00_guard.R provides the LOGIC for refusals (when to refuse).
+# This file provides the MECHANISM for refusals (how to refuse); the guard
+# files above provide the LOGIC (when to refuse). This is the ONLY definition
+# of catdriver_refuse() in the module. A second one lived in 00_guard.R with an
+# incompatible signature and was sourced last in the GUI, which turned every
+# refusal into BUG_INTERNAL_ERROR. That file is deleted; keep this the only one.
 #
 # Shared TRS infrastructure from: modules/shared/lib/trs_refusal.R
 #
