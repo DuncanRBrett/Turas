@@ -174,14 +174,38 @@ write_keydriver_config <- function(path, data_file, output_file,
     openxlsx::setColWidths(wb, nm, cols = 1:6, widths = "auto")
   }
 
-  # Never openxlsx::saveWorkbook directly: it writes relationships to drawing
-  # parts it does not create and Excel repairs the file, stripping dropdowns.
-  if (exists("turas_saveWorkbook", mode = "function")) {
-    turas_saveWorkbook(wb, path, overwrite = TRUE)
-  } else {
-    openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
-  }
+  .keydriver_example_saver()(wb, path, overwrite = TRUE)
   path
+}
+
+
+#' The workbook saver, found rather than assumed
+#'
+#' Never openxlsx::saveWorkbook() directly: it writes relationships to drawing
+#' parts it never creates, and Excel repairs the file by stripping every
+#' dropdown. See docs/HANDOVER_openxlsx_broken_workbooks.md. This example used
+#' a bare fallback when the helper was not loaded, which main's own guard test
+#' now forbids, so it locates the helper instead.
+#'
+#' @return A function with turas_saveWorkbook()'s signature.
+#' @keywords internal
+.keydriver_example_saver <- function() {
+  if (exists("turas_saveWorkbook", mode = "function")) return(turas_saveWorkbook)
+  rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  dir <- getwd()
+  while (!file.exists(file.path(dir, rel)) && dir != dirname(dir)) dir <- dirname(dir)
+  if (file.exists(file.path(dir, rel))) {
+    source(file.path(dir, rel))
+    if (exists("turas_saveWorkbook", mode = "function")) return(turas_saveWorkbook)
+  }
+  cat("\n\u250c\u2500\u2500\u2500 TURAS WARNING \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
+  cat("\u2502 Code: IO_SAVER_NOT_FOUND\n")
+  cat("\u2502 Message: turas_save_workbook_atomic.R was not found, so this example is\n")
+  cat("\u2502          written without part reconciliation and Excel may offer to\n")
+  cat("\u2502          repair it, losing its dropdowns.\n")
+  cat("\u2502 How to fix: run from the Turas project root\n")
+  cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
+  function(wb, file, overwrite = TRUE) openxlsx::saveWorkbook(wb, file, overwrite = overwrite)  # turas-saver-fallback
 }
 
 
@@ -206,11 +230,7 @@ build_keydriver_example <- function(root = NULL, out_dir = NULL, verbose = TRUE,
   openxlsx::addWorksheet(wb, "Data")
   openxlsx::writeData(wb, "Data", d,
                       headerStyle = openxlsx::createStyle(textDecoration = "bold"))
-  if (exists("turas_saveWorkbook", mode = "function")) {
-    turas_saveWorkbook(wb, data_file, overwrite = TRUE)
-  } else {
-    openxlsx::saveWorkbook(wb, data_file, overwrite = TRUE)
-  }
+  .keydriver_example_saver()(wb, data_file, overwrite = TRUE)
 
   # Two configs, the way the pricing example ships four.
   #
