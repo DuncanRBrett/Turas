@@ -119,6 +119,10 @@ run_keydriver_gui <- function() {
     "modules/keydriver/R/01_config.R",
     "modules/keydriver/R/02_term_mapping.R",
     "modules/keydriver/R/02_validation.R",
+    # The pre-flight checks live under lib/validation and were not sourced, so
+    # the GUI ran without them even once the pipeline started calling them
+    # (review H8).
+    "modules/keydriver/lib/validation/preflight_validators.R",
     "modules/keydriver/R/03_analysis.R",
     "modules/keydriver/R/04_output.R",
     "modules/keydriver/R/00_main.R"
@@ -413,13 +417,25 @@ run_keydriver_gui <- function() {
           output_text <- paste0(output_text, "Loading Key Driver module...\n\n")
           console_text(output_text)
 
+          # A failure to load import_all.R is not a warning. Everything after it
+          # depends on the shared library, and swallowing it meant the run
+          # continued and died later with "could not find function
+          # capture_console_all", which names a symptom and not the cause.
           for (src_file in kd_source_files) {
             src_path <- file.path(turas_root, src_file)
-            tryCatch({
+            src_err <- tryCatch({
               source(src_path)
-            }, error = function(e) {
-              cat(sprintf("   [WARN] Failed to source %s: %s\n", basename(src_path), e$message))
-            })
+              NULL
+            }, error = function(e) conditionMessage(e))
+            if (!is.null(src_err)) {
+              if (grepl("import_all[.]R$", src_file)) {
+                stop(sprintf(paste0(
+                  "The shared library could not be loaded from %s.\n%s\n",
+                  "Nothing downstream can run without it."),
+                  src_path, src_err))
+              }
+              cat(sprintf("   [WARN] Failed to source %s: %s\n", basename(src_path), src_err))
+            }
           }
 
           # Build HTML report flag

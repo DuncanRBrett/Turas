@@ -89,6 +89,9 @@ bootstrap_importance_ci <- function(data,
                                     config = list(),
                                     n_bootstrap = 1000,
                                     ci_level = 0.95) {
+  # Seeded, so the same config gives the same intervals twice (review M3).
+  if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config)
+
 
 
   # ------------------------------------------------------------------
@@ -177,13 +180,31 @@ bootstrap_importance_ci <- function(data,
   cols_to_check <- if (!is.null(weights)) c(all_vars, weights) else all_vars
   for (col in cols_to_check) {
     if (!is.numeric(data[[col]])) {
+      # The advice used to be "convert it to numeric", which an analyst must
+      # not follow for a nominal driver: scoring App, branch and call centre
+      # 1, 2, 3 invents an ordering and a spacing that are not in the data,
+      # and every number downstream would inherit them (review F14). The
+      # honest statement is that this limitation is ours, not statistics':
+      # resampling rows is indifferent to column types, and these estimators
+      # are the part that is numeric-only.
       return(keydriver_refuse(
         code   = "DATA_INVALID",
         title  = "Non-Numeric Variable",
         problem = paste0("Column '", col, "' is not numeric (class: ",
                          paste(class(data[[col]]), collapse = "/"), ")."),
-        why_it_matters = "Bootstrap importance requires numeric outcome, drivers, and weights.",
-        how_to_fix = paste0("Convert '", col, "' to numeric before calling bootstrap_importance_ci().")
+        why_it_matters = paste0(
+          "The bootstrap estimators in this module are written for numeric ",
+          "drivers only, so a study containing a categorical driver gets no ",
+          "intervals at all, including for its numeric drivers. The ",
+          "resampling itself is not the obstacle."),
+        how_to_fix = c(
+          paste0("If '", col, "' is genuinely a number recorded as text, ",
+                 "correct it in the data and rerun."),
+          paste0("If it is a nominal driver, do NOT score its categories ",
+                 "1, 2, 3 to get past this: that invents an order and a ",
+                 "spacing the data does not have."),
+          "Otherwise run without bootstrap intervals, or drop the categorical driver from this study."
+        )
       ))
     }
   }
@@ -334,7 +355,41 @@ bootstrap_importance_ci <- function(data,
                              "CI_Lower", "CI_Upper", "SE")]
   rownames(result_df) <- NULL
 
-  cat(sprintf("  - Bootstrap complete: %d drivers analyzed\n", n_drivers))
+  # Shapley is stamped in the policy note below rather than added as rows of
+  # NA. A row of NAs in a confidence-interval table reads as missing data,
+  # which is a different claim from "this method has no interval in this
+  # version" (review M4, decision 5: extending the bootstrap to Shapley is
+  # deferred).
+
+  # What these numbers are, carried with them. Point_Estimate is the mean of
+  # the bootstrap distribution, not the headline importance figure, and on a
+  # weighted study the resample is probability-proportional while each
+  # replicate's fit is unweighted. Both were invisible to a reader of the
+  # sheet, who would reasonably read Point_Estimate as the reported importance
+  # (review M4).
+  attr(result_df, "bootstrap_policy") <- paste0(
+    "Point_Estimate is the MEAN OF THE BOOTSTRAP DISTRIBUTION and will not equal ",
+    "the headline importance column; read the interval, not this column, and ",
+    "reconcile against the importance table. ",
+    if (!is.null(weights)) {
+      paste0("Respondents were resampled with probability proportional to '",
+             weights, "' and each replicate was fitted unweighted. ")
+    } else {
+      "Respondents were resampled with equal probability. "
+    },
+    "Shapley values carry no interval: the bootstrap does not extend to them ",
+    "in this version.")
+  attr(result_df, "iterations_requested") <- as.integer(n_bootstrap)
+  attr(result_df, "iterations_used") <- as.integer(n_bootstrap - n_failed)
+  attr(result_df, "iterations_dropped") <- as.integer(n_failed)
+
+  cat(sprintf("  - Bootstrap complete: %d drivers analyzed, %d of %d iterations used\n",
+              n_drivers, as.integer(n_bootstrap - n_failed), as.integer(n_bootstrap)))
+  if (n_failed > 0) {
+    cat(sprintf(paste0("  - %d iteration(s) dropped as near-singular; the intervals ",
+                       "rest on the %d that succeeded\n"),
+                as.integer(n_failed), as.integer(n_bootstrap - n_failed)))
+  }
 
   result_df
 }
@@ -428,21 +483,15 @@ calculate_single_bootstrap <- function(data, outcome, drivers, weights) {
 
   if (any(vals < 1e-10)) return(NULL)
 
+  # Johnson's symmetric square root, the same fix as the two sites in
+  # 03_analysis.R (review C1). A bootstrap of the wrong estimator produced
+  # intervals around the wrong point, so every replicate was affected.
   p <- n_drivers
-  Lambda_sqrt     <- diag(sqrt(vals),     nrow = p, ncol = p)
-  Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
-
-  Phi     <- vecs %*% Lambda_sqrt
-  r_z_y   <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy
-  r2_z_y  <- as.numeric(r_z_y)^2
-
-  rw_raw <- as.numeric(Phi^2 %*% r2_z_y)
-
-  # Rescale to model R-squared
-  model_R2 <- summary(model)$r.squared
-  if (!is.na(model_R2) && model_R2 > 0 && sum(rw_raw) > 0) {
-    rw_raw <- rw_raw * (model_R2 / sum(rw_raw))
-  }
+  Lam <- vecs %*% diag(sqrt(vals), nrow = p, ncol = p) %*% t(vecs)
+  beta_star <- solve(Lam) %*% r_xy
+  rw_raw <- as.numeric((Lam^2) %*% (beta_star^2))
+  # No rescale: correct raw weights already sum to R-squared. A replicate that
+  # cannot produce them is dropped by the caller, not stretched to fit.
 
   # Convert to percentages
   sum_rw <- sum(rw_raw)

@@ -403,12 +403,25 @@ generate_segment_insights <- function(comparison_matrix, classifications) {
 #' }
 #'
 #' @export
+#' Weighted standard deviation, the same convention the engine's weighted
+#' correlations use.
+#' @keywords internal
+.kd_weighted_sd <- function(x, w) {
+  ok <- !is.na(x) & !is.na(w) & w > 0
+  if (sum(ok) < 2) return(NA_real_)
+  x <- x[ok]; w <- w[ok]
+  mu <- sum(w * x) / sum(w)
+  sqrt(sum(w * (x - mu)^2) / sum(w))
+}
+
+
 run_segment_importance_comparison <- function(data,
                                               outcome,
                                               drivers,
                                               segment_var,
                                               segment_values = NULL,
-                                              config = list()) {
+                                              config = list(),
+                                              weight_var = NULL) {
 
   # --- Config defaults ---
   top_n               <- config$top_n               %||% 3L
@@ -459,16 +472,52 @@ run_segment_importance_comparison <- function(data,
   }
 
   # --- Determine segment values ---
+  # segment_values is either the levels to analyse one at a time, or a NAMED
+  # LIST grouping several levels into one segment: list(Younger = c("18-24",
+  # "25-34"), Older = c("35-49", "50+")). The Segments sheet expresses groupings
+  # that way and the caller could not pass them through before (review C2).
   if (is.null(segment_values)) {
     segment_values <- sort(unique(data[[segment_var]][!is.na(data[[segment_var]])]))
   }
+  segment_groups <- if (is.list(segment_values)) {
+    nm <- names(segment_values)
+    if (is.null(nm) || any(!nzchar(nm))) {
+      keydriver_refuse(
+        code = "CFG_SEGMENT_GROUPS_UNNAMED",
+        title = "Segment Groupings Need Names",
+        problem = "segment_values was given as a list, but not every element is named.",
+        why_it_matters = "The name is what the segment is called in the comparison table.",
+        how_to_fix = "Supply a named list, for example list(Younger = c('18-24', '25-34'))."
+      )
+    }
+    segment_values
+  } else {
+    stats::setNames(as.list(segment_values), as.character(segment_values))
+  }
 
-  if (length(segment_values) < 2) {
+  # A weight column must exist and be usable if one is named.
+  if (!is.null(weight_var) && nzchar(weight_var)) {
+    if (!weight_var %in% names(data)) {
+      keydriver_refuse(
+        code = "DATA_SEGMENT_WEIGHT_NOT_FOUND",
+        title = "Weight Variable Not Found For Segment Comparison",
+        problem = sprintf("Weight variable '%s' is not in the data.", weight_var),
+        why_it_matters = paste0(
+          "The study is weighted, so unweighted segment models would disagree with ",
+          "every other number in the report."),
+        how_to_fix = "Check the weight column name against the data file's headers."
+      )
+    }
+  } else {
+    weight_var <- NULL
+  }
+
+  if (length(segment_groups) < 2) {
     keydriver_refuse(
       code = "DATA_INSUFFICIENT_SEGMENTS",
       title = "Insufficient Segments",
       problem = sprintf("Only %d segment value(s) found. Need at least 2 for comparison.",
-                        length(segment_values)),
+                        length(segment_groups)),
       why_it_matters = "Segment comparison requires at least two distinct segments.",
       how_to_fix = c(
         "Check that segment_var contains at least 2 distinct values",
@@ -481,14 +530,15 @@ run_segment_importance_comparison <- function(data,
   cat("\nSegment Comparison Analysis\n")
   cat("- Method: Standardized Beta Weights (|beta| share)\n")
   cat(sprintf("- Analyzing %d segments: %s\n",
-              length(segment_values), paste(segment_values, collapse = ", ")))
+              length(segment_groups), paste(names(segment_groups), collapse = ", ")))
+  if (!is.null(weight_var)) cat(sprintf("- Weighted by %s\n", weight_var))
 
   # --- Run importance per segment ---
   results_by_segment <- list()
 
-  for (seg_val in segment_values) {
-    seg_label <- as.character(seg_val)
-    seg_data  <- data[data[[segment_var]] == seg_val & !is.na(data[[segment_var]]), , drop = FALSE]
+  for (seg_label in names(segment_groups)) {
+    seg_levels <- segment_groups[[seg_label]]
+    seg_data  <- data[data[[segment_var]] %in% seg_levels & !is.na(data[[segment_var]]), , drop = FALSE]
 
     if (nrow(seg_data) < min_segment_n) {
       cat(sprintf("- Segment '%s': n=%d (below minimum %d, skipping)\n",
@@ -507,10 +557,19 @@ run_segment_importance_comparison <- function(data,
       next
     }
 
-    # Fit linear model and extract standardised betas
+    # Fit linear model and extract standardised betas. Weighted when the study
+    # is weighted: the segment models were always unweighted, so a weighted
+    # study's segment comparison disagreed with every other number in its own
+    # report (review C2).
     formula_str <- paste(outcome, "~", paste(drivers, collapse = " + "))
+    seg_formula <- stats::as.formula(formula_str)
+    seg_w <- if (!is.null(weight_var)) as.numeric(seg_data[[weight_var]]) else NULL
     model <- tryCatch(
-      stats::lm(stats::as.formula(formula_str), data = seg_data),
+      if (is.null(seg_w)) {
+        stats::lm(seg_formula, data = seg_data)
+      } else {
+        stats::lm(seg_formula, data = seg_data, weights = seg_w)
+      },
       error = function(e) {
         cat(sprintf("- Segment '%s': model fitting failed (%s), skipping\n",
                     seg_label, e$message))
@@ -520,19 +579,59 @@ run_segment_importance_comparison <- function(data,
 
     if (is.null(model)) next
 
-    # Standardised betas
     coefs <- stats::coef(model)
     coefs <- coefs[names(coefs) != "(Intercept)"]
 
-    # Map coefficients back to driver names (handles factor expansion)
-    sd_y <- stats::sd(seg_data[[outcome]], na.rm = TRUE)
+    # Standardised betas over the MODEL MATRIX, not the raw columns. A factor
+    # driver's coefficient is named GenderMale, so coefs["Gender"] was NA and
+    # the driver scored a silent zero in every segment (review C2). Working on
+    # the model matrix gives one term per dummy, each with a real standard
+    # deviation, and build_term_mapping says which terms belong to which
+    # driver. Numeric drivers have one term each, so this is one code path.
+    mm <- tryCatch(stats::model.matrix(seg_formula, data = seg_data),
+                   error = function(e) NULL)
+    # Weighted where the outcome's spread is weighted. A standardised beta is
+    # b * (sd_x / sd_y); the coefficients come from a weighted fit and sd_y
+    # was already weighted, so an unweighted sd_x made the ratio mix two
+    # different populations. On a split where the weights vary within a
+    # segment it moved a driver's share by over a point (review F8).
+    term_sd <- if (is.null(mm)) {
+      NULL
+    } else if (is.null(seg_w)) {
+      apply(mm, 2, stats::sd, na.rm = TRUE)
+    } else {
+      stats::setNames(
+        apply(mm, 2, function(col) .kd_weighted_sd(col, seg_w)),
+        colnames(mm))
+    }
+    mapping <- if (!is.null(mm) && exists("build_term_mapping", mode = "function")) {
+      tryCatch(build_term_mapping(seg_formula, seg_data, drivers), error = function(e) NULL)
+    } else NULL
+
+    sd_y <- if (is.null(seg_w)) {
+      stats::sd(seg_data[[outcome]], na.rm = TRUE)
+    } else {
+      .kd_weighted_sd(seg_data[[outcome]], seg_w)
+    }
 
     importance_pct <- vapply(drivers, function(drv) {
-      coef_val <- coefs[drv]
-      if (is.na(coef_val)) return(0)
-      sd_x <- stats::sd(seg_data[[drv]], na.rm = TRUE)
-      if (sd_x == 0 || sd_y == 0) return(0)
-      abs(coef_val * (sd_x / sd_y))
+      terms_for_driver <- if (!is.null(mapping)) mapping$driver_terms[[drv]] else NULL
+      if (is.null(terms_for_driver) || length(terms_for_driver) == 0) {
+        terms_for_driver <- intersect(drv, names(coefs))
+      }
+      terms_for_driver <- intersect(terms_for_driver, names(coefs))
+      if (length(terms_for_driver) == 0 || sd_y == 0) return(0)
+      contrib <- vapply(terms_for_driver, function(tm) {
+        b <- coefs[[tm]]
+        sdx <- if (!is.null(term_sd) && tm %in% names(term_sd)) {
+          term_sd[[tm]]
+        } else {
+          suppressWarnings(stats::sd(seg_data[[tm]], na.rm = TRUE))
+        }
+        if (is.na(b) || is.na(sdx) || sdx == 0) return(0)
+        abs(b * (sdx / sd_y))
+      }, numeric(1))
+      sum(contrib)
     }, numeric(1))
 
     # Normalise to percentages

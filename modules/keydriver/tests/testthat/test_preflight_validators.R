@@ -225,32 +225,28 @@ test_that("Check 4 - driver type fails when DriverType column missing", {
 
 
 # ==============================================================================
-# CHECK 5: check_categorical_aggregation
+# CHECK 5 is gone (review F5)
 # ==============================================================================
 
-test_that("Check 5 - categorical with valid aggregation passes", {
-  vars_df <- make_variables_df(
-    drivers = c("brand"),
-    driver_types = c("categorical"),
-    agg_methods = c("partial_r2")
-  )
-  log <- init_preflight_log()
+test_that("no pre-flight check polices AggregationMethod any more (F5)", {
+  # The column's engine was deleted in this programme. The check warned that a
+  # blank column "will default to partial_r2", which defaulted to nothing, and
+  # refused the run for a value outside a set that decides nothing. Every
+  # template-built mixed study hit the warning, because the template emitted
+  # the column blank.
+  expect_false(exists("check_categorical_aggregation", mode = "function"))
+  src <- paste(readLines(file.path(module_dir, "lib", "validation",
+                                   "preflight_validators.R"), warn = FALSE),
+               collapse = "\n")
+  expect_false(grepl("check_categorical_aggregation(", src, fixed = TRUE))
+  expect_false(grepl("Will default to 'partial_r2'", src, fixed = TRUE))
 
-  result <- check_categorical_aggregation(vars_df, log)
-  expect_equal(nrow(result), 0)
-})
-
-test_that("Check 5 - categorical with missing aggregation warns", {
-  vars_df <- make_variables_df(
-    drivers = c("brand"),
-    driver_types = c("categorical"),
-    agg_methods = c(NA_character_)
-  )
-  log <- init_preflight_log()
-
-  result <- check_categorical_aggregation(vars_df, log)
-  expect_true(nrow(result) > 0)
-  expect_equal(result$Severity[1], "Warning")
+  # And the template no longer offers the column at all.
+  gen <- paste(readLines(file.path(module_dir, "lib",
+                                   "generate_config_templates.R"), warn = FALSE),
+               collapse = "\n")
+  expect_false(grepl("AggregationMethod", gen, fixed = TRUE))
+  expect_false(grepl("grouped_permutation", gen, fixed = TRUE))
 })
 
 
@@ -466,22 +462,68 @@ test_that("Check 13 - quadrant disabled skips check", {
   expect_equal(nrow(result), 0)
 })
 
-test_that("Check 13 - quadrant auto without stated importance errors", {
-  config <- list(enable_quadrant = TRUE, importance_source = "auto")
+test_that("Check 13 - quadrant without stated importance warns, it does not refuse (F4)", {
+  # It used to refuse, on the premise that the performance axis needed stated
+  # importance. It does not: performance comes from driver means and
+  # importance from the derived measure. What is actually lost is the stated
+  # against derived comparison, so that is what the warning says.
+  config <- list(settings = list(enable_quadrant = TRUE, importance_source = "auto"))
   log <- init_preflight_log()
 
   result <- check_quadrant_requirements(config, NULL, log)
-  expect_true(nrow(result) > 0)
-  expect_equal(result$Severity[1], "Error")
+  expect_equal(nrow(result), 1)
+  expect_equal(result$Severity[1], "Warning")
   expect_true(grepl("StatedImportance", result$Message[1]))
+  expect_true(grepl("will still be produced", result$Message[1]))
 })
 
-test_that("Check 13 - quadrant with derived importance_source passes without stated", {
-  config <- list(enable_quadrant = TRUE, importance_source = "shapley")
+test_that("Check 13 - a config spelled Yes is read the same as TRUE (F4)", {
+  # The check compared toupper(x) == "TRUE", so it fired for the spelling the
+  # template's dropdown emits and never for the spelling every example uses.
+  log <- init_preflight_log()
+  for (spelling in list(TRUE, "TRUE", "Yes", "yes", "Y", 1)) {
+    config <- list(settings = list(enable_quadrant = spelling,
+                                   importance_source = "auto"))
+    result <- check_quadrant_requirements(config, NULL, log)
+    expect_equal(nrow(result), 1, info = paste("spelling:", spelling))
+  }
+  for (spelling in list(FALSE, "FALSE", "No", "n", 0)) {
+    config <- list(settings = list(enable_quadrant = spelling,
+                                   importance_source = "auto"))
+    result <- check_quadrant_requirements(config, NULL, log)
+    expect_equal(nrow(result), 0, info = paste("spelling:", spelling))
+  }
+})
+
+test_that("Check 13 - importance_source is read from settings, and the set is real (F4)", {
+  # It read config$importance_source, which is NULL on the live object because
+  # the value sits in config$settings, so every run looked like "auto".
   log <- init_preflight_log()
 
-  result <- check_quadrant_requirements(config, NULL, log)
-  expect_equal(nrow(result), 0)
+  # A real derived source, with stated importance present: nothing to say.
+  stated <- data.frame(driver = "a", stated_importance = 5, stringsAsFactors = FALSE)
+  config <- list(settings = list(enable_quadrant = "Yes",
+                                 importance_source = "relative_weights"))
+  expect_equal(nrow(check_quadrant_requirements(config, stated, log)), 0)
+
+  # A source outside the set the quadrant can actually use is an Error, and
+  # the message names the real set rather than the old "shapley, relative,
+  # beta, or shap".
+  bad <- list(settings = list(enable_quadrant = "Yes", importance_source = "shapley"))
+  res <- check_quadrant_requirements(bad, stated, log)
+  expect_equal(nrow(res), 1)
+  expect_equal(res$Severity[1], "Error")
+  expect_true(grepl("relative_weights", res$Message[1], fixed = TRUE))
+  expect_false(grepl("beta, or shap", res$Message[1], fixed = TRUE))
+
+  # And the set the message quotes is the one the quadrant code enforces.
+  if (exists("KD_QUADRANT_IMPORTANCE_SOURCES")) {
+    for (src in KD_QUADRANT_IMPORTANCE_SOURCES) {
+      cfg <- list(settings = list(enable_quadrant = "Yes", importance_source = src))
+      expect_equal(nrow(check_quadrant_requirements(cfg, stated, log)), 0,
+                   info = src)
+    }
+  }
 })
 
 
@@ -571,4 +613,82 @@ test_that("Orchestrator returns a data frame with standard columns", {
 
   expect_true(is.data.frame(result))
   expect_true(all(c("Component", "Check", "Field", "Message", "Severity") %in% names(result)))
+})
+
+# ==============================================================================
+# H8: the checks are wired into the run, and the run respects them
+# ==============================================================================
+
+test_that("the pipeline calls the pre-flight orchestrator (H8)", {
+  # Fourteen checks and 574 lines of tests existed and nothing called the
+  # orchestrator, so the checks were dead code and their tests covered code no
+  # run could reach.
+  main <- readLines(file.path(module_dir, "R", "00_main.R"))
+  idx <- grep("validate_keydriver_preflight(", main, fixed = TRUE)
+  expect_gt(length(idx), 0)
+  # And an Error stops the run rather than being logged and ignored.
+  window <- main[seq(min(idx), min(min(idx) + 45, length(main)))]
+  expect_true(any(grepl("CFG_PREFLIGHT_FAILED", window, fixed = TRUE)))
+  expect_true(any(grepl("keydriver_refuse", window, fixed = TRUE)))
+})
+
+test_that("the GUI sources the validators it now depends on (H8)", {
+  gui <- file.path(module_dir, "run_keydriver_gui.R")
+  skip_if_not(file.exists(gui), "GUI not present")
+  src <- paste(readLines(gui, warn = FALSE), collapse = "\n")
+  expect_true(grepl("lib/validation/preflight_validators.R", src, fixed = TRUE))
+})
+
+test_that("checks 12 to 14 read the config shape a real run has (H8)", {
+  # The live pipeline stores these under config$settings. The checks read
+  # config$enable_shap, which is NULL there, so each returned early and the
+  # check never fired on a real run.
+  skip_if(!exists("check_shap_dependencies", mode = "function"), "check not loaded")
+  skip_if(!exists("check_feature_policies_valid", mode = "function"), "check not loaded")
+  log0 <- init_preflight_log()
+
+  # Nested, which is what a loaded config looks like.
+  nested <- list(settings = list(shap_on_fail = "explode"))
+  out_nested <- check_feature_policies_valid(nested, log0)
+  expect_equal(nrow(out_nested), 1)
+  expect_equal(out_nested$Severity[1], "Error")
+  expect_match(out_nested$Message[1], "explode")
+
+  # Flat, which is what the existing unit tests build, still works.
+  flat <- list(shap_on_fail = "explode")
+  expect_equal(nrow(check_feature_policies_valid(flat, log0)), 1)
+
+  # A valid value produces nothing, on either shape.
+  expect_equal(nrow(check_feature_policies_valid(
+    list(settings = list(shap_on_fail = "refuse")), log0)), 0)
+})
+
+test_that("a pre-flight Error would block a run, a Warning would not (H8)", {
+  skip_if(!exists("validate_keydriver_preflight", mode = "function"), "orchestrator not loaded")
+  set.seed(2)
+  n <- 60
+  d <- data.frame(Y = rnorm(n), D1 = rnorm(n), D2 = rnorm(n))
+  vars <- data.frame(
+    variable = c("Y", "D1", "D2"),
+    role = c("outcome", "driver", "driver"),
+    stringsAsFactors = FALSE
+  )
+  # Compare the same fixture with a valid and an invalid policy, so the
+  # difference is the policy rather than the fixture's own shape.
+  res_ok <- suppressWarnings(
+    validate_keydriver_preflight(list(settings = list(shap_on_fail = "refuse")),
+                                 d, vars, verbose = FALSE))
+  res_bad <- suppressWarnings(
+    validate_keydriver_preflight(list(settings = list(shap_on_fail = "maybe")),
+                                 d, vars, verbose = FALSE))
+  expect_true(is.data.frame(res_ok) && is.data.frame(res_bad))
+  n_ok <- sum(res_ok$Severity == "Error")
+  n_bad <- sum(res_bad$Severity == "Error")
+  # The invalid policy adds exactly one Error, and it names itself.
+  expect_equal(n_bad, n_ok + 1)
+  added <- setdiff(res_bad$Message, res_ok$Message)
+  expect_true(any(grepl("maybe", added, fixed = TRUE)))
+  # And the pipeline refuses when any Error is present, which is what makes
+  # this check mean anything.
+  expect_gt(n_bad, 0)
 })

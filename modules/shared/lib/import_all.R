@@ -34,7 +34,51 @@
 # ==============================================================================
 
 # Determine this file's directory for relative sourcing
-.shared_lib_path <- if (sys.nframe() > 0 && !is.null(sys.frame(1)$ofile)) {
+# Where this file is. sys.frame(1) is the OUTERMOST frame, not the frame doing
+# the sourcing, so it holds this file's ofile only when import_all.R is sourced
+# from the top of a script. Sourced from inside a function, which is what a
+# Shiny GUI does, it is NULL or another file's path, and the working-directory
+# fallbacks below are then the only thing left. When the working directory is
+# not the project root they all miss, this file fails, and the caller carries
+# on without the shared library until something dies with "could not find
+# function". Walking the frames outward-in finds it wherever it was sourced
+# from.
+.shared_lib_self <- local({
+  found <- NULL
+  if (sys.nframe() > 0) {
+    for (i in rev(seq_len(sys.nframe()))) {
+      of <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+      if (is.character(of) && length(of) == 1 && grepl("import_all[.]R$", of)) {
+        found <- dirname(normalizePath(of, mustWork = FALSE))
+        break
+      }
+      # This tested is.list(sf), and a frame's srcfile is never a list: it
+      # arrives either as the character path source() was given, or as a
+      # srcfile object carrying $filename. So the branch never fired and the
+      # ofile test above was doing all the work (review F23). Both shapes are
+      # handled now, which matters for the sourcing paths where ofile is
+      # absent.
+      sf <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+      sf_name <- if (is.character(sf) && length(sf) == 1) {
+        sf
+      } else if (!is.null(sf)) {
+        nm <- tryCatch(sf$filename, error = function(e) NULL)
+        if (is.character(nm) && length(nm) == 1) nm else NULL
+      } else {
+        NULL
+      }
+      if (!is.null(sf_name) && grepl("import_all[.]R$", sf_name)) {
+        found <- dirname(normalizePath(sf_name, mustWork = FALSE))
+        break
+      }
+    }
+  }
+  found
+})
+
+.shared_lib_path <- if (!is.null(.shared_lib_self) && dir.exists(.shared_lib_self)) {
+  .shared_lib_self
+} else if (sys.nframe() > 0 && !is.null(sys.frame(1)$ofile)) {
   dirname(sys.frame(1)$ofile)
 } else {
   # Fallback: try to find from working directory

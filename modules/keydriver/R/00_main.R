@@ -180,10 +180,11 @@ step_load_config <- function(config_file, data_file, output_file) {
   config <- load_keydriver_config(config_file)
   validate_keydriver_config(config)
 
-  enable_shap <- isTRUE(config$settings$enable_shap) ||
-                 isTRUE(as.logical(config$settings$enable_shap))
-  enable_quadrant <- isTRUE(config$settings$enable_quadrant) ||
-                     isTRUE(as.logical(config$settings$enable_quadrant))
+  # as.logical("Yes") is NA, so isTRUE(as.logical("Yes")) is FALSE and a config
+  # that says Yes silently switched the feature off (review M14).
+  # as_logical_setting() reads the spellings an analyst actually types.
+  enable_shap <- as_logical_setting(config$settings$enable_shap, FALSE)
+  enable_quadrant <- as_logical_setting(config$settings$enable_quadrant, FALSE)
 
   if (is.null(data_file)) {
     data_file <- config$data_file
@@ -252,21 +253,29 @@ step_calculate_correlations <- function(data, config, guard, has_mixed) {
   affected_outputs <- character(0)
   correlations <- NULL
 
-  if (has_mixed) {
-    numeric_drivers <- get_numeric_drivers(data$data, config$driver_vars)
-    if (length(numeric_drivers) < length(config$driver_vars)) {
-      degraded_reasons <- "Correlations only computed for numeric drivers (categorical excluded)"
-      affected_outputs <- c("Correlation matrix", "Quadrant chart correlations")
-      if (length(numeric_drivers) >= 2) {
-        numeric_config <- config
-        numeric_config$driver_vars <- numeric_drivers
-        correlations <- calculate_correlations(data$data, numeric_config)
-      }
+  # One path. calculate_correlations() now carries NA for every non-numeric
+  # column instead of erroring on it, so there is nothing left to branch on.
+  # This used to leave correlations NULL whenever fewer than two drivers were
+  # numeric, and the mixed importance path then recomputed them itself on the
+  # full driver list and died with a bare error (review F1).
+  correlations <- calculate_correlations(data$data, config)
+
+  numeric_drivers <- get_numeric_drivers(data$data, config$driver_vars)
+  if (length(numeric_drivers) < length(config$driver_vars)) {
+    affected_outputs <- c("Correlation matrix", "Quadrant chart correlations")
+    degraded_reasons <- if (length(numeric_drivers) == 0) {
+      # Refusing this study was wrong: beta weights, relative weights and
+      # Shapley values are all defined for categorical drivers and the mixed
+      # path computes them. Only the correlation column is undefined, and the
+      # refusal told the analyst to switch it off with a setting that does not
+      # exist (review F2).
+      paste0("No driver in this study is numeric, so the correlation column ",
+             "is empty. Beta weights, relative weights and Shapley values are ",
+             "unaffected.")
     } else {
-      correlations <- calculate_correlations(data$data, config)
+      "Correlations only computed for numeric drivers (categorical excluded)"
     }
-  } else {
-    correlations <- calculate_correlations(data$data, config)
+    cat(sprintf("   [NOTE] %s\n", degraded_reasons))
   }
 
   if (!is.null(correlations)) {
@@ -382,6 +391,37 @@ handle_optional_feature <- function(feature_name, feature_fn, on_fail_policy,
        degraded_reasons = degraded_reasons, affected_outputs = affected_outputs)
 }
 
+#' The Segments sheet as named groups, one entry per segment variable
+#'
+#' A row is a named segment: segment_name, segment_variable, and the
+#' segment_values that belong to it. Several rows on the same variable are
+#' several segments of that variable. An empty segment_values means "whatever
+#' levels the data has", which is the old behaviour for a single-row sheet.
+#'
+#' @param segments The Segments data frame from the config.
+#' @return A named list, variable -> named list of value vectors (possibly
+#'   empty, meaning let the data decide).
+#' @keywords internal
+.kd_segment_definitions <- function(segments) {
+  if (is.null(segments) || !is.data.frame(segments) || nrow(segments) == 0) return(list())
+  out <- list()
+  for (i in seq_len(nrow(segments))) {
+    var <- as.character(segments$segment_variable[i])
+    if (is.na(var) || !nzchar(trimws(var))) next
+    var <- trimws(var)
+    nm <- as.character(segments$segment_name[i] %||% NA)
+    raw <- as.character(segments$segment_values[i] %||% NA)
+    vals <- kd_split_segment_values(raw)
+    if (is.null(out[[var]])) out[[var]] <- list()
+    if (length(vals) > 0) {
+      label <- if (is.na(nm) || !nzchar(trimws(nm))) paste(vals, collapse = " / ") else trimws(nm)
+      out[[var]][[label]] <- vals
+    }
+  }
+  out
+}
+
+
 #' Determine final TRS run status (PASS or PARTIAL) from degraded reasons.
 #' @param degraded_reasons Character vector of degradation reasons.
 #' @param affected_outputs Character vector of affected output names.
@@ -470,6 +510,71 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   if (has_mixed) {
     cat("\n   [MIXED PREDICTORS DETECTED]\n")
     if (!is.null(config$encoding_report)) print_encoding_summary(config$encoding_report)
+  }
+
+  # --- Step 2b: Pre-flight cross-reference checks ---
+  # Fourteen checks and 574 lines of tests for them existed, and nothing ever
+  # called the orchestrator: the checks were dead code and their tests were
+  # testing code no run reached (review H8). An Error stops the run, because an
+  # Error is a configuration that cannot produce a correct answer. Anything
+  # else is reported and the run continues.
+  # Sourced here rather than left to the caller. The GUI sourced the
+  # validators and a headless call did not, so the same config refused from
+  # one entry point and passed from the other, and the suite's one end to end
+  # test was the silent path (review F7). Every other step the pipeline needs
+  # sources itself the same way.
+  if (!exists("validate_keydriver_preflight", mode = "function")) {
+    pf_file <- file.path(find_turas_root(), "modules", "keydriver", "lib",
+                         "validation", "preflight_validators.R")
+    if (file.exists(pf_file)) {
+      tryCatch(source(pf_file, local = FALSE), error = function(e) {
+        cat(sprintf("   [WARN] Pre-flight validators could not be loaded: %s\n",
+                    conditionMessage(e)))
+      })
+    }
+  }
+  if (exists("validate_keydriver_preflight", mode = "function")) {
+    preflight_log <- tryCatch(
+      validate_keydriver_preflight(
+        config = config,
+        data = data$data,
+        variables_df = config$variables %||% NULL,
+        segments_df = config$segments %||% NULL,
+        stated_df = config$stated_importance %||% NULL,
+        verbose = TRUE
+      ),
+      error = function(e) {
+        cat(sprintf("   [WARN] Pre-flight checks could not run: %s\n", conditionMessage(e)))
+        NULL
+      }
+    )
+    if (is.data.frame(preflight_log) && nrow(preflight_log) > 0) {
+      pf_errors <- preflight_log[preflight_log$Severity == "Error", , drop = FALSE]
+      pf_warnings <- preflight_log[preflight_log$Severity == "Warning", , drop = FALSE]
+      if (nrow(pf_errors) > 0) {
+        keydriver_refuse(
+          code = "CFG_PREFLIGHT_FAILED",
+          title = "Pre-Flight Checks Failed",
+          problem = sprintf("%d pre-flight check(s) reported an error: %s",
+                            nrow(pf_errors),
+                            paste(sprintf("[%s] %s", pf_errors$Check, pf_errors$Message),
+                                  collapse = "; ")),
+          why_it_matters = paste0(
+            "These checks cross-reference the config against the data. An error ",
+            "means the run would produce numbers from a setup that does not ",
+            "describe this study."),
+          how_to_fix = c(
+            "Read the boxed pre-flight errors on the console above; each names the field.",
+            "Fix the config or the data file, then run again."
+          )
+        )
+      }
+      if (nrow(pf_warnings) > 0) {
+        degraded_reasons <- c(degraded_reasons, sprintf(
+          "Pre-flight warning: %s", pf_warnings$Message))
+        affected_outputs <- c(affected_outputs, "preflight")
+      }
+    }
   }
 
   # --- Step 3: Calculate Correlations ---
@@ -605,7 +710,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # --- Step 8: Bootstrap Confidence Intervals (if enabled) ---
-  enable_bootstrap <- isTRUE(as.logical(config$settings$enable_bootstrap))
+  enable_bootstrap <- as_logical_setting(config$settings$enable_bootstrap, FALSE)
   if (enable_bootstrap) {
     step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0) + 1
     cat(sprintf("\n%d. Bootstrap confidence intervals...\n", step_num))
@@ -619,6 +724,11 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
         outcome = config$outcome_var,
         drivers = config$driver_vars,
         weights = config$weight_var,
+        # Without this the function seeded itself from an empty list, so it
+        # always applied the default seed and random_seed changed nothing:
+        # two runs with different seeds produced identical intervals to the
+        # last decimal (review F6).
+        config = config,
         n_bootstrap = as.numeric(config$settings$bootstrap_iterations %||% 500),
         ci_level = as.numeric(config$settings$bootstrap_ci_level %||% 0.95)
       )
@@ -676,26 +786,71 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
 
     source(file.path(turas_root, "modules/keydriver/R/07_segment_comparison.R"), local = FALSE)
 
-    segment_result <- tryCatch({
-      seg_var <- config$segments$segment_variable[1]
-      # Use raw_data (pre-filtering) since segment variable may not be in analysis variables
-      seg_data <- if (!is.null(config$raw_data)) config$raw_data else data$data
-      run_segment_importance_comparison(
-        data = seg_data,
-        outcome = config$outcome_var,
-        drivers = config$driver_vars,
-        segment_var = seg_var,
-        config = list(top_n = 3, rank_diff_threshold = 3, min_segment_n = 30)
-      )
-    }, error = function(e) {
-      cat(sprintf("   [WARN] Segment comparison failed: %s\n", e$message))
-      NULL
-    })
+    # Every row of the Segments sheet, not just the first. The call read
+    # segment_variable[1] and nothing else, so a sheet defining segments on two
+    # variables analysed one of them, and the segment_values column, which is
+    # what groups levels into a named segment, was never read at all. The
+    # console then reported "complete (n segments)" counting the sheet's rows
+    # rather than what ran (review C2).
+    seg_data <- if (!is.null(config$raw_data)) config$raw_data else data$data
+    # A segment variable the data does not have was dropped silently in
+    # validation; it degrades the run now (review C2).
+    if (length(data$missing_segment_vars %||% character(0)) > 0) {
+      degraded_reasons <- c(degraded_reasons, sprintf(
+        "Segments sheet names variable(s) absent from the data: %s",
+        paste(data$missing_segment_vars, collapse = ", ")))
+      affected_outputs <- c(affected_outputs, "segment_comparison")
+    }
+    seg_defs <- .kd_segment_definitions(config$segments)
+    min_seg_n <- suppressWarnings(as.numeric(
+      config$settings$min_segment_n %||% config$min_segment_n %||% 30))
+    if (!is.finite(min_seg_n) || min_seg_n < 2) min_seg_n <- 30
 
-    if (!is.null(segment_result)) {
-      results$segment_comparison <- segment_result
-      cat(sprintf("   [OK] Segment comparison complete (%d segments)\n",
-                  nrow(config$segments)))
+    segment_results <- list()
+    for (seg_var in names(seg_defs)) {
+      groups <- seg_defs[[seg_var]]
+      one <- tryCatch(
+        run_segment_importance_comparison(
+          data = seg_data,
+          outcome = config$outcome_var,
+          drivers = config$driver_vars,
+          segment_var = seg_var,
+          segment_values = if (length(groups)) groups else NULL,
+          config = list(top_n = 3, rank_diff_threshold = 3, min_segment_n = min_seg_n),
+          weight_var = config$weight_var
+        ),
+        turas_refusal = function(e) {
+          cat(sprintf("   ! Segment comparison on '%s' refused: %s\n",
+                      seg_var, e$code %||% "refused"))
+          structure(list(error = e$problem %||% conditionMessage(e),
+                         code = e$code %||% "KD_SEGMENT_REFUSED"), class = "kd_segment_failure")
+        },
+        error = function(e) {
+          cat(sprintf("   ! Segment comparison on '%s' failed: %s\n",
+                      seg_var, conditionMessage(e)))
+          structure(list(error = conditionMessage(e), code = "KD_SEGMENT_FAILED"),
+                    class = "kd_segment_failure")
+        }
+      )
+      if (inherits(one, "kd_segment_failure")) {
+        # A deliverable that was asked for and not produced is a degraded run,
+        # not a clean one. The bare tryCatch here returned NULL and the run
+        # closed at PASS with no segment comparison in it (review C2).
+        degraded_reasons <- c(degraded_reasons, sprintf(
+          "Segment comparison on '%s' not produced (%s)", seg_var, one$code))
+        affected_outputs <- c(affected_outputs, "segment_comparison")
+      } else {
+        segment_results[[seg_var]] <- one
+      }
+    }
+
+    if (length(segment_results) > 0) {
+      # The report reads the singular slot; Session B widens it to all
+      # variables. Both are populated so nothing downstream changes shape yet.
+      results$segment_comparison <- segment_results[[1]]
+      results$segment_comparisons <- segment_results
+      cat(sprintf("   [OK] Segment comparison complete on %d variable(s): %s\n",
+                  length(segment_results), paste(names(segment_results), collapse = ", ")))
     }
   }
 
@@ -704,7 +859,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   next_step <- step_num_effect + (if (!is.null(config$segments) && nrow(config$segments) > 0) 1 else 0) + 1
 
   # Elastic Net
-  enable_elastic_net <- isTRUE(as.logical(config$settings$enable_elastic_net))
+  enable_elastic_net <- as_logical_setting(config$settings$enable_elastic_net, FALSE)
   if (enable_elastic_net) {
     cat(sprintf("\n%d. Elastic Net analysis...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/09_elastic_net.R"), local = FALSE)
@@ -725,7 +880,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # Necessary Condition Analysis (NCA)
-  enable_nca <- isTRUE(as.logical(config$settings$enable_nca))
+  enable_nca <- as_logical_setting(config$settings$enable_nca, FALSE)
   if (enable_nca) {
     cat(sprintf("\n%d. Necessary Condition Analysis...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/10_nca.R"), local = FALSE)
@@ -746,7 +901,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # Dominance Analysis
-  enable_dominance <- isTRUE(as.logical(config$settings$enable_dominance))
+  enable_dominance <- as_logical_setting(config$settings$enable_dominance, FALSE)
   if (enable_dominance) {
     cat(sprintf("\n%d. Dominance Analysis...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/11_dominance.R"), local = FALSE)
@@ -767,7 +922,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # GAM Nonlinear Effects
-  enable_gam <- isTRUE(as.logical(config$settings$enable_gam))
+  enable_gam <- as_logical_setting(config$settings$enable_gam, FALSE)
   if (enable_gam) {
     cat(sprintf("\n%d. GAM nonlinear effects...\n", next_step))
     source(file.path(turas_root, "modules/keydriver/R/12_gam.R"), local = FALSE)
@@ -824,7 +979,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   enable_html <- if (!is.null(html_report)) {
     isTRUE(html_report)
   } else {
-    isTRUE(as.logical(config$settings$enable_html_report))
+    as_logical_setting(config$settings$enable_html_report, FALSE)
   }
   if (enable_html) {
     step_num_html <- step_num_output + 1
@@ -894,8 +1049,12 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   results$run_result <- run_result
 
   # --- Generate Stats Pack (optional) ---
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
+  # This compared toupper(x) == "Y", so a config that said "Yes", which is
+  # what the example ships and what an analyst writes, produced no stats pack
+  # and said nothing about it (review F13). It is the M14 defect class on the
+  # one gate the M14 sweep did not reach, because it is spelled with capitals.
+  generate_stats_pack_flag <- as_logical_setting(
+    config$settings$Generate_Stats_Pack, TRUE
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {
@@ -1055,7 +1214,11 @@ generate_keydriver_stats_pack <- function(config, survey_data, result,
     "Model R-squared"   = if (!is.na(r_squared)) sprintf("%.4f", r_squared) else "—",
     "Sample (model)"    = as.character(n_model),
     "Excluded (listwise)" = as.character(n_excluded),
-    "SHAP Values"       = if (shap_enabled) "shapr package" else "Not used",
+    # Not shapr. The SHAP path is TreeSHAP from an xgboost model, read with
+    # shapviz; the stats pack named a package the module does not use (H3).
+    "SHAP Values"       = if (shap_enabled) {
+      "TreeSHAP on a gradient-boosted model (xgboost, read with shapviz)"
+    } else "Not used",
     "Quadrant Analysis" = if (!is.null(result$quadrant)) "Enabled" else "Disabled",
     "TRS Status"        = run_result$status %||% "PASS",
     "TRS Events"        = trs_summary
@@ -1154,6 +1317,9 @@ run_shap_analysis_internal <- function(data, config) {
   source(file.path(methods_dir, "method_shap.R"), local = FALSE)
 
   shap_config <- list(
+    # Carried through so the seeding inside the SHAP path uses the configured
+    # seed rather than falling back to the default every time (review F6).
+    random_seed = config$settings$random_seed %||% config$random_seed,
     shap_model = config$settings$shap_model %||% "xgboost",
     n_trees = as.numeric(config$settings$n_trees %||% 100),
     max_depth = as.numeric(config$settings$max_depth %||% 6),
@@ -1161,7 +1327,7 @@ run_shap_analysis_internal <- function(data, config) {
     subsample = as.numeric(config$settings$subsample %||% 0.8),
     colsample_bytree = as.numeric(config$settings$colsample_bytree %||% 0.8),
     shap_sample_size = as.numeric(config$settings$shap_sample_size %||% 1000),
-    include_interactions = isTRUE(as.logical(config$settings$include_interactions)),
+    include_interactions = as_logical_setting(config$settings$include_interactions, FALSE),
     interaction_top_n = as.numeric(config$settings$interaction_top_n %||% 5),
     importance_top_n = as.numeric(config$settings$importance_top_n %||% 15)
   )
@@ -1189,11 +1355,11 @@ run_quadrant_analysis_internal <- function(results, data, config) {
   quad_config <- list(
     importance_source = config$settings$importance_source %||% "auto",
     threshold_method = config$settings$threshold_method %||% "mean",
-    normalize_axes = isTRUE(as.logical(config$settings$normalize_axes %||% TRUE)),
-    shade_quadrants = isTRUE(as.logical(config$settings$shade_quadrants %||% TRUE)),
-    label_all_points = isTRUE(as.logical(config$settings$label_all_points %||% TRUE)),
+    normalize_axes = as_logical_setting(config$settings$normalize_axes, TRUE),
+    shade_quadrants = as_logical_setting(config$settings$shade_quadrants, TRUE),
+    label_all_points = as_logical_setting(config$settings$label_all_points, TRUE),
     label_top_n = as.numeric(config$settings$label_top_n %||% 10),
-    show_diagonal = isTRUE(as.logical(config$settings$show_diagonal %||% FALSE))
+    show_diagonal = as_logical_setting(config$settings$show_diagonal, FALSE)
   )
 
   # Always pass full results (has $config$driver_vars and $importance$Driver).
@@ -1270,7 +1436,10 @@ write_keydriver_output_enhanced <- function(results, output_file,
     importance = results$importance, model = results$model,
     correlations = results$correlations, config = results$config,
     output_file = output_file, run_status = run_status,
-    status_details = status_details)
+    status_details = status_details,
+    # So the bootstrap and quadrant disclosures reach Run_Status rather than
+    # living on attributes nothing reads (reviews F10 and F11).
+    results = results)
 
   # Re-open workbook to add optional sheets
   has_extras <- !is.null(results$shap) || !is.null(results$quadrant) ||
@@ -1384,13 +1553,29 @@ write_keydriver_output_enhanced <- function(results, output_file,
                             cols = 1:ncol(dom$summary), gridExpand = TRUE)
           openxlsx::setColWidths(wb, "Dominance", cols = 1:ncol(dom$summary), widths = "auto")
           summary_row <- nrow(dom$summary) + 3
+          # Whether the fits were weighted, and which drivers are missing from
+          # the table, belong on the sheet. The truncation was a console line
+          # only, so a reader saw a dominance table that quietly omitted
+          # drivers the study measured (review H5).
           summary_df <- data.frame(
-            Metric = c("Total R-squared", "N drivers", "N sub-models", "N observations"),
+            Metric = c("Total R-squared", "N drivers", "N sub-models", "N observations",
+                       "Weighting", "Drivers omitted"),
             Value = c(
               round(dom$total_r_squared %||% 0, 4),
               dom$n_drivers %||% 0,
               2^(dom$n_drivers %||% 0),
-              dom$n_obs %||% 0
+              dom$n_obs %||% 0,
+              if (isTRUE(dom$weighted)) {
+                paste0("Weighted by ", dom$weight_variable %||% "the study weight",
+                       "; the dominance shares sum to the WEIGHTED model R-squared")
+              } else {
+                "Unweighted"
+              },
+              if (length(dom$drivers_omitted %||% character(0)) == 0) {
+                "None: every driver is in this table"
+              } else {
+                dom$truncation_note %||% paste(dom$drivers_omitted, collapse = ", ")
+              }
             ),
             stringsAsFactors = FALSE
           )

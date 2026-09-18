@@ -59,6 +59,11 @@ fit_shap_model <- function(prep, config) {
     max_rounds <- 500
   }
 
+  # xgb.cv subsamples rows and columns and had no seed, so the chosen number
+  # of rounds, and with it the SHAP figures, moved between runs on identical
+  # data (review F6). Two unseeded fits gave mean SHAP 0.71521 and 0.72788.
+  if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config)
+
   # Cross-validation to find optimal nrounds
   cv_result <- xgboost::xgb.cv(
     params = params,
@@ -74,6 +79,9 @@ fit_shap_model <- function(prep, config) {
   if (is.null(best_nrounds) || is.na(best_nrounds)) {
     best_nrounds <- max_rounds
   }
+
+  # The final fit subsamples too, so it is seeded on the same footing.
+  if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config)
 
   # Fit final model
   model <- xgboost::xgb.train(

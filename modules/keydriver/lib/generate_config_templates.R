@@ -354,8 +354,11 @@ build_keydriver_settings_def <- function() {
           required = FALSE,
           default = "auto",
           description = "Source of derived importance scores for quadrant placement",
-          valid_values_text = "auto, shapley, relative, beta, or shap",
-          dropdown = c("auto", "shapley", "relative", "beta", "shap"),
+          # These are the values the engine actually handles. The dropdown used
+          # to offer shapley, relative and beta, none of which it understood,
+          # so choosing one silently fell back to auto (review H11).
+          valid_values_text = "auto, shap, relative_weights, regression, or correlation",
+          dropdown = c("auto", "shap", "relative_weights", "regression", "correlation"),
           numeric_range = NULL,
           integer_range = NULL
         ),
@@ -581,15 +584,6 @@ build_variables_columns <- function() {
       numeric_range = NULL
     ),
     list(
-      name = "AggregationMethod",
-      width = 22,
-      required = FALSE,
-      description = "Method for aggregating categorical driver importance.",
-      dropdown = c("partial_r2", "grouped_permutation", "grouped_shapley"),
-      integer_range = NULL,
-      numeric_range = NULL
-    ),
-    list(
       name = "ReferenceLevel",
       width = 20,
       required = FALSE,
@@ -615,7 +609,6 @@ build_variables_examples <- function() {
       Type = "Outcome",
       Label = "Overall Satisfaction",
       DriverType = "",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -623,7 +616,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Service Quality",
       DriverType = "continuous",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -631,7 +623,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Value for Money",
       DriverType = "continuous",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -639,7 +630,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Ease of Use",
       DriverType = "continuous",
-      AggregationMethod = "",
       ReferenceLevel = ""
     ),
     list(
@@ -647,7 +637,6 @@ build_variables_examples <- function() {
       Type = "Driver",
       Label = "Brand Trust",
       DriverType = "categorical",
-      AggregationMethod = "partial_r2",
       ReferenceLevel = "Low"
     ),
     list(
@@ -655,7 +644,6 @@ build_variables_examples <- function() {
       Type = "Weight",
       Label = "Survey Weight",
       DriverType = "",
-      AggregationMethod = "",
       ReferenceLevel = ""
     )
   )

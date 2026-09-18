@@ -8,6 +8,12 @@
 #
 # ==============================================================================
 
+# The one list of values importance_source may take. The template's dropdown,
+# the switch below and both documents read from this (review H11).
+KD_QUADRANT_IMPORTANCE_SOURCES <- c("auto", "shap", "relative_weights",
+                                    "regression", "correlation")
+
+
 #' Extract Importance Scores from KDA Results
 #'
 #' Normalizes importance scores from various KDA methods to comparable scale.
@@ -51,22 +57,54 @@ extract_importance_scores <- function(kda_results, config) {
 
     importance_df <- kda_results$importance
 
+    # One canonical set of values, checked before anything is computed. The
+    # template's dropdown offered "shapley", "relative" and "beta", none of
+    # which this switch has ever handled, so choosing one fell through to the
+    # default branch and the quadrant silently used whatever "auto" picked
+    # (review H11). An unrecognised value refuses and names the set.
+    source_key <- tolower(trimws(as.character(source %||% "auto")))
+    if (!source_key %in% KD_QUADRANT_IMPORTANCE_SOURCES) {
+      keydriver_refuse(
+        code = "CFG_QUADRANT_IMPORTANCE_SOURCE",
+        title = "Unrecognised Quadrant Importance Source",
+        problem = sprintf("importance_source reads '%s'.", source),
+        why_it_matters = paste0(
+          "It decides which importance column places the drivers on the quadrant ",
+          "chart. An unrecognised value used to fall through to an automatic ",
+          "choice, so the chart was built from a different measure than the one ",
+          "asked for, with nothing saying so."),
+        how_to_fix = c(
+          sprintf("Use one of: %s.", paste(KD_QUADRANT_IMPORTANCE_SOURCES, collapse = ", ")),
+          "Older templates offered 'shapley', 'relative' and 'beta': these are now 'shap', 'relative_weights' and 'regression'."
+        )
+      )
+    }
+
+    # What was actually used, recorded on the result so the sheet and the
+    # report can say it rather than implying the requested source was honoured.
+    used_source <- source_key
+
     # Try to get importance based on source
-    imp <- switch(tolower(source),
+    imp <- switch(source_key,
       "shap" = {
-        if ("Shapley_Value" %in% names(importance_df)) {
-          data.frame(
-            driver = importance_df$Driver,
-            importance = importance_df$Shapley_Value,
-            stringsAsFactors = FALSE
-          )
-        } else if ("SHAP_Importance" %in% names(importance_df)) {
+        # SHAP_Importance is the TreeSHAP output, which is what "shap" means.
+        # Shapley_Value is the regression decomposition, a different measure
+        # that happens to share a name (review H11).
+        if ("SHAP_Importance" %in% names(importance_df)) {
           data.frame(
             driver = importance_df$Driver,
             importance = importance_df$SHAP_Importance,
             stringsAsFactors = FALSE
           )
+        } else if ("Shapley_Value" %in% names(importance_df)) {
+          used_source <- "shapley_value (SHAP was requested and is not in the results)"
+          data.frame(
+            driver = importance_df$Driver,
+            importance = importance_df$Shapley_Value,
+            stringsAsFactors = FALSE
+          )
         } else {
+          used_source <- "auto (SHAP was requested and is not in the results)"
           select_best_importance(importance_df)
         }
       },
@@ -78,6 +116,8 @@ extract_importance_scores <- function(kda_results, config) {
             stringsAsFactors = FALSE
           )
         } else {
+          used_source <- sprintf("auto (%s was requested and %s is not in the results)",
+                                  "relative_weights", "Relative_Weight")
           select_best_importance(importance_df)
         }
       },
@@ -89,6 +129,8 @@ extract_importance_scores <- function(kda_results, config) {
             stringsAsFactors = FALSE
           )
         } else {
+          used_source <- sprintf("auto (%s was requested and %s is not in the results)",
+                                  "regression", "Beta_Weight")
           select_best_importance(importance_df)
         }
       },
@@ -100,6 +142,8 @@ extract_importance_scores <- function(kda_results, config) {
             stringsAsFactors = FALSE
           )
         } else {
+          used_source <- sprintf("auto (%s was requested and %s is not in the results)",
+                                  "correlation", "Correlation")
           select_best_importance(importance_df)
         }
       },
@@ -107,7 +151,10 @@ extract_importance_scores <- function(kda_results, config) {
       select_best_importance(importance_df)
     )
 
-    return(normalize_importance(imp, config))
+    out <- normalize_importance(imp, config)
+    attr(out, "importance_source_requested") <- source_key
+    attr(out, "importance_source_used") <- used_source
+    return(out)
   }
 
   keydriver_refuse(
@@ -360,6 +407,12 @@ calculate_weighted_means <- function(data, drivers, weights = NULL) {
     performance = sapply(drivers, function(d) {
       if (!d %in% names(data)) return(NA_real_)
       x <- data[[d]]
+      # A mean performance score is not defined for a nominal driver.
+      # weighted.mean() on a factor returned NA anyway, after printing
+      # "'*' not meaningful for factors", so every mixed run ended with a
+      # row of warnings the analyst could do nothing about and which said
+      # nothing about their data (review F28). Answered quietly instead.
+      if (!is.numeric(x)) return(NA_real_)
       valid <- !is.na(x) & !is.na(w) & w > 0
       if (sum(valid) == 0) return(NA_real_)
       stats::weighted.mean(x[valid], w[valid])

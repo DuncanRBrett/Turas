@@ -147,13 +147,18 @@ Configure analysis parameters and file paths.
 - **Purpose:** Which importance method to use for quadrant chart
 - **Required:** No
 - **Default:** auto
-- **Valid Values:**
+- **Valid Values:** anything else refuses, naming this list.
   - `auto` - Uses SHAP if enabled, otherwise Shapley
-  - `shap` - SHAP importance
-  - `shapley` - Shapley values
+  - `shap` - TreeSHAP importance from the gradient-boosted model
   - `relative_weights` - Johnson method
   - `regression` - Beta weights
   - `correlation` - Zero-order correlations
+
+`shapley` is not one of them. It was listed here and offered by the template's
+dropdown, and the engine never handled it: choosing it fell through to `auto`
+and the chart was built from a different measure than the one asked for. Use
+`shap` for TreeSHAP; `auto` already falls back to the Shapley decomposition
+when SHAP is not available, and the chart now records which source it used.
 
 #### threshold_method
 

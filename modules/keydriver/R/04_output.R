@@ -43,6 +43,30 @@ calculate_vif <- function(model) {
 }
 
 
+#' The importance method this run actually used
+#'
+#' The Run_Status sheet stamped a constant, "partial_r2", which named a v10.3
+#' engine that nothing called and that is now deleted (review H3). Importance
+#' is computed and ranked by Shapley value; a mixed run says so, because its
+#' categorical drivers are aggregated from model terms rather than decomposed
+#' directly.
+#'
+#' @param results The analysis results list.
+#' @return A single string.
+#' @keywords internal
+.kd_primary_method <- function(results) {
+  imp <- results$importance
+  if (!is.data.frame(imp)) return("unknown")
+  if (!"Shapley_Value" %in% names(imp)) {
+    return(if ("Relative_Weight" %in% names(imp)) "johnson_relative_weights" else "unknown")
+  }
+  mixed <- "Method_Note" %in% names(imp) &&
+    any(grepl("grouped", as.character(imp$Method_Note), fixed = TRUE), na.rm = TRUE)
+  if (mixed) "shapley_r2_decomposition (mixed: categorical terms aggregated)" else
+    "shapley_r2_decomposition"
+}
+
+
 #' Write Key Driver Results to Excel
 #'
 #' @param importance Importance data frame
@@ -53,8 +77,50 @@ calculate_vif <- function(model) {
 #' @param run_status TRS run status (PASS, PARTIAL)
 #' @param status_details Optional list with status details
 #' @keywords internal
+#' Build the Run_Status disclosure rows for optional features
+#'
+#' @param results The results list, or NULL
+#' @param escape_text Excel escaping function
+#' @return A two-column data frame, possibly with no rows
+#' @keywords internal
+.kd_disclosure_rows <- function(results, escape_text = identity) {
+  rows <- data.frame(Field = character(0), Value = character(0),
+                     stringsAsFactors = FALSE)
+  add <- function(field, value) {
+    if (is.null(value) || length(value) == 0 || all(is.na(value))) return(invisible(NULL))
+    rows <<- rbind(rows, data.frame(Field = field,
+                                    Value = escape_text(as.character(value)[1]),
+                                    stringsAsFactors = FALSE))
+  }
+  if (is.null(results)) return(rows)
+
+  boot <- results$bootstrap_ci
+  if (!is.null(boot)) {
+    add("bootstrap_iterations_requested", attr(boot, "iterations_requested"))
+    add("bootstrap_iterations_used", attr(boot, "iterations_used"))
+    add("bootstrap_iterations_dropped", attr(boot, "iterations_dropped"))
+    add("bootstrap_policy", attr(boot, "bootstrap_policy"))
+  }
+
+  quad <- results$quadrant
+  if (!is.null(quad)) {
+    req <- attr(quad, "importance_source_requested")
+    used <- attr(quad, "importance_source_used")
+    if (is.null(req) && is.list(quad)) {
+      req <- attr(quad$data, "importance_source_requested")
+      used <- attr(quad$data, "importance_source_used")
+    }
+    add("quadrant_importance_source_requested", req)
+    add("quadrant_importance_source_used", used)
+  }
+
+  rows
+}
+
+
 write_keydriver_output <- function(importance, model, correlations, config, output_file,
-                                    run_status = "PASS", status_details = NULL) {
+                                    run_status = "PASS", status_details = NULL,
+                                    results = NULL) {
 
   wb <- openxlsx::createWorkbook()
 
@@ -63,12 +129,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   escape_text <- if (exists("turas_excel_escape", mode = "function")) {
     turas_excel_escape
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
-    cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
     # Minimal inline fallback: prefix dangerous characters with single quote
     # Covers OWASP CSV injection vectors: =, +, -, @, tab, CR, LF
     # Must match .EXCEL_FORMULA_PREFIXES in shared/lib/turas_excel_escape.R
@@ -115,12 +175,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     names(summary_data) <- c("Driver", "Label", "Shapley (%)", "Rel. Weight (%)",
                              "Beta Weight (%)", "Beta Coef", "Correlation (r)", "Avg Rank")
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
-    cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
     # Fallback if column names differ
     summary_data <- importance
   }
@@ -144,12 +198,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     names(ranking_data) <- c("Driver", "Label", "Shapley Rank", "Rel. Weight Rank",
                              "Beta Rank", "Corr Rank", "Average Rank")
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
-    cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
     ranking_data <- importance
   }
 
@@ -199,12 +247,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                          "N/A — VIF requires at least 2 predictors.",
                          startRow = vif_start_row + 1, startCol = 1)
     } else {
-      # The shared saver is not loaded, so this workbook cannot have its
-      # worksheet relationships reconciled and Excel may offer to repair it,
-      # stripping any dropdowns it carries.
-      cat("[TRS WARNING] Saving without part reconciliation: ",
-          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-          "report a problem with this file and offer to repair it.\n", sep = "")
       vif_df <- data.frame(
         Driver = names(vif_vals),
         VIF = as.numeric(vif_vals),
@@ -239,12 +281,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                        cols = 1:ncol(cor_df), gridExpand = TRUE)
     openxlsx::setColWidths(wb, "Correlations", cols = 1:ncol(cor_df), widths = "auto")
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
-    cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Correlations",
                        "Correlation matrix not available (insufficient numeric drivers).",
                        startRow = 1, startCol = 1)
@@ -305,12 +341,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     # Note: Don't delete plot_file yet - it needs to exist until saveWorkbook() is called
     # The temp file will be cleaned up by the OS eventually
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
-    cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Charts",
                        "Shapley_Value column not found; chart not generated.",
                        startRow = 1, startCol = 1)
@@ -331,6 +361,9 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       "sample_size",
       "r_squared",
       "primary_method",
+      # The run is seeded, and nothing recorded which seed, so a set of
+      # intervals could not be reproduced from the outputs alone (review F6).
+      "random_seed",
       "spec_version"
     ),
     Value = c(
@@ -340,11 +373,31 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       length(config$driver_vars),
       nobs(model),
       round(summary(model)$r.squared, 4),
-      "partial_r2",
+      # What actually ran. This said "partial_r2", naming an engine the
+      # pipeline never called: importance is computed and ranked by Shapley
+      # value (review H3).
+      # write_keydriver_output() takes importance as its own argument; there is
+      # no `results` object in this frame. Caught by the Suiderland example on
+      # its first end-to-end run, which is what an example is for.
+      .kd_primary_method(list(importance = importance)),
+      as.character(if (exists("kd_seed_value", mode = "function")) {
+        kd_seed_value(config)
+      } else {
+        config$settings$random_seed %||% config$random_seed %||% NA
+      }),
       "TURAS-KD-CONTINUOUS-UPGRADE-v1.0"
     ),
     stringsAsFactors = FALSE
   )
+
+  # Disclosures the features compute and used to attach to their own return
+  # value, where nothing read them: the bootstrap's policy and iteration
+  # counts, and which importance source the quadrant asked for against the one
+  # it got (reviews F10 and F11). A reader of the workbook could not tell that
+  # Point_Estimate is the mean of the bootstrap distribution, that iterations
+  # had been dropped, or that a requested quadrant source had been substituted.
+  status_table <- rbind(status_table,
+                        .kd_disclosure_rows(results, escape_text))
 
   openxlsx::writeData(wb, "Run_Status", status_table, startRow = 1)
   openxlsx::addStyle(wb, "Run_Status", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
@@ -380,12 +433,6 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       nrow(status_table) + length(status_details$degraded_reasons) +
         length(status_details$affected_outputs) + 8
     } else {
-      # The shared saver is not loaded, so this workbook cannot have its
-      # worksheet relationships reconciled and Excel may offer to repair it,
-      # stripping any dropdowns it carries.
-      cat("[TRS WARNING] Saving without part reconciliation: ",
-          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-          "report a problem with this file and offer to repair it.\n", sep = "")
       nrow(status_table) + 4
     }
 
@@ -545,12 +592,19 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       )
     }
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
+    # turas_saveWorkbook() is not loaded, so this workbook is saved by
+    # openxlsx directly and its worksheet relationships are not reconciled.
+    # Excel may report a problem with the file and offer to repair it, which
+    # strips any dropdowns it carries.
+    #
+    # This block used to be pasted into seven other else branches that have
+    # nothing to do with saving, including two "the expected columns are not
+    # there" fallbacks, so the line printed on ordinary runs and told the
+    # reader something untrue about them (review F21). This is the one place
+    # the sentence is true.
     cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
+        "turas_saveWorkbook() is not loaded, so Excel may report a problem ",
+        "with this file and offer to repair it.\n", sep = "")
     tryCatch(
       openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE),
       error = function(e) {

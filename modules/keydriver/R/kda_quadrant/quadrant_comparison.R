@@ -53,7 +53,14 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
 
     seg_name <- as.character(segments$segment_name[i])
     seg_var <- as.character(segments$segment_variable[i])
-    seg_vals <- strsplit(as.character(segments$segment_values[i]), ",\\s*")[[1]]
+    # One parser for the Segments sheet, shared with the pipeline and
+    # pre-flight. This split on ",\\s*" alone (review F15).
+    seg_vals <- if (exists("kd_split_segment_values", mode = "function")) {
+      kd_split_segment_values(segments$segment_values[i])
+    } else {
+      v <- trimws(unlist(strsplit(as.character(segments$segment_values[i]), "[;,|]")))
+      v[nzchar(v)]
+    }
 
     # Check segment variable exists
     if (!seg_var %in% names(data)) {
@@ -143,16 +150,24 @@ create_faceted_quadrant_plot <- function(all_segments, config) {
     all_segments,
     ggplot2::aes(x = x, y = y, color = factor(quadrant))
   ) +
-    # Quadrant lines (use first row's threshold as reference)
+    # Quadrant lines, per facet. They used to be drawn from the FIRST
+    # segment's thresholds on every panel, so each segment's points were
+    # divided by another segment's mean and a driver could be shown in the
+    # wrong quadrant for its own segment (review M5). One row per segment
+    # carries that segment's own thresholds.
     ggplot2::geom_vline(
-      xintercept = all_segments$x_threshold[1],
+      data = unique(all_segments[, c("segment", "x_threshold")]),
+      ggplot2::aes(xintercept = x_threshold),
       linetype = "dashed",
-      color = "gray40"
+      color = "gray40",
+      inherit.aes = FALSE
     ) +
     ggplot2::geom_hline(
-      yintercept = all_segments$y_threshold[1],
+      data = unique(all_segments[, c("segment", "y_threshold")]),
+      ggplot2::aes(yintercept = y_threshold),
       linetype = "dashed",
-      color = "gray40"
+      color = "gray40",
+      inherit.aes = FALSE
     ) +
     # Points
     ggplot2::geom_point(size = 3, alpha = 0.8)

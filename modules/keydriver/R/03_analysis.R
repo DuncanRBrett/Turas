@@ -27,7 +27,38 @@ weighted_cov <- function(x, y, w) {
 
 #' Weighted Correlation
 #' @keywords internal
+#' Weighted Standard Deviation
+#'
+#' A standardised beta is b * (sd_x / sd_y). On a weighted study the
+#' coefficients came from a weighted fit and the standard deviations did not,
+#' so the ratio mixed two populations: the model's weighted one and the file's
+#' unweighted one (review M1). This is the same convention weighted_cor() uses.
+#'
+#' @param x Numeric vector.
+#' @param w Weights, the same length as x.
+#' @return The weighted standard deviation, or NA when fewer than two cases
+#'   carry a usable weight.
+#' @keywords internal
+weighted_sd <- function(x, w) {
+  # A standard deviation is only defined for numbers. A categorical driver
+  # reaching here means the caller should not have asked; NA is the honest
+  # answer and the caller already treats NA as "no standardised beta".
+  if (!is.numeric(x)) return(NA_real_)
+  ok <- !is.na(x) & !is.na(w) & w > 0
+  if (sum(ok) < 2) return(NA_real_)
+  x <- x[ok]; w <- w[ok]
+  mu <- sum(w * x) / sum(w)
+  sqrt(sum(w * (x - mu)^2) / sum(w))
+}
+
+
 weighted_cor <- function(x, y, w) {
+  # A correlation is only defined between numbers. On a weighted study with a
+  # categorical driver this multiplied a factor by a weight, which warns
+  # "'*' not meaningful for factors" and yields NA anyway. Found by running the
+  # Suiderland example, which is the first keydriver study to pair a weight
+  # column with a categorical driver.
+  if (!is.numeric(x) || !is.numeric(y)) return(NA_real_)
   w <- w / sum(w)
   mx <- sum(w * x)
   my <- sum(w * y)
@@ -44,24 +75,34 @@ calculate_correlations <- function(data, config) {
   vars <- c(config$outcome_var, config$driver_vars)
   weight_var <- config$weight_var
 
-  if (is.null(weight_var)) {
-    # Simple Pearson correlation
-    cors <- stats::cor(data[, vars, drop = FALSE], use = "pairwise.complete.obs")
-    return(cors)
-  }
+  # A categorical driver has no zero-order correlation. The weighted path
+  # returned NA for one, but the unweighted path handed the factor straight to
+  # stats::cor(), which errors, so an unweighted mixed study died with a bare
+  # "'x' must be numeric" part-way through building the importance table
+  # (review F1). Both paths now return a full matrix carrying NA wherever a
+  # column is not numeric, and the caller reads only the cells it wants.
+  is_num <- vapply(vars, function(v) is.numeric(data[[v]]), logical(1))
+  num_vars <- vars[is_num]
 
-  # Weighted correlation matrix
-  w <- data[[weight_var]]
-  w <- as.numeric(w)
   m <- length(vars)
   mat <- matrix(NA_real_, nrow = m, ncol = m,
                 dimnames = list(vars, vars))
+  if (length(num_vars) == 0) return(mat)
 
-  for (i in seq_len(m)) {
-    for (j in i:m) {
-      r <- weighted_cor(data[[vars[i]]], data[[vars[j]]], w)
-      mat[i, j] <- r
-      mat[j, i] <- r
+  if (is.null(weight_var)) {
+    # Simple Pearson correlation
+    cors <- stats::cor(data[, num_vars, drop = FALSE], use = "pairwise.complete.obs")
+    mat[num_vars, num_vars] <- cors
+    return(mat)
+  }
+
+  # Weighted correlation matrix
+  w <- as.numeric(data[[weight_var]])
+  for (i in seq_along(num_vars)) {
+    for (j in i:length(num_vars)) {
+      r <- weighted_cor(data[[num_vars[i]]], data[[num_vars[j]]], w)
+      mat[num_vars[i], num_vars[j]] <- r
+      mat[num_vars[j], num_vars[i]] <- r
     }
   }
 
@@ -191,9 +232,21 @@ calculate_beta_weights <- function(model, data, config) {
     )
   }
 
-  # Standard deviations
-  sd_x <- vapply(driver_vars, function(v) stats::sd(data[[v]], na.rm = TRUE), numeric(1))
-  sd_y <- stats::sd(data[[outcome_var]], na.rm = TRUE)
+  # Standard deviations, weighted when the fit was weighted (review M1).
+  kd_w <- if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
+              config$weight_var %in% names(data)) {
+    as.numeric(data[[config$weight_var]])
+  } else {
+    NULL
+  }
+  sd_x <- vapply(driver_vars, function(v) {
+    if (is.null(kd_w)) stats::sd(data[[v]], na.rm = TRUE) else weighted_sd(data[[v]], kd_w)
+  }, numeric(1))
+  sd_y <- if (is.null(kd_w)) {
+    stats::sd(data[[outcome_var]], na.rm = TRUE)
+  } else {
+    weighted_sd(data[[outcome_var]], kd_w)
+  }
 
   # Additional safety checks (should have been caught in validation, but double-check)
   if (any(sd_x == 0)) {
@@ -279,35 +332,51 @@ calculate_relative_weights <- function(model, correlations, config) {
     )
   }
 
-  # sqrt(Λ) and Λ^{-1/2}
-  Lambda_sqrt <- diag(sqrt(vals), nrow = p, ncol = p)
-  Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
+  # Johnson's symmetric square root of R_xx: Lam = V sqrt(L) V'.
+  #
+  # This used to be V sqrt(L), which is the PCA rotation, not Johnson's
+  # orthogonal counterpart set (review C1). The two differ by the V' on the
+  # right and the consequence is not subtle: with two drivers the PCA form
+  # returns 50/50 whatever the data says, so every two-driver study's headline
+  # importance split was a constant. Johnson (2000) requires the symmetric
+  # root, which is the orthogonal basis closest to the original predictors in
+  # a least-squares sense.
+  Lam <- vecs %*% diag(sqrt(vals), nrow = p, ncol = p) %*% t(vecs)
 
-  # Correlations between original predictors X and orthogonal components Z
-  # Z = X * V * Λ^{-1/2}, so corr(X, Z) = V * Λ^{1/2}
-  Phi <- vecs %*% Lambda_sqrt  # p x p
+  # Betas of the outcome on the orthogonals, then the weights in R-squared
+  # units: RW_i = sum_j Lam_ij^2 * beta*_j^2.
+  beta_star <- solve(Lam) %*% r_xy
+  rw_raw <- as.numeric((Lam^2) %*% (beta_star^2))
 
-  # Correlations between Z and Y (with standardized Y)
-  # corr(Z, Y) = Λ^{-1/2} * V' * r_xy
-  r_z_y <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy  # p x 1
-  r2_z_y <- as.numeric(r_z_y)^2  # component-level R² contributions
-
-  # Total R² in orthogonal space
-  total_R2 <- sum(r2_z_y)
-  if (total_R2 <= 0) {
+  if (sum(rw_raw) <= 0) {
     return(rep(0, p))
   }
 
-  # Predictor-level relative weights in R² units:
-  # RW_i = Σ_j (phi_ij^2 * r_zj,y^2)
-  Phi_sq <- Phi^2  # element-wise square (p x p)
-  rw_raw <- Phi_sq %*% r2_z_y  # p x 1
-  rw_raw <- as.numeric(rw_raw)
-
-  # Optional rescale so that sum of raw RWs matches model R² exactly
+  # No rescale to R-squared. Correct raw weights already sum to it, which is
+  # the identity the old rescale was quietly papering over: a wrong
+  # decomposition was being stretched to the right total. Assert it instead,
+  # with room for the difference between the model's own R-squared and the one
+  # implied by the correlation matrix it was handed.
   model_R2 <- summary(model)$r.squared
-  if (!is.na(model_R2) && model_R2 > 0 && sum(rw_raw) > 0) {
-    rw_raw <- rw_raw * (model_R2 / sum(rw_raw))
+  if (!is.na(model_R2) && model_R2 > 0) {
+    drift <- abs(sum(rw_raw) - model_R2)
+    if (drift > 0.01 + 0.02 * model_R2) {
+      keydriver_refuse(
+        code = "CALC_RW_DOES_NOT_SUM_TO_R2",
+        title = "Relative Weights Do Not Reconstruct The Model",
+        problem = sprintf(
+          "The relative weights sum to %.4f and the model's R-squared is %.4f.",
+          sum(rw_raw), model_R2),
+        why_it_matters = paste0(
+          "Johnson's weights are a decomposition of R-squared, so they must add ",
+          "back up to it. A gap this size means the correlation matrix and the ",
+          "fitted model were not built from the same respondents."),
+        how_to_fix = paste0(
+          "Check that the correlation matrix and the regression used the same ",
+          "rows: a driver with missing values dropped from one and not the other ",
+          "will do this.")
+      )
+    }
   }
 
   # Convert to percentages
@@ -496,6 +565,12 @@ calculate_importance_mixed <- function(model, data, config, term_mapping,
   # METHOD 4: Correlations - only for numeric drivers
   numeric_drivers <- get_numeric_drivers(data, driver_vars)
   if (is.null(correlations)) {
+    # An all-categorical study used to be refused here, and told to switch the
+    # correlation column off with a setting that does not exist (review F2).
+    # Beta weights, relative weights and Shapley values are all defined for
+    # categorical drivers and computed just below, so only the correlation
+    # column is missing. calculate_correlations() fills it with NA and the
+    # pipeline records a degraded reason naming what is not there.
     correlations <- calculate_correlations(data, config)
   }
 
@@ -580,15 +655,49 @@ calculate_beta_weights_mixed <- function(model, data, config, term_mapping) {
   mm <- stats::model.matrix(model)
   mm <- mm[, colnames(mm) != "(Intercept)", drop = FALSE]
 
-  # Calculate term-level standardized betas
-  sd_y <- sd(data[[outcome_var]], na.rm = TRUE)
+  # Calculate term-level standardized betas, weighted when the fit was
+  # weighted (review M1).
+  #
+  # The model matrix can have fewer rows than the data, because the fit drops
+  # rows it cannot use. This took the FIRST nrow(mm) weights, which pairs
+  # respondent 1's weight with whichever respondent survived into row 1, and
+  # so on down: silently wrong whenever a dropped row is not at the end
+  # (review F22). The model matrix carries the row labels it kept, so they are
+  # matched rather than counted. The outcome is subset to the same rows, since
+  # sd_y used the full column against the full weight vector while sd_x used a
+  # subset of both.
+  mixed_rows <- match(rownames(mm), rownames(data))
+  if (anyNA(mixed_rows)) {
+    mixed_rows <- if (nrow(mm) == nrow(data)) seq_len(nrow(data)) else NULL
+  }
+
+  mixed_w <- if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
+                 config$weight_var %in% names(data)) {
+    if (is.null(mixed_rows)) {
+      cat(paste0("   [WARN] The model dropped rows and they could not be ",
+                 "matched back to the data, so standardised betas are ",
+                 "computed unweighted for this model.\n"))
+      NULL
+    } else {
+      as.numeric(data[[config$weight_var]])[mixed_rows]
+    }
+  } else {
+    NULL
+  }
+
+  outcome_rows <- if (is.null(mixed_rows)) seq_len(nrow(data)) else mixed_rows
+  sd_y <- if (is.null(mixed_w)) {
+    sd(data[[outcome_var]][outcome_rows], na.rm = TRUE)
+  } else {
+    weighted_sd(data[[outcome_var]][outcome_rows], mixed_w)
+  }
   term_betas <- numeric(length(all_coefs))
   names(term_betas) <- names(all_coefs)
 
   for (term in names(all_coefs)) {
     if (!is.na(all_coefs[term]) && term %in% colnames(mm)) {
-      sd_x <- sd(mm[, term], na.rm = TRUE)
-      if (sd_x > 0 && sd_y > 0) {
+      sd_x <- if (is.null(mixed_w)) sd(mm[, term], na.rm = TRUE) else weighted_sd(mm[, term], mixed_w)
+      if (!is.na(sd_x) && !is.na(sd_y) && sd_x > 0 && sd_y > 0) {
         term_betas[term] <- all_coefs[term] * (sd_x / sd_y)
       }
     }
@@ -672,12 +781,35 @@ calculate_relative_weights_mixed <- function(model, data, config, term_mapping) 
   mm <- mm[complete, , drop = FALSE]
   y <- y[complete]
 
-  # Correlation matrix of model matrix columns (terms)
-  R_xx <- cor(mm)
-  r_xy <- cor(mm, y)[, 1]
-
+  # Correlation matrix of model matrix columns (terms). Weighted when the study
+  # is weighted: these were plain cor() while the non-mixed path used the
+  # weighted machinery, so a weighted mixed run's relative weights were
+  # computed on the wrong correlations (review A1).
+  w <- NULL
+  if (!is.null(config$weight_var) && nzchar(config$weight_var) &&
+      config$weight_var %in% names(data)) {
+    w <- as.numeric(data[[config$weight_var]])[complete]
+  }
   p <- ncol(mm)
   term_names <- colnames(mm)
+
+  if (is.null(w)) {
+    R_xx <- cor(mm)
+    r_xy <- cor(mm, y)[, 1]
+  } else {
+    R_xx <- matrix(1, p, p, dimnames = list(term_names, term_names))
+    for (i in seq_len(p)) {
+      for (j in seq_len(p)) {
+        if (i < j) {
+          r <- weighted_cor(mm[, i], mm[, j], w)
+          R_xx[i, j] <- r
+          R_xx[j, i] <- r
+        }
+      }
+    }
+    r_xy <- vapply(seq_len(p), function(i) weighted_cor(mm[, i], y, w), numeric(1))
+    names(r_xy) <- term_names
+  }
 
   # Eigen decomposition
   eig <- eigen(R_xx, symmetric = TRUE)
@@ -687,24 +819,41 @@ calculate_relative_weights_mixed <- function(model, data, config, term_mapping) 
   # Guard against numerical negatives
   vals[vals < 0] <- 0
 
-  # Check for near-singularity
+  # Near-singularity refuses, the same as the non-mixed path (review H4).
+  #
+  # It used to substitute squared correlations for Johnson's weights, print one
+  # console line, and carry on. Squared correlations are not relative weights:
+  # they ignore the predictors' correlations with each other, which is the
+  # entire problem the method exists to solve, and they do not sum to R-squared.
+  # The report labelled them "Relative_Weight" and nothing downstream knew the
+  # difference. The identical condition in the non-mixed path refuses, so the
+  # same data got a refusal or a silently different number depending on whether
+  # a categorical driver happened to be in the model.
   if (any(vals < 1e-10)) {
-    # Matrix is near-singular - use fallback to beta weights
-    cat("   [WARN] Near-singular correlation matrix - using simplified relative weights\n")
-    # Fallback: use squared correlations as proxy
-    rw_term <- r_xy^2
-    rw_term[is.na(rw_term)] <- 0
+    keydriver_refuse(
+      code = "MODEL_SINGULAR_MATRIX",
+      title = "Singular Correlation Matrix",
+      problem = paste0(
+        "The model-term correlation matrix is singular or nearly singular ",
+        "(severe multicollinearity among the drivers' model terms)."),
+      why_it_matters = paste0(
+        "Relative weights cannot be computed reliably when terms are this ",
+        "closely related. The previous behaviour substituted squared ",
+        "correlations, which ignore how the drivers relate to each other and do ",
+        "not decompose R-squared, and reported them under the same column name."),
+      how_to_fix = c(
+        "Identify highly correlated driver pairs using a correlation matrix",
+        "Remove or combine drivers that are too similar",
+        "A categorical driver with a level almost nobody chose will do this: check the level counts",
+        "Aim for correlations below 0.9 between predictors"
+      )
+    )
   } else {
-    # Standard Johnson relative weights at term level
-    Lambda_sqrt <- diag(sqrt(vals), nrow = p, ncol = p)
-    Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
-
-    Phi <- vecs %*% Lambda_sqrt
-    r_z_y <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy
-    r2_z_y <- as.numeric(r_z_y)^2
-
-    Phi_sq <- Phi^2
-    rw_term <- as.numeric(Phi_sq %*% r2_z_y)
+    # Johnson relative weights at term level, on the symmetric square root
+    # (review C1). The same PCA-rotation error lived here.
+    Lam <- vecs %*% diag(sqrt(vals), nrow = p, ncol = p) %*% t(vecs)
+    beta_star <- solve(Lam) %*% r_xy
+    rw_term <- as.numeric((Lam^2) %*% (beta_star^2))
   }
 
   names(rw_term) <- term_names
@@ -810,188 +959,11 @@ calculate_partial_r2 <- function(data, outcome_var, all_drivers, target_driver, 
 }
 
 
-#' Calculate Importance Using Partial R² Method
-#'
-#' Computes driver-level importance using partial R² for all drivers.
-#' This is the default method per TURAS-KD-CONTINUOUS-UPGRADE-v1.0.
-#'
-#' @param data Data frame
-#' @param config Configuration list
-#' @return Named numeric vector of partial R² values (summing to 100%)
-#' @export
-calculate_importance_partial_r2 <- function(data, config) {
+# The v10.3 importance engine was deleted here (review H3). Three functions,
+# calculate_importance_partial_r2(), calculate_importance_permutation() and
+# calculate_importance_by_config(), implemented a partial-R-squared and
+# permutation scheme that nothing in the pipeline ever called: importance is
+# computed and ranked by Shapley value in calculate_driver_importance() above.
+# The Run_Status sheet nevertheless stamped "partial_r2" as the primary method,
+# so the provenance named an engine that had not run.
 
-  outcome_var <- config$outcome_var
-  driver_vars <- config$driver_vars
-  weight_var <- config$weight_var
-
-  # Calculate partial R² for each driver
-  partial_r2_vals <- numeric(length(driver_vars))
-  names(partial_r2_vals) <- driver_vars
-
-  for (drv in driver_vars) {
-    partial_r2_vals[drv] <- calculate_partial_r2(
-      data = data,
-      outcome_var = outcome_var,
-      all_drivers = driver_vars,
-      target_driver = drv,
-      weight_var = weight_var
-    )
-  }
-
-  # Normalize to percentages
-  sum_pr2 <- sum(partial_r2_vals)
-  if (sum_pr2 > 0) {
-    partial_r2_vals <- (partial_r2_vals / sum_pr2) * 100
-  }
-
-  partial_r2_vals
-}
-
-
-#' Calculate Grouped Permutation Importance
-#'
-#' Computes driver-level importance using permutation-based approach.
-#' For categorical drivers, all dummy columns are permuted together.
-#'
-#' @param model Fitted model
-#' @param data Data frame
-#' @param config Configuration list
-#' @param n_permutations Number of permutations (default 50)
-#' @return Named numeric vector of permutation importance (summing to 100%)
-#' @export
-calculate_importance_permutation <- function(model, data, config, n_permutations = 50) {
-
-  outcome_var <- config$outcome_var
-  driver_vars <- config$driver_vars
-
-  # Get baseline MSE
-  y <- data[[outcome_var]]
-  y_pred <- predict(model, newdata = data)
-  baseline_mse <- mean((y - y_pred)^2)
-
-  # Calculate permutation importance for each driver
-  perm_importance <- numeric(length(driver_vars))
-  names(perm_importance) <- driver_vars
-
-  for (drv in driver_vars) {
-    mse_diffs <- numeric(n_permutations)
-
-    for (p in seq_len(n_permutations)) {
-      # Create permuted data
-      data_perm <- data
-      data_perm[[drv]] <- sample(data[[drv]])
-
-      # Predict and calculate MSE
-      y_pred_perm <- tryCatch(
-        predict(model, newdata = data_perm),
-        error = function(e) rep(NA, nrow(data_perm))
-      )
-
-      if (any(is.na(y_pred_perm))) {
-        mse_diffs[p] <- 0
-      } else {
-        mse_perm <- mean((y - y_pred_perm)^2)
-        mse_diffs[p] <- mse_perm - baseline_mse
-      }
-    }
-
-    # Importance = mean increase in MSE
-    perm_importance[drv] <- max(0, mean(mse_diffs))
-  }
-
-  # Normalize to percentages
-  sum_perm <- sum(perm_importance)
-  if (sum_perm > 0) {
-    perm_importance <- (perm_importance / sum_perm) * 100
-  }
-
-  perm_importance
-}
-
-
-#' Calculate Driver Importance Using Config-Specified Method
-#'
-#' Main entry point for importance calculation that respects the
-#' aggregation method specified in config for each driver.
-#'
-#' Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
-#' - Continuous drivers: direct importance
-#' - Categorical drivers: grouped importance using specified method
-#'
-#' @param model Fitted model
-#' @param data Data frame
-#' @param config Configuration list
-#' @param term_mapping Term mapping result (optional, for mixed predictors)
-#' @return Data frame with driver-level importance
-#' @export
-calculate_importance_by_config <- function(model, data, config, term_mapping = NULL) {
-
-  driver_vars <- config$driver_vars
-  driver_settings <- config$driver_settings
-
-  # Initialize results
-  importance <- data.frame(
-    Driver = driver_vars,
-    Label = vapply(
-      driver_vars,
-      function(v) {
-        label <- config$variables$Label[config$variables$VariableName == v][1]
-        if (is.na(label) || is.null(label)) v else label
-      },
-      character(1)
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  # Add driver type from config
-  if (!is.null(driver_settings)) {
-    importance$DriverType <- vapply(driver_vars, function(drv) {
-      get_driver_type(drv, driver_settings) %||% "continuous"
-    }, character(1))
-
-    importance$AggMethod <- vapply(driver_vars, function(drv) {
-      get_aggregation_method(drv, driver_settings) %||% "direct"
-    }, character(1))
-  } else {
-    # Fallback for old configs without driver_settings
-    importance$DriverType <- rep("continuous", length(driver_vars))
-    importance$AggMethod <- rep("direct", length(driver_vars))
-  }
-
-  # Calculate importance using primary method: Partial R²
-  # This gives exactly one score per driver
-  partial_r2_vals <- calculate_importance_partial_r2(data, config)
-  importance$Importance <- as.numeric(partial_r2_vals[driver_vars])
-
-  # Also calculate Shapley for comparison (if not too many drivers)
-  if (length(driver_vars) <= 15) {
-    shapley_vals <- calculate_shapley_values(model, data, config)
-    importance$Shapley_Value <- as.numeric(shapley_vals)
-  } else {
-    importance$Shapley_Value <- importance$Importance  # Use partial R² as proxy
-  }
-
-  # Calculate ranks
-  importance$Importance_Rank <- rank(-importance$Importance, ties.method = "average")
-
-  # Add method notes
-  importance$Method_Note <- vapply(seq_len(nrow(importance)), function(i) {
-    drv_type <- importance$DriverType[i]
-    agg_method <- importance$AggMethod[i]
-
-    if (drv_type == "categorical") {
-      paste0("grouped_", agg_method)
-    } else if (drv_type == "ordinal") {
-      "numeric_ordinal"
-    } else {
-      "direct"
-    }
-  }, character(1))
-
-  # Sort by importance
-  importance <- importance[order(-importance$Importance), ]
-  rownames(importance) <- NULL
-
-  importance
-}

@@ -72,6 +72,7 @@ encode_features <- function(X) {
   X_encoded <- X
   cols_to_remove <- character(0)
   new_cols <- list()
+  dummy_owner <- list()
 
   for (col in names(X)) {
     if (is.factor(X[[col]]) || is.character(X[[col]])) {
@@ -88,6 +89,9 @@ encode_features <- function(X) {
         for (j in seq_len(ncol(dummies))) {
           new_col_name <- colnames(dummies)[j]
           new_cols[[new_col_name]] <- dummies[, j]
+          # Record the dummy's owner here, where it is known exactly, rather
+          # than recovering it from the name afterwards (review H6).
+          dummy_owner[[new_col_name]] <- col
         }
       }
     } else if (!is.numeric(X[[col]])) {
@@ -107,7 +111,23 @@ encode_features <- function(X) {
     }
   }
 
+  # The map travels with the frame, so no caller has to guess it back.
+  attr(X_encoded, "kd_feature_map") <- if (length(dummy_owner)) dummy_owner else NULL
   X_encoded
+}
+
+
+#' Turn a dummy-to-driver map into shapviz's driver-to-dummies form
+#'
+#' @param feature_map Named list, dummy column name to driver name, or NULL
+#' @return Named list, driver name to its dummy columns, or NULL
+#' @keywords internal
+.kd_shap_collapse <- function(feature_map) {
+  if (is.null(feature_map) || length(feature_map) == 0) return(NULL)
+  owners <- unlist(feature_map, use.names = FALSE)
+  dummies <- names(feature_map)
+  if (is.null(dummies) || anyNA(owners)) return(NULL)
+  split(dummies, owners)
 }
 
 
@@ -121,24 +141,30 @@ encode_features <- function(X) {
 #' @keywords internal
 create_feature_map <- function(X_raw, X_encoded) {
 
+  # The encoder knows which dummy belongs to which driver, because it made
+  # them. Prefer its record (review H6).
+  recorded <- attr(X_encoded, "kd_feature_map")
+  if (!is.null(recorded) && length(recorded) > 0) return(recorded)
+
   # If no new columns were added, no mapping needed
   if (ncol(X_encoded) == ncol(X_raw)) {
     return(NULL)
   }
 
-  # Build mapping
+  # Fallback for a frame that did not come from encode_features(). This used to
+  # be the only path, with the pattern "^Gender(?=$|[^[:alnum:]_])", which
+  # requires the character after the driver's name to be non-alphanumeric.
+  # model.matrix names its dummies GenderFemale and GenderMale, so the
+  # lookahead could never match: the map was always NULL and driver-level SHAP
+  # importance for categorical drivers never existed. Matching each known
+  # level exactly cannot have that failure mode, and still cannot confuse Q1
+  # with Q10, because a level is matched in full.
   feature_map <- list()
-
   for (col in names(X_raw)) {
     if (is.factor(X_raw[[col]]) && !is.ordered(X_raw[[col]])) {
-      # Find dummy columns for this factor using exact prefix matching
-      # Anchor with word boundary to prevent "Q1" matching "Q10", "Q100", etc.
-      dummy_pattern <- paste0("^", col, "(?=$|[^[:alnum:]_])")
-      matches <- grep(dummy_pattern, names(X_encoded), value = TRUE, perl = TRUE)
-      if (length(matches) > 0) {
-        for (m in matches) {
-          feature_map[[m]] <- col
-        }
+      for (lev in levels(X_raw[[col]])) {
+        candidate <- paste0(col, lev)
+        if (candidate %in% names(X_encoded)) feature_map[[candidate]] <- col
       }
     }
   }
@@ -179,7 +205,9 @@ calculate_shap_values <- function(model, prep, config) {
   max_n <- config$shap_sample_size %||% 1000
 
   if (n > max_n) {
-    set.seed(42)  # For reproducibility
+    # One seed for the whole run, from the config (review M3). This was 42,
+    # hard-coded, while every other randomised step was unseeded.
+    if (exists("kd_apply_seed", mode = "function")) kd_apply_seed(config) else set.seed(42)
     idx <- sample(n, max_n)
     X_explain <- prep$X[idx, , drop = FALSE]
     X_display <- prep$X_display[idx, , drop = FALSE]
@@ -193,12 +221,18 @@ calculate_shap_values <- function(model, prep, config) {
   # Calculate SHAP values with interactions if requested
   include_interactions <- isTRUE(config$include_interactions)
 
-  # Create shapviz object
+  # Create shapviz object.
+  # create_feature_map() returns dummy -> driver, because that is the question
+  # the encoder can answer and what everything else here reads. shapviz's
+  # collapse argument takes the opposite, driver -> its dummies, and it was
+  # handed the map the wrong way round, so SHAP for a categorical driver died
+  # with "'collapse' cannot have overlapping vectors" and the feature was
+  # dropped from every mixed study (review F3).
   shp <- shapviz::shapviz(
     object = model,
     X_pred = X_explain,
     X = X_display,
-    collapse = prep$feature_map,
+    collapse = .kd_shap_collapse(prep$feature_map),
     interactions = include_interactions
   )
 

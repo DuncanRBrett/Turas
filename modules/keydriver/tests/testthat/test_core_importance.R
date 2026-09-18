@@ -271,13 +271,3 @@ test_that("weighted model produces valid importance scores", {
 # Partial R-squared importance
 # ==============================================================================
 
-test_that("calculate_importance_partial_r2 returns valid percentages", {
-  importance <- calculate_importance_partial_r2(basic_data, basic_config)
-
-  expect_true(is.numeric(importance))
-  expect_equal(length(importance), length(basic_config$driver_vars))
-  expect_true(all(importance >= 0))
-  # Should sum to approximately 100% (partial R2 values normalized)
-  expect_true(abs(sum(importance) - 100) < 1,
-              info = paste0("Partial R2 sum = ", sum(importance)))
-})

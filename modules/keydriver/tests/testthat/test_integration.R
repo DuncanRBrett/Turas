@@ -496,8 +496,10 @@ test_that("HTML report includes v10.4 sections when data present", {
 # ==============================================================================
 
 test_that("mixed predictor data handles categorical drivers", {
-  skip_if(!exists("build_term_map", mode = "function"),
-          message = "build_term_map not available")
+  # The function is build_term_mapping; the old name meant this test skipped
+  # every time it was asked to run (review A11).
+  skip_if(!exists("build_term_mapping", mode = "function"),
+          message = "build_term_mapping not available")
 
   data <- generate_mixed_kda_data(n = 200, seed = 123)
 
@@ -506,22 +508,21 @@ test_that("mixed predictor data handles categorical drivers", {
                data = data)
   model_terms <- names(coef(model))[-1]  # remove intercept
 
-  result <- tryCatch(
-    build_term_map(
-      model_terms = model_terms,
-      driver_vars = c("price", "quality", "service", "region", "segment"),
-      data = data
-    ),
-    error = function(e) NULL
-  )
+  drivers <- c("price", "quality", "service", "region", "segment")
+  mapping <- build_term_mapping(
+    stats::as.formula(paste("overall_satisfaction ~", paste(drivers, collapse = " + "))),
+    data, drivers)
 
-  skip_if(is.null(result), message = "build_term_map failed with mixed predictors")
-
-  # All model terms should be mapped to a driver
-  expect_true(is.character(result) || is.list(result))
-  if (is.character(result)) {
-    expect_true(length(result) == length(model_terms))
-    # Every mapped driver should be one of the original drivers
-    expect_true(all(result %in% c("price", "quality", "service", "region", "segment")))
-  }
+  # Every model term maps to exactly one of the configured drivers, and every
+  # driver owns at least one term. This is the check the old skip prevented.
+  expect_true(is.list(mapping))
+  expect_setequal(names(mapping$driver_terms), drivers)
+  expect_true(all(vapply(mapping$driver_terms, length, integer(1)) > 0))
+  mapped <- unlist(mapping$term_map)
+  expect_equal(length(mapped), length(model_terms))
+  expect_true(all(mapped %in% drivers))
+  expect_false(any(is.na(mapped)))
+  # The categorical drivers expand to more than one term; the numeric ones do not.
+  expect_gt(length(mapping$driver_terms[["region"]]), 1)
+  expect_equal(length(mapping$driver_terms[["price"]]), 1)
 })

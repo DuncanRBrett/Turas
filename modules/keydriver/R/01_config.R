@@ -436,6 +436,55 @@ get_setting <- function(settings, name, default = NULL) {
 #' @param default Default if NULL/NA
 #' @return Logical value
 #' @keywords internal
+#' The Run's Random Seed, Recorded
+#'
+#' The bootstrap, xgb.cv, cv.glmnet and the Shapiro subsample all draw at
+#' random and none of them was seeded, so two runs of the same config gave
+#' different confidence intervals and a different SHAP model (review M3). One
+#' seed, from the config when it sets one, applied at every draw and stamped on
+#' the provenance so a result can be reproduced.
+#'
+#' @param config The loaded configuration.
+#' @return The integer seed in use.
+#' @keywords internal
+KD_DEFAULT_SEED <- 20260101L
+
+#' Split a Segments sheet segment_values cell
+#'
+#' One parser. Pre-flight split on "," alone, the quadrant comparison on
+#' ",\\s*" and the pipeline on "[;,|]", so a cell written "18-24; 25-34" built
+#' one segment in the pipeline, checked as two different strings in pre-flight
+#' and produced a segment the quadrant could not match (review F15). Every
+#' consumer reads a cell the same way now: comma, semicolon or pipe, trimmed,
+#' empties dropped.
+#'
+#' @param raw A single segment_values cell
+#' @return Character vector of values, possibly empty
+#' @keywords internal
+kd_split_segment_values <- function(raw) {
+  if (is.null(raw) || length(raw) == 0) return(character(0))
+  raw <- as.character(raw)[1]
+  if (is.na(raw) || !nzchar(trimws(raw))) return(character(0))
+  vals <- trimws(unlist(strsplit(raw, "[;,|]")))
+  vals[nzchar(vals)]
+}
+
+kd_seed_value <- function(config) {
+  raw <- config$settings$random_seed %||% config$random_seed %||% KD_DEFAULT_SEED
+  seed <- suppressWarnings(as.integer(raw))
+  if (length(seed) != 1 || is.na(seed)) seed <- KD_DEFAULT_SEED
+  seed
+}
+
+#' Apply the run's seed before a randomised step.
+#' @keywords internal
+kd_apply_seed <- function(config, context = NULL) {
+  seed <- kd_seed_value(config)
+  set.seed(seed)
+  invisible(seed)
+}
+
+
 as_logical_setting <- function(value, default = FALSE) {
   if (is.null(value) || is.na(value)) {
     return(default)
@@ -446,7 +495,10 @@ as_logical_setting <- function(value, default = FALSE) {
   }
 
   if (is.character(value)) {
-    return(tolower(value) %in% c("true", "yes", "1", "on", "enabled"))
+    # "Y" and "T" are what an analyst types in a spreadsheet cell, and
+    # as.logical() reads both as NA (review M14).
+    return(tolower(trimws(value)) %in%
+             c("true", "t", "yes", "y", "1", "on", "enabled"))
   }
 
   if (is.numeric(value)) {
@@ -611,7 +663,6 @@ validate_driver_declarations <- function(driver_rows, variables) {
   valid_driver_types <- c("continuous", "ordinal", "categorical")
 
   # Valid aggregation methods per spec
-  valid_agg_methods <- c("partial_r2", "grouped_permutation", "grouped_shapley")
 
   # Check if DriverType column exists
   has_driver_type <- "DriverType" %in% names(driver_rows)
@@ -663,8 +714,7 @@ validate_driver_declarations <- function(driver_rows, variables) {
 
   # Validate each driver
   invalid_types <- character(0)
-  missing_agg <- character(0)
-  invalid_agg <- character(0)
+  configured_agg <- character(0)
 
   for (i in seq_len(n_drivers)) {
     drv <- driver_settings$driver[i]
@@ -676,14 +726,9 @@ validate_driver_declarations <- function(driver_rows, variables) {
       invalid_types <- c(invalid_types, paste0(drv, " (got: '", drv_type, "')"))
     }
 
-    # Check aggregation_method for categorical drivers
-    if (!is.na(drv_type) && drv_type == "categorical") {
-      if (is.na(agg_method) || !nzchar(agg_method)) {
-        # Default to partial_r2 per spec
-        driver_settings$aggregation_method[i] <- "partial_r2"
-      } else if (!agg_method %in% valid_agg_methods) {
-        invalid_agg <- c(invalid_agg, paste0(drv, " (got: '", agg_method, "')"))
-      }
+    # AggregationMethod is recorded only so the note below can mention it.
+    if (!is.na(agg_method) && nzchar(agg_method)) {
+      configured_agg <- c(configured_agg, drv)
     }
   }
 
@@ -706,24 +751,18 @@ validate_driver_declarations <- function(driver_rows, variables) {
     )
   }
 
-  # Report invalid aggregation methods
-  if (length(invalid_agg) > 0) {
-    keydriver_refuse(
-      code = "CFG_INVALID_AGGREGATION_METHOD",
-      title = "Invalid Aggregation Method",
-      problem = paste0(length(invalid_agg), " categorical driver(s) have invalid aggregation method."),
-      why_it_matters = paste0(
-        "Aggregation method determines how multiple coefficients from categorical ",
-        "drivers are combined into a single importance score."
-      ),
-      how_to_fix = c(
-        "Set AggregationMethod to one of: partial_r2, grouped_permutation, grouped_shapley",
-        "partial_r2 is the default and recommended method",
-        "grouped_shapley requires SHAP analysis to be enabled"
-      ),
-      expected = paste(valid_agg_methods, collapse = ", "),
-      missing = invalid_agg
-    )
+  # AggregationMethod is not validated any more, and the column decides
+  # nothing. It refused a run over a value that no code path read: the only
+  # consumer was the v10.3 engine, which nothing called and which is now
+  # deleted (review H3). A config that still carries the column is told once
+  # rather than refused, because the analysis it asks for is unaffected.
+  if (length(configured_agg) > 0) {
+    cat(sprintf(paste0(
+      "   [NOTE] The Drivers sheet sets AggregationMethod for %d driver(s). ",
+      "That setting is withdrawn and nothing reads it: importance is computed ",
+      "by Shapley decomposition, with a categorical driver's model terms ",
+      "aggregated by the term mapping. You can delete the column.\n"),
+      length(configured_agg)))
   }
 
   driver_settings

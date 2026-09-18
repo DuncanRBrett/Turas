@@ -132,8 +132,10 @@ test_that("BUG-8: Term mapping processes drivers longest-name-first", {
     error = function(e) skip(paste("Cannot load term mapping:", conditionMessage(e)))
   )
 
-  skip_if_not(exists("build_term_map", mode = "function"),
-              "build_term_map not found")
+  # The function is build_term_mapping. Named wrongly, this skip was never
+  # false, so the test below has never run (review A11).
+  skip_if_not(exists("build_term_mapping", mode = "function"),
+              "build_term_mapping not found")
 
   # Create data with prefix collision potential
   data <- data.frame(
@@ -143,18 +145,20 @@ test_that("BUG-8: Term mapping processes drivers longest-name-first", {
     stringsAsFactors = FALSE
   )
 
-  # This should not fail from prefix collision
-  result <- tryCatch(
-    build_term_map(
-      model_terms = c("age", "age_groupold"),
-      driver_vars = c("age", "age_group"),
-      data = data
-    ),
-    error = function(e) NULL
-  )
+  # Prefix collision: "age" is a prefix of "age_group", so a mapper that
+  # matches on prefixes assigns age_groupold to age.
+  mapping <- build_term_mapping(y ~ age + age_group, data, c("age", "age_group"))
+  expect_true(is.list(mapping))
+  expect_true(all(c("term_map", "driver_terms") %in% names(mapping)))
 
-  # Should produce a mapping without NA values
-  if (!is.null(result)) {
-    expect_true(is.character(result) || is.list(result))
+  # Every term belongs to exactly one driver, and to the right one.
+  expect_equal(unname(mapping$term_map[["age"]]), "age")
+  age_group_terms <- mapping$driver_terms[["age_group"]]
+  expect_gt(length(age_group_terms), 0)
+  expect_false("age" %in% age_group_terms)
+  for (tm in age_group_terms) {
+    expect_equal(unname(mapping$term_map[[tm]]), "age_group", info = tm)
   }
+  # And nothing is left unmapped.
+  expect_false(any(is.na(unlist(mapping$term_map))))
 })
