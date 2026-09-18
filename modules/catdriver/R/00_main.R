@@ -768,7 +768,7 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
     }
   }
 
-  prep_data_g <- preprocess_catdriver_data(data_g, config)
+  prep_data_g <- preprocess_catdriver_data(data_g, config, group_label = group_label)
 
   if (verbose) {
     outcome_type_label <- switch(prep_data_g$outcome_info$type,

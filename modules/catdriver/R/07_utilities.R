@@ -622,31 +622,11 @@ format_ci <- function(lower, upper, digits = 2) {
 # MODEL DIAGNOSTIC HELPERS
 # ==============================================================================
 
-#' Calculate McFadden Pseudo R-squared
-#'
-#' @param model Fitted model (glm, polr, or multinom)
-#' @param null_model Optional null model for comparison
-#' @return Numeric pseudo R-squared value
-#' @keywords internal
-calc_mcfadden_r2 <- function(model, null_model = NULL) {
-  # Get log-likelihoods
-  ll_full <- logLik(model)[1]
+# calc_mcfadden_r2() was deleted 2026-09-18. It had no callers and, worse, it
+# fabricated its null log-likelihood as `ll_full * 0.5` behind a placeholder
+# comment, so anything that had started using it would have got an invented
+# R-squared. Each engine computes McFadden against its own fitted null model.
 
-  if (!is.null(null_model)) {
-    ll_null <- logLik(null_model)[1]
-  } else {
-    # Try to get from model
-    if (inherits(model, "glm")) {
-      ll_null <- model$null.deviance / -2
-    } else {
-      # Approximate from model
-      cat("   [WARNING] Null model not provided, R-squared may be approximate\n")
-      ll_null <- ll_full * 0.5  # Placeholder
-    }
-  }
-
-  1 - (ll_full / ll_null)
-}
 
 
 #' Check for Separation in Binary Model

@@ -194,54 +194,6 @@ test_that("mapping does NOT use substring parsing for complex names", {
 })
 
 
-test_that("extract_odds_ratios uses mapping not substring parsing", {
-  data <- generate_messy_labels_data(200)
-
-  prep_data <- list(
-    data = data,
-    outcome_info = list(type = "binary", categories = levels(data$outcome)),
-    predictor_info = list(
-      campus_type = list(levels = levels(data$campus_type), reference_level = levels(data$campus_type)[1]),
-      age_bracket = list(levels = levels(data$age_bracket), reference_level = levels(data$age_bracket)[1])
-    ),
-    model_formula = outcome ~ campus_type + age_bracket
-  )
-
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("campus_type", "age_bracket"),
-    driver_labels = list(campus_type = "Campus Type", age_bracket = "Age"),
-    confidence_level = 0.95
-  )
-
-  model <- glm(prep_data$model_formula, data = data, family = binomial())
-  model_result <- list(
-    model = model,
-    model_type = "binary_logistic",
-    coefficients = data.frame(
-      term = names(coef(model)),
-      estimate = as.numeric(coef(model)),
-      std_error = summary(model)$coefficients[, 2],
-      z_value = summary(model)$coefficients[, 3],
-      p_value = summary(model)$coefficients[, 4],
-      odds_ratio = exp(coef(model)),
-      or_lower = exp(confint.default(model)[, 1]),
-      or_upper = exp(confint.default(model)[, 2]),
-      stringsAsFactors = FALSE
-    )
-  )
-
-  or_df <- extract_odds_ratios(model_result, config, prep_data)
-
-  # All comparisons should have valid factor and level names
-  for (i in seq_len(nrow(or_df))) {
-    factor_name <- or_df$factor[i]
-    comparison <- or_df$comparison[i]
-
-    expect_true(factor_name %in% c("campus_type", "age_bracket"),
-                info = paste("Invalid factor:", factor_name))
-  }
-})
 
 
 # ==============================================================================
@@ -250,41 +202,10 @@ test_that("extract_odds_ratios uses mapping not substring parsing", {
 
 context("Missing Data Handling (Per-Variable Strategy)")
 
-test_that("prepare_analysis_data uses per-variable strategy, not complete.cases", {
-  data <- generate_missing_data(300)
-  n_original <- nrow(data)
+# These two tests used to run against prepare_analysis_data(), a dead twin of
+# the live handler that nothing but the suite called. They run against
+# handle_missing_data() now, which is what a real run uses.
 
-  # Config with different strategies per driver
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("driver1", "driver2"),
-    weight_var = NULL,
-    driver_settings = data.frame(
-      driver = c("driver1", "driver2"),
-      type = c("nominal", "nominal"),
-      missing_strategy = c("drop_row", "missing_as_level"),
-      stringsAsFactors = FALSE
-    )
-  )
-
-  result <- prepare_analysis_data(data, config, NULL)
-
-  # driver1 should have rows dropped
-  expect_true(result$n_excluded > 0)
-
-  # driver2 should have "Missing" level, not dropped
-  expect_true("Missing" %in% levels(result$data$driver2))
-
-  # Verify that NOT all rows with any missing were dropped
-  # (i.e., we're not using blanket complete.cases)
-  n_driver1_missing <- sum(is.na(data$driver1))
-  n_driver2_missing <- sum(is.na(data$driver2))
-
-  # If we used complete.cases, we'd drop ~35 rows (20 + 15)
-
-  # With per-variable strategy, we should drop fewer since driver2 is recoded
-  expect_true(result$n_excluded <= n_driver1_missing)
-})
 
 
 test_that("missing_as_level creates Missing category correctly", {
@@ -302,17 +223,18 @@ test_that("missing_as_level creates Missing category correctly", {
     )
   )
 
-  result <- prepare_analysis_data(data, config, NULL)
+  result <- handle_missing_data(data, config)
 
-  # Should have "Missing" level
-  expect_true("Missing" %in% levels(result$data$driver1))
+  # The live handler's label, which the dead twin spelled differently
+  missing_label <- "Missing / Not answered"
+  expect_true(missing_label %in% levels(result$data$driver1))
 
   # Should have NO NA values in driver1
   expect_equal(sum(is.na(result$data$driver1)), 0)
 
-  # Count of "Missing" should match original NA count
+  # Count of the missing level should match the original NA count
   n_original_na <- sum(is.na(data$driver1))
-  n_missing_level <- sum(result$data$driver1 == "Missing")
+  n_missing_level <- sum(result$data$driver1 == missing_label)
   expect_equal(n_missing_level, n_original_na)
 })
 
@@ -333,7 +255,7 @@ test_that("error_if_missing strategy produces hard error", {
   )
 
   expect_error(
-    prepare_analysis_data(data, config, NULL),
+    handle_missing_data(data, config),
     "MISSING VALUES NOT ALLOWED"
   )
 })

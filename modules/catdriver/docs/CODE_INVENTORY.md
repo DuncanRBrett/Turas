@@ -8,7 +8,7 @@ The Turas Categorical Key Driver (CatDriver) module performs categorical key dri
 -   **Ordinal** -- Ordered categories such as Low/Medium/High (clm from the ordinal package)
 -   **Multinomial** -- Unordered categories such as Brand A/B/C (multinom from nnet)
 
-Key capabilities include Type II Wald chi-square importance ranking, marginal effects analysis, odds ratio computation, subgroup comparison across grouping variables, and interactive HTML reports with comparison and unified tabbed views across multiple configurations. The module follows TRS v1.0 conventions throughout, with a split hard/soft guard system and structured refusal messages.
+Key capabilities include likelihood-ratio chi-square importance ranking, probability lifts (differences in mean fitted probability, not marginal effects), odds ratio computation, subgroup comparison across grouping variables, and interactive HTML reports with comparison and unified tabbed views across multiple configurations. The module follows TRS v1.0 conventions throughout, with a split hard/soft guard system and structured refusal messages.
 
 ------------------------------------------------------------------------
 
@@ -40,32 +40,37 @@ Key capabilities include Type II Wald chi-square importance ranking, marginal ef
 
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
-| `00_main.R` | 1,230 | Entry point and orchestration; TRS-compliant pipeline | 88/100 | Largest core file; coordinates full analysis lifecycle |
-| `01_config.R` | 705 | Load and validate Excel configuration workbook | 90/100 | Parses driver specs, outcome definitions, analysis options; includes `load_slides_from_config()` for Slides sheet |
-| `02_validation.R` | 651 | Load and validate input CSV data against config | 90/100 | Column existence, type checks, completeness validation |
-| `03_preprocessing.R` | 727 | Variable type detection, factor ordering, reference levels | 88/100 | Handles factor level consolidation and ordering logic |
-| `04_analysis.R` | 378 | Dispatcher to ordinal/multinomial/binary model engines | 92/100 | Clean routing logic; delegates to 04a/04b or internal binary |
-| `04a_ordinal.R` | 537 | Ordinal logistic regression via clm (ordinal package) | 90/100 | Proportional odds model with diagnostics |
-| `04b_multinomial.R` | 247 | Multinomial logistic regression via multinom (nnet) | 90/100 | Compact; handles multi-category unordered outcomes |
-| `05_importance.R` | 681 | Type II Wald chi-square tests, driver importance ranking | 88/100 | Core analytical output; ranks drivers by effect size |
-| `06_output.R` | 577 | Main Excel workbook generation orchestrator | 87/100 | Coordinates sheet creation across 06a/06b/06c |
-| `06a_sheets_summary.R` | 413 | Executive summary and importance ranking sheets | 88/100 | Professional formatting with conditional styling |
-| `06b_sheets_detail.R` | 384 | Per-driver detail sheets and odds ratios | 85/100 | One sheet per driver with coefficient tables |
-| `06c_sheets_subgroup.R` | 278 | Subgroup comparison Excel output sheets | 85/100 | Side-by-side subgroup results in Excel |
-| `07_utilities.R` | 881 | Helper functions: colors, formatting, statistical utils | 85/100 | Large file with many responsibilities; candidate for split |
-| `08_guard.R` | 368 | TRS guard framework layer; guard registration/dispatch | 93/100 | Clean guard orchestration pattern |
-| `08a_guards_hard.R` | 579 | Hard guards: REFUSE with actionable TRS messages | 93/100 | Catches fatal misconfigurations before analysis runs |
-| `08b_guards_soft.R` | 347 | Soft guards: WARN and degrade to PARTIAL status | 90/100 | Non-fatal issues that allow degraded execution |
-| `09_mapper.R` | 533 | Design matrix term to driver name mapping (canonical) | 90/100 | Resolves interaction/dummy terms back to config driver names |
-| `10_missing.R` | 441 | Missing data strategies per driver | 88/100 | Supports listwise, pairwise, and imputation strategies |
-| `11_subgroup_comparison.R` | 475 | Split analysis by grouping variable | 88/100 | Runs full pipeline per subgroup, collates results |
+| `00_main.R` | 1625 | Entry point and orchestration; TRS-compliant pipeline | 88/100 | Largest core file; coordinates full analysis lifecycle |
+| `01_config.R` | 814 | Load and validate Excel configuration workbook | 90/100 | Parses driver specs, outcome definitions, analysis options; includes `load_slides_from_config()` for Slides sheet |
+| `02_validation.R` | 489 | Load and validate input CSV data against config | 90/100 | Column existence, type checks, completeness validation |
+| `03_preprocessing.R` | 787 | Variable type detection, factor ordering, reference levels | 88/100 | Handles factor level consolidation and ordering logic |
+| `04_analysis.R` | 399 | Dispatcher to ordinal/multinomial/binary model engines | 92/100 | Clean routing logic; delegates to 04a/04b or internal binary |
+| `04a_ordinal.R` | 638 | Ordinal logistic regression via clm (ordinal package) | 90/100 | Proportional odds model with diagnostics |
+| `04b_multinomial.R` | 261 | Multinomial logistic regression via multinom (nnet) | 90/100 | Compact; handles multi-category unordered outcomes |
+| `05_importance.R` | 603 | Driver importance: likelihood-ratio chi-square shares (car::Anova type II for binary and ordinal, reduced-model refits for multinomial), with a z-squared Wald fallback that stamps itself | 88/100 | Core analytical output. Every row carries the method that produced it; the fallback degrades the run |
+| `06_output.R` | 634 | Main Excel workbook generation orchestrator | 87/100 | Coordinates sheet creation across 06a/06b/06c |
+| `06a_sheets_summary.R` | 443 | Executive summary and importance ranking sheets | 88/100 | Professional formatting with conditional styling |
+| `06b_sheets_detail.R` | 420 | Per-driver detail sheets and odds ratios | 85/100 | One sheet per driver with coefficient tables |
+| `06c_sheets_subgroup.R` | 295 | Subgroup comparison Excel output sheets | 85/100 | Side-by-side subgroup results in Excel |
+| `07_utilities.R` | 1269 | Helper functions: colors, formatting, statistical utils | 85/100 | Large file with many responsibilities; candidate for split |
+| `08_guard.R` | 410 | TRS guard framework layer; guard registration/dispatch | 93/100 | The module's ONLY definition of catdriver_refuse(). 00_guard.R held a second, incompatible one and was deleted 2026-09-18 |
+| `08a_guards_hard.R` | 687 | Hard guards: REFUSE with actionable TRS messages | 93/100 | Catches fatal misconfigurations before analysis runs |
+| `08b_guards_soft.R` | 384 | Soft guards: WARN and degrade to PARTIAL status | 90/100 | Non-fatal issues that allow degraded execution |
+| `09_mapper.R` | 550 | Design matrix term to driver name mapping (canonical) | 90/100 | Resolves interaction/dummy terms back to config driver names |
+| `10_missing.R` | 440 | Missing data strategies per driver | 88/100 | Strategies are drop_row, missing_as_level and error_if_missing (not listwise/pairwise/imputation) |
+| `11_subgroup_comparison.R` | 559 | Split analysis by grouping variable | 88/100 | Runs full pipeline per subgroup, collates results |
 
 ### Configuration and Validation (`lib/`)
 
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
 | `generate_config_templates.R` | 762 | Generate professional Excel config template with validation dropdowns | 88/100 | Creates ready-to-fill config workbooks for end users; includes Slides sheet template (slide_order, slide_title, slide_content, slide_image_path) |
-| `validation/preflight_validators.R` | 1,183 | 15 pre-flight cross-referential validation checks | 92/100 | Catches config-data mismatches before analysis begins |
+
+`lib/validation/preflight_validators.R` (1,183 lines, 17 functions) was deleted
+on 2026-09-18. It was never sourced and never called anywhere in the module or
+the GUI, while this document scored it 92/100 and drew it inside the live
+pipeline. Nothing replaced it: the guards in `R/08a_guards_hard.R` and
+`R/08b_guards_soft.R` are what actually runs.
 
 ### HTML Report R Files (`lib/html_report/`)
 
@@ -116,25 +121,25 @@ Key capabilities include Type II Wald chi-square importance ranking, marginal ef
                     v                                     v
         +-----------------------+            +-------------------------+
         |   Guard System        |            |   01_config.R           |
-        |   08_guard.R (368L)   |            |   Load & Validate Config|
-        |   08a_hard  (579L)    |            |       (705L)            |
-        |   08b_soft  (347L)    |            +------------+------------+
+        |   08_guard.R (410L)   |            |   Load & Validate Config|
+        |   08a_hard  (687L)    |            |       (705L)            |
+        |   08b_soft  (384L)    |            +------------+------------+
         +-----------+-----------+                         |
                     |                                     v
                     | PASS/PARTIAL                +-------------------------+
                     +------------------+          |   02_validation.R       |
                                        |          |   Load & Validate Data  |
-                                       |          |       (651L)            |
+                                       |          |       (489L)            |
                                        |          +------------+------------+
                                        |                       |
                                        v                       v
-                              +------------------+   +-------------------------+
-                              |  Preflight       |   |   03_preprocessing.R    |
-                              |  Validators      |   |   Factor Ordering,      |
-                              |  (1,183L)        |   |   Type Detection (727L) |
-                              +--------+---------+   +------------+------------+
-                                       |                           |
-                                       +-------------+------------+
+                                                      +-------------------------+
+                                                      |   03_preprocessing.R    |
+                                                      |   Factor Ordering,      |
+                                                      |   Type Detection (787L) |
+                                                      +------------+------------+
+                                                                   |
+                                                     +-------------+
                                                      |
                                                      v
                                           +---------------------+
