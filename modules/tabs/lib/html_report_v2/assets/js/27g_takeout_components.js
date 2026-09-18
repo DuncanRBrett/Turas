@@ -222,6 +222,14 @@
     return group ? '<span class="tko-chip tko-bg">' + fmt.escapeHtml(group) + "</span>" : "";
   };
 
+  /** The group's base, beside its banner chip. A portrait is a claim about a
+   *  named set of people, and how many they are belongs on the card's face
+   *  rather than only in the also-scanned line underneath. */
+  ui.baseChip = function (base) {
+    if (base === null || base === undefined || !isFinite(base)) return "";
+    return '<span class="tko-chip tko-n">n = ' + fmt.base(base) + "</span>";
+  };
+
   /** The synopsis strip: where this group actually stands, before any story
    *  about it. Two parts, both plain counts.
    *

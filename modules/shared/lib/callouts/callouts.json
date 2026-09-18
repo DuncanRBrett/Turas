@@ -607,7 +607,7 @@
     },
     "patterns.no_story": {
       "title": "Patterns: groups with no portrait",
-      "text": "Also scanned: {names}. No consistent story held up beyond chance for {it_them}. No portrait is honest reporting, not a gap.",
+      "text": "Also scanned: {names}. No consistent story held up beyond chance for {it_them}.",
       "context": "Group overview, under the portraits",
       "page": "Group overview"
     },
