@@ -178,14 +178,17 @@ and the `27z_pricing.js` inline-SVG pattern.
 
 ## Dependency that dies at retirement
 
-`.md_drop_id_cols()` is defined at
-`modules/maxdiff/lib/html_report/01_data_transformer.R:461` and is used to
-strip respondent id columns before computing densities. The whole directory
-is deleted at step 4, so this helper moves into `modules/maxdiff/R/` with the
-distributions work.
+Checked before building, and again on 18 Sep after the island was written.
+Nothing the island needs lives in `lib/html_report/`.
 
-`compute_head_to_head()` is already at `modules/maxdiff/R/utils.R:783` and
-survives retirement untouched.
+`compute_head_to_head()` is at `modules/maxdiff/R/utils.R` and survives
+retirement untouched. So does `strip_respondent_id_cols()`, which the island's
+three new readers use to drop the respondent id by name and then anything
+non-numeric, so a numeric id column is never averaged in as an item.
+
+`.md_drop_id_cols()` in `01_data_transformer.R` is the classic report's own
+copy of the first half of that. It is used only inside that directory and dies
+with it. An earlier draft of this checklist said it had to move; it does not.
 
 ## The whitelist trap, stated correctly
 

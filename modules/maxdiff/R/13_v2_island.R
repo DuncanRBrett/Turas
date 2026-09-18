@@ -97,11 +97,12 @@ MAXDIFF_ISLAND_SCHEMA <- 1L
   util_stats <- list()
   indiv <- results$hb_results$individual_utilities
   if (!is.null(indiv)) {
-    indiv <- .md_drop_id_cols(indiv)
+    # Drops the respondent id BY NAME and then anything non-numeric, so a
+    # numeric id column is never averaged in as if it were an item.
+    indiv <- strip_respondent_id_cols(indiv)
     mat <- NULL
-    if (is.data.frame(indiv)) {
-      keep <- vapply(indiv, is.numeric, logical(1))
-      if (sum(keep) >= 2L) mat <- as.matrix(indiv[, keep, drop = FALSE])
+    if (is.data.frame(indiv) && ncol(indiv) >= 2L) {
+      mat <- as.matrix(indiv)
     } else if (is.matrix(indiv) && ncol(indiv) >= 2L) {
       mat <- indiv
     }
@@ -189,10 +190,9 @@ MAXDIFF_ISLAND_SCHEMA <- 1L
   mat <- NULL
   indiv <- results$hb_results$individual_utilities
   if (!is.null(indiv)) {
-    indiv <- .md_drop_id_cols(indiv)
-    if (is.data.frame(indiv)) {
-      keep <- vapply(indiv, is.numeric, logical(1))
-      if (any(keep)) mat <- as.matrix(indiv[, keep, drop = FALSE])
+    indiv <- strip_respondent_id_cols(indiv)
+    if (is.data.frame(indiv) && ncol(indiv) > 0L) {
+      mat <- as.matrix(indiv)
     } else if (is.matrix(indiv)) {
       mat <- indiv
     }
@@ -359,12 +359,11 @@ MAXDIFF_ISLAND_SCHEMA <- 1L
 
   indiv <- results$hb_results$individual_utilities
   if (is.null(indiv)) return(NULL)
-  indiv <- .md_drop_id_cols(indiv)
+  indiv <- strip_respondent_id_cols(indiv)
 
   mat <- NULL
-  if (is.data.frame(indiv)) {
-    keep <- vapply(indiv, is.numeric, logical(1))
-    if (any(keep)) mat <- as.matrix(indiv[, keep, drop = FALSE])
+  if (is.data.frame(indiv) && ncol(indiv) > 0L) {
+    mat <- as.matrix(indiv)
   } else if (is.matrix(indiv)) {
     mat <- indiv
   }
