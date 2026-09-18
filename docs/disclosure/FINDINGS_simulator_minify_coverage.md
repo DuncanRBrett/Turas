@@ -128,6 +128,25 @@ The full outer maxdiff report carrying a minified inner simulator was never
 built and never put through `turas_minify()` and the render gate. Only the
 inner document and a hand-built iframe wrapper were.
 
+> **Closed 2026-09-18.** Both gaps above are now covered, and the second was
+> verified end to end rather than argued. A full maxdiff run with
+> `Generate_HTML_Report = YES` and `Generate_Simulator = YES` was built
+> headless with `TURAS_PREPARE_DELIVERABLE` set, producing a 2.08 MB dev copy
+> and a 2.41 MB deliverable. The `srcdoc` attribute was unescaped from each and
+> compared: the dev copy carries 901,230 readable characters with 185 `/*`
+> comment openers, 243 `//` comments and 33 `SimUI` references; the deliverable
+> carries the same document obfuscated, with 0 `SimUI` references, 0 `//`
+> comments and hex-mangled identifiers of the `_0x6cb1d3['push']` form. The
+> deliverable is larger, which is the documented consequence of obfuscating a
+> report whose only JavaScript lives inside the `srcdoc` and which
+> `turas_minify()` handles explicitly at step 2b.
+>
+> One name survives: `SimEngine`, because it is declared in the embedded
+> script's outermost scope and `minify_profile.json` sets
+> `renameGlobals: false` with terser at `--mangle toplevel=false`, both on
+> purpose. Its body is obfuscated. That is platform behaviour, not a maxdiff
+> defect, and it is the same trait documented for island-carried pages.
+
 ## What was built, and where it moved to
 
 Duncan approved both jobs on 4 September 2026. The wiring fixes landed as
