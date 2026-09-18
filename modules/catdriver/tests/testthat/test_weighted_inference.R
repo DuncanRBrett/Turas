@@ -70,6 +70,21 @@ test_that("weights are normalised to mean 1 and every repair is counted", {
   expect_true(any(grepl("set to 0", res$notes)))
 })
 
+test_that("rim weights rounded in a workbook are normalised but not reported as a rescale", {
+  set.seed(7)
+  w <- runif(500, 0.4, 2.2)
+  w <- round(w / mean(w), 6)          # mean 1, then rounded, as a config workbook stores it
+  expect_false(isTRUE(all.equal(mean(w), 1, tolerance = 0)))
+
+  res <- normalise_catdriver_weights(w, "wt")
+  expect_false(res$rescaled)          # no PARTIAL, no reason, nothing to report
+  expect_length(res$notes, 0)
+  expect_equal(mean(res$weights), 1)  # but still exactly normalised
+
+  # An expansion weight IS reported
+  expect_true(normalise_catdriver_weights(w * 1200, "wt")$rescaled)
+})
+
 test_that("weights already on mean 1 are left alone", {
   res <- normalise_catdriver_weights(c(0.5, 1, 1.5), "wt")
   expect_false(res$rescaled)

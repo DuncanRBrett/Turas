@@ -713,7 +713,11 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
 
       weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
       if (!is.null(weight_diagnostics_g)) {
-        weight_diagnostics_g$normalisation <- weight_normalisation_g
+        # Keep the provenance, not the vector: results travel into the report
+        # layer and a per-respondent weight column has no business there.
+        weight_provenance_g <- weight_normalisation_g
+        weight_provenance_g$weights <- NULL
+        weight_diagnostics_g$normalisation <- weight_provenance_g
         weight_diagnostics_g$inference_stamp <- catdriver_weighting_stamp(
           config$weight_var, weight_diagnostics_g, weight_normalisation_g)
 

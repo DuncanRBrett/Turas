@@ -824,6 +824,13 @@ cd_muffle_noninteger_successes <- function(expr) {
 }
 
 
+#' How far a weight vector's mean may sit from 1 before the run calls it a
+#' rescale. Below this the weights are still normalised; the run just does not
+#' report it, because rounding in a config workbook is not a finding.
+#' @keywords internal
+CATDRIVER_WEIGHT_RESCALE_TOLERANCE <- 1e-3
+
+
 #' Normalise a Weight Vector to Mean 1
 #'
 #' CatDriver's four engines pass weights to glm/clm/polr/multinom as frequency
@@ -874,9 +881,15 @@ normalise_catdriver_weights <- function(raw, weight_var = "weight") {
   if (length(positive) == 0) return(out)
 
   raw_mean <- mean(positive)
-  rescaled <- !isTRUE(abs(raw_mean - 1) < 1e-8)
   scale_factor <- if (raw_mean > 0) 1 / raw_mean else 1
-  if (rescaled) w <- w * scale_factor
+  if (!isTRUE(all.equal(raw_mean, 1))) w <- w * scale_factor
+
+  # Rim weights arrive already on mean 1 and are then rounded in the config
+  # workbook, so their mean is 1.0000002 rather than 1. Normalising them is
+  # free, but calling that a rescale would put every ordinary weighted run into
+  # PARTIAL with a reason that says nothing. Only a materially different scale
+  # (expansion weights, percentages, counts) is reported.
+  rescaled <- abs(raw_mean - 1) > CATDRIVER_WEIGHT_RESCALE_TOLERANCE
 
   notes <- character(0)
   if (n_na > 0) {
