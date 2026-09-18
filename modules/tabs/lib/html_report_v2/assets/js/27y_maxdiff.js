@@ -1,7 +1,13 @@
 /**
  * MaxDiff view. Item scores with preference shares and best/worst bars, the
- * estimator named in words, then TURF, must-haves and discrimination classes
- * when the study produced them.
+ * estimator named in words, then TURF, must-haves, discrimination classes,
+ * head-to-head win rates, per-segment scores, utility distributions and model
+ * diagnostics, each when the study produced them.
+ *
+ * The panel set is deliberate: it matches the classic MaxDiff HTML report so
+ * that report can be retired. The content enumeration, including what is
+ * carried and what is dropped and why, is
+ * docs/v2_lift/MAXDIFF_PARITY_CHECKLIST.md.
  *
  * FROZEN, NOT LIVE. Every other analysis tab recomputes from microdata when
  * the audience filter changes. MaxDiff cannot: the utilities were estimated
@@ -288,6 +294,153 @@
       rows + "</tbody></table></section>";
   }
 
+  // A label for an item id, from the scores block. Falls back to the id.
+  function labelFor(id) {
+    var sc = TR.MD && TR.MD.scores;
+    if (!sc || !arr(sc.itemId)) return id;
+    var k = sc.itemId.indexOf(id);
+    return k >= 0 && sc.label ? sc.label[k] : id;
+  }
+
+  // One stat card. Value, then what it is, then the qualifier under it.
+  function statCard(value, label, sub) {
+    return '<div class="md-stat">' +
+      '<div class="md-stat-value">' + value + "</div>" +
+      '<div class="md-stat-label">' + esc(label) + "</div>" +
+      (sub ? '<div class="md-stat-sub">' + esc(sub) + "</div>" : "") +
+      "</div>";
+  }
+
+  function statGroup(title, cards) {
+    var kept = cards.filter(function (c) { return !!c; });
+    if (!kept.length) return "";
+    return '<h4 class="md-stat-head">' + esc(title) + "</h4>" +
+      '<div class="md-stat-grid">' + kept.join("") + "</div>";
+  }
+
+  // Present only when the island carried the number. A dash in a stat card
+  // reads as a measurement of nothing, which is worse than no card at all.
+  function has(v) { return v !== null && v !== undefined && !isNaN(v); }
+
+  /**
+   * Model diagnostics. The classic report's panel showed four groups of stat
+   * cards, two of which never rendered: it read the aggregate logit fit from
+   * results$logit_results$fit_stats, a key the module does not write, and the
+   * only builder that would have drawn the fit was called by no panel. The
+   * island reads model_fit, so those numbers appear here for the first time.
+   */
+  function diagnosticsHtml(d) {
+    if (!d) return "";
+
+    var model = statGroup("Model", [
+      has(d.nSegments) ? statCard(esc(num(d.nSegments, 0)), "Segments analysed") : "",
+      has(d.logLikelihood) ? statCard(esc(num(d.logLikelihood, 1)), "Log-likelihood",
+        "Aggregate logit fit") : "",
+      has(d.aic) ? statCard(esc(num(d.aic, 1)), "AIC", "Lower is better") : "",
+      has(d.bic) ? statCard(esc(num(d.bic, 1)), "BIC", "Lower is better") : "",
+      has(d.pseudoR2) ? statCard(esc(num(d.pseudoR2, 3)), "Pseudo R-squared",
+        "McFadden") : ""
+    ]);
+
+    var pop = statGroup("Population utilities", [
+      has(d.utilityRange) ? statCard(esc(num(d.utilityRange, 3)), "Utility range",
+        "Highest item minus lowest") : "",
+      has(d.meanUtility) ? statCard(esc(num(d.meanUtility, 3)), "Mean utility") : "",
+      has(d.utilitySd) ? statCard(esc(num(d.utilitySd, 3)), "Utility spread",
+        "Average spread across respondents") : "",
+      has(d.discrimination) ? statCard(esc(num(d.discrimination, 3)), "Discrimination",
+        "Utility range divided by item count") : ""
+    ]);
+
+    var sharp = statGroup("How decisive respondents were", [
+      has(d.meanMaxShare) ? statCard(esc(num(d.meanMaxShare, 1)) + "%",
+        "Mean top-item share",
+        has(d.chanceLevel) ? "Chance is " + num(d.chanceLevel, 1) + "%" : "") : "",
+      has(d.sharpnessRatio) ? statCard(esc(num(d.sharpnessRatio, 1)) + "x",
+        "Sharpness", "Top-item share against chance") : "",
+      has(d.entropyRatio) ? statCard(esc(num(d.entropyRatio, 3)), "Entropy ratio",
+        "0 is decisive, 1 is indifferent") : "",
+      has(d.heterogeneity) ? statCard(esc(num(d.heterogeneity, 3)), "Heterogeneity",
+        "How much respondents differed") : ""
+    ]);
+
+    var resp = statGroup("Spread within a respondent", [
+      has(d.meanRespondentRange) ? statCard(esc(num(d.meanRespondentRange, 2)),
+        "Mean utility range", "Per respondent") : "",
+      has(d.minRespondentRange) ? statCard(esc(num(d.minRespondentRange, 2)),
+        "Smallest range", "Least decisive respondent") : "",
+      has(d.maxRespondentRange) ? statCard(esc(num(d.maxRespondentRange, 2)),
+        "Largest range", "Most decisive respondent") : ""
+    ]);
+
+    var body = model + pop + sharp + resp;
+    if (!body) return "";
+
+    return '<section class="md-panel"><h3>Model diagnostics</h3>' +
+      '<p class="md-note">' + esc("How well the study separated the items, and how " +
+        "decisive respondents were. A sharp, high-range study discriminates; a flat " +
+        "one means the items were too close together to tell apart.") + "</p>" +
+      body + "</section>";
+  }
+
+  /**
+   * Head-to-head win rates. The island carries the UPPER TRIANGLE only,
+   * because P(j beats i) is exactly 100 minus P(i beats j); the mirror is
+   * derived here so a pair always sums to 100.
+   */
+  function headToHeadHtml(h) {
+    if (!h || !arr(h.rowItem) || !h.rowItem.length) return "";
+
+    // Item order follows the scores table, so the matrix reads down the same
+    // ranking the reader has just looked at.
+    var sc = TR.MD.scores;
+    var ids = arr(sc && sc.itemId) ? sc.itemId.slice() : [];
+    var seen = {};
+    h.rowItem.forEach(function (id) { seen[id] = true; });
+    h.colItem.forEach(function (id) { seen[id] = true; });
+    ids = ids.filter(function (id) { return seen[id]; });
+    if (ids.length < 2) return "";
+
+    var SEP = "";
+    var byPair = {};
+    h.rowItem.forEach(function (r, i) { byPair[r + SEP + h.colItem[i]] = h.prob[i]; });
+
+    var lookup = function (a, b) {
+      if (a === b) return null;
+      var v = byPair[a + SEP + b];
+      if (v !== undefined && v !== null) return v;
+      var mirror = byPair[b + SEP + a];
+      return mirror === undefined || mirror === null ? null : 100 - mirror;
+    };
+
+    var head = '<tr><th>Wins over</th>' + ids.map(function (id) {
+      return '<th class="md-num">' + esc(labelFor(id)) + "</th>";
+    }).join("") + "</tr>";
+
+    var rows = ids.map(function (a) {
+      var cells = ids.map(function (b) {
+        var v = lookup(a, b);
+        if (v === null) return '<td class="md-num md-h2h-self"></td>';
+        // Above 50 leans to the row item, below 50 to the column item. The
+        // tint is proportional, so a near-even pair looks near-even.
+        var lean = Math.min(1, Math.abs(v - 50) / 50);
+        var bg = v >= 50 ? TR.svg.shade("#2e7d4f", lean * 0.55)
+                         : TR.svg.shade("#b3564b", lean * 0.55);
+        return '<td class="md-num" style="background:' + bg + '">' +
+          num(v, 1) + "</td>";
+      }).join("");
+      return "<tr><th>" + esc(labelFor(a)) + "</th>" + cells + "</tr>";
+    }).join("");
+
+    return '<section class="md-panel"><h3>Head-to-head win rates</h3>' +
+      '<p class="md-note">' + esc(h.note || "") + " " +
+      esc("Read across a row: each cell is the chance the row item is chosen over " +
+          "the column item. Above 50 means the row item wins more often than not.") +
+      "</p>" +
+      '<div class="md-matrix"><table class="md-table md-h2h"><thead>' + head +
+      "</thead><tbody>" + rows + "</tbody></table></div></section>";
+  }
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -308,6 +461,8 @@
       turfHtml(d.turf) +
       anchorHtml(d.anchor) +
       discriminationHtml(d.discrimination) +
+      headToHeadHtml(d.headToHead) +
+      diagnosticsHtml(d.diagnostics) +
       "</div>";
   };
 

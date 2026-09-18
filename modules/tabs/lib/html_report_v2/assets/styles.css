@@ -1422,6 +1422,37 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 }
 .md-tag-must { background: #e2f3e6; color: #1f5b2d; }
 
+/* Parity panels (section 6): diagnostics stat cards and the head-to-head
+   matrix. The matrix scrolls sideways rather than squeezing its columns, so a
+   ten-item study stays readable on a laptop. Cell tints are inline, computed
+   from the value, for the same reason chart colours are literal: a rasterised
+   pin looks like the page. */
+.md-stat-head {
+  margin: 14px 0 6px; font-size: .78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: #667;
+}
+.md-stat-grid {
+  display: grid; gap: 10px; margin-bottom: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.md-stat {
+  border: 1px solid #e6e6e6; border-radius: 4px; padding: 9px 11px;
+  background: #fbfbfc;
+}
+.md-stat-value {
+  font-size: 1.3rem; font-weight: 600; color: var(--brand, #323367);
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.md-stat-label { font-size: .82rem; color: #333; margin-top: 2px; }
+.md-stat-sub { font-size: .74rem; color: #777; margin-top: 1px; }
+.md-matrix { overflow-x: auto; }
+.md-h2h { min-width: 520px; }
+.md-h2h th { white-space: nowrap; }
+.md-h2h tbody th { font-weight: 600; text-align: left; background: #fafafa; }
+.md-h2h-self { background: #f2f2f4; }
+.md-chart { margin: 4px 0 12px; }
+.md-chart svg { width: 100%; height: auto; max-width: 720px; display: block; }
+
 /* ---------------------------------------------------------------------------
    Pricing tab (27z_pricing.js). The same shape as the Conjoint and MaxDiff
    tabs: frozen panels fed by the pricing module's island (14_v2_island.R).
