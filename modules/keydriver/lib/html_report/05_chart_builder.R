@@ -342,8 +342,23 @@ build_kd_correlation_heatmap <- function(correlations, brand_colour = "#323367")
     if (nchar(v) > max_label) paste0(substr(v, 1, max_label - 1), "\u2026") else v
   }, character(1))
 
+  # LOWER TRIANGLE ONLY. The matrix is symmetric, so the upper half repeated
+  # every number, and the diagonal was a row of 1.00 in the strongest colour,
+  # which drew the eye to the only cells that carry no information. Dropping
+  # both also drops the longest rotated label, which is what used to run off
+  # the right edge (product_range came out as "product_ran").
+  #
+  # Column j is only labelled when it has a cell under it, and row i only when
+  # it has a cell beside it, so the first column and the last row carry no
+  # label of their own.
   cs <- 44; lm <- 140; rm <- 100
-  cw <- lm + n * cs + 20; ch <- rm + n * cs + 20
+  # A label rotated 45 degrees reaches up and to the RIGHT of its anchor. The
+  # width has to carry that overhang or the last one is clipped, which is the
+  # bug this had. Roughly 0.7 of the label's own length at 45 degrees.
+  longest <- max(nchar(display_names[seq_len(n - 1)]), 0)
+  overhang <- ceiling(longest * 6.2 * 0.707) + 16
+  cw <- lm + (n - 1) * cs + overhang
+  ch <- rm + (n - 1) * cs + 28
 
   # Red (#ef4444=239,68,68) <-> white <-> blue (#3b82f6=59,130,246)
   cor2col <- function(r) {
@@ -358,19 +373,19 @@ build_kd_correlation_heatmap <- function(correlations, brand_colour = "#323367")
   s <- sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" class="kd-chart kd-correlation-heatmap" role="img" aria-label="Correlation heatmap" style="font-family:%s;">',
                cw, ch, .kd_font_family)
 
-  # Rotated column headers
-  for (j in seq_len(n)) {
+  # Rotated column headers, for the columns that have cells under them.
+  for (j in seq_len(n - 1)) {
     xc <- lm + (j - 1) * cs + cs / 2
     s <- paste0(s, sprintf('\n<text x="%.1f" y="%.1f" text-anchor="start" font-size="11" fill="%s" font-weight="500" transform="rotate(-45,%.1f,%.1f)">%s</text>',
                            xc, rm - 8, .kd_label_colour, xc, rm - 8, .kd_html_escape(display_names[j])))
   }
 
-  # Row labels + cells
-  for (i in seq_len(n)) {
-    yt <- rm + (i - 1) * cs; yc <- yt + cs / 2
+  # Row labels + cells, lower triangle only (row i against column j < i).
+  for (i in 2:n) {
+    yt <- rm + (i - 2) * cs; yc <- yt + cs / 2
     s <- paste0(s, "\n", .kd_svg_text(lm - 10, yc, display_names[i], size = 11,
                                        fill = .kd_label_colour, anchor = "end", baseline = "central"))
-    for (j in seq_len(n)) {
+    for (j in seq_len(i - 1)) {
       xl <- lm + (j - 1) * cs; xc <- xl + cs / 2
       v <- cor_mat[i, j]; fill <- cor2col(v)
       s <- paste0(s, sprintf('\n<rect x="%.0f" y="%.0f" width="%d" height="%d" fill="%s" stroke="white" stroke-width="1"/>',
