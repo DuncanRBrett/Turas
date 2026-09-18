@@ -1059,18 +1059,20 @@ build_kd_interpretation_guide <- function() {
 
 
 # ==============================================================================
-# PINNED VIEWS PANEL
+# CONFIG-DRIVEN SLIDES AND THE PINNED VIEWS PANEL
 # ==============================================================================
 
-#' Build Pinned Views Panel
+#' Build the slide cards a config's CustomSlides sheet asks for
 #'
-#' Container for pinned items with export controls.
+#' These cards were built inside build_kd_pinned_panel() and then dropped on
+#' the floor: nothing in the panel it returned referenced them (review B3).
+#' They belong in the Added Slides tab, whose container the JS only ever
+#' appends to, so a server-rendered card survives page load.
 #'
-#' @return htmltools tag
+#' @param config The report config, carrying custom_slides and project_root
+#' @return A list of htmltools tags, empty when the sheet is absent
 #' @keywords internal
-build_kd_pinned_panel <- function(config = list()) {
-
-  # --- Build config-driven slide cards from CustomSlides sheet ---
+build_kd_config_slide_cards <- function(config = list()) {
   config_slides <- NULL
   cs <- config$custom_slides
   if (!is.null(cs) && is.data.frame(cs) && nrow(cs) > 0) {
@@ -1164,6 +1166,18 @@ build_kd_pinned_panel <- function(config = list()) {
       )
     })
   }
+
+  if (is.null(config_slides)) list() else config_slides
+}
+
+#' Build Pinned Views Panel
+#'
+#' Container for pinned items with export controls. The cards themselves are
+#' rendered by the JS, which clears this container on load.
+#'
+#' @return htmltools tag
+#' @keywords internal
+build_kd_pinned_panel <- function(config = list()) {
 
   # Inline section — same approach as catdriver/tabs modules
   htmltools::tags$div(

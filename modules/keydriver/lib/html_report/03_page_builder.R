@@ -71,6 +71,11 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
   .show <- function(key, default = TRUE) {
     val <- settings[[key]]
     if (is.null(val)) return(default)
+    # as.logical("Yes") is NA, which silently read as FALSE and hid a
+    # section the analyst had asked for (review M14).
+    if (exists("as_logical_setting", mode = "function")) {
+      return(as_logical_setting(val, default))
+    }
     isTRUE(as.logical(val))
   }
 
@@ -146,6 +151,7 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
     build_kd_interpretation_guide()
   }
   pinned_section <- build_kd_pinned_panel(config)
+  config_slide_cards <- build_kd_config_slide_cards(config)
   footer_section <- build_kd_footer(config)
 
   # Hidden pinned views data store
@@ -273,10 +279,14 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
                   )
                 )
               ),
+              # Slides the config asked for, rendered server side. The JS
+              # only ever appends to this container, so they survive load.
               htmltools::tags$div(id = "kd-qual-slides-container",
-                class = "kd-qual-slides-container"),
+                class = "kd-qual-slides-container",
+                config_slide_cards),
               htmltools::tags$div(id = "kd-qual-slides-empty",
                 class = "kd-pinned-empty",
+                style = if (length(config_slide_cards) > 0) "display:none" else NULL,
                 htmltools::tags$div(class = "kd-pinned-empty-icon", "\U0001F4DD"),
                 htmltools::tags$div("No slides yet. Click '+ New Slide' to add one.")
               )

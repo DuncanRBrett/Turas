@@ -169,8 +169,8 @@ modules/keydriver/
 │       ├── 99_html_report_main.R  # HTML report entry point
 │       └── js/
 │           ├── kd_navigation.js   # Section nav, scroll spy, anchor links
-│           ├── kd_pinned_views.js # Pinned section management
-│           ├── kd_slide_export.js # PNG slide export from pinned views
+│           ├── kd_pins.js        # Pinning, on the shared TurasPins library
+│           ├── kd_pins_extras.js  # Added Slides, Print and PDF
 │           └── kd_utils.js        # Shared JS utilities
 ├── tests/
 │   ├── run_tests.R                # Test runner
@@ -1163,8 +1163,8 @@ pattern used by catdriver and tabs modules.
     +-- 04_html_writer.R            # File writer
     |
     +-- js/kd_navigation.js         # Section nav, scroll spy
-    +-- js/kd_pinned_views.js       # Pinned section management
-    +-- js/kd_slide_export.js       # PNG slide export
+    +-- js/kd_pins.js               # Pinning, on shared TurasPins
+    +-- js/kd_pins_extras.js        # Added Slides, Print and PDF
     +-- js/kd_utils.js              # Shared utilities
 ```
 
@@ -1288,8 +1288,8 @@ All CSS, SVG, and JavaScript are inlined -- no external dependencies.
 | File | Purpose |
 |------|---------|
 | `kd_navigation.js` | Section navigation sidebar, scroll spy for active section highlighting, smooth anchor scrolling, tab switching |
-| `kd_pinned_views.js` | Pin sections for side-by-side comparison. Manages pinned panel visibility and content cloning |
-| `kd_slide_export.js` | Export pinned views as PNG slides using html2canvas. Manages export queue and download |
+| `kd_pins.js` | Capture a section's chart, table and commentary and hand it to the shared TurasPins library |
+| `kd_pins_extras.js` | Added Slides tab, slide images, and the Print / PDF overlay |
 | `kd_utils.js` | Shared utilities: element selection helpers, CSS class toggling, debounce, format helpers |
 
 All JavaScript is inlined into the HTML file. CSS classes and DOM
@@ -1443,8 +1443,7 @@ in the R console:
 |--------|----------|-------------|
 | `slide_title` | Yes | Title displayed on the slide |
 | `slide_content` | Yes | Slide body text (supports markdown) |
-| `slide_image` | No | File path to an image to embed in the slide |
-| `slide_order` | No | Integer controlling display order |
+| `image_path` | No | File path to an image to embed in the slide |
 
 Custom slides appear in the HTML report's Pinned Views panel,
 allowing analysts to add qualitative commentary, methodology

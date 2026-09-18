@@ -160,8 +160,28 @@
    * already holds the text. This function is a hook for any pre-save work.
    */
   window.kdSyncAllInsights = function() {
-    // Insights live in contentEditable divs — they're serialized with the page.
-    // Nothing extra needed.
+    // Insights in contentEditable divs are serialised with the page and need
+    // nothing. The qualitative commentary boxes are <textarea> elements, and a
+    // textarea's typed content lives in its .value, which is NOT written back
+    // into the markup when the page is saved: only the original child text is.
+    // So everything an analyst typed into a commentary box was lost on Save
+    // Report, and this function's own comment said nothing extra was needed
+    // (review H10).
+    //
+    // Copying .value into the element's text content before serialising is
+    // what makes it survive. The same applies to the hidden image store, which
+    // holds base64 data in .value.
+    var synced = 0;
+    ['.kd-qual-md-editor', '.kd-qual-img-store'].forEach(function (sel) {
+      document.querySelectorAll(sel).forEach(function (el) {
+        if (typeof el.value !== 'string') return;
+        if (el.textContent !== el.value) {
+          el.textContent = el.value;
+          synced += 1;
+        }
+      });
+    });
+    return synced;
   };
 
   /**

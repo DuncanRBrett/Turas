@@ -110,8 +110,8 @@ keydriver/
 │           ├── kd_utils.js
 │           ├── kd_navigation.js
 │           ├── kd_table_export.js  # Per-table CSV/Excel (NEW v10.4)
-│           ├── kd_pinned_views.js
-│           └── kd_slide_export.js
+│           ├── kd_pins.js       # Pinning, on the shared TurasPins library
+│           └── kd_pins_extras.js # Added Slides and Print/PDF
 ├── tests/
 │   ├── testthat/              # 12 test files (NEW v10.3)
 │   ├── fixtures/              # Test data generators

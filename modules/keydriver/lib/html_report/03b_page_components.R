@@ -205,6 +205,11 @@ build_kd_nav <- function(html_data, settings = list()) {
   .show <- function(key, default = TRUE) {
     val <- settings[[key]]
     if (is.null(val)) return(default)
+    # as.logical("Yes") is NA, which silently read as FALSE and hid a
+    # section the analyst had asked for (review M14).
+    if (exists("as_logical_setting", mode = "function")) {
+      return(as_logical_setting(val, default))
+    }
     isTRUE(as.logical(val))
   }
 
@@ -390,34 +395,6 @@ build_kd_section_title_row <- function(title, section_key, prefix = "",
     class = "kd-section-title-row",
     htmltools::tags$h2(class = "kd-section-title", title),
     pin_btn
-  )
-}
-
-
-# ==============================================================================
-# COMPONENT PIN BUTTON
-# ==============================================================================
-
-#' Build Component Pin Button
-#'
-#' Small ghost-style pin button for individual chart/table pinning.
-#'
-#' @param section_key Section key (e.g., "importance", "correlations")
-#' @param component Component type: "chart" or "table"
-#' @param prefix ID prefix (default empty string)
-#' @return htmltools tag
-#' @keywords internal
-build_kd_component_pin_btn <- function(section_key, component, prefix = "") {
-  label <- if (component == "chart") "\U0001F4CC Chart" else "\U0001F4CC Table"
-  htmltools::tags$button(
-    class = "kd-component-pin",
-    `data-kd-pin-section` = section_key,
-    `data-kd-pin-prefix` = prefix,
-    `data-kd-pin-component` = component,
-    onclick = sprintf("kdPinComponent('%s','%s','%s')",
-                      section_key, component, prefix),
-    title = sprintf("Pin %s only", component),
-    label
   )
 }
 

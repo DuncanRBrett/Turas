@@ -212,6 +212,46 @@ build_keydriver_settings_def <- function() {
           integer_range = NULL
         ),
         list(
+          name = "enable_elastic_net",
+          required = FALSE,
+          default = "FALSE",
+          description = "Enable elastic net regularised regression (v10.4). Requires the glmnet package.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "enable_nca",
+          required = FALSE,
+          default = "FALSE",
+          description = "Enable Necessary Condition Analysis (v10.4). Requires the NCA package.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "enable_dominance",
+          required = FALSE,
+          default = "FALSE",
+          description = "Enable dominance analysis, the full LMG decomposition (v10.4). Requires the domir package.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "enable_gam",
+          required = FALSE,
+          default = "FALSE",
+          description = "Enable GAM nonlinear effects analysis (v10.4). Requires the mgcv package.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
           name = "enable_html_report",
           required = FALSE,
           default = "FALSE",
@@ -225,7 +265,7 @@ build_keydriver_settings_def <- function() {
           name = "Generate_Stats_Pack",
           required = FALSE,
           default = "Y",
-          description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
+          description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility, designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),
           numeric_range = NULL,
@@ -434,7 +474,9 @@ build_keydriver_settings_def <- function() {
         list(
           name = "bootstrap_iterations",
           required = FALSE,
-          default = 500,
+          # Was 500 here while the code's default was 1000, a fourth place
+          # for the two-defaults problem review M8 was about to hide in.
+          default = 1000,
           description = "Number of bootstrap resamples for confidence intervals",
           valid_values_text = "Integer between 50 and 10000",
           dropdown = NULL,
@@ -450,6 +492,243 @@ build_keydriver_settings_def <- function() {
           dropdown = NULL,
           numeric_range = c(0.80, 0.99),
           integer_range = NULL
+        )
+      )
+    ),
+
+    # ------------------------------------------------------------------
+    # ADVANCED METHOD CONFIG (v10.4)
+    # ------------------------------------------------------------------
+    list(
+      section_name = "ADVANCED METHOD CONFIG",
+      fields = list(
+        list(
+          name = "elastic_net_alpha",
+          required = FALSE,
+          default = 0.5,
+          description = "Elastic net mixing parameter. 0 is ridge, 1 is lasso, 0.5 is elastic net.",
+          valid_values_text = "Numeric between 0 and 1",
+          dropdown = NULL,
+          numeric_range = c(0, 1),
+          integer_range = NULL
+        ),
+        list(
+          name = "elastic_net_nfolds",
+          required = FALSE,
+          default = 10,
+          description = "Cross-validation folds for the elastic net.",
+          valid_values_text = "Integer between 3 and 20",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = c(3, 20)
+        ),
+        list(
+          name = "gam_k",
+          required = FALSE,
+          default = 5,
+          description = "Basis dimension for the GAM smooth terms. Five suits survey scales.",
+          valid_values_text = "Integer between 3 and 20",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = c(3, 20)
+        ),
+        list(
+          name = "nca_test_reps",
+          required = FALSE,
+          default = 100,
+          description = "Permutation replications for the NCA significance test. Zero skips the test.",
+          valid_values_text = "Integer between 0 and 10000",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = c(0, 10000)
+        ),
+        list(
+          name = "min_segment_n",
+          required = FALSE,
+          default = 30,
+          description = "Minimum respondents a segment needs before it is compared.",
+          valid_values_text = "Integer between 10 and 1000",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = c(10, 1000)
+        ),
+        list(
+          name = "vif_moderate_threshold",
+          required = FALSE,
+          default = 5,
+          description = "VIF above this is flagged as moderate multicollinearity.",
+          valid_values_text = "Numeric between 2 and 20",
+          dropdown = NULL,
+          numeric_range = c(2, 20),
+          integer_range = NULL
+        ),
+        list(
+          name = "vif_high_threshold",
+          required = FALSE,
+          default = 10,
+          description = "VIF above this is flagged as severe multicollinearity.",
+          valid_values_text = "Numeric between 2 and 50",
+          dropdown = NULL,
+          numeric_range = c(2, 50),
+          integer_range = NULL
+        )
+      )
+    ),
+
+    # ------------------------------------------------------------------
+    # REPORT SECTIONS
+    # ------------------------------------------------------------------
+    list(
+      section_name = "REPORT SECTIONS",
+      fields = list(
+        list(
+          name = "correlation_display",
+          required = FALSE,
+          default = "heatmap",
+          description = "How the correlation section is shown in the HTML report.",
+          valid_values_text = "heatmap, table or both",
+          dropdown = c("heatmap", "table", "both"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "bootstrap_display",
+          required = FALSE,
+          default = "summary",
+          description = "How the bootstrap section is shown in the HTML report.",
+          valid_values_text = "summary, table or full",
+          dropdown = c("summary", "table", "full"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_exec_summary",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Executive Summary section in the HTML report.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_importance",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Importance section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_methods",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Method Comparison section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_effect_sizes",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Effect Sizes section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_correlations",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Correlations section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_diagnostics",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Model Diagnostics section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_segments",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Segment Comparison section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_shap",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the SHAP section, when SHAP has run.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_quadrant",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Quadrant section, when the quadrant has run.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_bootstrap",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Bootstrap Intervals section, when the bootstrap has run.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "html_show_guide",
+          required = FALSE,
+          default = "TRUE",
+          description = "Show the Interpretation Guide section.",
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        )
+      )
+    ),
+
+    # ------------------------------------------------------------------
+    # REPRODUCIBILITY
+    # ------------------------------------------------------------------
+    list(
+      section_name = "REPRODUCIBILITY",
+      fields = list(
+        list(
+          name = "random_seed",
+          required = FALSE,
+          default = 20260101,
+          description = "Seed for every randomised step: the bootstrap, the SHAP model and its sampling. The same seed gives the same numbers twice, and the seed used is written to the Run_Status sheet.",
+          valid_values_text = "Any whole number",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = c(1, 2147483647)
         )
       )
     ),
@@ -481,6 +760,56 @@ build_keydriver_settings_def <- function() {
           integer_range = NULL
         ),
         list(
+          name = "company_name",
+          required = FALSE,
+          default = "",
+          description = "Your organisation's name, shown in the HTML report footer. Defaults to The Research LampPost (Pty) Ltd.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "client_name",
+          required = FALSE,
+          default = "",
+          description = "The client's name, shown in the HTML report footer when set.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "researcher_name",
+          required = FALSE,
+          default = "",
+          description = "The researcher's name, shown in the HTML report header when set.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "researcher_logo_path",
+          required = FALSE,
+          default = "",
+          description = "Path to your logo image for the HTML report header. Relative paths resolve from the config file's folder.",
+          valid_values_text = "File path to a png, jpg or svg",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "client_logo_path",
+          required = FALSE,
+          default = "",
+          description = "Path to the client's logo image for the HTML report header.",
+          valid_values_text = "File path to a png, jpg or svg",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
           name = "report_title",
           required = FALSE,
           default = "",
@@ -503,7 +832,7 @@ build_keydriver_settings_def <- function() {
           name = "Project_Name",
           required = FALSE,
           default = "",
-          description = "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
+          description = "Project name. Appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
           valid_values_text = "Free text",
           dropdown = NULL,
           numeric_range = NULL,
@@ -513,7 +842,7 @@ build_keydriver_settings_def <- function() {
           name = "Analyst_Name",
           required = FALSE,
           default = "",
-          description = "Analyst name — appears in the stats pack Declaration sheet.",
+          description = "Analyst name. Appears in the stats pack Declaration sheet.",
           valid_values_text = "Free text",
           dropdown = NULL,
           numeric_range = NULL,
@@ -523,7 +852,7 @@ build_keydriver_settings_def <- function() {
           name = "Research_House",
           required = FALSE,
           default = "",
-          description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
+          description = "Research organisation name. Appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
           valid_values_text = "Free text",
           dropdown = NULL,
           numeric_range = NULL,
@@ -650,6 +979,81 @@ build_variables_examples <- function() {
 }
 
 
+#' Build CustomSlides sheet column definitions
+#'
+#' @return List of column definitions
+#' @keywords internal
+build_custom_slides_columns <- function() {
+  list(
+    list(
+      name = "slide_title",
+      width = 34,
+      required = TRUE,
+      description = "Heading for the slide, shown on the card in the Added Slides tab.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
+      name = "slide_content",
+      width = 60,
+      required = TRUE,
+      description = "Commentary for the slide. Plain text or markdown. Editable in the report.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
+      name = "image_path",
+      width = 40,
+      required = FALSE,
+      description = "Optional image for the slide. Relative paths resolve from the config file's folder.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    )
+  )
+}
+
+
+#' Build Insights sheet column definitions
+#'
+#' @return List of column definitions
+#' @keywords internal
+build_insights_columns <- function() {
+  list(
+    list(
+      name = "section",
+      width = 24,
+      required = TRUE,
+      description = "Report section to pre-fill: exec-summary, importance, method-comparison, effect-sizes, correlations, diagnostics, segment-comparison, shap, quadrant or bootstrap.",
+      dropdown = c("exec-summary", "importance", "method-comparison",
+                   "effect-sizes", "correlations", "diagnostics",
+                   "segment-comparison", "shap", "quadrant", "bootstrap"),
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
+      name = "insight_text",
+      width = 70,
+      required = TRUE,
+      description = "Commentary to place in that section's insight box. Editable in the report.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
+      name = "image_path",
+      width = 40,
+      required = FALSE,
+      description = "Optional image for the insight box. Relative paths resolve from the config file's folder.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    )
+  )
+}
+
 #' Build Segments sheet column definitions
 #'
 #' Returns a list of column definitions for the Segments table sheet.
@@ -696,18 +1100,12 @@ build_segments_columns <- function() {
 #' @return List of named lists
 #' @keywords internal
 build_segments_examples <- function() {
-  list(
-    list(
-      segment_name = "Young Adults",
-      segment_variable = "age_group",
-      segment_values = "18-24,25-34"
-    ),
-    list(
-      segment_name = "Premium Customers",
-      segment_variable = "customer_tier",
-      segment_values = "Gold,Platinum"
-    )
-  )
+  # Deliberately empty. A row on this sheet is not an example, it is an
+  # instruction: the pipeline reads the sheet and runs a segment comparison on
+  # whatever variable it names. An untouched template asked for a comparison
+  # on "age_group", a column no real study has (review M12). The shape an
+  # analyst needs is in the column descriptions and the sheet subtitle.
+  list()
 }
 
 
@@ -748,24 +1146,11 @@ build_stated_importance_columns <- function() {
 #' @return List of named lists
 #' @keywords internal
 build_stated_importance_examples <- function() {
-  list(
-    list(
-      driver = "service_quality",
-      stated_importance = 8.2
-    ),
-    list(
-      driver = "value_for_money",
-      stated_importance = 7.5
-    ),
-    list(
-      driver = "ease_of_use",
-      stated_importance = 6.8
-    ),
-    list(
-      driver = "brand_trust",
-      stated_importance = 7.1
-    )
-  )
+  # Deliberately empty, for the same reason as the Segments sheet. Rows here
+  # feed the quadrant's dual-importance comparison, and driver names that do
+  # not match the Variables sheet are dropped without a word, so an untouched
+  # template fed the quadrant five fictional ratings (review M12).
+  list()
 }
 
 
@@ -865,12 +1250,42 @@ generate_keydriver_config_template <- function(output_path) {
   )
 
   # ============================================================
+  # SHEET 5: CustomSlides
+  # ============================================================
+  # The loader has read this sheet since v10.4 and the template has never
+  # offered it, so the feature was undiscoverable from the template an analyst
+  # actually opens (review M11). No example rows, for the same reason as
+  # Segments: a row here is an instruction, not an illustration.
+  write_table_sheet(
+    wb = wb,
+    sheet_name = "CustomSlides",
+    columns_def = build_custom_slides_columns(),
+    title = "TURAS Key Driver Analysis - Custom Slides",
+    subtitle = "Commentary slides written into the report's Added Slides tab (optional). One row per slide.",
+    example_rows = NULL,
+    num_blank_rows = 15
+  )
+
+  # ============================================================
+  # SHEET 6: Insights
+  # ============================================================
+  write_table_sheet(
+    wb = wb,
+    sheet_name = "Insights",
+    columns_def = build_insights_columns(),
+    title = "TURAS Key Driver Analysis - Insights",
+    subtitle = "Commentary pre-filled into a section's insight box (optional). One row per section.",
+    example_rows = NULL,
+    num_blank_rows = 15
+  )
+
+  # ============================================================
   # SAVE
   # ============================================================
   turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 
   cat(sprintf("[KeyDriver] Config template saved to: %s\n", output_path))
-  cat(sprintf("  Sheets: Settings, Variables, Segments, StatedImportance\n"))
+  cat(sprintf("  Sheets: Settings, Variables, Segments, StatedImportance, CustomSlides, Insights\n"))
 
   invisible(output_path)
 }

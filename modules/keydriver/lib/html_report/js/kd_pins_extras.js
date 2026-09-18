@@ -187,6 +187,26 @@
   // ── Print / PDF ────────────────────────────────────────────────────────────
 
   /**
+   * Render pin commentary the way the pinned cards render it.
+   *
+   * A qual slide stores its commentary as HTML, and this overlay escaped it,
+   * so Print and PDF showed the analyst literal <p> tags (review M22). The
+   * shared renderer already handles both shapes: sanitise when it is HTML,
+   * treat it as markdown when it is not.
+   * @param {string} text - Pin commentary, HTML or plain
+   * @return {string} HTML safe to insert
+   */
+  function kdRenderInsight(text) {
+    if (window.TurasPins && TurasPins._containsHtml &&
+        TurasPins._sanitizeHtml && TurasPins._renderMarkdown) {
+      return TurasPins._containsHtml(text)
+        ? TurasPins._sanitizeHtml(text)
+        : TurasPins._renderMarkdown(text);
+    }
+    return kdEscapeHtml(text);
+  }
+
+  /**
    * Print pinned views via window.print() overlay.
    * One pin per page, section dividers as heading strips.
    */
@@ -258,7 +278,7 @@
       page.innerHTML =
         (item.panelLabel ? '<div style="font-size:13px;font-weight:700;color:#323367;text-transform:uppercase;">' + kdEscapeHtml(item.panelLabel) + "</div>" : "") +
         '<div style="font-size:16px;font-weight:600;color:#1e293b;margin:2px 0 10px;">' + kdEscapeHtml(item.sectionTitle || item.title || "") + "</div>" +
-        (item.insightText ? '<div class="kd-print-insight">' + kdEscapeHtml(item.insightText) + "</div>" : "") +
+        (item.insightText ? '<div class="kd-print-insight">' + kdRenderInsight(item.insightText) + "</div>" : "") +
         (item.imageData ? '<div style="margin-bottom:12px;text-align:center;"><img src="' + item.imageData + '" style="max-width:100%;max-height:400px;border-radius:6px;" /></div>' : "") +
         (item.chartSvg ? '<div class="kd-print-chart">' + item.chartSvg + "</div>" : "") +
         (item.tableHtml ? '<div class="kd-print-table">' + item.tableHtml + "</div>" : "") +

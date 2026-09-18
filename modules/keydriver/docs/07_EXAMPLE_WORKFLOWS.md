@@ -388,7 +388,6 @@ website_ease     | 45
 ```
 Setting            | Value
 enable_quadrant    | TRUE
-use_stated_importance | TRUE
 ```
 
 ### Step 3: Interpret Dual-Importance Matrix
@@ -692,7 +691,7 @@ AIC                 | 1245         | 1198
 Add a new sheet called **CustomSlides** to your configuration Excel file:
 
 ```
-slide_title          | slide_content                                              | slide_image           | slide_order
+slide_title          | slide_content                                              | image_path
 Executive Summary    | ## Key Findings\n\nProduct quality is the dominant driver. | summary_chart.png     | 1
 Methodology Note     | Analysis uses Shapley values with 10 drivers.\n\n...       |                       | 2
 Regional Comparison  | ## Regional View\n\nSee attached chart for breakdown.      | regional_chart.png    | 3
@@ -701,8 +700,7 @@ Regional Comparison  | ## Regional View\n\nSee attached chart for breakdown.    
 **Column definitions:**
 - `slide_title` - Title displayed at the top of the slide
 - `slide_content` - Markdown-formatted text content (supports headers, bullets, bold, italics)
-- `slide_image` - Optional file path to an image (PNG/JPG) to include on the slide; leave blank for text-only slides
-- `slide_order` - Numeric order for slide positioning within the Pinned Views panel
+- `image_path` - Optional file path to an image (PNG/JPG) to include on the slide; leave blank for text-only slides
 
 ### Step 2: Run Analysis
 
@@ -712,14 +710,14 @@ results <- run_keydriver_analysis(config_file = "custom_slides_config.xlsx")
 
 ### Step 3: View in HTML Report
 
-Custom slides appear in the **Pinned Views** panel of the HTML report, ordered by `slide_order`. They sit alongside any auto-generated pinned views.
+Custom slides appear in the **Added Slides** tab of the HTML report, in the order they are written on the sheet. From there they can be edited, reordered, given an image, and pinned to Pinned Views.
 
 ### Step 4: Tips
 
 - **Markdown support:** Use `##` for sub-headers, `**bold**` for emphasis, `-` for bullet lists
 - **Newlines:** Use `\n` in the Excel cell to create line breaks in the rendered markdown
 - **Images:** Provide paths relative to the config file location, or use absolute paths; supported formats are PNG and JPG
-- **Slide order:** Custom slides are interleaved with auto-generated content based on `slide_order` values; use decimals (e.g., 1.5) to position between existing slides
+- **Slide order:** slides appear in sheet order and can be moved with the up and down controls on each card in the report
 - **No limit:** Add as many custom slides as needed, but keep content concise for readability
 
 ---

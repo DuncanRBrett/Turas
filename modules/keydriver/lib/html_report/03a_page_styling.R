@@ -1408,18 +1408,17 @@ td.kd-td {
 }
 
 /* ================================================================ */
-/* DIAGNOSTICS TABLE                                                 */
+/* PINNED TABLE HEADING                                              */
 /* ================================================================ */
+/* A pinned Diagnostics card carries both its tables, so each one     */
+/* needs its own heading (review M23). The .kd-diagnostics-table      */
+/* rules that used to sit here styled a class no builder assigns.     */
 
-.kd-diagnostics-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.kd-diagnostics-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+.kd-pinned-table-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin: 10px 0 4px;
 }
 
 /* ================================================================ */
