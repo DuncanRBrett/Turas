@@ -1111,7 +1111,7 @@ kda_quadrant/quadrant_main.R        # Orchestrator
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `importance_source` | "auto" | Method for importance: auto/shap/relative_weights/regression/correlation |
+| `importance_source` | "auto" | Method for importance: auto/shap/relative_weights/regression/correlation. `auto` resolves to Shapley (`select_best_importance()` checks `Shapley_Value` first and it is always present), which keeps the quadrant consistent with the importance table |
 | `threshold_method` | "mean" | How to set quadrant lines: mean/median/midpoint/custom |
 | `normalize_axes` | TRUE | Normalize both axes to 0-100 |
 | `shade_quadrants` | TRUE | Add background colour to quadrant areas |

@@ -492,7 +492,7 @@ Section 6 for a full guide to the HTML report.
 | Setting              | Default | Description                                      | Valid Values                       |
 |----------------------|---------|--------------------------------------------------|------------------------------------|
 | `enable_quadrant`    | FALSE   | Enable Importance-Performance Analysis            | TRUE, FALSE                        |
-| `importance_source`  | auto    | Which importance method to use for the IPA chart  | auto, shap, relative_weights, regression, correlation |
+| `importance_source`  | auto    | Which importance method places the drivers on the IPA chart. `auto` is the Shapley decomposition, always, even when SHAP has run; set `shap` explicitly for SHAP importance | auto, shap, relative_weights, regression, correlation |
 | `threshold_method`   | mean    | How to set the quadrant boundary lines            | mean, median, midpoint             |
 | `normalize_axes`     | TRUE    | Normalize importance and performance to 0--100    | TRUE, FALSE                        |
 | `shade_quadrants`    | TRUE    | Apply colour shading to quadrant regions          | TRUE, FALSE                        |

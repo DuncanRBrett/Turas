@@ -88,3 +88,66 @@ test_that("the template dropdown and the engine agree (H11)", {
                     src, fixed = TRUE))
   expect_false(grepl('"shapley", "relative", "beta"', src, fixed = TRUE))
 })
+
+
+# ==============================================================================
+# WHAT "auto" RESOLVES TO (review F26)
+# ==============================================================================
+# Closed as working as intended, and documented. "auto" is the Shapley
+# decomposition, always, even when SHAP has run. That is deliberate: the
+# importance table on the same tab is ranked by Shapley, so a quadrant built on
+# SHAP would disagree with the table beside it about which driver is biggest,
+# with nothing on the page saying why.
+#
+# The defect F26 actually found was in the docs, which said "Uses SHAP if
+# enabled, otherwise Shapley". The code has never done that. These tests bind
+# the two together so they cannot drift apart again.
+
+test_that("auto resolves to Shapley even when SHAP importance is present (F26)", {
+  skip_if(!exists("select_best_importance", mode = "function"),
+          "quadrant prep not loaded")
+  imp <- data.frame(
+    Driver          = c("a", "b"),
+    Shapley_Value   = c(60, 40),
+    SHAP_Importance = c(30, 70),   # deliberately the opposite order
+    stringsAsFactors = FALSE)
+
+  out <- suppressWarnings(utils::capture.output(res <- select_best_importance(imp)))
+  expect_equal(res$importance, c(60, 40))
+  expect_equal(res$driver[which.max(res$importance)], "a")
+  # And it says which one it used, rather than choosing in silence.
+  expect_true(any(grepl("Shapley", out, fixed = TRUE)))
+})
+
+test_that("auto falls through to SHAP only when Shapley is absent (F26)", {
+  skip_if(!exists("select_best_importance", mode = "function"),
+          "quadrant prep not loaded")
+  imp <- data.frame(Driver = c("a", "b"), SHAP_Importance = c(30, 70),
+                    stringsAsFactors = FALSE)
+  out <- suppressWarnings(utils::capture.output(res <- select_best_importance(imp)))
+  expect_equal(res$importance, c(30, 70))
+  expect_true(any(grepl("SHAP", out, fixed = TRUE)))
+})
+
+test_that("the docs describe what auto actually does (F26)", {
+  # The claim that was there before, and was never true of the code.
+  wrong <- "Uses SHAP if enabled, otherwise Shapley"
+  docs <- c(list.files(file.path(module_dir, "docs"), pattern = "[.]md$", full.names = TRUE),
+            file.path(module_dir, "README.md"))
+  docs <- docs[file.exists(docs)]
+  for (d in docs) {
+    src <- paste(readLines(d, warn = FALSE), collapse = "\n")
+    expect_false(grepl(wrong, src, fixed = TRUE), info = basename(d))
+  }
+
+  ref <- file.path(module_dir, "docs", "06_TEMPLATE_REFERENCE.md")
+  skip_if(!file.exists(ref), "template reference not present")
+  src <- paste(readLines(ref, warn = FALSE), collapse = "\n")
+  expect_true(grepl("The Shapley decomposition, always", src, fixed = TRUE))
+
+  # And the config template an analyst opens says the same thing.
+  gen <- paste(readLines(file.path(module_dir, "lib", "generate_config_templates.R"),
+                         warn = FALSE), collapse = "\n")
+  expect_true(grepl("'auto' means the Shapley decomposition", gen, fixed = TRUE))
+  expect_true(grepl("set 'shap' explicitly", gen, fixed = TRUE))
+})
