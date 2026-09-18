@@ -540,3 +540,77 @@ test_that("maxdiff and conjoint do not define the same top-level function name",
   expect_equal(clash, character(0),
                info = paste("new cross-module name collision:", paste(clash, collapse = ", ")))
 })
+
+# ------------------------------------------------------------------------------
+# M4, the last of the v2 follow-ups: the same class as F4 and F5 above. The tabs
+# exporter drops a respondent whose utilities are all missing, because they have
+# no share profile, and returns status = "PARTIAL" saying how many. Step 11b
+# never read that status, so the run closed on [TRS PASS] COMPLETED SUCCESSFULLY
+# over an export with a smaller base than the study. Duncan ruled on 2026-09-18
+# that an excluded respondent is an event.
+#
+# The exporter's own PARTIAL behaviour is covered in test_tabs_export.R, "a
+# respondent with missing utilities is excluded and counted". What is under test
+# here is the wiring: that step 11b reads the status and folds it in. The
+# exporter is therefore stubbed, so the test cannot pass or fail for reasons
+# inside it.
+# ------------------------------------------------------------------------------
+
+test_that("M4: respondents dropped from the tabs export change the verdict", {
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  skip_if(!file.exists(main))
+  source(main, local = FALSE)
+  skip_if(!exists("export_maxdiff_shares_for_tabs", mode = "function"))
+
+  real_exporter <- get("export_maxdiff_shares_for_tabs", envir = globalenv())
+  on.exit(assign("export_maxdiff_shares_for_tabs", real_exporter, envir = globalenv()),
+          add = TRUE)
+  assign("export_maxdiff_shares_for_tabs", function(results, config, verbose = FALSE) {
+    cat("[TRS INFO] MAXD_TABS_EXPORT_EXCLUDED: 2 of 20 respondents excluded from the tabs export.\n")
+    list(status = "PARTIAL",
+         output_file = file.path(dirname(results$output_path), "stub_shares.xlsx"),
+         n_exported = 18L, n_excluded = 2L)
+  }, envir = globalenv())
+
+  W <- tempfile("md_m4_"); dir.create(W); on.exit(unlink(W, recursive = TRUE), add = TRUE)
+  cfgp <- .review_gate_project(W, c(
+    Generate_Aggregate_Logit = "YES", Generate_HB_Model = "NO", Generate_HTML_Report = "NO",
+    Generate_Simulator = "NO", Generate_TURF = "NO", Generate_Charts = "NO",
+    Generate_Stats_Pack = "NO", Generate_Tabs_Export = "YES", Generate_Segment_Tables = "NO"))
+  res <- suppressMessages(suppressWarnings(run_maxdiff(cfgp, verbose = FALSE)))
+
+  expect_equal(res$tabs_export$status, "PARTIAL")
+  # The verdict, which is the whole point: PASS over a shrunken export was the bug.
+  expect_false(identical(res$run_result$status, "PASS"))
+  # And the warning has to carry the numbers, so the reader can reconcile a
+  # tabs base built from the export against one built from the data file.
+  expect_true(any(grepl("Tabs export covers 18 of 20", unlist(res$warnings), fixed = TRUE)),
+              info = paste(unlist(res$warnings), collapse = " | "))
+  expect_true(any(grepl("will be 2 lower", unlist(res$warnings), fixed = TRUE)))
+})
+
+test_that("M4: an export that drops nobody leaves the verdict alone", {
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  skip_if(!file.exists(main))
+  source(main, local = FALSE)
+  skip_if(!exists("export_maxdiff_shares_for_tabs", mode = "function"))
+
+  real_exporter <- get("export_maxdiff_shares_for_tabs", envir = globalenv())
+  on.exit(assign("export_maxdiff_shares_for_tabs", real_exporter, envir = globalenv()),
+          add = TRUE)
+  assign("export_maxdiff_shares_for_tabs", function(results, config, verbose = FALSE) {
+    list(status = "PASS",
+         output_file = file.path(dirname(results$output_path), "stub_shares.xlsx"),
+         n_exported = 20L, n_excluded = 0L)
+  }, envir = globalenv())
+
+  W <- tempfile("md_m4b_"); dir.create(W); on.exit(unlink(W, recursive = TRUE), add = TRUE)
+  cfgp <- .review_gate_project(W, c(
+    Generate_Aggregate_Logit = "YES", Generate_HB_Model = "NO", Generate_HTML_Report = "NO",
+    Generate_Simulator = "NO", Generate_TURF = "NO", Generate_Charts = "NO",
+    Generate_Stats_Pack = "NO", Generate_Tabs_Export = "YES", Generate_Segment_Tables = "NO"))
+  res <- suppressMessages(suppressWarnings(run_maxdiff(cfgp, verbose = FALSE)))
+
+  expect_equal(res$tabs_export$status, "PASS")
+  expect_false(any(grepl("Tabs export covers", unlist(res$warnings), fixed = TRUE)))
+})
