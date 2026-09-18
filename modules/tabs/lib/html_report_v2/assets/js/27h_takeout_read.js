@@ -35,10 +35,12 @@
   /** Heading line for a pattern card (subject + context). */
   function headHtml(p) {
     if (p.kind === "portrait" || p.kind === "steady") {
-      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
+      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" +
+        ui.bannerChip(p.group) + ui.baseChip(p.base);
     }
     if (p.kind === "group") {
-      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
+      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" +
+        ui.bannerChip(p.group) + ui.baseChip(p.base);
     }
     if (p.kind === "comove") {
       return '<div class="tko-ph">' + p.bundleCount + (p.bundleCount === 1 ? " set" : " sets") +

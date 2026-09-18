@@ -597,6 +597,41 @@ run("a scanned group with no lean becomes the STEADY card; overflow goes to the 
     "no portrayed banner -> no steady card, no note");
 });
 
+run("an IN FOCUS card states its own base, and the no-story note ends on the finding", () => {
+  // Duncan, 18 Sep 2026. A portrait is a claim about a named set of people, so
+  // how many they are belongs on the card's face. It used to appear only in the
+  // also-scanned line underneath, which names the groups that got NO card.
+  const gap = (title, value, total) => ({ title, value, total, scaleMax: 5 });
+  const columns = [
+    { column: "Strained", group: "Campus", base: 48,
+      gaps: [gap("Q1", 3.1, 4.0), gap("Q2", 3.0, 4.1), gap("Q3", 3.2, 4.2)] },
+    { column: "Flat", group: "Campus", base: 1200,
+      gaps: [gap("Q1", 4.01, 4.0), gap("Q2", 4.09, 4.1), gap("Q3", 4.21, 4.2)] },
+    { column: "FlatSmall", group: "Campus", base: 60,
+      gaps: [gap("Q1", 3.99, 4.0), gap("Q2", 4.11, 4.1), gap("Q3", 4.19, 4.2)] }
+  ];
+  const t = takeout.buildPatterns({ columns, scope: { rated: 3, shares: 0 } });
+  TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
+  TR.AGG = { project: {} };
+  TR.d2 = { storeKey: (k) => k };
+  const page = takeout.readView.html(t);
+  const carded = t.patterns.filter((p) => p.kind === "portrait" || p.kind === "steady");
+  assert(carded.length > 0, "the fixture produced at least one card");
+  carded.forEach((p) => {
+    assert(page.indexOf('<span class="tko-chip tko-n">n = ' + TR.fmt.base(p.base) + "</span>") !== -1,
+      "the card for " + p.subject + " shows its base of " + p.base);
+  });
+  // The base goes through the same formatter as everywhere else, so a four
+  // figure group reads "1 200" rather than "1200".
+  assert(page.indexOf("n = 1\u202F200") !== -1 || page.indexOf("n = " + TR.fmt.base(1200)) !== -1,
+    "the base is formatted, not concatenated");
+  const note = blockOf(page, "patterns.no_story");
+  assert(note.indexOf("No consistent story held up beyond chance") !== -1,
+    "the note still says what was tested and what came back");
+  assert(note.indexOf("honest reporting") === -1,
+    "the closing editorial sentence is gone (Duncan, 18 Sep 2026)");
+});
+
 run("census floor needs real coverage. A 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {
   // CCPB shape: population_size configured (FPC active for intervals) but only
   // ~5% of the universe interviewed. A thin filtered cell (n=16 fountain owners

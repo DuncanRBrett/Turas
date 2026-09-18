@@ -768,6 +768,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-metric .tko-tb { margin-left: 4px; }
 .tko-kpi-val .tko-tb { display: block; font-size: 12px; margin-top: 3px; }
 .tko-chip.tko-bg { color: var(--brand); background: #eef0f7; }
+.tko-chip.tko-n { color: var(--muted); background: var(--soft); font-variant-numeric: tabular-nums; }
 .tko-kpi-spark { display: inline-flex; align-items: center; line-height: 0; }
 .tko-kpi-spark svg { height: 20px; width: auto; }
 .tko-reliability { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); font: 11.5px var(--font); color: var(--muted); }
