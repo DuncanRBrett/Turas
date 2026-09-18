@@ -39,6 +39,10 @@ function viewSandbox(island) {
   sb.window = sb;
   sb.TR = { fmt: { escapeHtml: (s) => String(s == null ? "" : s) } };
   vm.createContext(sb);
+  // The view's charts draw with TR.svg. 03_svg.js is unconditionally in the
+  // shipped bundle (build_report_v2.R), so loading it here keeps this sandbox
+  // honest rather than testing a view the report never runs.
+  load(sb, "03_svg.js");
   load(sb, "27y_maxdiff.js");
   sb.TR.MD = island;
   return sb;
@@ -214,6 +218,22 @@ run("no em dash reaches the reader from this view", () => {
   const src = readFileSync(path.join(JS_DIR, "27y_maxdiff.js"), "utf8");
   lacks(src, "\u2014", "em dash in the view source");
   lacks(src, "&mdash;", "named em dash");
+});
+
+run("a missing chart helper costs the charts, not the whole tab", () => {
+  // If TR.svg ever falls out of the bundle, the reader must still get the
+  // tables. An exception in render() leaves the entire MaxDiff tab blank.
+  const sb = { console };
+  sb.globalThis = sb;
+  sb.window = sb;
+  sb.TR = { fmt: { escapeHtml: (x) => String(x == null ? "" : x) } };
+  vm.createContext(sb);
+  load(sb, "27y_maxdiff.js");
+  sb.TR.MD = ISLAND;
+  const host = { innerHTML: "" };
+  sb.TR.maxdiff.render(host);
+  has(host.innerHTML, "md-table", "the scores table still renders without TR.svg");
+  lacks(host.innerHTML, "<svg", "and no half-drawn chart is emitted");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

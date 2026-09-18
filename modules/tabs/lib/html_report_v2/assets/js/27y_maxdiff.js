@@ -442,6 +442,9 @@
         if (v === null) return '<td class="md-num md-h2h-self"></td>';
         // Above 50 leans to the row item, below 50 to the column item. The
         // tint is proportional, so a near-even pair looks near-even.
+        if (!(TR.svg && TR.svg.shade)) {
+          return '<td class="md-num">' + num(v, 1) + "</td>";
+        }
         var lean = Math.min(1, Math.abs(v - 50) / 50);
         var bg = v >= 50 ? TR.svg.shade("#2e7d4f", lean * 0.55)
                          : TR.svg.shade("#b3564b", lean * 0.55);
@@ -477,6 +480,11 @@
   var GRID = "#e6e8ee";
   var INK = "#4b5263";
 
+  // 03_svg.js is unconditionally in the shipped bundle, so this is normally
+  // true. If it ever is not, the charts drop out and the tables stay; an
+  // exception here would leave the whole MaxDiff tab blank instead.
+  function canDraw() { return !!(TR.svg && TR.svg.el && TR.svg.root); }
+
   function chartBox(svgStr) {
     return '<div class="md-chart">' + svgStr + "</div>";
   }
@@ -485,13 +493,15 @@
   function seriesColours(n) {
     var out = [];
     for (var i = 0; i < n; i++) {
-      out.push(TR.svg.shade(BRAND, n === 1 ? 1 : 1 - (i / n) * 0.72));
+      out.push(canDraw() ? TR.svg.shade(BRAND, n === 1 ? 1 : 1 - (i / n) * 0.72)
+                         : BRAND);
     }
     return out;
   }
 
   /** TURF reach curve: how much reach each added item buys. */
   function turfCurveSvg(t) {
+    if (!canDraw()) return "";
     var steps = arr(t.step);
     if (!steps || steps.length < 2) return "";
     // The bottom margin holds however many label lines the longest item needs.
@@ -558,6 +568,7 @@
    * right is one everybody wants.
    */
   function quadrantSvg(sc) {
+    if (!canDraw()) return "";
     var u = arr(sc.hbUtility), sd = arr(sc.hbSpread), lab = arr(sc.label);
     if (!u || !sd || !lab) return "";
     var pts = [];
@@ -627,6 +638,7 @@
 
   /** Grouped bars: one group per item, one bar per level of a variable. */
   function segmentBarsSvg(variable, levels, items, valueAt) {
+    if (!canDraw()) return "";
     var nS = levels.length, nI = items.length;
     if (!nS || !nI) return "";
     var barH = 12, barGap = 2, groupGap = 12;
@@ -686,6 +698,7 @@
    * respondents disagreed about the item; a narrow one means they agreed.
    */
   function violinSvg(dist) {
+    if (!canDraw()) return "";
     var ids = arr(dist.itemId);
     var k = dist.nPoints;
     if (!ids || !k || !arr(dist.densityX)) return "";
