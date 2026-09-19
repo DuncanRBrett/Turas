@@ -70,12 +70,41 @@ calculate_importance <- function(model_result, config) {
   # Process Anova results
   importance_df <- process_anova_results(anova_result, config)
 
-  # car::Anova(type = "II") on glm and clm reports LIKELIHOOD-RATIO chi-squares,
-  # not Wald ones, whatever the stats pack used to claim. Verified by running it
-  # against a manual deviance difference, 2026-09-18.
-  importance_df$method <- "LR chi-square share (car::Anova type II)"
+  # Which statistic car::Anova returned is a property of the model class, not of
+  # this module: glm gives a likelihood-ratio chi-square (column "LR Chisq"),
+  # clm gives a WALD chi-square (column "Chisq"), and polr gives LR again. An
+  # earlier version of this line stamped every path as likelihood-ratio on the
+  # strength of having checked glm, which is the same dishonest provenance the
+  # stamp exists to prevent: on the ordinal demo the Wald figure is 120.4 where
+  # the likelihood-ratio one is 135.4. Read the column and say what it is.
+  importance_df$method <- .cd_anova_method_label(anova_result, model_result)
 
   importance_df
+}
+
+
+#' Name the Statistic car::Anova Returned
+#'
+#' @param anova_result The object returned by \code{car::Anova}.
+#' @param model_result The model result, used to name the engine.
+#' @return Single character string for the importance frame's method column.
+#' @keywords internal
+.cd_anova_method_label <- function(anova_result, model_result = NULL) {
+
+  cols <- tryCatch(names(as.data.frame(anova_result)), error = function(e) character(0))
+  engine <- model_result$engine_used %||% model_result$model_type %||% "model"
+
+  statistic <- if (any(grepl("^LR", cols))) {
+    "LR chi-square share"
+  } else if (any(grepl("^Chisq$", cols))) {
+    "Wald chi-square share"
+  } else if (any(grepl("^F$", cols))) {
+    "F-statistic share"
+  } else {
+    "chi-square share"
+  }
+
+  sprintf("%s (car::Anova type II on %s)", statistic, engine)
 }
 
 

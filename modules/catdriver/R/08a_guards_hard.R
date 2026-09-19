@@ -50,6 +50,71 @@ guard_require_outcome_type <- function(config) {
 }
 
 
+#' Guard: The Weight Variable Must Be Usable
+#'
+#' REFUSES when a weight variable is named in the config but cannot be used:
+#' the column is absent from the data, or it holds nothing numeric.
+#'
+#' Both cases used to run unweighted and report PASS, while the stats pack's
+#' Declaration still named the weight variable and said the analysis was
+#' weighted. A misspelled weight name is the likeliest way to ship unweighted
+#' numbers to a client believing they are weighted, so it refuses rather than
+#' degrades: the config says weighting matters, and nothing here can honour it.
+#'
+#' @param config Configuration list.
+#' @param data Data frame.
+#' @keywords internal
+guard_weight_variable_usable <- function(config, data) {
+
+  weight_var <- config$weight_var
+  if (is.null(weight_var) || !nzchar(weight_var)) {
+    return(invisible(TRUE))
+  }
+
+  if (!weight_var %in% names(data)) {
+    catdriver_refuse(
+      reason = "CFG_WEIGHT_VAR_NOT_FOUND",
+      title = "WEIGHT VARIABLE NOT IN DATA",
+      problem = paste0("The config names '", weight_var,
+                       "' as the weight variable, but the data has no such column."),
+      why_it_matters = paste0(
+        "The analysis would run unweighted while every stamp on the output said it was weighted. ",
+        "Unweighted percentages from a weighted sample are the wrong numbers."
+      ),
+      fix = paste0(
+        "Check the spelling of the Weight row in the Variables sheet against your data file.\n",
+        "Columns available: ", paste(utils::head(names(data), 40), collapse = ", "),
+        if (length(names(data)) > 40) ", ..." else "",
+        "\nIf the study is genuinely unweighted, remove the Weight row."
+      )
+    )
+  }
+
+  raw <- data[[weight_var]]
+  numeric_values <- suppressWarnings(as.numeric(raw))
+  usable <- sum(is.finite(numeric_values) & numeric_values > 0)
+
+  if (usable == 0) {
+    catdriver_refuse(
+      reason = "CFG_WEIGHT_VAR_NOT_NUMERIC",
+      title = "WEIGHT VARIABLE HOLDS NO USABLE WEIGHTS",
+      problem = paste0("Column '", weight_var,
+                       "' contains no positive numeric values (type: ", class(raw)[1], ")."),
+      why_it_matters = paste0(
+        "Every value would be repaired to 1, so the analysis would be unweighted while the output ",
+        "said it was weighted by this variable."
+      ),
+      fix = paste0(
+        "Check that '", weight_var, "' holds numbers rather than text, and that it is not empty.\n",
+        "If the study is genuinely unweighted, remove the Weight row from the Variables sheet."
+      )
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Guard: Reserved Internal Column Names
 #'
 #' REFUSES when an analysis variable is named like one of the columns the

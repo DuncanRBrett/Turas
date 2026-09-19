@@ -282,6 +282,20 @@ normalise_or_frame <- function(or_df, group_label = "") {
       as.character(or_df$factor)
     },
     level = as.character(or_df$comparison),
+    # A multinomial model produces K-1 odds ratios for every driver level, one
+    # per outcome level. Without this column they all key to the same row and
+    # the comparison keeps whichever came last, silently reporting one level of
+    # several as though it were the answer.
+    outcome_level = if ("outcome_level" %in% names(or_df)) {
+      as.character(or_df$outcome_level)
+    } else {
+      NA_character_
+    },
+    reference_outcome = if ("reference_outcome" %in% names(or_df)) {
+      as.character(or_df$reference_outcome)
+    } else {
+      NA_character_
+    },
     or = suppressWarnings(as.numeric(or_df$odds_ratio)),
     or_ci_lower = suppressWarnings(as.numeric(or_df$or_lower)),
     or_ci_upper = suppressWarnings(as.numeric(or_df$or_upper)),
@@ -307,9 +321,12 @@ normalise_or_frame <- function(or_df, group_label = "") {
 #'   containing an \code{odds_ratios} data frame in the mapper's schema
 #'   (factor, comparison, factor_label, odds_ratio, or_lower, or_upper,
 #'   p_value), read through \code{normalise_or_frame()}.
-#' @return Data frame with columns: driver, label, level,
-#'   {group}_or (numeric), {group}_ci (character), {group}_p (numeric),
-#'   or_ratio (numeric, max/min OR), notable (character, "Yes"/"No"/"-").
+#' @return Data frame with columns: driver, label, level, outcome_level,
+#'   reference_outcome, {group}_or (numeric), {group}_ci (character),
+#'   {group}_p (numeric), or_ratio (numeric, max/min OR), notable
+#'   (character, "Yes"/"No"/"-"). For a binary or ordinal outcome
+#'   outcome_level is NA; for a multinomial one there is a row per outcome
+#'   level, because a driver level has a different odds ratio against each.
 #' @keywords internal
 build_or_comparison <- function(successful) {
 
@@ -324,13 +341,16 @@ build_or_comparison <- function(successful) {
     for (i in seq_len(nrow(or_df))) {
       driver <- or_df$driver[i]
       level <- or_df$level[i]
-      key <- paste0(driver, "||", level)
+      outcome_level <- or_df$outcome_level[i]
+      key <- paste0(driver, "||", level, "||", outcome_level %||% "")
 
       if (!key %in% names(all_or)) {
         all_or[[key]] <- list(
           driver = driver,
           label = or_df$label[i],
           level = level,
+          outcome_level = outcome_level,
+          reference_outcome = or_df$reference_outcome[i],
           ors = list(),
           cis = list(),
           ps = list()
@@ -355,6 +375,7 @@ build_or_comparison <- function(successful) {
   if (length(all_or) == 0) {
     return(data.frame(
       driver = character(0), label = character(0), level = character(0),
+      outcome_level = character(0), reference_outcome = character(0),
       or_ratio = numeric(0), notable = character(0),
       stringsAsFactors = FALSE
     ))
@@ -366,6 +387,8 @@ build_or_comparison <- function(successful) {
       driver = entry$driver,
       label = entry$label,
       level = entry$level,
+      outcome_level = entry$outcome_level %||% NA_character_,
+      reference_outcome = entry$reference_outcome %||% NA_character_,
       stringsAsFactors = FALSE
     )
 

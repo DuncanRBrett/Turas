@@ -857,6 +857,13 @@ normalise_catdriver_weights <- function(raw, weight_var = "weight") {
   n_neg <- sum(w < 0)
   w[w < 0] <- 0
 
+  # Count what was genuinely a weight before any repair. A column of text or of
+  # nothing but NA would otherwise be imputed to all-ones, which fits an
+  # unweighted model while every stamp says the run was weighted.
+  genuine <- sum(is.finite(suppressWarnings(as.numeric(raw))) &
+                   suppressWarnings(as.numeric(raw)) > 0)
+  if (genuine == 0) return(out)
+
   positive <- w[w > 0]
   if (length(positive) == 0) return(out)
 

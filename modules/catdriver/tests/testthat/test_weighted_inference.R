@@ -93,11 +93,20 @@ test_that("weights already on mean 1 are left alone", {
 })
 
 test_that("a weight column with nothing usable in it is reported, not used", {
-  res <- normalise_catdriver_weights(c(0, -1, NA_real_), "wt")
-  # NA becomes 1, so this one IS usable; the all-zero case is the unusable one
-  expect_true(res$usable)
+  # Changed 2026-09-19 after review finding F2. This test used to assert that
+  # c(0, -1, NA) was usable, because the NA was repaired to 1. That is precisely
+  # the defect: a column holding no genuine weight was repaired into all-ones,
+  # the model was fitted unweighted, and every stamp said the run was weighted.
+  # Usable now means at least one value was a real positive weight to begin with.
+  expect_false(normalise_catdriver_weights(c(0, -1, NA_real_), "wt")$usable)
   expect_false(normalise_catdriver_weights(c(0, 0, 0), "wt")$usable)
   expect_null(normalise_catdriver_weights(c(0, 0, 0), "wt")$weights)
+
+  # one real weight among the wreckage is still a weighted study, with repairs
+  salvageable <- normalise_catdriver_weights(c(0, -1, NA_real_, 1.4), "wt")
+  expect_true(salvageable$usable)
+  expect_equal(salvageable$n_na_imputed, 1L)
+  expect_equal(salvageable$n_negative_zeroed, 1L)
 })
 
 test_that("the inference stamp says the design effect is not applied", {

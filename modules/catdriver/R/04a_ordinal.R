@@ -249,11 +249,27 @@ extract_clm_results <- function(model, config, guard) {
     lr_pvalue <- NA
   }
 
-  # Predicted probabilities
-  pred_probs <- tryCatch(
-    predict(model, type = "prob")$fit,
-    error = function(e) predict(model, type = "prob")
-  )
+  # Predicted probabilities, one column per outcome category.
+  #
+  # predict() on a clm WITHOUT newdata returns each respondent's probability of
+  # the category they were actually observed in, which is a fit diagnostic and
+  # not a probability of anything in particular. The probability lift then
+  # averaged that by driver level and called the difference a lift. Passing the
+  # estimation frame with the outcome column removed returns the full matrix,
+  # named by category, which is what a lift needs. Verified by running both,
+  # 2026-09-19.
+  pred_probs <- tryCatch({
+    newdata <- model$model
+    newdata[[config$outcome_var]] <- NULL
+    newdata[["(weights)"]] <- NULL
+    fit <- predict(model, newdata = newdata, type = "prob")$fit
+    if (is.null(dim(fit))) stop("clm returned no probability matrix")
+    fit
+  }, error = function(e) {
+    cat(sprintf("   [INFO] Per-category probabilities unavailable (%s); probability lift will be skipped\n",
+                conditionMessage(e)))
+    NULL
+  })
 
   # Convergence
   convergence_ok <- is.null(model$convergence) || model$convergence$code == 0

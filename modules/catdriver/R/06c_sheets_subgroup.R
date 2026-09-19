@@ -205,8 +205,14 @@ add_subgroup_or_sheet <- function(wb, comparison, config, styles) {
     openxlsx::addStyle(wb, sheet_name, style = styles$title, rows = 1, cols = 1)
   }
 
-  # Build display table — select key columns
-  display_cols <- c("driver", "label", "level")
+  # Build display table. outcome_level is present and populated only for a
+  # multinomial outcome, where every driver level carries one odds ratio per
+  # outcome level; printing the table without it says one of several is the
+  # answer.
+  has_outcome_level <- "outcome_level" %in% names(or_comp) &&
+    any(!is.na(or_comp$outcome_level))
+  display_cols <- c("driver", "label", "level",
+                    if (has_outcome_level) c("outcome_level", "reference_outcome"))
   for (grp in comparison$group_names) {
     display_cols <- c(display_cols, paste0(grp, "_or"), paste0(grp, "_p"))
   }
@@ -222,6 +228,8 @@ add_subgroup_or_sheet <- function(wb, comparison, config, styles) {
   col_names[col_names == "driver"] <- "Driver"
   col_names[col_names == "label"] <- "Label"
   col_names[col_names == "level"] <- "Level"
+  col_names[col_names == "outcome_level"] <- "Outcome Level"
+  col_names[col_names == "reference_outcome"] <- "vs Outcome"
   col_names[col_names == "or_ratio"] <- "OR Ratio"
   col_names[col_names == "notable"] <- "Notable"
   names(display_df) <- col_names

@@ -1415,9 +1415,14 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
     "TRS Events"         = trs_summary
   )
 
+  # The shared writer prints data_receipt$n_rows under DATA RECEIVED and
+  # data_used$n_respondents under "Respondents Analysed". survey_data arrives
+  # here as the post-deletion analysis frame, so taking the receipt from it
+  # printed 456 received and 500 analysed: more respondents analysed than the
+  # study received.
   data_receipt <- list(
     file_name           = basename(config$data_file %||% "unknown"),
-    n_rows              = nrow(survey_data),
+    n_rows              = as.integer(result$diagnostics$original_n %||% nrow(survey_data)),
     n_cols              = ncol(survey_data),
     questions_in_config = length(config$driver_vars)
   )
@@ -1445,9 +1450,12 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
   questions_skipped <- length(setdiff(config$driver_vars, analysed_drivers))
 
   data_used <- list(
-    n_respondents      = as.integer(n_original),
+    n_respondents      = if (!is.na(n_analysed)) as.integer(n_analysed) else as.integer(n_original),
     n_excluded         = n_excluded,
-    weight_variable    = config$weight_var %||% "",
+    # Name the weight only when one was applied. This line used to print the
+    # configured name whatever happened, so a weight that could not be used
+    # still produced a Declaration reading "weighted by <name>".
+    weight_variable    = if (!is.null(result$weight_diagnostics)) config$weight_var %||% "" else "",
     # Weighted means weights were actually applied, which the diagnostics only
     # exist for when they were.
     weighted           = !is.null(result$weight_diagnostics),
@@ -1550,7 +1558,11 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
   } else if (length(outcome_levels) == 2) {
     outcome_levels[2]
   } else {
-    "the modelled outcome"
+    # A vector of probabilities on a 3+ category outcome is not the probability
+    # of any one level, so there is nothing honest to label and nothing honest
+    # to report.
+    cat("   [INFO] Probability lift skipped: the model returned one probability per respondent, not one per outcome level\n")
+    return(NULL)
   }
 
   lift_list <- list()
