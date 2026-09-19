@@ -88,6 +88,37 @@ individual-level HB utilities · confidence intervals · MCMC convergence diagno
 
 Under a *curated* bar (Decision 1) some of these legitimately stay in the classic Excel deliverable, but that must be a **choice**, logged, not an accident.
 
+### Logged choices
+
+**catdriver, 2026-09-19 (Session C).** The `TR.CD` island carries driver
+importance with the method that computed it, an odds ratio per driver level with
+whatever interval was actually computed, probability lifts with the outcome level
+they describe, the raw factor patterns, model fit, and the subgroup comparison.
+Against the list above: model-fit statistics travel (McFadden R2, AIC, the
+likelihood-ratio test, classification accuracy); VIF travels as the
+multicollinearity check, with the method named, because on a cumulative-link
+model it is measured from the design matrix rather than the fit; design effect
+and weighting travel as the effective base and the inference stamp; confidence
+intervals travel, with the bootstrap interval where one ran and the Wald interval
+otherwise, each labelled.
+
+Deliberately NOT carried, and why:
+
+- **Per-level coefficient tables** (estimate, standard error, z). The odds ratio
+  and its interval are the same information in the units a reader uses.
+- **The missing-data report and the rare-level collapse report.** Their audience
+  is the analyst checking a run, and the island carries the counts that matter:
+  respondents analysed, respondents excluded.
+- **The bootstrap resample matrix.** Thousands of rows per term, for a
+  distribution the interval already summarises.
+- **Per-respondent fitted probabilities.** Ruled out by decision, not by
+  convenience: they are model estimates of a tabs-native outcome column with
+  artificially reduced variance, so exporting them as respondent data would
+  invite a reader to cross-tabulate a model and read the result as data.
+
+All four stay in the Excel deliverable, which is where the analyst-facing detail
+belongs.
+
 ---
 
 ## 8. Per-module execution checklist (once decisions locked)
