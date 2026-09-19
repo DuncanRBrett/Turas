@@ -499,7 +499,7 @@ row with Type = `Driver` - At most **1** row with Type = `Weight` -
 
 **When to use the Order column:** - **Always** for ordinal outcomes:
 `Low;Neutral;High` - **Always** for ordinal drivers: `D;C;B;A` -
-**Optional** for binary/nominal — leave blank
+**Optional** for binary and multinomial outcomes, leave blank
 
 **Example:**
 
@@ -826,11 +826,9 @@ report from an R script instead of the GUI:
 ``` r
 setwd("/path/to/Turas")
 
-# Source the modules
-source("modules/catdriver/R/00_main.R")
-assign(".catdriver_lib_dir",
-       file.path(getwd(), "modules/catdriver/lib"),
-       envir = globalenv())
+# Load the module. The loader sources the shared TRS infrastructure, then the
+# module files in dependency order, and sets .catdriver_lib_dir for the report.
+source("modules/catdriver/source_catdriver.R")
 source("modules/catdriver/lib/html_report/99_html_report_main.R")
 
 # Run each analysis

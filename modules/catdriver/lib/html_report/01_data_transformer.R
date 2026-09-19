@@ -167,7 +167,16 @@ transform_catdriver_for_html <- function(results, config) {
   }
 
   # Generate narrative insights
-  narrative <- generate_narrative_insights(importance, patterns, model_info, diagnostics)
+  # Which drivers the config declares ordinal, so the narrative can tell a
+  # graded relationship from an alphabetical coincidence.
+  ordinal_drivers <- character(0)
+  ds <- config$driver_settings
+  if (is.data.frame(ds) && all(c("driver", "type") %in% names(ds))) {
+    ordinal_drivers <- as.character(ds$driver[tolower(as.character(ds$type)) == "ordinal"])
+  }
+
+  narrative <- generate_narrative_insights(importance, patterns, model_info, diagnostics,
+                                           ordinal_drivers = ordinal_drivers)
 
   list(
     summary_lines = summary_lines,
@@ -205,7 +214,8 @@ transform_catdriver_for_html <- function(results, config) {
 #' @return List with: insights (character vector), dominant_driver (name or NULL),
 #'   dose_response_drivers (names), key_findings (list of finding structures)
 #' @keywords internal
-generate_narrative_insights <- function(importance, patterns, model_info, diagnostics) {
+generate_narrative_insights <- function(importance, patterns, model_info, diagnostics,
+                                        ordinal_drivers = character(0)) {
 
   insights <- character(0)
   key_findings <- list()
@@ -243,7 +253,14 @@ generate_narrative_insights <- function(importance, patterns, model_info, diagno
   }
 
   # --- Dose-response detection ---
+  #
+  # Only for drivers the config declares ordinal. A dose-response pattern means
+  # more of something produces more of the outcome, which requires the
+  # categories to have an order. Brand A, B, C sorted alphabetically and
+  # happening to line up is a coincidence, and calling it "a graded
+  # relationship" in a client report invents a finding.
   for (var_name in names(patterns)) {
+    if (!var_name %in% ordinal_drivers) next
     pat <- patterns[[var_name]]
     cats <- pat$categories
     if (length(cats) < 3) next
@@ -285,7 +302,13 @@ generate_narrative_insights <- function(importance, patterns, model_info, diagno
           category = cat$category,
           or_value = or_val,
           direction = "positive",
-          text = sprintf("%s \u2014 %s is %.1fx more likely than the reference group.",
+          # An odds ratio is a ratio of ODDS, not of probabilities. "5.3x more
+          # likely" reads as five times the chance and materially overstates
+          # the effect for any common outcome: at a 40 per cent base rate an OR
+          # of 5.3 is about a 78 per cent chance, 1.9 times as likely, not 5.3.
+          # The report's own interpretation guide said so while these standouts
+          # said otherwise.
+          text = sprintf("%s: the odds for %s are %.1f times those of the reference group.",
                          pat$label, cat$category, or_val)
         )))
       } else if (or_val <= 0.2 && or_val > 0) {
@@ -294,7 +317,7 @@ generate_narrative_insights <- function(importance, patterns, model_info, diagno
           category = cat$category,
           or_value = or_val,
           direction = "negative",
-          text = sprintf("%s \u2014 %s is %.0f%% less likely than the reference group.",
+          text = sprintf("%s: the odds for %s are %.0f%% lower than the reference group.",
                          pat$label, cat$category, (1 - or_val) * 100)
         )))
       }

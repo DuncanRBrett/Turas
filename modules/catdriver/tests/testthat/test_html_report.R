@@ -21,10 +21,12 @@ if (!dir.exists(html_report_dir)) {
 }
 
 # Source all html_report files in order
+# 08_subgroup_report.R was missing from this list, so every test of the
+# subgroup chart skipped, and a skipped test reads as a passing one.
 html_report_files <- c(
   "00_html_guard.R", "01_data_transformer.R", "02_table_builder.R",
   "03a_page_styling.R", "03b_page_components.R", "03c_section_builders.R",
-  "04_html_writer.R", "05_chart_builder.R"
+  "04_html_writer.R", "05_chart_builder.R", "08_subgroup_report.R"
 )
 
 # Ensure callout registry is available (required by section builders)
@@ -762,4 +764,137 @@ test_that("build_cd_importance_section renders filter bar for many drivers", {
   # Filter bar should appear for n_drivers > 5
   expect_true(grepl("cd-importance-filter", html, fixed = TRUE) ||
               grepl("cd-or-chip-bar", html, fixed = TRUE))
+})
+
+# ==============================================================================
+# SESSION B: the report layer's P-tier
+# ==============================================================================
+
+test_that("a label with markup in it cannot break the subgroup chart", {
+  skip_if_not_installed("htmltools")
+  expect_true(exists("build_subgroup_importance_chart", mode = "function"),
+              info = "the subgroup chart builder must be loaded, not skipped past")
+
+  # P6. A config label like "Response <24h" closed the SVG text element and
+  # broke the chart. Only double quotes were escaped, and only in attributes.
+  # The group names must match the {group}_pct columns the chart reads.
+  imp <- data.frame(
+    variable = c("a", "b"),
+    label = c("Response <24h", 'Says "yes" & means it'),
+    stringsAsFactors = FALSE
+  )
+  imp[["North_rank"]] <- c(1L, 2L)
+  imp[["North_pct"]] <- c(60, 40)
+  imp[["Risk <5%_rank"]] <- c(2L, 1L)
+  imp[["Risk <5%_pct"]] <- c(35, 65)
+  comparison <- list(importance_matrix = imp,
+                     group_names = c("North", "Risk <5%"),
+                     subgroup_var = "region")
+
+  svg <- as.character(build_subgroup_importance_chart(comparison, "#323367"))
+
+  expect_false(grepl("<text[^>]*>[^<]*<24h", svg))
+  expect_true(grepl("&lt;24h", svg, fixed = TRUE))
+  expect_true(grepl("Risk &lt;5%", svg, fixed = TRUE))
+  expect_false(grepl('data-cd-sg-legend="Risk <5%"', svg, fixed = TRUE))
+})
+
+test_that("the unified report links only to sections its panels contain", {
+  skip_if(!exists("build_cd_section_nav", mode = "function"), "nav builder not loaded")
+
+  # P4. The nav always emitted "Added Slides" and "Pinned Views"; the unified
+  # panels contain neither, and cdSwitchPage() on a missing section hides every
+  # section and shows nothing, so the click blanked the whole panel.
+  present <- c("exec-summary", "importance", "patterns", "probability-lifts",
+               "odds-ratios", "diagnostics", "interpretation")
+  nav <- as.character(build_cd_section_nav("#323367", id_prefix = "u-",
+                                           sections = present,
+                                           include_help = FALSE))
+
+  expect_false(grepl("qualitative", nav, fixed = TRUE))
+  expect_false(grepl("pinned-views", nav, fixed = TRUE))
+  expect_false(grepl("cdToggleHelp", nav, fixed = TRUE))   # P5: no button, no throw
+  for (p in present) expect_true(grepl(p, nav, fixed = TRUE), info = p)
+
+  # and the single-report nav is unchanged: every link, and the help button
+  full <- as.character(build_cd_section_nav("#323367", has_subgroup = TRUE))
+  expect_true(grepl("qualitative", full, fixed = TRUE))
+  expect_true(grepl("pinned-views", full, fixed = TRUE))
+  expect_true(grepl("subgroup-comparison", full, fixed = TRUE))
+  expect_true(grepl("cdToggleHelp", full, fixed = TRUE))
+})
+
+test_that("the pin count badge id is unique per panel", {
+  skip_if(!exists("build_cd_section_nav", mode = "function"), "nav builder not loaded")
+
+  # P7. Three panels each emitted id="cd-pin-count-badge", so two of the three
+  # were unreachable and stuck at 0.
+  a <- as.character(build_cd_section_nav("#323367", id_prefix = "panel-a-"))
+  b <- as.character(build_cd_section_nav("#323367", id_prefix = "panel-b-"))
+  expect_true(grepl('id="panel-a-cd-pin-count-badge"', a, fixed = TRUE))
+  expect_true(grepl('id="panel-b-cd-pin-count-badge"', b, fixed = TRUE))
+})
+
+test_that("a dose-response claim needs an ordinal driver", {
+  skip_if(!exists("generate_narrative_insights", mode = "function"),
+          "narrative builder not loaded")
+
+  # P7. Three categories whose odds ratios happen to rise in alphabetical order
+  # are not a graded relationship. The report used to call any monotonic run a
+  # dose-response pattern "suggesting a graded relationship", for unordered
+  # factors like brand or region.
+  make_pat <- function(label) list(
+    label = label,
+    categories = list(
+      list(category = "A", is_reference = TRUE, odds_ratio = 1),
+      list(category = "B", is_reference = FALSE, odds_ratio = 1.6),
+      list(category = "C", is_reference = FALSE, odds_ratio = 2.4),
+      list(category = "D", is_reference = FALSE, odds_ratio = 3.9)
+    )
+  )
+  patterns <- list(brand = make_pat("Brand"), service = make_pat("Service rating"))
+  importance <- list(list(variable = "brand", label = "Brand", importance_pct = 55),
+                     list(variable = "service", label = "Service rating",
+                          importance_pct = 45))
+  model_info <- list(n_drivers = 2, n_observations = 400,
+                     fit_statistics = list(mcfadden_r2 = 0.2))
+
+  # Nothing declared ordinal: no dose-response claim about anything
+  none <- generate_narrative_insights(importance, patterns, model_info, list(),
+                                      ordinal_drivers = character(0))
+  expect_length(none$dose_response_drivers, 0)
+  expect_false(any(grepl("dose-response", none$insights)))
+
+  # Service declared ordinal: the claim is made about service and not brand
+  some <- generate_narrative_insights(importance, patterns, model_info, list(),
+                                      ordinal_drivers = "service")
+  expect_equal(some$dose_response_drivers, "service")
+  expect_true(any(grepl("Service rating shows a dose-response", some$insights)))
+  expect_false(any(grepl("Brand shows a dose-response", some$insights)))
+})
+
+test_that("the startup guard requires the JS the report actually embeds", {
+  main <- readLines(file.path(turas_root, "modules", "catdriver", "lib",
+                              "html_report", "99_html_report_main.R"), warn = FALSE)
+  guard_block <- main[grep("\\.cd_required_js <- c\\(", main)[1] + 0:3]
+  required <- unlist(regmatches(guard_block, gregexpr('cd_[a-z_]+\\.js', guard_block)))
+
+  read_embedded <- function(file) {
+    src <- readLines(file.path(turas_root, "modules", "catdriver", "lib",
+                               "html_report", file), warn = FALSE)
+    block <- grep("js_files <- c\\(", src)[1]
+    unlist(regmatches(src[block + 0:2], gregexpr('cd_[a-z_]+\\.js', src[block + 0:2])))
+  }
+  embedded <- unique(c(read_embedded("03_page_builder.R"),
+                       read_embedded("07_unified_report.R")))
+
+  # Every file a report embeds must be checked for, and nothing else: the guard
+  # used to require two files no builder reads while ignoring two it does.
+  expect_setequal(required, embedded)
+
+  js_dir <- file.path(turas_root, "modules", "catdriver", "lib", "html_report", "js")
+  for (f in embedded) expect_true(file.exists(file.path(js_dir, f)), info = f)
+  # and the dead pair is gone
+  expect_false(file.exists(file.path(js_dir, "cd_pinned_views.js")))
+  expect_false(file.exists(file.path(js_dir, "cd_slide_export.js")))
 })

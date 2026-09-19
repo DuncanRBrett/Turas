@@ -272,7 +272,10 @@ build_subgroup_importance_chart <- function(comp, brand_colour) {
   # Bars
   y_offset <- 35
   for (d in seq_len(n_drivers)) {
-    driver_label <- imp$label[d]
+    # Escaped, like every other chart in the report (05_chart_builder.R). A
+    # driver or group label is user text from the config: one called
+    # "Response <24h" closes the text element and breaks the whole chart.
+    driver_label <- htmltools::htmlEscape(imp$label[d])
 
     # Driver label
     svg_elements <- c(svg_elements, list(sprintf(
@@ -289,7 +292,7 @@ build_subgroup_importance_chart <- function(comp, brand_colour) {
       bar_y <- y_offset + (g - 1) * (bar_height + bar_gap)
 
       # Bar (wrapped in g with data-cd-subgroup for JS toggling)
-      safe_grp <- gsub("\"", "&quot;", grp)
+      safe_grp <- htmltools::htmlEscape(grp, attribute = TRUE)
       svg_elements <- c(svg_elements, list(sprintf(
         '<g class="cd-sg-bar" data-cd-subgroup="%s">',
         safe_grp
@@ -316,14 +319,14 @@ build_subgroup_importance_chart <- function(comp, brand_colour) {
   legend_y <- total_height - 10
   legend_x <- label_width
   for (g in seq_along(group_names)) {
-    safe_grp <- gsub("\"", "&quot;", group_names[g])
+    safe_grp <- htmltools::htmlEscape(group_names[g], attribute = TRUE)
     svg_elements <- c(svg_elements, list(sprintf(
       '<rect x="%.1f" y="%d" width="12" height="12" rx="2" fill="%s" opacity="%.2f" data-cd-sg-legend="%s"/>',
       legend_x, legend_y, brand_colour, opacities[g], safe_grp
     )))
     svg_elements <- c(svg_elements, list(sprintf(
       '<text x="%.1f" y="%d" font-size="11" fill="#64748b" font-weight="400">%s</text>',
-      legend_x + 16, legend_y + 10, group_names[g]
+      legend_x + 16, legend_y + 10, htmltools::htmlEscape(group_names[g])
     )))
     legend_x <- legend_x + nchar(group_names[g]) * 7 + 30
   }

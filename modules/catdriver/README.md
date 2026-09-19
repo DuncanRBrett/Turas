@@ -1,7 +1,9 @@
 # Turas Categorical Key Driver Module
 
-**Version:** 14.0
-**Last Updated:** March 2026
+**Version:** see `CATDRIVER_VERSION` in `R/00_main.R`, which is the single
+source of truth for what this module calls itself. The version stamped on every
+run, every workbook and every stats pack comes from there.
+**Last Updated:** September 2026
 
 Key driver analysis for categorical outcomes using logistic regression methods.
 
@@ -63,11 +65,18 @@ the config Excel by adding a **Slides** sheet (see User Manual Section 15).
 ### Using Command Line
 
 ```r
-# Source module files
-source("modules/catdriver/R/00_main.R")
+# Load the module (shared TRS infrastructure, then the module files in order)
+source("modules/catdriver/source_catdriver.R")
 
-# Run analysis
-results <- run_categorical_keydriver("path/to/config.xlsx")
+# Run analysis. with_refusal_handler turns a refusal into a result object
+# instead of an error, which is what the GUI does too.
+results <- with_refusal_handler(
+  run_categorical_keydriver("path/to/config.xlsx")
+)
+if (!catdriver_result_status(results)$ok) {
+  # the console already carries the reason and the fix
+  stop("CatDriver did not produce results")
+}
 ```
 
 ---
@@ -153,7 +162,7 @@ modules/catdriver/
 ├── lib/html_report/        # HTML report pipeline
 ├── run_catdriver_gui.R     # Shiny GUI
 └── docs/                   # Documentation
-    ├── 01_README.md        # This file
+    ├── 01_README.md        # Pointer back to this file, plus the docs index
     ├── 03_REFERENCE_GUIDE.md
     ├── 04_USER_MANUAL.md
     ├── 05_TECHNICAL_DOCS.md

@@ -27,7 +27,7 @@ The Shiny launcher opens in your browser with a grid of all 12 analytical module
 | **Weighting** | Rim, cell, and design weighting |
 | **Confidence** | Confidence intervals for proportions, means, NPS |
 | **Key Driver** | Correlation-based importance (Shapley, SHAP, Elastic Net) |
-| **Cat Driver** | Categorical driver analysis (logistic regression, SHAP) |
+| **Cat Driver** | Categorical driver analysis (logistic regression) |
 | **Conjoint** | Choice-based conjoint (HB estimation, market simulator) |
 | **MaxDiff** | Best-worst scaling (HB and aggregate) |
 | **Pricing** | Van Westendorp, Gabor-Granger, monadic pricing |

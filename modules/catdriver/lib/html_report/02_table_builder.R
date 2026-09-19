@@ -260,15 +260,18 @@ build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE, id_pre
 
   rows <- lapply(odds_ratios, function(r) {
     or_val <- r$or_value
+    # Odds, not likelihood. An odds ratio above 1 raises the ODDS; how much it
+    # raises the chance depends on the base rate, so "much more likely" is a
+    # claim this column cannot make.
     interp <- if (is.na(or_val)) ""
-              else if (or_val > 3.0) "Much more likely"
-              else if (or_val > 2.0) "Substantially more likely"
-              else if (or_val > 1.5) "Moderately more likely"
-              else if (or_val > 1.1) "Slightly more likely"
+              else if (or_val > 3.0) "Much higher odds"
+              else if (or_val > 2.0) "Substantially higher odds"
+              else if (or_val > 1.5) "Moderately higher odds"
+              else if (or_val > 1.1) "Slightly higher odds"
               else if (or_val >= 0.9) "No meaningful difference"
-              else if (or_val >= 0.67) "Slightly less likely"
-              else if (or_val >= 0.5) "Moderately less likely"
-              else "Much less likely"
+              else if (or_val >= 0.67) "Slightly lower odds"
+              else if (or_val >= 0.5) "Moderately lower odds"
+              else "Much lower odds"
 
     sig_text <- if (is.null(r$significance) || is.na(r$significance)) "" else r$significance
     sig_class <- if (grepl("\\*\\*", sig_text)) "cd-sig-strong"

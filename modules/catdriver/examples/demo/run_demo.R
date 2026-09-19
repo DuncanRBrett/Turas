@@ -34,26 +34,16 @@ if (!file.exists(data_file)) {
 # --- Source catdriver module ---
 cat("\n=== Loading CatDriver Module ===\n\n")
 
-# Shared utilities - source individual files (skip import_all.R which uses
-# sys.frame(1)$ofile and resolves to the wrong path when nested-sourced)
-shared_lib <- file.path(project_root, "modules", "shared", "lib")
-if (dir.exists(shared_lib)) {
-  shared_files <- list.files(shared_lib, pattern = "\\.R$", full.names = TRUE)
-  shared_files <- shared_files[!grepl("import_all\\.R$", shared_files)]
-  for (f in shared_files) {
-    source(f, local = FALSE)
-  }
-}
+# One loader for the whole module (modules/catdriver/source_catdriver.R). This
+# block used to source the shared library file by file, skipping import_all.R
+# for a path bug fixed on 2026-09-17, and then the module's own files in SORTED
+# order. Sorted order is what the test helper uses and the opposite of what the
+# GUI uses, and that divergence is what hid the refusal-signature clash for as
+# long as it lasted.
+source(file.path(module_dir, "source_catdriver.R"))
 
-# CatDriver R files (in order)
-r_dir <- file.path(module_dir, "R")
-r_files <- sort(list.files(r_dir, pattern = "^\\d{2}.*\\.R$", full.names = TRUE))
-for (f in r_files) {
-  source(f, local = FALSE)
-}
-
-# HTML report pipeline - set lib dir so 99_html_report_main.R can find submodules
-assign(".catdriver_lib_dir", file.path(module_dir, "lib"), envir = globalenv())
+# HTML report pipeline. The loader sets .catdriver_lib_dir; the unified builder
+# is only needed when this script builds one.
 html_main <- file.path(module_dir, "lib", "html_report", "99_html_report_main.R")
 if (file.exists(html_main)) {
   tryCatch(source(html_main, local = FALSE), error = function(e) {

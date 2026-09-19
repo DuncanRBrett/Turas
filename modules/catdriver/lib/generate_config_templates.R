@@ -196,7 +196,7 @@ build_catdriver_settings_def <- function() {
           name = "reference_category",
           required = FALSE,
           default = "",
-          description = "Reference/baseline category for comparisons. If blank, the most frequent category is used.",
+          description = "Reference/baseline category for comparisons. If blank, the first category in the declared Order is used (alphabetically first when no Order is given), NOT the most frequent.",
           valid_values_text = "A value that appears in the outcome variable",
           dropdown = NULL,
           numeric_range = NULL,
@@ -664,8 +664,12 @@ build_catdriver_driver_settings_columns <- function() {
       name = "type",
       width = 16,
       required = TRUE,
-      description = "Statistical type: ordinal (ordered categories), nominal (unordered categories), categorical (generic), control_only (included as covariate, not reported as driver).",
-      dropdown = c("ordinal", "nominal", "categorical", "control_only"),
+      # The dropdown offered "nominal", which the guard refuses
+      # (CFG_DRIVER_TYPE_INVALID), and omitted "binary", which it accepts. A
+      # template that teaches a value the code rejects is worse than no
+      # template: the user picks it from a list and the run refuses.
+      description = "Statistical type: categorical (unordered categories), ordinal (ordered categories, needs levels_order), binary (two categories), control_only (included as a covariate, not reported as a driver).",
+      dropdown = c("categorical", "ordinal", "binary", "control_only"),
       integer_range = NULL,
       numeric_range = NULL
     ),

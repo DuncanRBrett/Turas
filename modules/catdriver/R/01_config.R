@@ -104,6 +104,38 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   # Convert to named list
   settings <- setNames(as.list(settings_df$Value), settings_df$Setting)
 
+  # Say something about rows nobody reads.
+  #
+  # The loader takes each setting by name, so a misspelled one ("bootstrap_resp"
+  # for "bootstrap_reps") is simply never looked at: the run uses the default
+  # and the user believes their setting took effect. Warn rather than refuse,
+  # because a config may legitimately carry notes for its author, and because
+  # refusing on an unknown row would break every config in the field the moment
+  # a setting is renamed.
+  known_settings <- c(
+    "accent_colour", "allow_missing_reference", "analysis_name", "bootstrap_ci",
+    "bootstrap_reps", "brand_colour", "client_logo_path", "confidence_level",
+    "custom_disclaimer", "custom_footer", "data_file", "detailed_output",
+    "html_report", "min_sample_size", "missing_threshold", "multinomial_mode",
+    "outcome_type", "output_file", "probability_lifts", "rare_cell_threshold",
+    "rare_level_policy", "rare_level_threshold", "reference_category",
+    "report_title", "researcher_logo_path", "researcher_name", "slide_image_dir",
+    "subgroup_include_total", "subgroup_min_n", "subgroup_var",
+    "target_outcome_level",
+    # read from config$settings rather than through get_setting()
+    "Generate_Stats_Pack", "Project_Name", "Analyst_Name", "Research_House"
+  )
+  unknown <- setdiff(names(settings), c(known_settings, "", NA_character_))
+  unknown <- unknown[!is.na(unknown) & nzchar(unknown)]
+  if (length(unknown) > 0) {
+    cat("\n\u250C\u2500\u2500\u2500 TURAS WARNING \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
+    cat("\u2502 Settings rows CatDriver does not read, so they have no effect:\n")
+    for (u in unknown) cat(sprintf("\u2502   %s\n", u))
+    cat("\u2502 Check the spelling against docs/06_TEMPLATE_REFERENCE.md.\n")
+    cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
+  }
+  attr(settings, "unrecognised") <- unknown
+
   # ===========================================================================
   # EXTRACT AND VALIDATE FILE PATHS
   # ===========================================================================

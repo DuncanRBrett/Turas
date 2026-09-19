@@ -85,7 +85,15 @@ as_logical_setting <- function(value, default = FALSE) {
   }
 
   if (is.character(value)) {
-    return(tolower(trimws(value)) %in% c("true", "yes", "1", "on", "enabled", "t", "y"))
+    # M9: an unrecognised string used to return FALSE whatever default the
+    # caller supplied, so "YES!" silently disabled a setting the user had
+    # switched on and nothing said so.
+    text <- tolower(trimws(value))
+    if (text %in% c("true", "yes", "1", "on", "enabled", "t", "y")) return(TRUE)
+    if (text %in% c("false", "no", "0", "off", "disabled", "f", "n")) return(FALSE)
+    cat(sprintf("   [WARNING] Setting value '%s' is not a yes/no value; using the default (%s)\n",
+                value, if (isTRUE(default)) "yes" else "no"))
+    return(default)
   }
 
   if (is.numeric(value)) {
@@ -114,6 +122,10 @@ as_numeric_setting <- function(value, default = NA_real_) {
   if (is.character(value)) {
     result <- suppressWarnings(as.numeric(value))
     if (is.na(result)) {
+      # M9: "95%" quietly became the default and the run carried on as though
+      # the user had never typed anything.
+      cat(sprintf("   [WARNING] Setting value '%s' is not a number; using the default (%s)\n",
+                  value, format(default)))
       return(default)
     }
     return(result)

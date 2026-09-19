@@ -255,7 +255,8 @@ run_catdriver_gui <- function() {
 
           div(class = "turas-status-info",
             tags$strong("Note: "), "These settings are applied to the generated HTML report. ",
-            "They override any brand/colour settings in individual config files."
+            "A field you change here overrides the config file; a field you leave as it is ",
+            "lets the config file decide."
           ),
 
           checkboxInput("generate_stats_pack",
@@ -578,30 +579,13 @@ run_catdriver_gui <- function() {
             assign("TURAS_CLIENT_NAME", .client, envir = .GlobalEnv)
           }
 
-          # 1. Source shared TRS infrastructure first (required by guard files)
-          # Also loads turas_minify.R and turas_minify_verify.R
-          source(file.path(turas_root, "modules/shared/lib/import_all.R"))
-
-          # 2. Source CatDriver modules in dependency order
-          source(file.path(turas_root, "modules/catdriver/R/07_utilities.R"))
-          source(file.path(turas_root, "modules/catdriver/R/08_guard.R"))
-          source(file.path(turas_root, "modules/catdriver/R/08a_guards_hard.R"))
-          source(file.path(turas_root, "modules/catdriver/R/08b_guards_soft.R"))
-          source(file.path(turas_root, "modules/catdriver/R/01_config.R"))
-          source(file.path(turas_root, "modules/catdriver/R/02_validation.R"))
-          source(file.path(turas_root, "modules/catdriver/R/03_preprocessing.R"))
-          source(file.path(turas_root, "modules/catdriver/R/09_mapper.R"))
-          source(file.path(turas_root, "modules/catdriver/R/10_missing.R"))
-          source(file.path(turas_root, "modules/catdriver/R/04_analysis.R"))
-          source(file.path(turas_root, "modules/catdriver/R/04a_ordinal.R"))
-          source(file.path(turas_root, "modules/catdriver/R/04b_multinomial.R"))
-          source(file.path(turas_root, "modules/catdriver/R/05_importance.R"))
-          source(file.path(turas_root, "modules/catdriver/R/06a_sheets_summary.R"))
-          source(file.path(turas_root, "modules/catdriver/R/06b_sheets_detail.R"))
-          source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
-          source(file.path(turas_root, "modules/catdriver/R/06c_sheets_subgroup.R"))
-          source(file.path(turas_root, "modules/catdriver/R/11_subgroup_comparison.R"))
-          source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
+          # 1 and 2. Load the module through its one loader, which sources the
+          # shared TRS infrastructure and then the module files in dependency
+          # order. That order used to be written out here, again in the demo
+          # runner, and again in whatever a session typed by hand; three copies
+          # free to drift, and the docs told users to source 00_main.R alone,
+          # which has never worked.
+          source(file.path(turas_root, "modules/catdriver/source_catdriver.R"))
 
           # 3. Set lib dir for HTML report auto-discovery + source pipeline if multi-config
           assign(".catdriver_lib_dir",
@@ -654,14 +638,32 @@ run_catdriver_gui <- function() {
               gui_overrides$subgroup_var <- trimws(subgroup_input)
             }
 
-            # Report branding settings
-            if (is_valid_hex(input$brand_colour)) {
+            # Report branding settings.
+            #
+            # Only what the user actually changed. These inputs are PREFILLED
+            # with the module defaults, and the old code sent any non-empty
+            # value, so an untouched form still overrode whatever the config
+            # said: brand_colour, accent_colour and report_title in a config
+            # file were unreachable through the normal launch path. Comparing
+            # against the prefill is the difference between an override and a
+            # default wearing an override costume.
+            CATDRIVER_GUI_PREFILL <- list(
+              brand_colour = "#323367",
+              accent_colour = "#CC9900",
+              report_title = "Categorical Key Driver Analysis"
+            )
+            edited <- function(field, value) {
+              !is.null(value) && nzchar(value) &&
+                !identical(trimws(value), CATDRIVER_GUI_PREFILL[[field]])
+            }
+
+            if (is_valid_hex(input$brand_colour) && edited("brand_colour", input$brand_colour)) {
               gui_overrides$brand_colour <- input$brand_colour
             }
-            if (is_valid_hex(input$accent_colour)) {
+            if (is_valid_hex(input$accent_colour) && edited("accent_colour", input$accent_colour)) {
               gui_overrides$accent_colour <- input$accent_colour
             }
-            if (!is.null(input$report_title) && nzchar(input$report_title)) {
+            if (edited("report_title", input$report_title)) {
               gui_overrides$report_title <- input$report_title
             }
             if (!is.null(input$client_name) && nzchar(input$client_name)) {
@@ -686,6 +688,8 @@ run_catdriver_gui <- function() {
             }
 
             # Run with full output capture
+            # The config still wins where it says something; this is the
+            # caller's preference for configs that stay silent.
             options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
             captured <- capture_console_all({
               run_categorical_keydriver(
@@ -706,20 +710,27 @@ run_catdriver_gui <- function() {
             } else {
               result <- captured$result
 
-              # Check for TRS refusal
-              is_refused <- isTRUE(result$status == "REFUSED") ||
-                            isTRUE(result$run_status == "REFUSED")
+              # One classifier for every caller (08_guard.R). The old test here
+              # was run_status == "REFUSED"; the handler returns "REFUSE", so a
+              # refusal was announced as complete and fed to the unified report.
+              verdict <- catdriver_result_status(result)
 
-              if (is_refused) {
+              if (!verdict$ok) {
                 output_text <- paste0(output_text,
-                  sprintf("\n\u2717 Config '%s' REFUSED: %s\n", config_name,
-                          result$message %||% result$code %||% "Unknown"))
+                  sprintf("\n\u2717 Config '%s' %s%s: %s\n", config_name,
+                          verdict$status,
+                          if (!is.null(verdict$code)) paste0(" [", verdict$code, "]") else "",
+                          verdict$message))
                 failed_configs[[config_name]] <- result
+                showNotification(
+                  sprintf("%s: %s", config_name, verdict$message),
+                  type = "error", duration = NULL
+                )
 
               } else {
                 output_text <- paste0(output_text,
                   sprintf("\n\u2713 Config '%s' complete (status: %s)\n",
-                          config_name, result$run_status %||% "PASS"))
+                          config_name, verdict$status))
 
                 analyses[[config_name]] <- list(
                   results = result,
@@ -825,9 +836,22 @@ run_catdriver_gui <- function() {
               n_success, n_configs,
               if (n_configs != 1) "s" else "", n_failed))
           } else if (n_configs == 1) {
+            single_verdict <- if (!captured$has_error) {
+              catdriver_result_status(captured$result)
+            } else {
+              NULL
+            }
             if (captured$has_error) {
               output_text <- paste0(output_text,
                 "\n\n\u2717 Analysis failed - see error above")
+            } else if (!is.null(single_verdict) && !single_verdict$ok) {
+              # A single config that refused used to end on "Analysis complete!"
+              output_text <- paste0(output_text,
+                sprintf("\n\n\u2717 Analysis %s: %s", single_verdict$status,
+                        single_verdict$message))
+            } else if (!is.null(single_verdict) && identical(single_verdict$kind, "partial")) {
+              output_text <- paste0(output_text,
+                sprintf("\n\n\u26a0 %s", single_verdict$message))
             } else if (captured$has_warnings) {
               output_text <- paste0(output_text,
                 "\n\n\u26a0 Analysis complete with warnings - review above")

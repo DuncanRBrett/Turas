@@ -232,6 +232,17 @@ build_cd_css <- function(brand_colour, accent_colour) {
   display: block;
 }
 
+/* The Overview tab of the unified report is not paged.
+   Its three sections (summary cards, driver matrix, insights) are meant to be
+   read together, and that panel has no section nav to page between them, so
+   nothing ever added cd-page-active and the rule above hid all three. The
+   flagship multi-outcome deliverable opened on a blank tab: header, tab bar,
+   footer, and nothing in between. Comparison sections are always shown. */
+.cd-content .cd-comp-content .cd-section,
+.cd-content .cd-comp-section {
+  display: block;
+}
+
 .cd-section-title {
   font-size: 16px;
   font-weight: 700;
