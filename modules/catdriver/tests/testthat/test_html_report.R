@@ -21,10 +21,12 @@ if (!dir.exists(html_report_dir)) {
 }
 
 # Source all html_report files in order
+# 08_subgroup_report.R was missing from this list, so every test of the
+# subgroup chart skipped, and a skipped test reads as a passing one.
 html_report_files <- c(
   "00_html_guard.R", "01_data_transformer.R", "02_table_builder.R",
   "03a_page_styling.R", "03b_page_components.R", "03c_section_builders.R",
-  "04_html_writer.R", "05_chart_builder.R"
+  "04_html_writer.R", "05_chart_builder.R", "08_subgroup_report.R"
 )
 
 # Ensure callout registry is available (required by section builders)
@@ -762,4 +764,73 @@ test_that("build_cd_importance_section renders filter bar for many drivers", {
   # Filter bar should appear for n_drivers > 5
   expect_true(grepl("cd-importance-filter", html, fixed = TRUE) ||
               grepl("cd-or-chip-bar", html, fixed = TRUE))
+})
+
+# ==============================================================================
+# SESSION B: the report layer's P-tier
+# ==============================================================================
+
+test_that("a label with markup in it cannot break the subgroup chart", {
+  skip_if_not_installed("htmltools")
+  expect_true(exists("build_subgroup_importance_chart", mode = "function"),
+              info = "the subgroup chart builder must be loaded, not skipped past")
+
+  # P6. A config label like "Response <24h" closed the SVG text element and
+  # broke the chart. Only double quotes were escaped, and only in attributes.
+  # The group names must match the {group}_pct columns the chart reads.
+  imp <- data.frame(
+    variable = c("a", "b"),
+    label = c("Response <24h", 'Says "yes" & means it'),
+    stringsAsFactors = FALSE
+  )
+  imp[["North_rank"]] <- c(1L, 2L)
+  imp[["North_pct"]] <- c(60, 40)
+  imp[["Risk <5%_rank"]] <- c(2L, 1L)
+  imp[["Risk <5%_pct"]] <- c(35, 65)
+  comparison <- list(importance_matrix = imp,
+                     group_names = c("North", "Risk <5%"),
+                     subgroup_var = "region")
+
+  svg <- as.character(build_subgroup_importance_chart(comparison, "#323367"))
+
+  expect_false(grepl("<text[^>]*>[^<]*<24h", svg))
+  expect_true(grepl("&lt;24h", svg, fixed = TRUE))
+  expect_true(grepl("Risk &lt;5%", svg, fixed = TRUE))
+  expect_false(grepl('data-cd-sg-legend="Risk <5%"', svg, fixed = TRUE))
+})
+
+test_that("the unified report links only to sections its panels contain", {
+  skip_if(!exists("build_cd_section_nav", mode = "function"), "nav builder not loaded")
+
+  # P4. The nav always emitted "Added Slides" and "Pinned Views"; the unified
+  # panels contain neither, and cdSwitchPage() on a missing section hides every
+  # section and shows nothing, so the click blanked the whole panel.
+  present <- c("exec-summary", "importance", "patterns", "probability-lifts",
+               "odds-ratios", "diagnostics", "interpretation")
+  nav <- as.character(build_cd_section_nav("#323367", id_prefix = "u-",
+                                           sections = present,
+                                           include_help = FALSE))
+
+  expect_false(grepl("qualitative", nav, fixed = TRUE))
+  expect_false(grepl("pinned-views", nav, fixed = TRUE))
+  expect_false(grepl("cdToggleHelp", nav, fixed = TRUE))   # P5: no button, no throw
+  for (p in present) expect_true(grepl(p, nav, fixed = TRUE), info = p)
+
+  # and the single-report nav is unchanged: every link, and the help button
+  full <- as.character(build_cd_section_nav("#323367", has_subgroup = TRUE))
+  expect_true(grepl("qualitative", full, fixed = TRUE))
+  expect_true(grepl("pinned-views", full, fixed = TRUE))
+  expect_true(grepl("subgroup-comparison", full, fixed = TRUE))
+  expect_true(grepl("cdToggleHelp", full, fixed = TRUE))
+})
+
+test_that("the pin count badge id is unique per panel", {
+  skip_if(!exists("build_cd_section_nav", mode = "function"), "nav builder not loaded")
+
+  # P7. Three panels each emitted id="cd-pin-count-badge", so two of the three
+  # were unreachable and stuck at 0.
+  a <- as.character(build_cd_section_nav("#323367", id_prefix = "panel-a-"))
+  b <- as.character(build_cd_section_nav("#323367", id_prefix = "panel-b-"))
+  expect_true(grepl('id="panel-a-cd-pin-count-badge"', a, fixed = TRUE))
+  expect_true(grepl('id="panel-b-cd-pin-count-badge"', b, fixed = TRUE))
 })

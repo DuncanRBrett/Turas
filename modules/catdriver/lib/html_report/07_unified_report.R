@@ -634,8 +634,18 @@ build_cd_analysis_panel <- function(tab_id, panel_title, html_data, tables,
     )
   )
 
-  # Section nav bar (sticky, scoped with id_prefix)
-  section_nav <- build_cd_section_nav(brand_colour, id_prefix = id_prefix)
+  # Section nav bar (sticky, scoped with id_prefix).
+  #
+  # Only the sections this panel builds, and no help button: the overlay
+  # cdToggleHelp() opens is emitted by the single-report builder, so in a
+  # unified report the button threw. A link to a missing section was worse than
+  # dead: clicking it hid every section and left the panel empty.
+  section_nav <- build_cd_section_nav(
+    brand_colour, id_prefix = id_prefix,
+    sections = c("exec-summary", "importance", "patterns", "probability-lifts",
+                 "odds-ratios", "diagnostics", "interpretation"),
+    include_help = FALSE
+  )
 
   # Build all 6 sections with id_prefix
   exec_summary <- build_cd_exec_summary(html_data, brand_colour,

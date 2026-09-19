@@ -195,6 +195,74 @@ is_refusal <- function(result) {
 }
 
 
+#' Classify What a CatDriver Run Returned
+#'
+#' The one place that decides whether a run succeeded, so the GUI, a script and
+#' the tests all answer the question the same way.
+#'
+#' It exists because they did not. The GUI tested
+#' \code{result$run_status == "REFUSED"}, and \code{with_refusal_handler()}
+#' returns \code{"REFUSE"} for a refusal and \code{"ERROR"} for an unexpected
+#' error. Neither string matched, so a refused run was announced as
+#' "complete (status: REFUSE)", counted as a success, and fed into the unified
+#' report alongside runs that had actually produced results.
+#'
+#' @param result The value returned by \code{with_refusal_handler()} around
+#'   \code{run_categorical_keydriver()}.
+#'
+#' @return List with:
+#'   \item{ok}{TRUE only for PASS or PARTIAL: a run that produced results}
+#'   \item{kind}{"pass", "partial", "refused", "error", "missing" or "unknown"}
+#'   \item{status}{The status string to show a user}
+#'   \item{code}{TRS code where there is one, else NULL}
+#'   \item{message}{One line saying what happened}
+#' @export
+catdriver_result_status <- function(result) {
+
+  out <- function(ok, kind, status, message, code = NULL) {
+    list(ok = ok, kind = kind, status = status, code = code, message = message)
+  }
+
+  if (is.null(result)) {
+    return(out(FALSE, "missing", "NO RESULT",
+               "The analysis returned nothing at all."))
+  }
+
+  if (is_refusal(result)) {
+    return(out(FALSE, "refused", "REFUSED",
+               result$problem %||% result$title %||% result$message %||%
+                 "The run refused; see the console for the reason.",
+               code = result$code %||% result$reason))
+  }
+
+  if (inherits(result, "turas_error_result") ||
+      inherits(result, "catdriver_error_result") || isTRUE(result$error)) {
+    return(out(FALSE, "error", "ERROR",
+               result$message %||% "An unexpected error occurred.",
+               code = "BUG_INTERNAL_ERROR"))
+  }
+
+  status <- toupper(as.character(result$run_status %||% result$status %||% ""))
+
+  if (identical(status, "PASS")) {
+    return(out(TRUE, "pass", "PASS", "Analysis complete."))
+  }
+  if (identical(status, "PARTIAL")) {
+    n <- length(result$degraded_reasons %||% character(0))
+    return(out(TRUE, "partial", "PARTIAL",
+               sprintf("Analysis complete with %d qualification%s; see the Run_Status sheet.",
+                       n, if (n == 1) "" else "s")))
+  }
+
+  # Anything else is a failure, including a status nobody has seen before.
+  # Treating an unknown status as success is how the old check failed.
+  out(FALSE, "unknown",
+      if (nzchar(status)) status else "UNKNOWN",
+      sprintf("The analysis returned an unrecognised status (%s) and is treated as failed.",
+              if (nzchar(status)) status else "none"))
+}
+
+
 # ==============================================================================
 # GUARD STATE TRACKING
 # ==============================================================================

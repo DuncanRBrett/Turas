@@ -169,11 +169,11 @@ build_cd_forest_plot <- function(odds_ratios, brand_colour = "#323367",
   less_x <- label_width + plot_area_width * 0.15
   more_x <- label_width + plot_area_width * 0.85
   zone_labels <- sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="%s" font-style="italic">Lower likelihood</text>\n',
+    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="%s" font-style="italic">Lower odds</text>\n',
     less_x, total_height - 2, .cd_muted_colour
   )
   zone_labels <- paste0(zone_labels, sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="%s" font-style="italic">Higher likelihood</text>\n',
+    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="%s" font-style="italic">Higher odds</text>\n',
     more_x, total_height - 2, .cd_muted_colour
   ))
 

@@ -706,20 +706,27 @@ run_catdriver_gui <- function() {
             } else {
               result <- captured$result
 
-              # Check for TRS refusal
-              is_refused <- isTRUE(result$status == "REFUSED") ||
-                            isTRUE(result$run_status == "REFUSED")
+              # One classifier for every caller (08_guard.R). The old test here
+              # was run_status == "REFUSED"; the handler returns "REFUSE", so a
+              # refusal was announced as complete and fed to the unified report.
+              verdict <- catdriver_result_status(result)
 
-              if (is_refused) {
+              if (!verdict$ok) {
                 output_text <- paste0(output_text,
-                  sprintf("\n\u2717 Config '%s' REFUSED: %s\n", config_name,
-                          result$message %||% result$code %||% "Unknown"))
+                  sprintf("\n\u2717 Config '%s' %s%s: %s\n", config_name,
+                          verdict$status,
+                          if (!is.null(verdict$code)) paste0(" [", verdict$code, "]") else "",
+                          verdict$message))
                 failed_configs[[config_name]] <- result
+                showNotification(
+                  sprintf("%s: %s", config_name, verdict$message),
+                  type = "error", duration = NULL
+                )
 
               } else {
                 output_text <- paste0(output_text,
                   sprintf("\n\u2713 Config '%s' complete (status: %s)\n",
-                          config_name, result$run_status %||% "PASS"))
+                          config_name, verdict$status))
 
                 analyses[[config_name]] <- list(
                   results = result,
@@ -825,9 +832,22 @@ run_catdriver_gui <- function() {
               n_success, n_configs,
               if (n_configs != 1) "s" else "", n_failed))
           } else if (n_configs == 1) {
+            single_verdict <- if (!captured$has_error) {
+              catdriver_result_status(captured$result)
+            } else {
+              NULL
+            }
             if (captured$has_error) {
               output_text <- paste0(output_text,
                 "\n\n\u2717 Analysis failed - see error above")
+            } else if (!is.null(single_verdict) && !single_verdict$ok) {
+              # A single config that refused used to end on "Analysis complete!"
+              output_text <- paste0(output_text,
+                sprintf("\n\n\u2717 Analysis %s: %s", single_verdict$status,
+                        single_verdict$message))
+            } else if (!is.null(single_verdict) && identical(single_verdict$kind, "partial")) {
+              output_text <- paste0(output_text,
+                sprintf("\n\n\u26a0 %s", single_verdict$message))
             } else if (captured$has_warnings) {
               output_text <- paste0(output_text,
                 "\n\n\u26a0 Analysis complete with warnings - review above")

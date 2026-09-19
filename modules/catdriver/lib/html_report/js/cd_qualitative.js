@@ -120,6 +120,41 @@
   }
 
   /**
+   * Read a slide store.
+   *
+   * The stores were textareas read through .value. Save Report serialises the
+   * page with outerHTML, which writes a textarea's original text content and
+   * knows nothing about .value, so everything a user wrote was lost on reopen.
+   * They are script elements now, whose textContent DOES survive that round
+   * trip; writes go through cdSetStore so both sides stay in step.
+   *
+   * @param {HTMLElement|null} store
+   * @returns {string}
+   */
+  function cdGetStore(store) {
+    if (!store) return '';
+    if (typeof store.textContent === 'string' && store.tagName === 'SCRIPT') {
+      return store.textContent.replace(/<\\\//g, '</');
+    }
+    return store.value || '';   // a textarea from a report saved before this fix
+  }
+
+  /**
+   * Write a slide store, escaping so the script element cannot end early.
+   * @param {HTMLElement|null} store
+   * @param {string} text
+   */
+  function cdSetStore(store, text) {
+    if (!store) return;
+    var value = text == null ? '' : String(text);
+    if (store.tagName === 'SCRIPT') {
+      store.textContent = value.replace(/<\//g, '<\\/');
+    } else {
+      store.value = value;
+    }
+  }
+
+  /**
    * Get the slides container element.
    * @returns {HTMLElement|null}
    */
@@ -155,12 +190,13 @@
 
     // Render markdown
     if (mdStore && rendered) {
-      rendered.innerHTML = cdRenderMarkdown(mdStore.value || '');
+      rendered.innerHTML = cdRenderMarkdown(cdGetStore(mdStore));
     }
 
     // Restore image
-    if (imgStore && imgStore.value && imgPreview) {
-      var dataUrl = imgStore.value;
+    var storedImage = cdGetStore(imgStore);
+    if (storedImage && imgPreview) {
+      var dataUrl = storedImage;
       imgPreview.innerHTML = '<img src="' + dataUrl + '" alt="Slide image" ' +
         'style="max-width:100%; max-height:300px; border-radius:4px;" ' +
         'data-img-width="' + (card.getAttribute('data-img-width') || '') + '" ' +
@@ -185,13 +221,13 @@
 
     if (isEditing) {
       // Save and switch to view mode
-      mdStore.value = editor.value;
+      cdSetStore(mdStore, editor.value);
       rendered.innerHTML = cdRenderMarkdown(editor.value);
       editor.style.display = 'none';
       rendered.style.display = 'block';
     } else {
       // Switch to edit mode
-      editor.value = mdStore.value || '';
+      editor.value = cdGetStore(mdStore);
       editor.style.display = 'block';
       rendered.style.display = 'none';
       editor.focus();
@@ -242,7 +278,7 @@
             'placeholder="Write your content here... (supports **bold**, *italic*, ## headings, - bullets, > quotes)" ' +
             'rows="6" style="display:block;"></textarea>' +
           '<div class="cd-qual-md-rendered" style="display:none;"></div>' +
-          '<textarea class="cd-qual-md-store" style="display:none;"></textarea>' +
+          '<script type="application/x-cd-slide-md" class="cd-qual-md-store"><\/script>' +
         '</div>' +
         '<div class="cd-qual-slide-image">' +
           '<div class="cd-qual-img-preview"></div>' +
@@ -306,7 +342,7 @@
 
         // Store base64 data
         var imgStore = card.querySelector('.cd-qual-img-store');
-        if (imgStore) imgStore.value = dataUrl;
+        if (imgStore) cdSetStore(imgStore, dataUrl);
 
         // Show preview
         var preview = card.querySelector('.cd-qual-img-preview');
@@ -353,7 +389,7 @@
     var preview = card.querySelector('.cd-qual-img-preview');
     var input = card.querySelector('.cd-qual-img-input');
 
-    if (imgStore) imgStore.value = '';
+    if (imgStore) cdSetStore(imgStore, '');
     if (preview) preview.innerHTML = '';
     if (input) input.value = '';
 
@@ -423,12 +459,12 @@
 
     // Sync editor to store if still in edit mode
     if (editor && editor.style.display !== 'none') {
-      if (mdStore) mdStore.value = editor.value;
+      if (mdStore) cdSetStore(mdStore, editor.value);
     }
 
     var title = titleEl ? titleEl.textContent.trim() : 'Untitled Slide';
-    var mdText = mdStore ? mdStore.value : '';
-    var imgData = imgStore ? imgStore.value : '';
+    var mdText = cdGetStore(mdStore);
+    var imgData = cdGetStore(imgStore);
 
     // Build the pin object
     var pin = {

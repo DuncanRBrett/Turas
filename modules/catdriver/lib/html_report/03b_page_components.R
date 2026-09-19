@@ -6,8 +6,40 @@
 # Extracted from 03_page_builder.R for maintainability.
 # ==============================================================================
 
+#' Escape text stored inside a script element
+#'
+#' A script element ends at the first \code{</} sequence, whatever follows it,
+#' so a slide containing \code{</script>} (or any markup a user pasted) would
+#' end the store early and spill its content into the page. Escaping the
+#' slash is enough, and the reader reverses it.
+#'
+#' @param text Character scalar, possibly NULL.
+#' @return Character scalar safe to place inside a script element.
+#' @keywords internal
+cd_escape_store_text <- function(text) {
+  if (is.null(text) || length(text) == 0 || is.na(text[1])) return("")
+  gsub("</", "<\\/", as.character(text)[1], fixed = TRUE)
+}
+
+
+#' Build the section navigation bar
+#'
+#' @param brand_colour Brand colour.
+#' @param id_prefix Prefix for element ids in a unified report.
+#' @param has_subgroup Whether a subgroup section exists in this panel.
+#' @param sections Character vector of the section keys the panel ACTUALLY
+#'   contains. A link to a section that is not there deactivates every section
+#'   and leaves the panel blank, because cdSwitchPage() hides all of them and
+#'   then finds nothing to show. The unified report emitted "Added Slides" and
+#'   "Pinned Views" links into panels that have neither.
+#' @param include_help Whether to show the help button. The overlay it opens is
+#'   built by the single-report builder only, so in a unified report the button
+#'   called a function that was never defined.
+#' @keywords internal
 build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "",
-                                  has_subgroup = FALSE) {
+                                  has_subgroup = FALSE,
+                                  sections = NULL,
+                                  include_help = TRUE) {
 
   # Page-based navigation (show/hide sections instead of scrolling)
   links <- list(
@@ -41,22 +73,33 @@ build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "",
                       onclick = "cdSwitchPage('pinned-views')",
                       htmltools::HTML(paste0(
                         "Pinned Views ",
-                        '<span id="cd-pin-count-badge" class="cd-pin-count-badge">0</span>'
+                        '<span id="', id_prefix, 'cd-pin-count-badge" class="cd-pin-count-badge">0</span>'
                       )))
   ))
 
-  help_btn <- htmltools::tags$button(
-    class = "cd-help-btn-nav",
-    onclick = "cdToggleHelp()",
-    title = "Show help guide",
-    "?"
-  )
+  # Keep only the links whose sections are present. The id lives in the
+  # data-cd-page attribute, so the filter reads the same key cdSwitchPage uses.
+  if (!is.null(sections)) {
+    links <- Filter(function(link) {
+      page <- link$attribs[["data-cd-page"]]
+      is.null(page) || page %in% sections
+    }, links)
+  }
+
+  nav_children <- links
+  if (isTRUE(include_help)) {
+    nav_children <- c(nav_children, list(htmltools::tags$button(
+      class = "cd-help-btn-nav",
+      onclick = "cdToggleHelp()",
+      title = "Show help guide",
+      "?"
+    )))
+  }
 
   htmltools::tags$nav(
     class = "cd-section-nav",
     id = paste0(id_prefix, "cd-section-nav"),
-    links,
-    help_btn
+    nav_children
   )
 }
 
@@ -753,9 +796,22 @@ build_cd_qual_slide_card <- function(slide_id, title, content_md, image_data = N
     ),
     # Rendered output (shown when not editing)
     htmltools::tags$div(class = "cd-qual-md-rendered"),
-    # Hidden stores for persistence
-    htmltools::tags$textarea(class = "cd-qual-md-store", style = "display:none;", content_md),
-    htmltools::tags$textarea(class = "cd-qual-img-store", style = "display:none;",
-      if (!is.null(image_data) && nzchar(image_data %||% "")) image_data else "")
+    # Hidden stores for persistence.
+    #
+    # These were textareas, read and written through .value. Save Report
+    # serialises the page with outerHTML, which writes a textarea's ORIGINAL
+    # text content and knows nothing about .value, so every slide a user had
+    # written came back empty on reopen. Worse, hydrateCard then re-rendered
+    # from the empty store and wiped the rendered HTML that had survived.
+    #
+    # A script element of a non-executable type keeps its textContent through
+    # outerHTML, which is the pattern TurasPins already uses for its island.
+    htmltools::tags$script(type = "application/x-cd-slide-md",
+                           class = "cd-qual-md-store",
+                           htmltools::HTML(cd_escape_store_text(content_md))),
+    htmltools::tags$script(type = "application/x-cd-slide-img",
+                           class = "cd-qual-img-store",
+                           htmltools::HTML(cd_escape_store_text(
+                             if (!is.null(image_data) && nzchar(image_data %||% "")) image_data else "")))
   )
 }

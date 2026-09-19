@@ -285,7 +285,13 @@ generate_narrative_insights <- function(importance, patterns, model_info, diagno
           category = cat$category,
           or_value = or_val,
           direction = "positive",
-          text = sprintf("%s \u2014 %s is %.1fx more likely than the reference group.",
+          # An odds ratio is a ratio of ODDS, not of probabilities. "5.3x more
+          # likely" reads as five times the chance and materially overstates
+          # the effect for any common outcome: at a 40 per cent base rate an OR
+          # of 5.3 is about a 78 per cent chance, 1.9 times as likely, not 5.3.
+          # The report's own interpretation guide said so while these standouts
+          # said otherwise.
+          text = sprintf("%s: the odds for %s are %.1f times those of the reference group.",
                          pat$label, cat$category, or_val)
         )))
       } else if (or_val <= 0.2 && or_val > 0) {
@@ -294,7 +300,7 @@ generate_narrative_insights <- function(importance, patterns, model_info, diagno
           category = cat$category,
           or_value = or_val,
           direction = "negative",
-          text = sprintf("%s \u2014 %s is %.0f%% less likely than the reference group.",
+          text = sprintf("%s: the odds for %s are %.0f%% lower than the reference group.",
                          pat$label, cat$category, (1 - or_val) * 100)
         )))
       }
