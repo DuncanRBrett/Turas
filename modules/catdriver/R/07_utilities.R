@@ -622,31 +622,11 @@ format_ci <- function(lower, upper, digits = 2) {
 # MODEL DIAGNOSTIC HELPERS
 # ==============================================================================
 
-#' Calculate McFadden Pseudo R-squared
-#'
-#' @param model Fitted model (glm, polr, or multinom)
-#' @param null_model Optional null model for comparison
-#' @return Numeric pseudo R-squared value
-#' @keywords internal
-calc_mcfadden_r2 <- function(model, null_model = NULL) {
-  # Get log-likelihoods
-  ll_full <- logLik(model)[1]
+# calc_mcfadden_r2() was deleted 2026-09-18. It had no callers and, worse, it
+# fabricated its null log-likelihood as `ll_full * 0.5` behind a placeholder
+# comment, so anything that had started using it would have got an invented
+# R-squared. Each engine computes McFadden against its own fitted null model.
 
-  if (!is.null(null_model)) {
-    ll_null <- logLik(null_model)[1]
-  } else {
-    # Try to get from model
-    if (inherits(model, "glm")) {
-      ll_null <- model$null.deviance / -2
-    } else {
-      # Approximate from model
-      cat("   [WARNING] Null model not provided, R-squared may be approximate\n")
-      ll_null <- ll_full * 0.5  # Placeholder
-    }
-  }
-
-  1 - (ll_full / ll_null)
-}
 
 
 #' Check for Separation in Binary Model
@@ -743,6 +723,263 @@ safe_rbind <- function(...) {
 #'   - design_effect: Kish design effect = n / effective_n
 #'   - has_extreme_weights: TRUE if max/min > 10
 #' @export
+#' How Many Parameters the Model Fitted
+#'
+#' Events per parameter is only meaningful against the parameters that were
+#' estimated. glm and polr report them through \code{coef()}; clm adds its
+#' thresholds (\code{alpha}); multinom holds a matrix with one row per
+#' non-reference outcome level.
+#'
+#' @param model A fitted model object.
+#' @return Integer count, or NULL when the shape is unfamiliar.
+#' @keywords internal
+cd_fitted_parameter_count <- function(model) {
+  if (is.null(model)) return(NULL)
+
+  if (inherits(model, "multinom")) {
+    cf <- tryCatch(coef(model), error = function(e) NULL)
+    if (is.null(cf)) return(NULL)
+    return(as.integer(length(cf)))
+  }
+  if (inherits(model, "clm")) {
+    return(as.integer(length(model$beta %||% coef(model)) + length(model$alpha %||% 0)))
+  }
+  if (inherits(model, "polr")) {
+    return(as.integer(length(coef(model)) + length(model$zeta %||% 0)))
+  }
+  cf <- tryCatch(coef(model), error = function(e) NULL)
+  if (is.null(cf)) return(NULL)
+  as.integer(sum(!is.na(cf)))
+}
+
+
+#' The Outcome Values the Model Actually Fitted
+#'
+#' Predictions come back only for the rows the fit used, while the caller's
+#' frame still holds every row. Crossing the two produced
+#' "all arguments must have the same length" the moment any predictor had a
+#' missing value: a raw error, not a refusal. This returns the outcome vector
+#' aligned to the fitted rows.
+#'
+#' @param model A fitted model object.
+#' @param data The frame passed to the fit.
+#' @param outcome_var Name of the outcome column.
+#' @return The outcome vector for the fitted rows.
+#' @keywords internal
+cd_fitted_outcome <- function(model, data, outcome_var) {
+  keep <- cd_estimation_rows(model, nrow(data))
+  if (is.null(keep)) data[[outcome_var]] else data[[outcome_var]][keep]
+}
+
+
+#' Row Positions the Model Fitted
+#'
+#' The positions of \code{data}'s rows that survived the fit's own listwise
+#' deletion, or NULL when nothing was dropped.
+#'
+#' This reads \code{model$na.action}, which the fitted object carries, rather
+#' than \code{model.frame(model)}: model.frame re-evaluates the model call in
+#' the FORMULA's environment, and CatDriver builds its formulas in the caller,
+#' so the fit's local data frame is not visible there. Verified by running it,
+#' 2026-09-18: model.frame() on a multinom fitted this way fails with
+#' "object 'fit_data' not found".
+#'
+#' @param model A fitted model object.
+#' @param n_rows Number of rows in the frame handed to the fit.
+#' @return Integer vector of kept positions, or NULL when all rows were used.
+#' @keywords internal
+cd_estimation_rows <- function(model, n_rows) {
+  omit <- model$na.action
+  if (is.null(omit) || length(omit) == 0) return(NULL)
+  if (!inherits(omit, "omit")) return(NULL)
+  dropped <- as.integer(unclass(omit))
+  dropped <- dropped[!is.na(dropped) & dropped >= 1 & dropped <= n_rows]
+  if (length(dropped) == 0) return(NULL)
+  setdiff(seq_len(n_rows), dropped)
+}
+
+
+#' Muffle the Binomial Non-Integer-Successes Warning
+#'
+#' With frequency weights that are not whole numbers, \code{glm(family =
+#' binomial)} (and \code{MASS::polr}, which uses a binomial fit for its
+#' starting values) warns "non-integer #successes in a binomial glm!" on every
+#' fit. The warning says the weights are not counts; it does not say the fit is
+#' wrong. Coefficients and the deviance-based likelihood-ratio tests are the
+#' ones the module reports, and they are correct.
+#'
+#' It matters that this is muffled at the fit site rather than swallowed by a
+#' \code{tryCatch(warning = ...)} handler: the old bootstrap code treated the
+#' warning as a failure and returned NULL, so weighted binary runs silently lost
+#' their confidence intervals.
+#'
+#' Switching the family to \code{quasibinomial} was considered and rejected:
+#' it keeps the coefficients identical but estimates a dispersion parameter, so
+#' the standard errors move, and \code{logLik()}/\code{AIC()} return NA, which
+#' would take out McFadden R-squared and the LR test. Verified by running both
+#' on a weighted fit, 2026-09-18.
+#'
+#' @param expr Expression to evaluate.
+#' @return The value of \code{expr}.
+#' @export
+cd_muffle_noninteger_successes <- function(expr) {
+  withCallingHandlers(
+    expr,
+    warning = function(w) {
+      if (grepl("non-integer #successes", conditionMessage(w), fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
+
+#' How far a weight vector's mean may sit from 1 before the run calls it a
+#' rescale. Below this the weights are still normalised; the run just does not
+#' report it, because rounding in a config workbook is not a finding.
+#' @keywords internal
+CATDRIVER_WEIGHT_RESCALE_TOLERANCE <- 1e-3
+
+
+#' Normalise a Weight Vector to Mean 1
+#'
+#' CatDriver's four engines pass weights to glm/clm/polr/multinom as frequency
+#' weights, which means the standard errors scale with the SUM of the weights,
+#' not with the number of respondents. Expansion weights (summing to a
+#' population) therefore produce standard errors that are far too small and
+#' p-values that are far too significant, silently, under PASS. Normalising to
+#' mean 1 makes the weighted sample the size of the real sample, which is the
+#' frequency-weight approximation the module stamps on its output.
+#'
+#' NA weights are imputed to 1 and negative weights to 0, as before, but the
+#' counts are returned so the caller can report them instead of hiding them.
+#'
+#' @param raw Weight vector as read from the data (any type).
+#' @param weight_var Name of the weight variable, used in messages.
+#'
+#' @return List with:
+#'   \item{weights}{Numeric vector normalised to mean 1, or NULL if unusable}
+#'   \item{n_na_imputed}{Count of NA weights set to 1}
+#'   \item{n_negative_zeroed}{Count of negative weights set to 0}
+#'   \item{n_zero}{Count of zero weights after imputation}
+#'   \item{raw_mean}{Mean of the weights before normalisation}
+#'   \item{scale_factor}{Multiplier applied (1 / raw_mean)}
+#'   \item{rescaled}{TRUE when the raw mean was not already 1}
+#'   \item{notes}{Character vector of human-readable notes}
+#'   \item{usable}{FALSE when no positive finite weight remains}
+#' @export
+normalise_catdriver_weights <- function(raw, weight_var = "weight") {
+
+  out <- list(
+    weights = NULL, n_na_imputed = 0L, n_negative_zeroed = 0L, n_zero = 0L,
+    raw_mean = NA_real_, scale_factor = NA_real_, rescaled = FALSE,
+    notes = character(0), usable = FALSE
+  )
+
+  if (is.null(raw) || length(raw) == 0) return(out)
+
+  w <- suppressWarnings(as.numeric(raw))
+
+  n_na <- sum(is.na(w))
+  w[is.na(w)] <- 1
+  n_nonfinite <- sum(!is.finite(w))
+  w[!is.finite(w)] <- 1
+  n_neg <- sum(w < 0)
+  w[w < 0] <- 0
+
+  # Count what was genuinely a weight before any repair. A column of text or of
+  # nothing but NA would otherwise be imputed to all-ones, which fits an
+  # unweighted model while every stamp says the run was weighted.
+  genuine <- sum(is.finite(suppressWarnings(as.numeric(raw))) &
+                   suppressWarnings(as.numeric(raw)) > 0)
+  if (genuine == 0) return(out)
+
+  positive <- w[w > 0]
+  if (length(positive) == 0) return(out)
+
+  raw_mean <- mean(positive)
+  scale_factor <- if (raw_mean > 0) 1 / raw_mean else 1
+  if (!isTRUE(all.equal(raw_mean, 1))) w <- w * scale_factor
+
+  # Rim weights arrive already on mean 1 and are then rounded in the config
+  # workbook, so their mean is 1.0000002 rather than 1. Normalising them is
+  # free, but calling that a rescale would put every ordinary weighted run into
+  # PARTIAL with a reason that says nothing. Only a materially different scale
+  # (expansion weights, percentages, counts) is reported.
+  rescaled <- abs(raw_mean - 1) > CATDRIVER_WEIGHT_RESCALE_TOLERANCE
+
+  notes <- character(0)
+  if (n_na > 0) {
+    notes <- c(notes, sprintf("%d missing weight(s) in '%s' set to 1", n_na, weight_var))
+  }
+  if (n_nonfinite > 0) {
+    notes <- c(notes, sprintf("%d non-finite weight(s) in '%s' set to 1", n_nonfinite, weight_var))
+  }
+  if (n_neg > 0) {
+    notes <- c(notes, sprintf("%d negative weight(s) in '%s' set to 0 (those respondents carry no information)",
+                              n_neg, weight_var))
+  }
+  if (rescaled) {
+    notes <- c(notes, sprintf("Weights rescaled to mean 1 over the respondents carrying a positive weight (raw mean %.4f, factor %.6g); without this, standard errors would follow the weight total rather than the sample size",
+                              raw_mean, scale_factor))
+  }
+
+  out$weights <- w
+  out$n_na_imputed <- as.integer(n_na)
+  out$n_nonfinite_imputed <- as.integer(n_nonfinite)
+  out$n_negative_zeroed <- as.integer(n_neg)
+  out$n_zero <- as.integer(sum(w == 0))
+  out$raw_mean <- raw_mean
+  out$scale_factor <- scale_factor
+  out$rescaled <- rescaled
+  out$notes <- notes
+  out$usable <- TRUE
+
+  out
+}
+
+
+#' Inference Stamp for a Weighted CatDriver Run
+#'
+#' The honest one-line description of what the weighting did and did not do.
+#' CatDriver treats weights as frequency weights normalised to mean 1; it does
+#' not run design-based (survey-package) inference, so the design effect is
+#' reported but never applied to the standard errors.
+#'
+#' @param weight_var Name of the weight variable, or NULL/"" if unweighted.
+#' @param diagnostics Output of \code{calculate_weight_diagnostics()}, or NULL.
+#' @param normalisation Output of \code{normalise_catdriver_weights()}, or NULL.
+#'
+#' @return Single character string.
+#' @export
+catdriver_weighting_stamp <- function(weight_var = NULL, diagnostics = NULL,
+                                      normalisation = NULL) {
+
+  if (is.null(weight_var) || !nzchar(weight_var) || is.null(diagnostics)) {
+    return("Unweighted analysis. Standard errors, confidence intervals and p-values assume simple random sampling.")
+  }
+
+  # "Mean 1" is true of the respondents who carry a weight. Zero-weight rows stay
+  # in the frame and in the reported sample size, so the delivered vector's own
+  # mean is below 1 whenever there are any, and saying "mean 1" flatly would be
+  # a small untruth in a stamp whose whole job is precision.
+  parts <- sprintf("Weighted by '%s', applied as frequency weights normalised to mean 1 across the respondents with a positive weight.",
+                   weight_var)
+
+  if (!is.null(normalisation) && isTRUE(normalisation$rescaled)) {
+    parts <- paste(parts, sprintf("Raw weights had mean %.4f and were rescaled by %.6g.",
+                                  normalisation$raw_mean, normalisation$scale_factor))
+  }
+
+  parts <- paste(parts, sprintf("Kish effective n = %.0f of %d (design effect %.2f).",
+                                diagnostics$effective_n, diagnostics$n_weights,
+                                diagnostics$design_effect))
+
+  paste(parts,
+        "Inference is a frequency-weight approximation: the design effect is reported but NOT applied to standard errors, confidence intervals or p-values, so significance is stated slightly optimistically. Design-based inference is not implemented in CatDriver.")
+}
+
+
 calculate_weight_diagnostics <- function(weights) {
 
   if (is.null(weights) || length(weights) == 0) {
@@ -768,8 +1005,18 @@ calculate_weight_diagnostics <- function(weights) {
   # Coefficient of variation
   cv_w <- if (mean_w > 0) sd_w / mean_w else NA
 
-  # Kish effective sample size: (sum(w))^2 / sum(w^2)
-  effective_n <- if (sum_w2 > 0) (sum_w^2) / sum_w2 else n
+  # Kish effective sample size: (sum(w))^2 / sum(w^2).
+  # One definition for the platform (modules/shared/lib/effective_n.R, OPUS-0).
+  # The local expression below is the same statistic and is only reached when
+  # that file was not sourced; it is kept so a bare source() of this file still
+  # works.
+  effective_n <- if (exists("calculate_effective_n", mode = "function")) {
+    calculate_effective_n(w)
+  } else if (sum_w2 > 0) {
+    (sum_w^2) / sum_w2
+  } else {
+    n
+  }
 
   # Design effect: actual n / effective n
   design_effect <- if (effective_n > 0) n / effective_n else 1
@@ -823,9 +1070,15 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
                              progress_callback = NULL) {
 
   # Get term names from initial fit
-  initial_model <- fit_model_for_bootstrap(data, formula, outcome_type, weights)
+  initial_fit <- fit_model_for_bootstrap(data, formula, outcome_type, weights)
+  initial_model <- initial_fit$model
   if (is.null(initial_model)) {
-    cat("   [WARNING] Initial model fit failed - cannot run bootstrap\n")
+    # This is where weighted binary bootstraps used to die in silence: the
+    # old handler treated the "non-integer #successes" warning, which every
+    # weighted binomial fit raises, as a failure. The user asked for bootstrap
+    # intervals, got none, and the run still said PASS.
+    cat(sprintf("   [WARNING] Initial model fit failed (%s) - cannot run bootstrap\n",
+                paste(c(initial_fit$status, initial_fit$flags), collapse = "; ")))
     return(NULL)
   }
 
@@ -841,6 +1094,8 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
   colnames(boot_or) <- term_names
 
   successful_boots <- 0
+  discard_reasons <- character(0)
+  kept_flagged <- character(0)
 
   for (b in seq_len(n_boot)) {
     # Update progress every 10 iterations
@@ -854,9 +1109,11 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
     boot_weights <- if (!is.null(weights)) weights[boot_idx] else NULL
 
     # Fit model to bootstrap sample
-    boot_model <- tryCatch({
+    boot_fit <- tryCatch({
       fit_model_for_bootstrap(boot_data, formula, outcome_type, boot_weights)
-    }, error = function(e) NULL)
+    }, error = function(e) list(model = NULL, status = "error", flags = conditionMessage(e)))
+
+    boot_model <- boot_fit$model
 
     if (!is.null(boot_model)) {
       # Extract coefficients
@@ -868,17 +1125,54 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
         }
       }
       successful_boots <- successful_boots + 1
+      # A resample that converged but hit quasi-separation is kept; it is a real
+      # draw from a sparse region, and dropping it is what biased the old
+      # intervals narrow. It is counted so the caveat can say so.
+      if (length(boot_fit$flags) > 0) {
+        # One resample, however many warning classes it raised. Counting the
+        # flags made a single fit that warned twice look like two resamples.
+        kept_flagged <- c(kept_flagged, paste(sort(unique(boot_fit$flags)), collapse = "+"))
+      }
+    } else {
+      discard_reasons <- c(discard_reasons, boot_fit$status %||% "error")
     }
   }
 
   # Calculate summary statistics
   alpha <- 1 - conf_level
+  discard_counts <- as.list(table(discard_reasons))
+  kept_flag_counts <- as.list(table(kept_flagged))
+
+  caveat <- if (length(discard_reasons) == 0) {
+    "All resamples were usable."
+  } else {
+    sprintf("%d of %d resamples were discarded (%s). Percentile intervals and sign stability describe the resamples that survived, so they are, to that extent, optimistic.",
+            length(discard_reasons), n_boot,
+            paste(sprintf("%s: %d", names(discard_counts), unlist(discard_counts)),
+                  collapse = ", "))
+  }
+  if (length(kept_flagged) > 0) {
+    caveat <- paste(caveat,
+      sprintf("%d resample(s) were kept despite a warning (%s); dropping them would bias the intervals narrow.",
+              length(kept_flagged),
+              paste(sprintf("%s: %d", names(kept_flag_counts), unlist(kept_flag_counts)),
+                    collapse = ", ")))
+  }
+
   results <- list(
     term = term_names,
     n_boot = n_boot,
     n_successful = successful_boots,
+    n_discarded = length(discard_reasons),
+    discard_counts = discard_counts,
+    kept_flag_counts = kept_flag_counts,
+    caveat = caveat,
     boot_or_matrix = boot_or
   )
+
+  if (length(discard_reasons) > 0) {
+    cat(sprintf("   [INFO] Bootstrap: %s\n", caveat))
+  }
 
   # For each term, calculate stats
   results$median_or <- apply(boot_or, 2, median, na.rm = TRUE)
@@ -912,40 +1206,108 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
 #' @keywords internal
 fit_model_for_bootstrap <- function(data, formula, outcome_type, weights = NULL) {
 
-  model <- tryCatch({
-    if (outcome_type == "binary") {
-      if (!is.null(weights)) {
-        glm(formula, data = data, family = binomial(), weights = weights)
-      } else {
-        glm(formula, data = data, family = binomial())
-      }
-    } else if (outcome_type == "ordinal") {
-      if (requireNamespace("ordinal", quietly = TRUE)) {
+  warn_flags <- character(0)
+
+  classify <- function(msg) {
+    if (grepl("fitted probabilities numerically 0 or 1|separation", msg, ignore.case = TRUE)) {
+      "separation"
+    } else if (grepl("did not converge|convergence", msg, ignore.case = TRUE)) {
+      "non_convergence"
+    } else {
+      "other"
+    }
+  }
+
+  model <- withCallingHandlers(
+    tryCatch({
+      if (outcome_type == "binary") {
         if (!is.null(weights)) {
-          data$..catdriver_wt.. <- weights
-          ordinal::clm(formula, data = data, weights = ..catdriver_wt.., link = "logit")
+          fit_data <- data
+          fit_data$..catdriver_wt.. <- weights
+          glm(formula, data = fit_data, family = binomial(), weights = ..catdriver_wt..)
         } else {
-          ordinal::clm(formula, data = data, link = "logit")
+          glm(formula, data = data, family = binomial())
         }
-      } else if (requireNamespace("MASS", quietly = TRUE)) {
-        if (!is.null(weights)) {
-          MASS::polr(formula, data = data, weights = weights, Hess = TRUE)
+      } else if (outcome_type == "ordinal") {
+        if (requireNamespace("ordinal", quietly = TRUE)) {
+          if (!is.null(weights)) {
+            data$..catdriver_wt.. <- weights
+            ordinal::clm(formula, data = data, weights = ..catdriver_wt.., link = "logit")
+          } else {
+            ordinal::clm(formula, data = data, link = "logit")
+          }
+        } else if (requireNamespace("MASS", quietly = TRUE)) {
+          if (!is.null(weights)) {
+            data$..catdriver_wt.. <- weights
+            MASS::polr(formula, data = data, weights = ..catdriver_wt.., Hess = TRUE)
+          } else {
+            MASS::polr(formula, data = data, Hess = TRUE)
+          }
         } else {
-          MASS::polr(formula, data = data, Hess = TRUE)
+          NULL
         }
       } else {
+        # Multinomial - skip for bootstrap (too complex)
         NULL
       }
-    } else {
-      # Multinomial - skip for bootstrap (too complex)
+    }, error = function(e) {
+      warn_flags <<- c(warn_flags, paste0("error: ", conditionMessage(e)))
       NULL
+    }),
+    warning = function(w) {
+      msg <- conditionMessage(w)
+      # Non-integer successes is what every weighted binary fit says about its
+      # weights; it is not a fault in the resample. Everything else is counted
+      # and reported, but still muffled: 200 resamples would otherwise bury the
+      # Shiny console.
+      if (!grepl("non-integer #successes", msg, fixed = TRUE)) {
+        warn_flags <<- c(warn_flags, classify(msg))
+      }
+      invokeRestart("muffleWarning")
     }
-  }, error = function(e) NULL, warning = function(w) NULL)
+  )
+
+  status <- if (is.null(model)) {
+    "error"
+  } else if (!cd_fit_converged(model)) {
+    "non_convergence"
+  } else {
+    "ok"
+  }
 
   # For ordinal::clm, coefficients are in $beta
   if (!is.null(model) && inherits(model, "clm")) {
     model$coefficients <- model$beta
   }
 
-  model
+  list(
+    model = if (identical(status, "ok")) model else NULL,
+    status = status,
+    flags = unique(warn_flags)
+  )
+}
+
+
+#' Did This Fit Converge
+#'
+#' glm, clm and polr each report convergence differently. A resample that did
+#' not converge carries meaningless coefficients and must not enter a bootstrap
+#' distribution; a resample that merely warned about separation is a real draw
+#' from a sparse region and must, or the intervals come out falsely narrow
+#' exactly where the bootstrap was worth running.
+#'
+#' @param model A fitted model object.
+#' @return TRUE when the fit converged (or says nothing about it).
+#' @keywords internal
+cd_fit_converged <- function(model) {
+  if (is.null(model)) return(FALSE)
+  if (inherits(model, "glm")) return(isTRUE(model$converged))
+  if (inherits(model, "clm")) {
+    code <- model$convergence$code
+    return(is.null(code) || isTRUE(code == 0))
+  }
+  if (inherits(model, "polr")) {
+    return(is.null(model$convergence) || isTRUE(model$convergence == 0))
+  }
+  TRUE
 }

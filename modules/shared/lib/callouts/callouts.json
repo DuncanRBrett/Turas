@@ -104,7 +104,7 @@
     },
     "probability_lifts": {
       "title": "What do probability lifts mean?",
-      "text": "Probability lifts translate the odds ratios into a more intuitive metric: the percentage-point change in probability of achieving the top outcome when a driver improves by one unit. A lift of +5pp means that improving this driver by one scale point is associated with a 5 percentage-point increase in the probability of the best outcome.",
+      "text": "A probability lift is the difference in mean fitted probability between the respondents in a category and the respondents in the reference category, in percentage points. The probabilities come from the model, so each respondent's own profile is in them, but the two groups are not otherwise matched: whatever else differs between them is still in the difference. Read it as a descriptive gap between two real groups, not as the effect of moving a respondent from one category to the other.",
       "context": "Probability lifts section"
     },
     "diagnostics": {

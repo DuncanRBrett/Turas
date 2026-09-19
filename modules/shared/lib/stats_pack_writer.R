@@ -248,14 +248,14 @@ sp_write_declaration_sheet <- function(wb, payload) {
   row <- row + 1
   run_ts <- if (!is.null(payload$run_timestamp)) {
     format(payload$run_timestamp, "%Y-%m-%d %H:%M:%S")
-  } else "—"
+  } else "–"
   row <- write_kv("Run Date / Time", run_ts, row)
 
   duration_str <- if (!is.null(payload$duration_seconds)) {
     sprintf("%.1f seconds", payload$duration_seconds)
-  } else "—"
+  } else "–"
   row <- write_kv("Duration", duration_str, row)
-  row <- write_kv("Turas Version",  payload$turas_version %||% "—", row)
+  row <- write_kv("Turas Version",  payload$turas_version %||% "–", row)
 
   # Status with colour
   status_val <- payload$status %||% "UNKNOWN"
@@ -274,7 +274,7 @@ sp_write_declaration_sheet <- function(wb, payload) {
   dr <- payload$data_receipt %||% list()
   row <- write_section("DATA RECEIVED", row)
   row <- row + 1
-  row <- write_kv("Source File",            dr$file_name %||% "—", row)
+  row <- write_kv("Source File",            dr$file_name %||% "–", row)
   row <- write_kv("Respondents",            format(dr$n_rows %||% 0, big.mark = ","), row)
   row <- write_kv("Columns",               format(dr$n_cols %||% 0, big.mark = ","), row)
   row <- write_kv("Questions in Config",   format(dr$questions_in_config %||% 0, big.mark = ","), row)
@@ -291,7 +291,7 @@ sp_write_declaration_sheet <- function(wb, payload) {
   q_skipped      <- du$questions_skipped %||% 0
 
   resp_note <- if (n_excluded > 0) {
-    sprintf("%s  (%s excluded — see Data_Used sheet for detail)",
+    sprintf("%s  (%s excluded; see the Data_Used sheet where per-item detail is available)",
             format(n_resp_used, big.mark = ","),
             format(n_excluded, big.mark = ","))
   } else {
@@ -299,7 +299,7 @@ sp_write_declaration_sheet <- function(wb, payload) {
   }
 
   q_note <- if (q_skipped > 0) {
-    sprintf("%s  (%s skipped — see Data_Used sheet for detail)",
+    sprintf("%s  (%s skipped; see the Data_Used sheet where per-item detail is available)",
             format(q_analysed, big.mark = ","),
             format(q_skipped, big.mark = ","))
   } else {
@@ -311,11 +311,11 @@ sp_write_declaration_sheet <- function(wb, payload) {
 
   # Weighting note
   weight_note <- if (!is.null(du$weight_variable) && du$weight_variable != "") {
-    sprintf("Yes — weight variable: %s", du$weight_variable)
+    sprintf("Yes, weight variable: %s", du$weight_variable)
   } else if (isTRUE(du$weighted)) {
     "Yes"
   } else {
-    "No — unweighted analysis"
+    "No, unweighted analysis"
   }
   row <- write_kv("Weighting", weight_note, row)
   row <- row + 1
@@ -421,7 +421,7 @@ sp_write_data_used_sheet <- function(wb, payload) {
         entry <- du$skipped_questions_detail[[qid]]
         data.frame(
           Question_ID = qid,
-          Reason      = entry$reason %||% "—",
+          Reason      = entry$reason %||% "–",
           stringsAsFactors = FALSE
         )
       }
@@ -469,7 +469,7 @@ sp_write_assumptions_sheet <- function(wb, payload) {
   params_df <- data.frame(
     Parameter = names(assumptions),
     Value     = vapply(assumptions, function(x) {
-      if (is.null(x) || (length(x) == 1 && is.na(x))) "—"
+      if (is.null(x) || (length(x) == 1 && is.na(x))) "–"
       else paste(as.character(x), collapse = "; ")
     }, character(1)),
     stringsAsFactors = FALSE
@@ -507,7 +507,7 @@ sp_write_warnings_sheet <- function(wb, payload) {
 
   if (is.null(run_result) || length(run_result$events) == 0) {
     openxlsx::writeData(wb, sheet,
-                        "No warnings or events recorded — analysis completed cleanly.",
+                        "No warnings or events recorded; the analysis completed cleanly.",
                         startRow = 1, startCol = 1)
     return(invisible(TRUE))
   }
@@ -518,7 +518,10 @@ sp_write_warnings_sheet <- function(wb, payload) {
       Code     = e$code     %||% NA_character_,
       Title    = e$title    %||% NA_character_,
       Question = e$question_code %||% NA_character_,
-      Detail   = e$detail   %||% NA_character_,
+      # turas_run_state_partial() and its siblings record the text in `problem`;
+      # only some callers set `detail`. Printing `detail` alone gave a Warnings
+      # sheet of levels and codes with every explanation blank.
+      Detail   = e$detail   %||% e$problem %||% NA_character_,
       Fix      = e$fix      %||% NA_character_,
       stringsAsFactors = FALSE
     )
@@ -579,12 +582,12 @@ sp_write_reproducibility_sheet <- function(wb, payload) {
   env_df <- data.frame(
     Item  = c("Turas Version", "R Version", "Platform", "Run Timestamp"),
     Value = c(
-      payload$turas_version %||% "—",
+      payload$turas_version %||% "–",
       payload$r_version %||% R.version$version.string,
       paste(R.version$os, R.version$arch),
       if (!is.null(payload$run_timestamp)) {
         format(payload$run_timestamp, "%Y-%m-%d %H:%M:%S")
-      } else "—"
+      } else "–"
     ),
     stringsAsFactors = FALSE
   )

@@ -89,7 +89,10 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
       if (!is.null(weights) && length(weights) == nrow(data)) {
         if (!all(abs(weights - 1) < 1e-10)) {
           fit_data$.wt <- weights
-          MASS::polr(formula, data = fit_data, weights = .wt, Hess = TRUE, method = "logistic")
+          # polr fits a binomial glm for starting values, so weighted runs raise
+          # the same "non-integer #successes" warning as the binary engine.
+          cd_muffle_noninteger_successes(
+            MASS::polr(formula, data = fit_data, weights = .wt, Hess = TRUE, method = "logistic"))
         } else {
           MASS::polr(formula, data = fit_data, Hess = TRUE, method = "logistic")
         }
@@ -218,8 +221,19 @@ extract_clm_results <- function(model, config, guard) {
 
   # Null model for comparison
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  # The null model must be fitted on the SAME rows and with the SAME weights as
+  # the full model. model$model holds the rows clm actually used and carries the
+  # weights under the non-syntactic name "(weights)"; refitting without them
+  # compared a weighted full model to an unweighted null and produced negative
+  # McFadden R-squared values under PASS.
   null_model <- tryCatch({
-    ordinal::clm(null_formula, data = model$model, link = "logit")
+    null_data <- model$model
+    if ("(weights)" %in% names(null_data)) {
+      null_data[["..catdriver_wt.."]] <- as.numeric(null_data[["(weights)"]])
+      ordinal::clm(null_formula, data = null_data, weights = ..catdriver_wt.., link = "logit")
+    } else {
+      ordinal::clm(null_formula, data = null_data, link = "logit")
+    }
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {
@@ -235,11 +249,27 @@ extract_clm_results <- function(model, config, guard) {
     lr_pvalue <- NA
   }
 
-  # Predicted probabilities
-  pred_probs <- tryCatch(
-    predict(model, type = "prob")$fit,
-    error = function(e) predict(model, type = "prob")
-  )
+  # Predicted probabilities, one column per outcome category.
+  #
+  # predict() on a clm WITHOUT newdata returns each respondent's probability of
+  # the category they were actually observed in, which is a fit diagnostic and
+  # not a probability of anything in particular. The probability lift then
+  # averaged that by driver level and called the difference a lift. Passing the
+  # estimation frame with the outcome column removed returns the full matrix,
+  # named by category, which is what a lift needs. Verified by running both,
+  # 2026-09-19.
+  pred_probs <- tryCatch({
+    newdata <- model$model
+    newdata[[config$outcome_var]] <- NULL
+    newdata[["(weights)"]] <- NULL
+    fit <- predict(model, newdata = newdata, type = "prob")$fit
+    if (is.null(dim(fit))) stop("clm returned no probability matrix")
+    fit
+  }, error = function(e) {
+    cat(sprintf("   [INFO] Per-category probabilities unavailable (%s); probability lift will be skipped\n",
+                conditionMessage(e)))
+    NULL
+  })
 
   # Convergence
   convergence_ok <- is.null(model$convergence) || model$convergence$code == 0
@@ -257,9 +287,140 @@ extract_clm_results <- function(model, config, guard) {
       lr_df = lr_df,
       lr_pvalue = lr_pvalue
     ),
-    proportional_odds = NULL,  # clm has built-in tests
+    # The comment here used to read "clm has built-in tests", and no test was
+    # ever run: guard_check_proportional_odds() skips on NULL, so the default
+    # engine's central assumption went unchecked while the docs implied it had
+    # been checked. ordinal::nominal_test() is the built-in test; it is run now,
+    # and when it cannot run the run says so rather than saying nothing.
+    proportional_odds = test_proportional_odds_clm(model),
     predicted_probs = pred_probs,
     convergence = convergence_ok
+  )
+}
+
+
+#' Test the Proportional Odds Assumption on a clm Fit
+#'
+#' Runs \code{ordinal::nominal_test()}, the likelihood-ratio test of whether
+#' each predictor's effect is constant across the outcome thresholds. A small
+#' p-value says the proportional-odds assumption does not hold for that
+#' predictor, so its single odds ratio is describing thresholds that behave
+#' differently.
+#'
+#' The test refits the model per predictor and can fail on sparse level
+#' combinations. That is disclosed, never fatal: the result says the assumption
+#' was not tested, which is what a reader needs to know.
+#'
+#' @param model A fitted \code{ordinal::clm} object.
+#' @return List in the shape \code{guard_check_proportional_odds()} expects:
+#'   checked, status, interpretation, plus the per-predictor p-values.
+#' @keywords internal
+test_proportional_odds_clm <- function(model) {
+
+  if (!requireNamespace("ordinal", quietly = TRUE) ||
+      !exists("nominal_test", where = asNamespace("ordinal"), mode = "function")) {
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = "Proportional odds assumption NOT tested: ordinal::nominal_test is unavailable."
+    ))
+  }
+
+  # nominal_test() refits the model per predictor, and a refit re-evaluates the
+  # original call in the FORMULA's environment. CatDriver builds its formulas in
+  # the caller, so the engine's local fit frame is not visible there and the
+  # refits come back empty: the test then reported "assumption holds" having
+  # tested nothing. Refit here, from the model's own frame, with a formula whose
+  # environment is this one, and test that.
+  res <- tryCatch({
+    mf <- model$model
+    if (is.null(mf)) stop("the fitted model kept no model frame")
+    link <- model$link %||% "logit"
+    model_formula <- formula(model)
+    w <- if ("(weights)" %in% names(mf)) as.numeric(mf[["(weights)"]]) else NULL
+
+    # The data and the weights go into the call BY VALUE. nominal_test refits
+    # per predictor with update(), which re-evaluates the call, and a call that
+    # only names its data frame is re-evaluated wherever the formula came from:
+    # the caller, where the engine's fit frame does not exist. The refits then
+    # come back blank and the test would report that the assumption holds having
+    # tested nothing. Verified both ways by running it, 2026-09-18.
+    refit_call <- if (is.null(w)) {
+      bquote(ordinal::clm(.(model_formula), data = .(mf), link = .(link)))
+    } else {
+      bquote(ordinal::clm(.(model_formula), data = .(mf), weights = .(w), link = .(link)))
+    }
+    ordinal::nominal_test(eval(refit_call))
+  }, error = function(e) e)
+
+  if (inherits(res, "error")) {
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = paste0(
+        "Proportional odds assumption NOT tested: ordinal::nominal_test could not run (",
+        conditionMessage(res), "). Read the odds ratios as an average across thresholds."
+      )
+    ))
+  }
+
+  res_df <- as.data.frame(res)
+  p_col <- grep("^Pr", names(res_df), value = TRUE)
+  if (length(p_col) == 0) {
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = "Proportional odds assumption NOT tested: nominal_test returned no p-values."
+    ))
+  }
+
+  p_values <- res_df[[p_col[1]]]
+  names(p_values) <- rownames(res_df)
+  p_values <- p_values[!is.na(p_values)]
+
+  if (length(p_values) == 0) {
+    # Every per-predictor refit failed. Saying "the assumption holds" here would
+    # be reporting a test that never ran.
+    return(list(
+      checked = FALSE,
+      status = "NOT_TESTED",
+      method = "ordinal::nominal_test",
+      interpretation = paste0(
+        "Proportional odds assumption NOT tested: ordinal::nominal_test returned no usable ",
+        "p-values (the per-predictor refits did not converge). Read the odds ratios as an ",
+        "average across thresholds."
+      )
+    ))
+  }
+
+  violations <- names(p_values)[p_values < 0.05]
+
+  if (length(violations) > 0) {
+    status <- "WARNING"
+    interpretation <- paste0(
+      "Proportional odds assumption is rejected for: ", paste(violations, collapse = ", "),
+      " (ordinal::nominal_test, p < 0.05). Those drivers act differently at different points ",
+      "of the scale, so a single odds ratio averages effects that are not the same. ",
+      "Consider a multinomial model, or report those drivers threshold by threshold."
+    )
+  } else {
+    status <- "PASS"
+    interpretation <- paste0(
+      "Proportional odds assumption holds (ordinal::nominal_test, smallest p = ",
+      if (length(p_values) > 0) sprintf("%.3f", min(p_values)) else "n/a", ")."
+    )
+  }
+
+  list(
+    checked = TRUE,
+    status = status,
+    method = "ordinal::nominal_test",
+    p_values = p_values,
+    violations = violations,
+    interpretation = interpretation
   )
 }
 
@@ -328,8 +489,16 @@ extract_polr_results <- function(model, config, guard) {
   ll_full <- logLik(model)
 
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  # Same rows, same weights as the full fit (see the clm path above).
   null_model <- tryCatch({
-    MASS::polr(null_formula, data = model$model, Hess = TRUE, method = "logistic")
+    null_data <- model$model
+    if ("(weights)" %in% names(null_data)) {
+      null_data[["..catdriver_wt.."]] <- as.numeric(null_data[["(weights)"]])
+      MASS::polr(null_formula, data = null_data, weights = ..catdriver_wt..,
+                 Hess = TRUE, method = "logistic")
+    } else {
+      MASS::polr(null_formula, data = null_data, Hess = TRUE, method = "logistic")
+    }
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {
@@ -382,6 +551,11 @@ extract_polr_results <- function(model, config, guard) {
 #' @keywords internal
 check_proportional_odds <- function(model, data, config) {
 
+  # NOTE: this is the polr fallback path's ad-hoc check (an odds-ratio ratio
+  # across thresholds, not a test). Its per-threshold refits below do not carry
+  # the study weights, so on a weighted study it describes the unweighted
+  # sample; the interpretation string says so. The clm path, which is the
+  # default engine, uses ordinal::nominal_test via test_proportional_odds_clm().
   outcome_var <- config$outcome_var
   outcome <- data[[outcome_var]]
   levels_vec <- levels(outcome)
@@ -449,12 +623,16 @@ check_proportional_odds <- function(model, data, config) {
     }
   }
 
+  unweighted_note <- " This heuristic compares odds ratios across thresholds on the UNWEIGHTED sample; it is not a statistical test."
+
   if (max_or_ratio < 1.25) {
     status <- "PASS"
-    interpretation <- "Proportional odds assumption appears reasonable (OR variation < 25% across thresholds)"
+    interpretation <- paste0("Proportional odds assumption appears reasonable (OR variation < 25% across thresholds).",
+                             unweighted_note)
   } else if (max_or_ratio < 1.5) {
     status <- "MARGINAL"
-    interpretation <- "Proportional odds assumption is marginally met. Results are likely still valid."
+    interpretation <- paste0("Proportional odds assumption is marginally met. Results are likely still valid.",
+                             unweighted_note)
   } else {
     status <- "WARNING"
     interpretation <- paste0("Proportional odds assumption may be violated for: ",
@@ -472,66 +650,5 @@ check_proportional_odds <- function(model, data, config) {
 }
 
 
-#' Verify OR Direction Using Predicted Probabilities
-#'
-#' Sanity check that OR direction matches predicted probability direction.
-#' Uses predicted probabilities to verify that OR > 1 corresponds to higher
-#' categories being more likely.
-#'
-#' @param model Fitted ordinal model (clm or polr)
-#' @param data Analysis data
-#' @param coef_df Coefficient data frame with odds ratios
-#' @return List with verification results
-#' @keywords internal
-verify_or_direction <- function(model, data, coef_df) {
+# verify_or_direction() was deleted 2026-09-18: deprecated, no callers.
 
-  # Find a coefficient with substantial effect for verification
-  # Pick the one with largest absolute estimate
-  if (nrow(coef_df) == 0) {
-    return(list(verified = FALSE, reason = "No coefficients to verify"))
-  }
-
-  test_row <- coef_df[which.max(abs(coef_df$estimate)), ]
-  test_term <- test_row$term
-  test_or <- test_row$odds_ratio
-  test_estimate <- test_row$estimate
-
-  # Get predicted probabilities at baseline vs shifted predictor
-  # This requires identifying the predictor variable from the term name
-  result <- tryCatch({
-    # Get model predictions for first and last observations
-    # to see if probability of higher categories changes as expected
-    if (inherits(model, "clm")) {
-      probs <- predict(model, type = "prob")$fit
-    } else {
-      probs <- predict(model, type = "probs")
-    }
-
-    # Calculate mean probability of being in top half of categories
-    n_cats <- ncol(probs)
-    top_half_start <- ceiling(n_cats / 2) + 1
-    if (top_half_start > n_cats) top_half_start <- n_cats
-
-    mean_top_probs <- rowMeans(probs[, top_half_start:n_cats, drop = FALSE])
-
-    # Check if observations with positive linear predictor have higher top probs
-    # This is a rough sanity check
-    list(
-      verified = TRUE,
-      test_term = test_term,
-      test_or = test_or,
-      test_estimate = test_estimate,
-      interpretation = if (test_or > 1) {
-        paste0("OR=", round(test_or, 2), " for '", test_term,
-               "' suggests higher categories more likely when this predictor increases")
-      } else {
-        paste0("OR=", round(test_or, 2), " for '", test_term,
-               "' suggests lower categories more likely when this predictor increases")
-      }
-    )
-  }, error = function(e) {
-    list(verified = FALSE, reason = paste("Prediction error:", e$message))
-  })
-
-  result
-}

@@ -205,10 +205,20 @@ add_subgroup_or_sheet <- function(wb, comparison, config, styles) {
     openxlsx::addStyle(wb, sheet_name, style = styles$title, rows = 1, cols = 1)
   }
 
-  # Build display table — select key columns
-  display_cols <- c("driver", "label", "level")
+  # Build display table. outcome_level is present and populated only for a
+  # multinomial outcome, where every driver level carries one odds ratio per
+  # outcome level; printing the table without it says one of several is the
+  # answer.
+  has_outcome_level <- "outcome_level" %in% names(or_comp) &&
+    any(!is.na(or_comp$outcome_level))
+  display_cols <- c("driver", "label", "level",
+                    if (has_outcome_level) c("outcome_level", "reference_outcome"))
   for (grp in comparison$group_names) {
-    display_cols <- c(display_cols, paste0(grp, "_or"), paste0(grp, "_p"))
+    # The confidence intervals were built and then never written: the sheet
+    # selected the odds ratio and the p-value only, so a reader saw a point
+    # estimate per group with no sense of its precision.
+    display_cols <- c(display_cols, paste0(grp, "_or"), paste0(grp, "_ci"),
+                      paste0(grp, "_p"))
   }
   display_cols <- c(display_cols, "or_ratio", "notable")
 
@@ -217,11 +227,14 @@ add_subgroup_or_sheet <- function(wb, comparison, config, styles) {
 
   # Rename columns
   col_names <- names(display_df)
+  col_names <- gsub("_ci$", " 95% CI", col_names)
   col_names <- gsub("_or$", " OR", col_names)
   col_names <- gsub("_p$", " p-value", col_names)
   col_names[col_names == "driver"] <- "Driver"
   col_names[col_names == "label"] <- "Label"
   col_names[col_names == "level"] <- "Level"
+  col_names[col_names == "outcome_level"] <- "Outcome Level"
+  col_names[col_names == "reference_outcome"] <- "vs Outcome"
   col_names[col_names == "or_ratio"] <- "OR Ratio"
   col_names[col_names == "notable"] <- "Notable"
   names(display_df) <- col_names
@@ -281,10 +294,28 @@ add_subgroup_model_fit_sheet <- function(wb, comparison, config, styles) {
     openxlsx::addStyle(wb, sheet_name, style = styles$title, rows = 1, cols = 1)
   }
 
-  # Rename columns
+  # Rename columns by name, not by position.
+  #
+  # This was `names(display_df) <- c(...seven names...)`. A frame with eight
+  # columns then got NA as its eighth name, openxlsx wrote a header cell with no
+  # string behind it, and the workbook's shared-string table came out EMPTY:
+  # 372 declared entries, none present. Excel would offer to repair the file and
+  # openxlsx segfaulted reading it back. Nothing warned; the sheet looked
+  # written. Adding one column to the comparison broke the whole workbook.
   display_df <- model_fit
-  names(display_df) <- c("Subgroup", "N", "McFadden R2", "AIC",
-                           "Convergence", "Status", "Engine")
+  pretty <- c(subgroup = "Subgroup", n = "N (analysed)",
+              n_before_missing = "N (before missing data)",
+              mcfadden_r2 = "McFadden R2", aic = "AIC",
+              convergence = "Convergence", status = "Status",
+              engine_used = "Engine", engine = "Engine")
+  known <- names(display_df) %in% names(pretty)
+  names(display_df)[known] <- unname(pretty[names(display_df)[known]])
+  if (any(is.na(names(display_df))) || any(!nzchar(names(display_df)))) {
+    # Never hand openxlsx a nameless column; it produces a workbook Excel has to
+    # repair and R cannot read.
+    blank <- is.na(names(display_df)) | !nzchar(names(display_df))
+    names(display_df)[blank] <- paste0("Column", seq_len(sum(blank)))
+  }
 
   openxlsx::writeData(wb, sheet_name, display_df, startRow = 3, headerStyle = styles$header)
 

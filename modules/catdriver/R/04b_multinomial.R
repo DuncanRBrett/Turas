@@ -10,13 +10,11 @@
 
 #' Run Multinomial Logistic Regression with Robust Handling
 #'
-#' Supports three multinomial modes (set in config$multinomial_mode):
-#' - "baseline_category": Compare all levels to reference (default)
-#' - "all_pairwise": Compare every pair of levels
-#' - "one_vs_all": Compare each level vs. all others combined
-#'
-#' When multinomial_mode="one_vs_all", config$target_outcome_level specifies
-#' which outcome level to treat as "success".
+#' One mode exists: "baseline_category", every outcome level compared with one
+#' reference level. config$multinomial_mode must say so. The module used to
+#' accept all_pairwise, one_vs_all and per_outcome and then fit this same model
+#' regardless, which meant the odds ratios did not answer the question the
+#' setting asked; those values are refused now (see guard_require_multinomial_mode).
 #'
 #' @param formula Model formula
 #' @param data Analysis data
@@ -50,41 +48,23 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
     multinomial_mode <- "baseline_category"  # Default
   }
 
-  valid_modes <- c("baseline_category", "all_pairwise", "one_vs_all")
-  if (!multinomial_mode %in% valid_modes) {
+  # One implemented mode. The guard refuses the others before the run reaches
+  # here; this is the engine's own backstop for a direct call.
+  if (!identical(multinomial_mode, "baseline_category")) {
     catdriver_refuse(
-      reason = "CFG_INVALID_MULTINOMIAL_MODE",
-      title = "INVALID MULTINOMIAL MODE",
-      problem = paste0("multinomial_mode='", multinomial_mode, "' is not a valid option."),
-      why_it_matters = "The multinomial mode determines how outcome categories are compared.",
-      fix = paste0("Set multinomial_mode to one of: ", paste(valid_modes, collapse = ", "))
+      reason = "CFG_MULTINOMIAL_MODE_NOT_IMPLEMENTED",
+      title = "MULTINOMIAL MODE NOT IMPLEMENTED",
+      problem = paste0("multinomial_mode='", multinomial_mode, "' is not implemented."),
+      why_it_matters = paste0(
+        "Only 'baseline_category' exists. The engine fits that model whatever this setting says, ",
+        "so accepting another value would report odds ratios that do not answer the question asked."
+      ),
+      fix = paste0(
+        "Set multinomial_mode to 'baseline_category'.\n",
+        "To compare one level against all others, recode the outcome as binary ",
+        "and run it with outcome_type = 'binary'."
+      )
     )
-  }
-
-  # For one_vs_all mode, require target_outcome_level
-  target_outcome_level <- config$target_outcome_level
-  if (multinomial_mode == "one_vs_all") {
-    if (is.null(target_outcome_level) || is.na(target_outcome_level)) {
-      catdriver_refuse(
-        reason = "CFG_TARGET_LEVEL_MISSING",
-        title = "TARGET OUTCOME LEVEL REQUIRED",
-        problem = "multinomial_mode='one_vs_all' requires target_outcome_level to be specified.",
-        why_it_matters = "One-vs-all mode compares a specific level against all others combined.",
-        fix = "Add target_outcome_level to your config specifying which outcome level to treat as 'success'."
-      )
-    }
-
-    # Validate target level exists in data
-    outcome_levels <- levels(data[[config$outcome_var]])
-    if (!target_outcome_level %in% outcome_levels) {
-      catdriver_refuse(
-        reason = "CFG_TARGET_LEVEL_NOT_FOUND",
-        title = "TARGET OUTCOME LEVEL NOT IN DATA",
-        problem = paste0("target_outcome_level='", target_outcome_level, "' not found in outcome variable."),
-        why_it_matters = "The specified target level must exist in your data to use one-vs-all mode.",
-        fix = paste0("Set target_outcome_level to one of: ", paste(outcome_levels, collapse = ", "))
-      )
-    }
   }
 
   # ===========================================================================
@@ -166,7 +146,7 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
       z_val <- if (!is.na(se) && se > 0) est / se else NA
       p_val <- if (!is.na(z_val)) 2 * pnorm(-abs(z_val)) else NA
 
-      conf_level <- config$confidence_level
+      conf_level <- config$confidence_level %||% CATDRIVER_DEFAULTS$confidence_level %||% 0.95
       z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
       coef_list[[length(coef_list) + 1]] <- data.frame(
@@ -192,8 +172,30 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   ll_full <- logLik(model)
 
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  # The null model must see the same rows and the same weights as the full fit.
+  # It used to be refitted on the caller's raw frame with no weights, which
+  # compared a weighted full model to an unweighted null (negative McFadden
+  # R-squared and an invalid LR test, under PASS) and, where a predictor had
+  # missing values, on more rows than the full model ever used.
+  estimation_rows <- cd_estimation_rows(model, nrow(fit_data))
+  estimation_data <- if (!is.null(estimation_rows)) {
+    fit_data[estimation_rows, , drop = FALSE]
+  } else {
+    fit_data
+  }
+  weights_used <- if ("..catdriver_wt.." %in% names(estimation_data)) {
+    estimation_data[["..catdriver_wt.."]]
+  } else {
+    NULL
+  }
+
   null_model <- tryCatch({
-    nnet::multinom(null_formula, data = data, trace = FALSE)
+    if (!is.null(weights_used)) {
+      nnet::multinom(null_formula, data = estimation_data, weights = ..catdriver_wt..,
+                     trace = FALSE)
+    } else {
+      nnet::multinom(null_formula, data = estimation_data, trace = FALSE)
+    }
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {
@@ -215,13 +217,22 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   pred_probs <- predict(model, type = "probs")
   pred_class <- predict(model, type = "class")
 
-  confusion <- table(Actual = data[[config$outcome_var]], Predicted = pred_class)
+  # Predictions cover only the rows the model fitted; the caller's frame may
+  # hold more (a predictor with missing values). Cross like with like.
+  confusion <- table(Actual = cd_fitted_outcome(model, data, config$outcome_var),
+                     Predicted = pred_class)
   total_obs <- sum(confusion)
   accuracy <- if (total_obs > 0) sum(diag(confusion)) / total_obs else NA_real_
 
   list(
     model = model,
     analysis_data = data,
+    # The rows and weights the full model actually used. Importance refits
+    # every reduced model and must use exactly these, or the likelihood-ratio
+    # statistics are not comparable.
+    estimation_data = estimation_data,
+    estimation_weights = weights_used,
+    weight_column = if (!is.null(weights_used)) "..catdriver_wt.." else NULL,
     model_type = "multinomial_logistic",
     engine_used = engine_used,
     fallback_used = fallback_used,
@@ -229,7 +240,7 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
     coefficients = coef_df,
     reference_outcome = ref_level,
     multinomial_mode = multinomial_mode,
-    target_outcome_level = target_outcome_level,
+    target_outcome_level = NULL,  # one_vs_all is not implemented; see the guard
     fit_statistics = list(
       log_likelihood = as.numeric(ll_full),
       mcfadden_r2 = mcfadden_r2,

@@ -459,15 +459,27 @@ validate_catdriver_data <- function(data, config) {
     } else {
       weights <- data[[config$weight_var]]
 
-      if (!is.numeric(weights)) {
+      # "Not numeric" used to mean "not stored as a numeric column", so a column
+      # of numbers read as text ("0.95") was reported as unweighted while the
+      # engine parsed and applied it perfectly well. What matters is whether the
+      # values are numbers, not how the file stored them. A column with nothing
+      # numeric in it is refused upstream by guard_weight_variable_usable().
+      numeric_weights <- suppressWarnings(as.numeric(as.character(weights)))
+      parseable <- sum(is.finite(numeric_weights))
+
+      if (parseable == 0) {
         diagnostics$warnings <- c(diagnostics$warnings,
-          "Weight variable is not numeric. Proceeding unweighted.")
+          "Weight variable holds no numeric values.")
+      } else if (!is.numeric(weights)) {
+        diagnostics$warnings <- c(diagnostics$warnings,
+          paste0("Weight variable is stored as ", class(weights)[1],
+                 " and was read as numbers. Check the column in your data file."))
       } else if (any(weights < 0, na.rm = TRUE)) {
         diagnostics$warnings <- c(diagnostics$warnings,
           "Weight variable contains negative values. These will be treated as 0.")
       } else if (all(is.na(weights))) {
         diagnostics$warnings <- c(diagnostics$warnings,
-          "Weight variable is entirely missing. Proceeding unweighted.")
+          "Weight variable is entirely missing.")
       }
     }
   }
@@ -476,177 +488,14 @@ validate_catdriver_data <- function(data, config) {
 }
 
 
-#' Prepare Data for Analysis
-#'
-#' Applies per-variable missing data strategy as specified in Driver_Settings.
-#' DOES NOT use blanket complete.cases() deletion.
-#'
-#' Missing data strategy per variable (from Driver_Settings sheet):
-#' - outcome missing: ALWAYS drop the row
-#' - driver missing with "drop_row": drop the row
-#' - driver missing with "missing_as_level": recode to "Missing" level
-#' - driver missing with "error_if_missing": hard error if any missing
-#'
-#' @param data Raw data frame
-#' @param config Configuration list
-#' @param diagnostics Validation diagnostics
-#' @return List with analysis-ready data and metadata
-#' @keywords internal
-prepare_analysis_data <- function(data, config, diagnostics) {
-
-  n_original <- nrow(data)
-  missing_report <- list()
-
-  # ==========================================================================
-  # STEP 1: Handle outcome variable (ALWAYS drop rows with missing outcome)
-  # ==========================================================================
-
-  outcome_missing <- is.na(data[[config$outcome_var]])
-  n_outcome_missing <- sum(outcome_missing)
-
-  if (n_outcome_missing > 0) {
-    data <- data[!outcome_missing, , drop = FALSE]
-    missing_report$outcome <- list(
-      variable = config$outcome_var,
-      strategy = "drop_row",
-      n_missing = n_outcome_missing,
-      action = "dropped"
-    )
-  }
-
-  # ==========================================================================
-  # STEP 2: Handle each driver variable per its missing_strategy
-  # ==========================================================================
-
-  for (driver_var in config$driver_vars) {
-    # Get per-variable strategy from Driver_Settings
-    # Default must match 10_missing.R::handle_missing_data() which defaults to "missing_as_level"
-    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "missing_as_level")
-
-    driver_missing <- is.na(data[[driver_var]])
-    n_missing <- sum(driver_missing)
-
-    if (n_missing == 0) {
-      # No missing - nothing to do
-      next
-    }
-
-    if (strategy == "error_if_missing") {
-      # Policy refusal - explicit choice to not allow missing values
-      catdriver_refuse(
-        reason = "DATA_MISSING_NOT_ALLOWED",
-        title = "MISSING VALUES NOT ALLOWED",
-        problem = paste0("Variable '", driver_var, "' has ", n_missing, " missing value(s)."),
-        why_it_matters = paste0("The missing_strategy for this variable is 'error_if_missing', ",
-                                "which requires complete data."),
-        fix = paste0("Either:\n",
-                     "  1. Fix the missing values in your data, OR\n",
-                     "  2. Change missing_strategy to 'drop_row' or 'missing_as_level' in Driver_Settings")
-      )
-
-    } else if (strategy == "missing_as_level") {
-      # Recode missing to "Missing" level
-      var_data <- data[[driver_var]]
-
-      if (!is.factor(var_data)) {
-        var_data <- factor(var_data)
-      }
-
-      # Add "Missing" as a level and recode NAs
-      levels(var_data) <- c(levels(var_data), "Missing")
-      var_data[is.na(var_data)] <- "Missing"
-      data[[driver_var]] <- var_data
-
-      missing_report[[driver_var]] <- list(
-        variable = driver_var,
-        strategy = "missing_as_level",
-        n_missing = n_missing,
-        action = "recoded to 'Missing' level"
-      )
-
-    } else {
-      # Default: drop_row
-      data <- data[!driver_missing, , drop = FALSE]
-
-      missing_report[[driver_var]] <- list(
-        variable = driver_var,
-        strategy = "drop_row",
-        n_missing = n_missing,
-        action = "dropped"
-      )
-    }
-  }
-
-  # ==========================================================================
-  # STEP 3: Handle weights
-  # ==========================================================================
-
-  has_weights <- FALSE
-  weights <- rep(1, nrow(data))
-
-  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
-    w <- data[[config$weight_var]]
-    if (is.numeric(w) && !all(is.na(w))) {
-      has_weights <- TRUE
-      w[is.na(w)] <- 1
-      w[w < 0] <- 0
-      weights <- w
-    }
-  }
-
-  # ==========================================================================
-  # STEP 4: Compile result
-  # ==========================================================================
-
-  n_complete <- nrow(data)
-  n_excluded <- n_original - n_complete
-
-  list(
-    data = data,
-    weights = weights,
-    has_weights = has_weights,
-    n_original = n_original,
-    n_complete = n_complete,
-    n_excluded = n_excluded,
-    missing_report = missing_report
-  )
-}
+# prepare_analysis_data() was deleted 2026-09-18. It was a dead, inconsistent
+# twin of the live missing-data handler in 10_missing.R, called by nothing but
+# its own tests, so the suite tested behaviour production never used.
 
 
-#' Generate Missing Data Report
-#'
-#' Creates a formatted summary of missing data for output.
-#'
-#' @param diagnostics Validation diagnostics
-#' @return Character string with formatted report
-#' @export
-format_missing_report <- function(diagnostics) {
-  lines <- character(0)
 
-  lines <- c(lines, "Missing data detected:")
-  lines <- c(lines, sprintf("- Original sample: %d respondents",
-                           diagnostics$original_n))
-  lines <- c(lines, sprintf("- Complete cases: %d respondents (%s%%)",
-                           diagnostics$complete_n, diagnostics$pct_complete))
-  lines <- c(lines, sprintf("- Excluded: %d respondents (%s%%)",
-                           diagnostics$original_n - diagnostics$complete_n,
-                           round(100 - diagnostics$pct_complete, 1)))
+# format_missing_report() was deleted here 2026-09-18. Two functions of that
+# name existed, this one and 10_missing.R's, both uncalled; whichever was
+# sourced last won. The one in 10_missing.R is kept, beside the report it
+# formats.
 
-  # Variables with highest missing
-  if (!is.null(diagnostics$missing_summary)) {
-    ms <- diagnostics$missing_summary
-    ms <- ms[order(-ms$Pct_Missing), ]
-    ms <- ms[ms$Pct_Missing > 0, ]
-
-    if (nrow(ms) > 0) {
-      lines <- c(lines, "")
-      lines <- c(lines, "Variables with missing data:")
-      for (i in 1:min(5, nrow(ms))) {
-        lines <- c(lines, sprintf("- %s: %s%% missing",
-                                 ms$Variable[i], ms$Pct_Missing[i]))
-      }
-    }
-  }
-
-  paste(lines, collapse = "\n")
-}

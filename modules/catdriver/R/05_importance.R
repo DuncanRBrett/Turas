@@ -21,39 +21,119 @@ calculate_importance <- function(model_result, config) {
 
   model <- model_result$model
 
-  # Try car::Anova for Type II tests
-  anova_result <- tryCatch({
-    if (!requireNamespace("car", quietly = TRUE)) {
+  # The car dependency is checked OUTSIDE the fallback handler. It used to sit
+  # inside a tryCatch whose error branch called the z-squared fallback, and a
+  # TRS refusal is an error condition, so a missing package silently became a
+  # different statistic instead of a refusal. Every refusal raised anywhere
+  # below the car::Anova call had the same fate.
+  if (model_result$model_type == "multinomial_logistic") {
+    # The multinomial path uses likelihood-ratio refits, not car::Anova, so it
+    # must not be gated on a package it never calls. Its refusals travel because
+    # it is called outside the fallback handler below.
+    return(calculate_multinomial_importance(model_result, config))
+  }
+
+  if (!requireNamespace("car", quietly = TRUE)) {
+    catdriver_refuse(
+      reason = "PKG_CAR_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'car' is required for variable importance calculation but is not installed.",
+      why_it_matters = "Variable importance uses likelihood-ratio chi-square tests from car::Anova.",
+      fix = "Install the package with: install.packages('car')"
+    )
+  }
+
+  anova_result <- tryCatch(
+    # car::Anova refits the model for each term, so a weighted binomial repeats
+    # the "non-integer #successes" warning once per driver. Same muffler, same
+    # reason as the fit sites.
+    cd_muffle_noninteger_successes(car::Anova(model, type = "II")),
+    turas_refusal = function(e) stop(e),   # a refusal is not a reason to fall back
+    error = function(e) {
+      cat(sprintf("   [WARNING] car::Anova failed: %s. Falling back to z-squared shares.\n",
+                  conditionMessage(e)))
+      structure(list(reason = conditionMessage(e)), class = "cd_anova_failed")
+    }
+  )
+
+  if (inherits(anova_result, "cd_anova_failed")) {
+    importance_df <- calculate_fallback_importance(model_result, config)
+
+    # The fallback aggregates dummy terms back to their drivers, and it can only
+    # do that with a term mapping. It used to be called without one, so the
+    # Importance Summary listed twelve per-level rows like
+    # "service_qualityExcellent" and the run separately reported that every
+    # configured driver was missing from the table. A table nobody can read is
+    # not a fallback, so if the mapping did not resolve, refuse.
+    unresolved <- setdiff(importance_df$variable, config$driver_vars)
+    if (length(unresolved) > 0) {
       catdriver_refuse(
-        reason = "PKG_CAR_MISSING",
-        title = "REQUIRED PACKAGE MISSING",
-        problem = "Package 'car' is required for variable importance calculation but is not installed.",
-        why_it_matters = "Variable importance uses Type II Wald chi-square tests from car::Anova.",
-        fix = "Install the package with: install.packages('car')"
+        reason = "CALC_IMPORTANCE_FALLBACK_UNMAPPED",
+        title = "IMPORTANCE COULD NOT BE REPORTED BY DRIVER",
+        problem = paste0(
+          "car::Anova failed (", anova_result$reason,
+          ") and the fallback could not aggregate its coefficients back to drivers: ",
+          paste(utils::head(unresolved, 8), collapse = ", "),
+          if (length(unresolved) > 8) ", ..." else ""
+        ),
+        why_it_matters = paste0(
+          "The fallback would otherwise report one row per dummy coefficient, which is not ",
+          "driver importance and cannot be compared with any other run."
+        ),
+        fix = paste0(
+          "Check that the 'car' package is installed and current: install.packages('car').\n",
+          "If it is, simplify the model (fewer drivers, or collapse rare levels) and run again."
+        )
       )
     }
-
-    if (model_result$model_type == "multinomial_logistic") {
-      # For multinomial, use custom approach
-      calculate_multinomial_importance(model_result, config)
-    } else {
-      # Binary and ordinal use car::Anova
-      car::Anova(model, type = "II")
-    }
-  }, error = function(e) {
-    cat(sprintf("   [WARNING] car::Anova failed: %s. Using fallback method.\n", e$message))
-    calculate_fallback_importance(model_result, config)
-  })
-
-  # If already a data frame (from multinomial), return it
-  if (is.data.frame(anova_result) && "importance_pct" %in% names(anova_result)) {
-    return(anova_result)
+    # D5: the output says which statistic produced it, and the run says so too.
+    importance_df$method <- "z-squared share (Wald, car::Anova unavailable)"
+    attr(importance_df, "cd_importance_degraded") <- paste0(
+      "Driver importance used a z-squared Wald share instead of likelihood-ratio ",
+      "chi-squares, because car::Anova failed: ", anova_result$reason,
+      ". The two statistics are not the same and the shares are not comparable with other runs."
+    )
+    return(importance_df)
   }
 
   # Process Anova results
   importance_df <- process_anova_results(anova_result, config)
 
+  # Which statistic car::Anova returned is a property of the model class, not of
+  # this module: glm gives a likelihood-ratio chi-square (column "LR Chisq"),
+  # clm gives a WALD chi-square (column "Chisq"), and polr gives LR again. An
+  # earlier version of this line stamped every path as likelihood-ratio on the
+  # strength of having checked glm, which is the same dishonest provenance the
+  # stamp exists to prevent: on the ordinal demo the Wald figure is 120.4 where
+  # the likelihood-ratio one is 135.4. Read the column and say what it is.
+  importance_df$method <- .cd_anova_method_label(anova_result, model_result)
+
   importance_df
+}
+
+
+#' Name the Statistic car::Anova Returned
+#'
+#' @param anova_result The object returned by \code{car::Anova}.
+#' @param model_result The model result, used to name the engine.
+#' @return Single character string for the importance frame's method column.
+#' @keywords internal
+.cd_anova_method_label <- function(anova_result, model_result = NULL) {
+
+  cols <- tryCatch(names(as.data.frame(anova_result)), error = function(e) character(0))
+  engine <- model_result$engine_used %||% model_result$model_type %||% "model"
+
+  statistic <- if (any(grepl("^LR", cols))) {
+    "LR chi-square share"
+  } else if (any(grepl("^Chisq$", cols))) {
+    "Wald chi-square share"
+  } else if (any(grepl("^F$", cols))) {
+    "F-statistic share"
+  } else {
+    "chi-square share"
+  }
+
+  sprintf("%s (car::Anova type II on %s)", statistic, engine)
 }
 
 
@@ -164,32 +244,52 @@ calculate_multinomial_importance <- function(model_result, config) {
 
   model <- model_result$model
 
-  # Extract data safely - model$model may be NULL for multinom
-  # Priority: analysis_data (explicit from 04b) > model.frame > model$model
-  data <- model_result$analysis_data
-  if (is.null(data)) data <- tryCatch(model.frame(model), error = function(e) NULL)
-  if (is.null(data)) data <- model$model
-
+  # The reduced models must be refitted on exactly the rows the full model used
+  # and with exactly the same weights. 04b stores that frame as estimation_data
+  # (with the weight column ..catdriver_wt.. when the run is weighted).
+  #
+  # This used to refit on analysis_data, the raw frame with no weight column,
+  # so a weighted full log-likelihood was compared with an unweighted reduced
+  # one. Coordinator-verified in the July 2026 review: chi-square of -282.1 for
+  # a real driver, which then divided into importance_pct as a NEGATIVE share.
+  data <- model_result$estimation_data
+  weight_col <- model_result$weight_column
   if (is.null(data)) {
-    cat("   [WARN] Cannot extract data for multinomial importance — returning equal importance\n")
-    importance_df <- data.frame(
-      variable = config$driver_vars,
-      chi_square = rep(0, length(config$driver_vars)),
-      df = rep(NA, length(config$driver_vars)),
-      p_value = rep(NA, length(config$driver_vars)),
-      importance_pct = rep(round(100 / length(config$driver_vars), 1), length(config$driver_vars)),
-      label = sapply(config$driver_vars, function(v) get_var_label(config, v)),
-      significance = rep("", length(config$driver_vars)),
-      effect_size = rep("Unknown", length(config$driver_vars)),
-      rank = seq_along(config$driver_vars),
-      stringsAsFactors = FALSE
-    )
-    return(importance_df)
+    data <- model_result$analysis_data
+    if (is.null(data)) data <- tryCatch(model.frame(model), error = function(e) NULL)
+    if (is.null(data)) data <- model$model
+    weight_col <- NULL
   }
 
-  # Strip internal weight column if present (prevents refit issues)
-  if (".wt" %in% names(data)) {
-    data[[".wt"]] <- NULL
+  if (is.null(data)) {
+    # This used to write every driver an equal share of 100 per cent, with ranks
+    # and "Unknown" effect sizes, behind a console [WARN]. Those numbers were
+    # invented: they describe no model and no data.
+    catdriver_refuse(
+      reason = "CALC_IMPORTANCE_DATA_UNAVAILABLE",
+      title = "MULTINOMIAL IMPORTANCE CANNOT BE COMPUTED",
+      problem = "The data the multinomial model was fitted on could not be recovered, so no reduced model can be refitted.",
+      why_it_matters = paste0(
+        "Importance for a multinomial model comes from refitting the model without each driver. ",
+        "Earlier versions filled the table with an equal share for every driver instead, which ",
+        "looked like a result and was not one."
+      ),
+      fix = paste0(
+        "Re-run the analysis. If it happens again, the multinomial fit did not return its ",
+        "estimation data: reduce the number of outcome levels or drivers and try again."
+      )
+    )
+  }
+
+  weighted_refit <- !is.null(weight_col) && weight_col %in% names(data)
+  if (weighted_refit && !identical(weight_col, "..catdriver_wt..")) {
+    data[["..catdriver_wt.."]] <- data[[weight_col]]
+  }
+
+  importance_method <- if (weighted_refit) {
+    "LR-test share (weighted multinomial refits)"
+  } else {
+    "LR-test share (multinomial refits)"
   }
 
   # Get full model log-likelihood
@@ -209,18 +309,34 @@ calculate_multinomial_importance <- function(model_result, config) {
       reduced_formula <- as.formula(paste(config$outcome_var, "~ 1"))
     }
 
-    # Fit reduced model
+    # Fit reduced model on the same rows, with the same weights
     reduced_model <- tryCatch({
-      nnet::multinom(reduced_formula, data = data, trace = FALSE, maxit = 500)
+      if (weighted_refit) {
+        nnet::multinom(reduced_formula, data = data, weights = ..catdriver_wt..,
+                       trace = FALSE, maxit = 500)
+      } else {
+        nnet::multinom(reduced_formula, data = data, trace = FALSE, maxit = 500)
+      }
     }, error = function(e) NULL)
 
     if (!is.null(reduced_model)) {
       ll_reduced <- logLik(reduced_model)
 
-      # Likelihood ratio test
+      # Likelihood ratio test. A correctly nested pair cannot give a negative
+      # statistic; if one appears the two fits are not comparable and the value
+      # must not reach an importance share.
       lr_stat <- -2 * (as.numeric(ll_reduced) - as.numeric(ll_full))
       lr_df <- attr(ll_full, "df") - attr(ll_reduced, "df")
-      lr_pvalue <- pchisq(lr_stat, abs(lr_df), lower.tail = FALSE)
+      if (is.finite(lr_stat) && lr_stat < 0) {
+        if (lr_stat < -1e-6) {
+          cat(sprintf("   [WARN] Reduced model for '%s' fitted better than the full model (LR = %.3f); importance for this driver is not available\n",
+                      var_name, lr_stat))
+          lr_stat <- NA_real_
+        } else {
+          lr_stat <- 0  # numerical noise around a driver that adds nothing
+        }
+      }
+      lr_pvalue <- if (is.na(lr_stat)) NA_real_ else pchisq(lr_stat, abs(lr_df), lower.tail = FALSE)
 
       importance_list[[var_name]] <- data.frame(
         variable = var_name,
@@ -260,6 +376,9 @@ calculate_multinomial_importance <- function(model_result, config) {
 
   importance_df$effect_size <- vapply(importance_df$importance_pct,
     classify_importance_effect, character(1))
+
+  # D5: every importance row says how it was computed.
+  importance_df$method <- importance_method
 
   # Sort and rank
   importance_df <- importance_df[order(-importance_df$importance_pct), ]
@@ -320,8 +439,21 @@ calculate_fallback_importance <- function(model_result, config) {
     )
   }
 
-  # Map dummy variables back to original factors
-  importance_df <- aggregate_dummy_importance(importance_df, config)
+  # Map dummy variables back to original factors. Without a mapping this
+  # aggregation cannot resolve a term like "service_qualityExcellent", so build
+  # one from the model itself where the module's own mapper can read it.
+  mapping <- tryCatch({
+    data <- model_result$estimation_data %||% model_result$analysis_data
+    formula <- model_result$formula
+    if (is.null(data) || is.null(formula)) stop("no frame to map against")
+    if (identical(model_result$model_type, "multinomial_logistic")) {
+      map_multinomial_terms(model_result$model, data, formula, config$outcome_var)
+    } else {
+      map_terms_to_levels(model_result$model, data, formula)
+    }
+  }, error = function(e) NULL)
+
+  importance_df <- aggregate_dummy_importance(importance_df, config, mapping = mapping)
 
   # Calculate relative importance
   total_chisq <- sum(importance_df$chi_square, na.rm = TRUE)
@@ -439,155 +571,11 @@ aggregate_dummy_importance <- function(importance_df, config, mapping = NULL, pr
 }
 
 
-#' Extract Odds Ratios Summary (DEPRECATED)
-#'
-#' @description
-#' \lifecycle{deprecated}
-#'
-#' This function is DEPRECATED as of v2.0. Use extract_odds_ratios_mapped()
-#' with a canonical term mapping from map_terms_to_levels() instead.
-#'
-#' The main pipeline (run_categorical_keydriver) no longer calls this function.
-#' It exists only for backward compatibility and will be removed in a future version.
-#'
-#' @param model_result Model results
-#' @param config Configuration list
-#' @param prep_data Preprocessed data
-#' @param mapping Optional pre-computed mapping from map_terms_to_levels()
-#' @return Data frame with odds ratio summary
-#' @keywords internal
-extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL) {
+# extract_odds_ratios() was deleted 2026-09-18. It was deprecated at v2.0 and
+# called by nothing; extract_odds_ratios_mapped() in 09_mapper.R is the live
+# one and maps coefficients through the model matrix rather than by parsing
+# coefficient names.
 
-  # Deprecation warning
-
-  cat("   [WARNING] extract_odds_ratios() is DEPRECATED as of v2.0. Use extract_odds_ratios_mapped() with canonical term mapping instead. This function will be removed in a future version.\n")
-
-  coef_df <- model_result$coefficients
-
-  # Remove intercept
-  coef_df <- coef_df[!grepl("^\\(Intercept\\)", coef_df$term), ]
-
-  # Build mapping if not provided - use model matrix infrastructure
-  # TRS v1.0: Mapping failures must REFUSE, not warn and continue (risk of silent wrong answers)
-  if (is.null(mapping) && !is.null(model_result$model)) {
-    mapping <- tryCatch({
-      if (model_result$model_type == "multinomial_logistic") {
-        map_multinomial_terms(model_result$model, prep_data$data,
-                             prep_data$model_formula, config$outcome_var)
-      } else {
-        map_terms_to_levels(model_result$model, prep_data$data,
-                           prep_data$model_formula)
-      }
-    }, error = function(e) {
-      catdriver_refuse(
-        code = "MAPPER_TERM_MAPPING_FAILED",
-        title = "Cannot Build Term Mapping",
-        problem = paste0("Failed to map model terms to driver levels: ", e$message),
-        why_it_matters = "Without proper term mapping, importance scores cannot be correctly attributed to driver levels. Analysis would produce incorrect results.",
-        how_to_fix = c(
-          "Check that all driver variables exist in your data file",
-          "Ensure driver variables have the expected factor levels",
-          "Review the error message above for specific issues"
-        )
-      )
-    })
-  }
-
-  # Parse term names to extract factor and level
-  or_list <- list()
-
-  for (i in seq_len(nrow(coef_df))) {
-    term <- coef_df$term[i]
-
-    # Try to match using proper mapping first
-    matched_var <- NULL
-    matched_level <- NULL
-    ref_level <- NA
-
-    if (!is.null(mapping)) {
-      # Use canonical mapping
-      match_idx <- which(mapping$coef_name == term & !mapping$is_reference)
-      if (length(match_idx) > 0) {
-        m <- mapping[match_idx[1], ]
-        matched_var <- m$driver
-        matched_level <- m$level
-        ref_level <- m$reference_level
-      }
-    }
-
-    # Fallback: exact match to driver variable (for continuous vars)
-    if (is.null(matched_var)) {
-      if (term %in% config$driver_vars) {
-        matched_var <- term
-        matched_level <- "per unit"
-      } else {
-        # Use predictor_info from prep_data for mapping via levels
-        for (driver_var in config$driver_vars) {
-          info <- prep_data$predictor_info[[driver_var]]
-          if (!is.null(info) && !is.null(info$levels)) {
-            for (lvl in info$levels[-1]) {  # Skip reference
-              expected_col <- paste0(driver_var, lvl)
-              expected_col_clean <- paste0(driver_var, make.names(lvl))
-              if (term == expected_col || term == expected_col_clean) {
-                matched_var <- driver_var
-                matched_level <- lvl
-                ref_level <- info$reference_level
-                break
-              }
-            }
-          }
-          if (!is.null(matched_var)) break
-        }
-      }
-    }
-
-    # Final fallback: use term as-is
-    if (is.null(matched_var)) {
-      matched_var <- term
-      matched_level <- NA
-    }
-
-    # Get reference level from prep_data if not already set
-    if (is.na(ref_level) && !is.null(prep_data$predictor_info[[matched_var]])) {
-      ref_level <- prep_data$predictor_info[[matched_var]]$reference_level
-    }
-
-    row_data <- data.frame(
-      factor = matched_var,
-      factor_label = get_var_label(config, matched_var),
-      comparison = matched_level,
-      reference = ref_level,
-      odds_ratio = coef_df$odds_ratio[i],
-      or_lower = coef_df$or_lower[i],
-      or_upper = coef_df$or_upper[i],
-      p_value = coef_df$p_value[i],
-      stringsAsFactors = FALSE
-    )
-
-    # Add multinomial outcome level if present
-    if ("outcome_level" %in% names(coef_df)) {
-      row_data$outcome_level <- coef_df$outcome_level[i]
-    }
-
-    or_list[[length(or_list) + 1]] <- row_data
-  }
-
-  or_df <- do.call(rbind, or_list)
-  rownames(or_df) <- NULL
-
-  # Add effect size interpretation
-  or_df$effect <- sapply(or_df$odds_ratio, interpret_or_effect)
-
-  # Add significance
-  or_df$significance <- sapply(or_df$p_value, get_sig_stars)
-
-  # Format for display
-  or_df$or_formatted <- format_or(or_df$odds_ratio)
-  or_df$ci_formatted <- mapply(format_ci, or_df$or_lower, or_df$or_upper)
-  or_df$p_formatted <- sapply(or_df$p_value, format_pvalue)
-
-  or_df
-}
 
 
 #' Calculate Factor Patterns

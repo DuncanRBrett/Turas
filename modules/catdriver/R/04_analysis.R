@@ -86,7 +86,9 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   # ==========================================================================
 
   fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
-  model <- tryCatch({
+  # Non-integer frequency weights make glm warn on every fit; muffled at the fit
+  # site, with the reason recorded in cd_muffle_noninteger_successes().
+  model <- cd_muffle_noninteger_successes(tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
       if (all(abs(weights - 1) < 1e-10)) {
         glm(formula, data = fit_data, family = binomial(link = "logit"))
@@ -99,7 +101,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
     }
   }, error = function(e) {
     list(error = TRUE, message = e$message)
-  })
+  }))
 
   # ==========================================================================
   # CHECK FOR SEPARATION / CONVERGENCE ISSUES
@@ -135,7 +137,9 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   if (needs_fallback) {
     # Try brglm2 for Firth correction
     if (requireNamespace("brglm2", quietly = TRUE)) {
-      model <- tryCatch({
+      # Same muffler as the primary fit: the Firth fallback is still a binomial
+      # glm and still says "non-integer #successes" about weighted data.
+      model <- cd_muffle_noninteger_successes(tryCatch({
         engine_used <- "brglm2 (Firth)"
         fallback_used <- TRUE
 
@@ -150,7 +154,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
         }
       }, error = function(e) {
         list(error = TRUE, message = e$message)
-      })
+      }))
     } else {
       # ========================================================================
       # HARD STOP: Separation detected but no fallback available
@@ -234,7 +238,9 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   rownames(coef_df) <- NULL
 
   # Calculate odds ratios and CIs
-  conf_level <- config$confidence_level
+  # A config without confidence_level used to give qnorm(numeric(0)) and a
+  # zero-length CI column, which surfaces as an unrelated data.frame error.
+  conf_level <- config$confidence_level %||% CATDRIVER_DEFAULTS$confidence_level %||% 0.95
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
   coef_df$odds_ratio <- exp(coef_df$estimate)
@@ -255,8 +261,8 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   # Get predicted probabilities
   pred_probs <- predict(model, type = "response")
 
-  # Classification metrics
-  outcome_actual <- data[[config$outcome_var]]
+  # Classification metrics, on the rows the model fitted (see cd_fitted_outcome)
+  outcome_actual <- cd_fitted_outcome(model, data, config$outcome_var)
   pred_class <- factor(ifelse(pred_probs >= 0.5,
                               levels(outcome_actual)[2],
                               levels(outcome_actual)[1]),
@@ -307,6 +313,74 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
 }
 
 
+#' Multicollinearity from the Design Matrix
+#'
+#' For engines whose own fit \code{car::vif()} cannot read (cumulative-link
+#' models), collinearity is measured where it actually lives: among the
+#' predictors. An auxiliary linear model is fitted with an arbitrary numeric
+#' response, so its coefficients are meaningless and its variance inflation
+#' factors are exactly the ones the design matrix implies.
+#'
+#' @param model The fitted model, used for its model frame.
+#' @param config Configuration list.
+#' @return The same shape as \code{check_multicollinearity()}.
+#' @keywords internal
+check_multicollinearity_from_design <- function(model, config) {
+
+  result <- tryCatch({
+    mf <- model$model
+    if (is.null(mf)) stop("the fitted model kept no model frame")
+    drivers <- intersect(config$driver_vars, names(mf))
+    if (length(drivers) < 2) {
+      return(list(checked = FALSE,
+                  message = "Multicollinearity needs at least two drivers"))
+    }
+    aux <- mf[, drivers, drop = FALSE]
+    aux[["..cd_aux_response.."]] <- seq_len(nrow(aux))
+    aux_formula <- as.formula(paste("..cd_aux_response.. ~",
+                                    paste(drivers, collapse = " + ")))
+    environment(aux_formula) <- environment()
+    vif_vals <- car::vif(lm(aux_formula, data = aux))
+    vif_vals
+  }, error = function(e) e)
+
+  if (inherits(result, "error")) {
+    return(list(
+      checked = FALSE,
+      message = paste0("Multicollinearity not measured on this engine: ",
+                       conditionMessage(result))
+    ))
+  }
+  if (is.list(result) && isTRUE(result$checked == FALSE)) {
+    return(result)
+  }
+
+  df <- if (is.matrix(result)) {
+    data.frame(variable = rownames(result), gvif = result[, "GVIF"],
+               df = result[, "Df"], gvif_adj = result[, "GVIF^(1/(2*Df))"],
+               stringsAsFactors = FALSE)
+  } else {
+    data.frame(variable = names(result), gvif = as.numeric(result), df = 1,
+               gvif_adj = sqrt(as.numeric(result)), stringsAsFactors = FALSE)
+  }
+  rownames(df) <- NULL
+
+  high <- df$variable[df$gvif_adj > CATDRIVER_DEFAULTS$vif_threshold]
+  list(
+    checked = TRUE,
+    vif_table = df,
+    method = "GVIF on an auxiliary linear model of the design matrix (the clm fit itself has no intercept for car::vif)",
+    status = if (length(high) > 0) "WARNING" else "PASS",
+    high_vif_vars = high,
+    interpretation = if (length(high) > 0) {
+      paste0("High multicollinearity detected in: ", paste(high, collapse = ", "))
+    } else {
+      "No multicollinearity concerns (all adjusted GVIF below threshold)"
+    }
+  )
+}
+
+
 #' Check Multicollinearity
 #'
 #' Calculates GVIF for model predictors.
@@ -314,7 +388,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
 #' @param model Fitted model
 #' @return Data frame with GVIF values
 #' @export
-check_multicollinearity <- function(model) {
+check_multicollinearity <- function(model, config = NULL) {
 
   if (!requireNamespace("car", quietly = TRUE)) {
     return(list(
@@ -329,6 +403,17 @@ check_multicollinearity <- function(model) {
       checked = FALSE,
       message = "VIF not available for multinomial models (limitation of car::vif)"
     ))
+  }
+
+  # A cumulative-link model has no intercept in the sense car::vif() needs: it
+  # has thresholds. Running it anyway returned GVIF values in the tens of
+  # thousands with df 0 and adjusted values of Inf, R's own warning that "vifs
+  # may not be sensible", and a degraded reason declaring high multicollinearity
+  # on every ordinal run ever made. Collinearity among the predictors is a
+  # property of the design matrix, so it is measured on an auxiliary linear
+  # model of that matrix instead.
+  if (inherits(model, "clm")) {
+    return(check_multicollinearity_from_design(model, config))
   }
 
   vif_result <- tryCatch({

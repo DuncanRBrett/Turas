@@ -200,7 +200,10 @@ insights.
 #### Order
 
 -   **Purpose:** Category ordering for ordinal variables
--   **Required:** No (but recommended for ordinal outcomes)
+-   **Required:** **Yes for an ordinal outcome** (the run refuses with
+    `CFG_OUTCOME_ORDER_MISSING` without it); optional elsewhere. Without an
+    Order the categories are sorted alphabetically, so "High;Low;Medium" is
+    what the model fits, and every odds ratio and importance figure is wrong
 -   **Format:** Semicolon-separated, low to high
 -   **Examples:**
     -   `Low;Medium;High`

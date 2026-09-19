@@ -122,10 +122,12 @@ CatDriver uses `ordinal::clm()` as the primary engine, with `MASS::polr()` as fa
 
 For unordered outcomes with 3+ categories. Fits K-1 binary comparisons simultaneously (each category vs the reference category). Requires larger samples because each comparison has its own set of coefficients.
 
-CatDriver uses `nnet::multinom()`. Two modes are available:
-
--   **One-vs-rest:** Each category compared against all others combined
--   **One-vs-one:** Pairwise comparisons between specific categories
+CatDriver uses `nnet::multinom()` in one mode, baseline-category: every
+outcome level is compared with one reference level. One-vs-rest and pairwise
+reporting are not implemented, and a config asking for them is refused rather
+than quietly given baseline-category odds ratios. To compare one level against
+all others, recode the outcome as binary and run it with
+`outcome_type = binary`.
 
 ### Variable importance
 
@@ -156,7 +158,18 @@ Because odds ratios are hard to explain to non-statistical audiences, CatDriver 
 
 Example: If the reference category has a 20% predicted churn probability and category X has 35%, the probability lift is +15 percentage points. This is directly interpretable: "Customers in category X are 15 percentage points more likely to churn than the reference group."
 
-Probability lifts are model-adjusted (they account for all other drivers) and are the recommended metric for client-facing reports.
+What CatDriver computes is the difference in **mean fitted probability** between
+a category's respondents and the reference category's respondents. The
+probabilities come from the fitted model, so each respondent's own profile is in
+them, but the two groups are not otherwise matched: whatever else differs between
+them is still in the difference. It is not an average marginal effect, which
+holds the other drivers fixed, and CatDriver does not compute one. Read a
+probability lift as a descriptive difference between two groups of real
+respondents, not as the effect of moving one respondent from one category to the
+other.
+
+For a multinomial outcome the probability is the probability of one named
+outcome level, which the lift table names in its `outcome_level` column.
 
 ### Importance rankings
 

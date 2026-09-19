@@ -108,6 +108,24 @@ add_model_summary_sheet <- function(wb, results, config, styles) {
     Interpretation = if (model_result$convergence) "Model converged normally" else "Check results carefully"
   ))
 
+  # D5: what the weighting did, and what it did not do, on the face of the sheet
+  weighting_stamp <- results$weight_diagnostics$inference_stamp
+  if (is.null(weighting_stamp)) {
+    weighting_stamp <- catdriver_weighting_stamp(config$weight_var,
+                                                 results$weight_diagnostics,
+                                                 results$weight_diagnostics$normalisation)
+  }
+  summary_data <- rbind(summary_data, data.frame(
+    Metric = "Weighting and inference",
+    Value = if (!is.null(results$weight_diagnostics)) {
+      sprintf("Weighted (%s), effective n = %.0f",
+              config$weight_var %||% "weight", results$weight_diagnostics$effective_n)
+    } else {
+      "Unweighted"
+    },
+    Interpretation = weighting_stamp
+  ))
+
   # Write to sheet
   openxlsx::writeData(wb, "Model Summary", summary_data,
                       startRow = 1, startCol = 1,
@@ -340,6 +358,54 @@ add_diagnostics_sheet <- function(wb, results, config, styles) {
     check.names = FALSE
   ))
 
+  # Proportional odds. The test runs on every ordinal fit but its result used to
+  # be read only when it FAILED, so a reader had no way to tell an assumption
+  # that had been checked and held from one that was never checked at all.
+  po <- results$model_result$proportional_odds
+  if (!is.null(po)) {
+    checks <- rbind(checks, data.frame(
+      Check = "Proportional odds assumption",
+      Status = if (isTRUE(po$checked)) {
+        if (identical(po$status, "WARNING")) "WARNING" else "PASS"
+      } else {
+        "NOT TESTED"
+      },
+      Details = po$interpretation %||% po$message %||% "No detail recorded",
+      `Action Required` = if (identical(po$status, "WARNING")) {
+        "Consider a multinomial model, or report the affected drivers threshold by threshold"
+      } else {
+        "None"
+      },
+      check.names = FALSE
+    ))
+  }
+
+  # Multicollinearity, including how it was measured: the clm engine cannot be
+  # read by car::vif() directly, so its figures come from the design matrix.
+  vif <- results$multicollinearity
+  if (!is.null(vif) && isTRUE(vif$checked)) {
+    checks <- rbind(checks, data.frame(
+      Check = "Multicollinearity",
+      Status = if (identical(vif$status, "WARNING")) "WARNING" else "PASS",
+      Details = paste0(vif$interpretation %||% "",
+                       if (!is.null(vif$method)) paste0(" [", vif$method, "]") else ""),
+      `Action Required` = if (identical(vif$status, "WARNING")) {
+        "Consider dropping or combining the correlated drivers"
+      } else {
+        "None"
+      },
+      check.names = FALSE
+    ))
+  } else if (!is.null(vif)) {
+    checks <- rbind(checks, data.frame(
+      Check = "Multicollinearity",
+      Status = "NOT TESTED",
+      Details = vif$message %||% "Not measured",
+      `Action Required` = "None",
+      check.names = FALSE
+    ))
+  }
+
   openxlsx::writeData(wb, "Diagnostics", checks,
                       startRow = current_row, startCol = 1,
                       headerStyle = styles$header)
@@ -361,6 +427,29 @@ add_diagnostics_sheet <- function(wb, results, config, styles) {
   }
 
   current_row <- current_row + nrow(checks) + 3
+
+  # Section 1b: what the guards said, in full.
+  #
+  # The guards compose messages carrying the numbers a reader needs ("Low
+  # events-per-parameter ratio (2.5, from 30 minority-class events over 12
+  # parameters)"), and nothing read them: only the terse stability flags reached
+  # the workbook, so the run status said "Low events-per-parameter ratio" and
+  # the figures behind it existed nowhere.
+  guard_warnings <- results$guard_status$warnings
+  if (length(guard_warnings) > 0) {
+    openxlsx::writeData(wb, "Diagnostics", "Guard Warnings",
+                        startRow = current_row, startCol = 1)
+    openxlsx::addStyle(wb, "Diagnostics", styles$section,
+                       rows = current_row, cols = 1)
+    current_row <- current_row + 1
+
+    guard_df <- data.frame(Warning = as.character(guard_warnings),
+                           stringsAsFactors = FALSE)
+    openxlsx::writeData(wb, "Diagnostics", guard_df,
+                        startRow = current_row, startCol = 1,
+                        headerStyle = styles$header)
+    current_row <- current_row + nrow(guard_df) + 3
+  }
 
   # Section 2: Missing Data Summary
   openxlsx::writeData(wb, "Diagnostics", "Missing Data Summary",

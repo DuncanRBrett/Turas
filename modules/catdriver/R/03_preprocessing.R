@@ -347,7 +347,7 @@ prepare_outcome <- function(data, config, outcome_info) {
 #'   \item{predictor_info}{Named list keyed by variable name, each containing
 #'     type, needs_dummy, n_dummies, reference_level, levels, and source}
 #' @export
-prepare_predictors <- function(data, config) {
+prepare_predictors <- function(data, config, group_label = "") {
 
   predictor_info <- list()
 
@@ -477,6 +477,12 @@ prepare_predictors <- function(data, config) {
               "Mismatched levels would cause incorrect OR interpretations or silent data loss."
             ),
             fix = c(
+              if (nzchar(group_label)) paste0(
+                "This is subgroup '", group_label,
+                "', not the whole sample: a level declared in the config has no respondents here. ",
+                "The config may well be right for the study as a whole. Raise subgroup_min_n, ",
+                "collapse the level, or drop this subgroup."
+              ) else NULL,
               "Update the Order column or levels_order in Driver_Settings to match your data values.",
               if (length(missing_in_data) > 0)
                 paste0("Config levels not in data: ", paste(missing_in_data, collapse = ", ")),
@@ -549,6 +555,12 @@ prepare_predictors <- function(data, config) {
               "Mismatched levels would cause incorrect OR interpretations or silent data loss."
             ),
             fix = c(
+              if (nzchar(group_label)) paste0(
+                "This is subgroup '", group_label,
+                "', not the whole sample: a level declared in the config has no respondents here. ",
+                "The config may well be right for the study as a whole. Raise subgroup_min_n, ",
+                "collapse the level, or drop this subgroup."
+              ) else NULL,
               "Update the Order column or levels_order in Driver_Settings to match your data values.",
               if (length(missing_in_data) > 0)
                 paste0("Config levels not in data: ", paste(missing_in_data, collapse = ", ")),
@@ -663,7 +675,7 @@ build_model_formula <- function(config) {
 #'   \item{n_predictors}{Integer, number of predictor variables}
 #'   \item{n_terms}{Integer, total number of model terms (sum of dummies)}
 #' @export
-preprocess_catdriver_data <- function(data, config) {
+preprocess_catdriver_data <- function(data, config, group_label = "") {
 
   # Detect outcome type
   outcome_info <- detect_outcome_type(
@@ -676,7 +688,7 @@ preprocess_catdriver_data <- function(data, config) {
   data <- prepare_outcome(data, config, outcome_info)
 
   # Prepare predictors
-  prep_result <- prepare_predictors(data, config)
+  prep_result <- prepare_predictors(data, config, group_label = group_label)
   data <- prep_result$data
   predictor_info <- prep_result$predictor_info
 

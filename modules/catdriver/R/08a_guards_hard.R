@@ -50,6 +50,162 @@ guard_require_outcome_type <- function(config) {
 }
 
 
+#' Guard: The Weight Variable Must Be Usable
+#'
+#' REFUSES when a weight variable is named in the config but cannot be used:
+#' the column is absent from the data, or it holds nothing numeric.
+#'
+#' Both cases used to run unweighted and report PASS, while the stats pack's
+#' Declaration still named the weight variable and said the analysis was
+#' weighted. A misspelled weight name is the likeliest way to ship unweighted
+#' numbers to a client believing they are weighted, so it refuses rather than
+#' degrades: the config says weighting matters, and nothing here can honour it.
+#'
+#' @param config Configuration list.
+#' @param data Data frame.
+#' @keywords internal
+guard_weight_variable_usable <- function(config, data) {
+
+  weight_var <- config$weight_var
+  if (is.null(weight_var) || !nzchar(weight_var)) {
+    return(invisible(TRUE))
+  }
+
+  if (!weight_var %in% names(data)) {
+    catdriver_refuse(
+      reason = "CFG_WEIGHT_VAR_NOT_FOUND",
+      title = "WEIGHT VARIABLE NOT IN DATA",
+      problem = paste0("The config names '", weight_var,
+                       "' as the weight variable, but the data has no such column."),
+      why_it_matters = paste0(
+        "The analysis would run unweighted while every stamp on the output said it was weighted. ",
+        "Unweighted percentages from a weighted sample are the wrong numbers."
+      ),
+      fix = paste0(
+        "Check the spelling of the Weight row in the Variables sheet against your data file.\n",
+        "Columns available: ", paste(utils::head(names(data), 40), collapse = ", "),
+        if (length(names(data)) > 40) ", ..." else "",
+        "\nIf the study is genuinely unweighted, remove the Weight row."
+      )
+    )
+  }
+
+  raw <- data[[weight_var]]
+  numeric_values <- suppressWarnings(as.numeric(raw))
+  usable <- sum(is.finite(numeric_values) & numeric_values > 0)
+
+  if (usable == 0) {
+    catdriver_refuse(
+      reason = "CFG_WEIGHT_VAR_NOT_NUMERIC",
+      title = "WEIGHT VARIABLE HOLDS NO USABLE WEIGHTS",
+      problem = paste0("Column '", weight_var,
+                       "' contains no positive numeric values (type: ", class(raw)[1], ")."),
+      why_it_matters = paste0(
+        "Every value would be repaired to 1, so the analysis would be unweighted while the output ",
+        "said it was weighted by this variable."
+      ),
+      fix = paste0(
+        "Check that '", weight_var, "' holds numbers rather than text, and that it is not empty.\n",
+        "If the study is genuinely unweighted, remove the Weight row from the Variables sheet."
+      )
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Guard: Reserved Internal Column Names
+#'
+#' REFUSES when an analysis variable is named like one of the columns the
+#' engines add to their own copy of the data to carry weights.
+#'
+#' The engines write \code{..catdriver_wt..} (multinomial, bootstrap) and
+#' \code{.wt} (binary, ordinal) into the fit frame. A user column of either
+#' name would be overwritten, and the importance refits decide whether a run is
+#' weighted by testing for that column, so a stray column would make an
+#' unweighted run behave as though it were weighted. Silent, and wrong.
+#'
+#' @param config Configuration list.
+#' @param data Data frame.
+#' @keywords internal
+guard_reserved_column_names <- function(config, data) {
+
+  reserved <- c("..catdriver_wt..", ".wt")
+  in_play <- unique(c(config$outcome_var, config$driver_vars, config$weight_var,
+                      config$subgroup_var))
+  in_play <- in_play[!is.na(in_play) & nzchar(in_play)]
+
+  clashes <- intersect(reserved, c(in_play, names(data)))
+
+  if (length(clashes) > 0) {
+    catdriver_refuse(
+      reason = "DATA_RESERVED_COLUMN_NAME",
+      title = "RESERVED COLUMN NAME IN DATA",
+      problem = paste0("The data contains the reserved column name(s): ",
+                       paste(clashes, collapse = ", "), "."),
+      why_it_matters = paste0(
+        "CatDriver adds these columns to its own copy of the data to carry survey weights. ",
+        "A column of the same name would be overwritten, and the module decides whether a fit ",
+        "was weighted by looking for it, so the run could report weighted results from an ",
+        "unweighted model."
+      ),
+      fix = paste0("Rename the column(s) ", paste(clashes, collapse = ", "),
+                   " in your data file. Any other name will do.")
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Guard: Ordinal Outcome Must Declare Its Order
+#'
+#' REFUSES when \code{outcome_type = "ordinal"} and the outcome variable has no
+#' Order in the Variables sheet.
+#'
+#' Without an Order, \code{detect_outcome_type()} sorts the categories
+#' alphabetically. Numeric scales survive that by luck. Text scales do not:
+#' "High" < "Low" < "Medium" fits a proportional-odds model to an order nobody
+#' intended, and every odds ratio and importance figure that follows is wrong
+#' while the run reports PASS. The equivalent guard for ordinal DRIVERS already
+#' exists (guard_ordinal_levels_order); the outcome had none.
+#'
+#' @param config Configuration list.
+#' @keywords internal
+guard_ordinal_outcome_order <- function(config) {
+
+  if (!identical(tolower(config$outcome_type %||% ""), "ordinal")) {
+    return(invisible(TRUE))
+  }
+
+  order_spec <- config$outcome_order
+  has_order <- !is.null(order_spec) && length(order_spec) > 0 &&
+    !all(is.na(order_spec)) && any(nzchar(as.character(order_spec)))
+
+  if (!has_order) {
+    catdriver_refuse(
+      reason = "CFG_OUTCOME_ORDER_MISSING",
+      title = "ORDINAL OUTCOME ORDER REQUIRED",
+      problem = paste0("Outcome '", config$outcome_var,
+                       "' is declared ordinal but the Variables sheet gives no Order for it."),
+      why_it_matters = paste0(
+        "An ordinal model needs to know which category is lowest. Without an Order the ",
+        "categories are sorted alphabetically, so a scale like Low/Medium/High is fitted as ",
+        "High < Low < Medium and every odds ratio and importance figure is wrong, silently."
+      ),
+      fix = paste0(
+        "Add an 'Order' for '", config$outcome_var, "' in the Variables sheet.\n",
+        "Format: semicolon-separated from lowest to highest ",
+        "(for example 'Dissatisfied;Neutral;Satisfied')."
+      )
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Guard: Validate Outcome Levels Match Config
 #'
 #' REFUSES if data outcome levels don't match config declaration.
@@ -140,36 +296,53 @@ guard_require_multinomial_mode <- function(config) {
   }
 
   multinomial_mode <- config$multinomial_mode
-  valid_modes <- c("baseline_category", "all_pairwise", "one_vs_all", "per_outcome")
 
-  if (is.null(multinomial_mode) || !nzchar(multinomial_mode) || !multinomial_mode %in% valid_modes) {
+  # Only one mode is implemented. The engine has always fitted the same
+  # baseline-category model whatever this setting said: all_pairwise and
+  # one_vs_all were accepted by the guard and then ignored, so a user who asked
+  # for one-vs-rest received baseline-category odds ratios believing otherwise,
+  # and per_outcome passed the guard only to be refused by the engine two steps
+  # later. Implementing the other three is a new statistical feature, not a fix,
+  # so they are refused honestly instead of pretended.
+  if (is.null(multinomial_mode) || !nzchar(multinomial_mode)) {
     catdriver_refuse(
       reason = "CFG_MULTINOMIAL_MODE_MISSING",
       title = "MULTINOMIAL MODE REQUIRED",
-      problem = "Outcome type is multinomial but multinomial_mode is missing or invalid.",
-      why_it_matters = "Multinomial models produce multiple sets of odds ratios. We refuse to guess which one you want.",
+      problem = "Outcome type is multinomial but multinomial_mode is missing.",
+      why_it_matters = "Multinomial models can be reported several ways. CatDriver refuses to guess which one you meant.",
       fix = paste0(
-        "Add 'multinomial_mode' to Settings sheet.\n",
-        "VALID VALUES:\n",
-        "  - 'baseline_category': Compare all levels to one reference (default)\n",
-        "  - 'per_outcome': Report ORs for each outcome level separately\n",
-        "  - 'all_pairwise': Compare every pair of levels\n",
-        "  - 'one_vs_all': Compare each level vs. all others (requires target_outcome_level)"
+        "Add 'multinomial_mode' to the Settings sheet with the value:\n",
+        "  - 'baseline_category': every level compared with one reference level\n\n",
+        "That is the only mode CatDriver implements."
       )
     )
   }
 
-  if (multinomial_mode == "one_vs_all") {
-    target_level <- config$target_outcome_level
-    if (is.null(target_level) || is.na(target_level) || !nzchar(target_level)) {
-      catdriver_refuse(
-        reason = "CFG_TARGET_OUTCOME_MISSING",
-        title = "TARGET OUTCOME LEVEL REQUIRED",
-        problem = "multinomial_mode is 'one_vs_all' but target_outcome_level is missing.",
-        why_it_matters = "one_vs_all mode needs to know which outcome category to treat as 'success'.",
-        fix = "Add 'target_outcome_level' to Settings sheet with the desired outcome category."
+  if (!identical(multinomial_mode, "baseline_category")) {
+    catdriver_refuse(
+      reason = "CFG_MULTINOMIAL_MODE_NOT_IMPLEMENTED",
+      title = "MULTINOMIAL MODE NOT IMPLEMENTED",
+      problem = paste0("multinomial_mode='", multinomial_mode,
+                       "' is not implemented in CatDriver."),
+      why_it_matters = paste0(
+        "Only 'baseline_category' exists. Earlier versions accepted this setting and then fitted ",
+        "the baseline-category model anyway, so the odds ratios did not answer the question the ",
+        "setting asked."
+      ),
+      fix = paste0(
+        "Set multinomial_mode to 'baseline_category' in the Settings sheet.\n",
+        "To compare one level against all others, recode the outcome into a binary variable ",
+        "and run it with outcome_type = 'binary'."
       )
-    }
+    )
+  }
+
+  # target_outcome_level only ever meant anything for one_vs_all. Say so rather
+  # than leaving a setting in the workbook that does nothing.
+  tgt <- config$target_outcome_level
+  if (!is.null(tgt) && !all(is.na(tgt)) && any(nzchar(as.character(tgt)))) {
+    cat(sprintf("   [INFO] Setting 'target_outcome_level' (%s) is ignored: it belonged to the one_vs_all mode, which is not implemented.\n",
+                paste(tgt, collapse = ", ")))
   }
 
   invisible(TRUE)

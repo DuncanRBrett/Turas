@@ -7,12 +7,14 @@
 #   shared TRS infrastructure, maintaining module-specific naming.
 #
 # NOT TO BE CONFUSED WITH:
-#   - 00_guard.R: Validation gates (validate_catdriver_config, guard_validate_data_hard, etc.)
 #   - 08a_guards_hard.R: Hard error guards (require_* functions)
 #   - 08b_guards_soft.R: Soft warning guards (check_* functions)
 #
-# This file provides the MECHANISM for refusals (how to refuse).
-# 00_guard.R provides the LOGIC for refusals (when to refuse).
+# This file provides the MECHANISM for refusals (how to refuse); the guard
+# files above provide the LOGIC (when to refuse). This is the ONLY definition
+# of catdriver_refuse() in the module. A second one lived in 00_guard.R with an
+# incompatible signature and was sourced last in the GUI, which turned every
+# refusal into BUG_INTERNAL_ERROR. That file is deleted; keep this the only one.
 #
 # Shared TRS infrastructure from: modules/shared/lib/trs_refusal.R
 #
@@ -56,7 +58,10 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
                              details = NULL) {
 
   # Ensure reason has valid TRS prefix, add CFG_ if missing
-  if (!is.null(reason) && !grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", reason)) {
+  # CALC_ is the platform's prefix for calculation failures (project CLAUDE.md);
+  # without it here, a CALC_ code was silently rewritten to CFG_CALC_ and told
+  # the user to look at their configuration for a computation that failed.
+  if (!is.null(reason) && !grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", reason)) {
     reason <- paste0("CFG_", reason)
   }
   if (is.null(reason)) {
@@ -69,7 +74,7 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
     # why_it_matters is now MANDATORY per TRS governance
     turas_refuse(
       code = reason,
-      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", "", reason),
+      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", "", reason),
       problem = message,
       why_it_matters = if (!is.null(why_it_matters)) why_it_matters else "This issue prevents the analysis from producing valid results.",
       how_to_fix = if (!is.null(fix)) fix else "Review the error message above and correct your configuration or data.",
@@ -81,7 +86,7 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
     # why_it_matters is now MANDATORY per TRS governance
     turas_refuse(
       code = reason,
-      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", "", reason),
+      title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", "", reason),
       problem = if (!is.null(problem)) problem else "An error occurred in CatDriver analysis.",
       why_it_matters = if (!is.null(why_it_matters)) why_it_matters else "This issue prevents the analysis from producing valid results.",
       how_to_fix = if (!is.null(fix)) fix else "Review the error details and correct your configuration or data.",

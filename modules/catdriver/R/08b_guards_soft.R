@@ -68,19 +68,41 @@ guard_check_collapsing <- function(guard, collapsed_levels) {
 #'
 #' SOFT FAILURE if sample size concerning.
 #'
+#' The events-per-parameter rule counts EVENTS, meaning respondents in the
+#' smallest outcome category, not respondents. This used to divide the total
+#' observation count by the parameter count, which at 10 per cent prevalence is
+#' roughly ten times too optimistic: a model with 40 events and 20 parameters
+#' passed a gate it fails by an order of magnitude. TECHNIQUE_GUIDE defined the
+#' rule correctly all along; only the code disagreed.
+#'
 #' @param guard Guard state object
 #' @param n_obs Number of observations
 #' @param n_params Number of parameters
 #' @param outcome_type Outcome type
+#' @param config Configuration list
+#' @param outcome_values Optional vector of the outcome values actually
+#'   modelled. When given, the gate uses the smallest category's count, for
+#'   every outcome type; without it, it falls back to observations and says so.
 #' @return Updated guard state
 #' @keywords internal
-guard_check_sample_size <- function(guard, n_obs, n_params, outcome_type, config = NULL) {
-  # Events per parameter rule
-  epp <- if (n_params > 0) n_obs / n_params else Inf
+guard_check_sample_size <- function(guard, n_obs, n_params, outcome_type, config = NULL,
+                                    outcome_values = NULL) {
+
+  n_events <- NULL
+  if (!is.null(outcome_values)) {
+    counts <- table(outcome_values[!is.na(outcome_values)])
+    counts <- counts[counts > 0]
+    if (length(counts) > 0) n_events <- as.integer(min(counts))
+  }
+
+  basis <- if (is.null(n_events)) "observations" else "minority-class events"
+  numerator <- if (is.null(n_events)) n_obs else n_events
+  epp <- if (n_params > 0) numerator / n_params else Inf
 
   if (epp < CATDRIVER_DEFAULTS$min_epp) {
     guard <- guard_warn(guard,
-      sprintf("Low events-per-parameter ratio (%.1f). Recommend >= %g for stable estimates.", epp, CATDRIVER_DEFAULTS$min_epp),
+      sprintf("Low events-per-parameter ratio (%.1f, from %d %s over %d parameters). Recommend >= %g for stable estimates.",
+              epp, numerator, basis, n_params, CATDRIVER_DEFAULTS$min_epp),
       "sample_size"
     )
     guard <- guard_flag_stability(guard, "Low events-per-parameter ratio")
@@ -163,6 +185,27 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
   outcome_levels <- levels(prep_data$data[[outcome_var]])
   n_levels <- length(outcome_levels)
 
+  # The reference point has to come from OUTSIDE the model, or the check is
+  # tautological: reversing the Order flips both the model's "highest" level and
+  # the raw proportions computed against it, so the mismatch count is zero by
+  # construction and the guard could never fire on the case it is named for.
+  # config$outcome_order is what the analyst declared in the Variables sheet, so
+  # the top of that list is the level the analyst means by "high".
+  declared_order <- config$outcome_order
+  declared_top <- if (!is.null(declared_order) && length(declared_order) > 0 &&
+                      any(nzchar(as.character(declared_order)))) {
+    declared <- as.character(declared_order)
+    declared <- declared[declared %in% outcome_levels]
+    if (length(declared) > 0) declared[length(declared)] else NULL
+  } else {
+    NULL
+  }
+  if (is.null(declared_top)) {
+    # Nothing independent to check against. H4 refuses an ordinal outcome with
+    # no declared Order, so this is only reachable on a hand-built config.
+    return(guard)
+  }
+
   # Get top driver(s)
   coefs <- model_result$coefficients
   if (is.null(coefs) || nrow(coefs) == 0) {
@@ -182,9 +225,9 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
 
     ref_level <- driver_levels[1]
 
-    # Calculate raw proportion in highest outcome category
+    # Raw proportion in the level the ANALYST called highest
     outcome_data <- prep_data$data[[outcome_var]]
-    high_level <- outcome_levels[n_levels]
+    high_level <- declared_top
 
     # Reference group proportion in high
     ref_prop <- mean(outcome_data[driver_data == ref_level] == high_level, na.rm = TRUE)
@@ -219,15 +262,25 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
   # If majority of checked comparisons mismatch, likely reversal — warn, don't hard refuse
   # This is a soft guard: the model may still be valid (e.g. confounding effects)
   if (checked > 2 && mismatches / checked > 0.5) {
-    guard_warn(guard, paste0(
-      "OUTCOME ORDER MAY BE REVERSED: Odds ratio directions do not align with raw data patterns ",
+    # Guards are copy-on-modify. Both calls below used to discard their return
+    # value, so the only automated protection against a reversed ordinal outcome
+    # recorded nothing; and guard_flag_stability() takes two arguments, so the
+    # three-argument call threw "unused argument" the moment the check fired,
+    # which aborted the run.
+    message_text <- paste0(
+      "OUTCOME ORDER MAY BE REVERSED: the odds ratios point away from the raw pattern in '",
+      declared_top, "', the level the Variables sheet lists last, ",
       "for ", mismatches, "/", checked, " comparisons. ",
       "Check the 'Order' column for your outcome variable. ",
       "Ensure Low values are listed BEFORE High values (e.g. 'Dissatisfied;Neutral;Satisfied'). ",
       "Current order: ", paste(outcome_levels, collapse = " < ")
+    )
+    cat(sprintf("   [PARTIAL] %s\n", message_text))
+    guard <- guard_warn(guard, message_text, "direction_sanity")
+    guard <- guard_flag_stability(guard, paste0(
+      "OR direction mismatch in ", mismatches, "/", checked,
+      " comparisons: possible outcome order reversal"
     ))
-    guard_flag_stability(guard, "direction_sanity",
-      paste0("OR direction mismatch in ", mismatches, "/", checked, " comparisons — possible outcome order reversal"))
   }
 
   guard
@@ -296,8 +349,11 @@ guard_pre_analysis <- function(config, data) {
   guard <- guard_init()
 
   # Hard error checks (all use catdriver_refuse for clean exits)
+  guard_reserved_column_names(config, data)
+  guard_weight_variable_usable(config, data)   # a named weight must be usable
   guard_require_outcome_type(config)
   guard_outcome_levels_match(data, config)
+  guard_ordinal_outcome_order(config)      # Ordinal OUTCOME must declare its order
   guard_require_multinomial_mode(config)  # Only enforced for multinomial outcomes
 
   guard_require_driver_settings(config)   # Validates Driver_Settings exists and is complete
@@ -332,8 +388,20 @@ guard_post_model <- function(guard, prep_data, model_result, config) {
 
   # Sample size checks
   n_obs <- nrow(prep_data$data)
-  n_params <- prep_data$n_terms
-  guard <- guard_check_sample_size(guard, n_obs, n_params, config$outcome_type, config)
+  # The parameter count must be the number the model actually fitted, not the
+  # number of dummy columns. An ordinal fit adds its thresholds and a
+  # multinomial fit carries a full set of coefficients per non-reference outcome
+  # level, so on the demo the old count of 12 understated a multinomial model's
+  # 24 by half and the gate passed a design it should have flagged.
+  n_params <- cd_fitted_parameter_count(model_result$model) %||% prep_data$n_terms
+  outcome_values <- if (!is.null(config$outcome_var) &&
+                        config$outcome_var %in% names(prep_data$data)) {
+    prep_data$data[[config$outcome_var]]
+  } else {
+    NULL
+  }
+  guard <- guard_check_sample_size(guard, n_obs, n_params, config$outcome_type, config,
+                                   outcome_values = outcome_values)
 
   # Proportional odds check (ordinal only)
   if (!is.null(model_result$proportional_odds)) {

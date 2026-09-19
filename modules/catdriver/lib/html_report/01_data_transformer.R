@@ -158,6 +158,9 @@ transform_catdriver_for_html <- function(results, config) {
         label = var_df$driver_label[1],
         variable = var_name,
         reference = ref_level,
+        # Which outcome level these probabilities are OF. Dropping it left the
+        # report showing probabilities of an unnamed something.
+        outcome_level = if ("outcome_level" %in% names(var_df)) var_df$outcome_level[1] else NULL,
         categories = categories
       )
     }

@@ -250,7 +250,10 @@ apply_rare_level_policy <- function(data, config) {
 
   global_policy <- config$rare_level_policy
   global_threshold <- config$rare_level_threshold
-  cell_threshold <- config$rare_cell_threshold
+  # A config without this setting used to give "tab < NULL", a zero-row matrix
+  # and then an error from nrow() two calls away. The loader always sets it;
+  # a hand-built config should still fail on something it can read.
+  cell_threshold <- config$rare_cell_threshold %||% CATDRIVER_DEFAULTS$rare_cell_threshold %||% 5
 
   collapse_report <- list()
   rows_to_drop <- integer(0)

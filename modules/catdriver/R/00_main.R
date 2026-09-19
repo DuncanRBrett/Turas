@@ -35,7 +35,7 @@ CATDRIVER_VERSION <- "1.1"
 # TRS GUARD LAYER (Must be first)
 # ==============================================================================
 
-# Source TRS guard layer for refusal handling
+# Locate this module's directory (used for shared-lib and report discovery).
 .get_script_dir_for_guard <- function() {
   if (exists("script_dir_override", envir = globalenv())) {
     return(get("script_dir_override", envir = globalenv()))
@@ -46,17 +46,11 @@ CATDRIVER_VERSION <- "1.1"
   return(getwd())
 }
 
-.guard_path <- file.path(.get_script_dir_for_guard(), "00_guard.R")
-if (!file.exists(.guard_path)) {
-  .guard_path <- file.path(.get_script_dir_for_guard(), "R", "00_guard.R")
-}
-if (!file.exists(.guard_path)) {
-  # Try modules path
-  .guard_path <- file.path(getwd(), "modules", "catdriver", "R", "00_guard.R")
-}
-if (file.exists(.guard_path)) {
-  source(.guard_path)
-}
+# The refusal machinery lives in 08_guard.R and is sourced by the caller (the
+# GUI sources it before this file). 00_guard.R used to be re-sourced here and
+# carried a second, incompatible catdriver_refuse() that clobbered the live one
+# in every production session, so every refusal surfaced as BUG_INTERNAL_ERROR.
+# That file is deleted; do not reintroduce a module-side source of a guard file.
 
 # ==============================================================================
 # TRS INFRASTRUCTURE (TRS v1.0)
@@ -74,7 +68,11 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "stats_pack_writer.R")
+  # effective_n.R is the platform's one Kish effective sample size (OPUS-0);
+  # without it the weight diagnostics fall back to a local copy of the same
+  # formula that does not filter non-finite weights.
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                 "stats_pack_writer.R", "effective_n.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -337,6 +335,13 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 11: GENERATE OUTPUT & COMPLETION
   # ==========================================================================
 
+  # The number of respondents the model actually fitted. diagnostics carried
+  # original_n and complete_n but never analysis_n, so the Interpretation sheet
+  # printed "Sample size: n = " with the number missing and the effective-n line
+  # divided by nothing.
+  diagnostics$analysis_n <- model_result$n_observations %||%
+    diagnostics$complete_n %||% nrow(prep_data$data)
+
   run_catdriver_step_11_output(
     model_result = model_result,
     importance = importance,
@@ -472,6 +477,25 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
       guard, group_name, group_n, config$subgroup_min_n
     )
 
+    # subgroup_min_n is a floor. It used to be advice: a group below it was
+    # fitted anyway, sat in the comparison like any other, and the warning went
+    # into the guard's warning list, which nothing wrote to any sheet. A setting
+    # named minimum that does not exclude anything is a dead control.
+    min_n <- config$subgroup_min_n %||% 0
+    if (!identical(group_name, "Total") && is.numeric(min_n) && group_n < min_n) {
+      cat(sprintf("   [PARTIAL] Subgroup '%s' skipped: %d respondents, below the minimum of %d\n",
+                  group_name, group_n, min_n))
+      degraded_reasons <- c(degraded_reasons,
+        sprintf("Subgroup '%s' was not analysed: %d respondents, below subgroup_min_n of %d",
+                group_name, group_n, min_n))
+      affected_outputs <- c(affected_outputs, "Subgroup comparison")
+      subgroup_results[[group_name]] <- list(
+        status = "SKIPPED", group_name = group_name, group_n = group_n,
+        message = sprintf("Below subgroup_min_n (%d)", min_n)
+      )
+      next
+    }
+
     group_result <- tryCatch({
       run_catdriver_steps_4_to_10(
         group_data, config, guard, update_progress,
@@ -482,7 +506,8 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
                   group_name, conditionMessage(e)))
       guard <<- guard_check_subgroup_model_failed(guard, group_name, conditionMessage(e))
       degraded_reasons <<- c(degraded_reasons,
-        sprintf("Subgroup '%s' failed: %s", group_name, e$code %||% "UNKNOWN"))
+        sprintf("Subgroup '%s' failed (%s): %s", group_name, e$code %||% "UNKNOWN",
+                e$problem %||% conditionMessage(e)))
       list(status = "REFUSED", group_name = group_name,
            code = e$code %||% "UNKNOWN", message = conditionMessage(e))
     }, catdriver_refusal = function(e) {
@@ -490,7 +515,8 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
                   group_name, conditionMessage(e)))
       guard <<- guard_check_subgroup_model_failed(guard, group_name, conditionMessage(e))
       degraded_reasons <<- c(degraded_reasons,
-        sprintf("Subgroup '%s' failed: %s", group_name, e$code %||% "UNKNOWN"))
+        sprintf("Subgroup '%s' failed (%s): %s", group_name, e$code %||% "UNKNOWN",
+                e$problem %||% conditionMessage(e)))
       list(status = "REFUSED", group_name = group_name,
            code = e$code %||% "UNKNOWN", message = conditionMessage(e))
     }, error = function(e) {
@@ -516,16 +542,45 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
     }
   }
 
-  # Build comparison
+  # Build comparison.
+  # A failure here used to print a console warning, return NULL and leave the
+  # run at PASS, so Excel sheets 9 to 11 said "No subgroup comparison data" and
+  # nothing else ever mentioned it. The whole feature was dead for years on that
+  # silence. A failure now degrades the run and names itself.
   subgroup_comparison <- NULL
   if (exists("build_subgroup_comparison", mode = "function")) {
     subgroup_comparison <- tryCatch(
       build_subgroup_comparison(subgroup_results, config),
       error = function(e) {
-        cat(sprintf("   [WARNING] Subgroup comparison generation failed: %s\n", e$message))
+        cat("\n┌─── TURAS ERROR ─────────────────────────────────┐
+")
+        cat("│ Context: CatDriver subgroup comparison
+")
+        cat(sprintf("│ Message: %s
+", e$message))
+        cat("│ Effect: the comparison sheets are empty and the run is PARTIAL
+")
+        cat("└────────────────────────────────────────────────────┘
+
+")
+        degraded_reasons <<- c(degraded_reasons,
+          sprintf("Subgroup comparison could not be built: %s", e$message))
+        affected_outputs <<- c(affected_outputs,
+          "Subgroup importance matrix", "Subgroup odds-ratio comparison",
+          "Subgroup model fit", "Subgroup insights")
         NULL
       }
     )
+
+    # A comparison that came back with nothing in it is also worth saying out
+    # loud; it means the groups produced no odds ratios to compare.
+    if (!is.null(subgroup_comparison) &&
+        is.null(subgroup_comparison$or_comparison) &&
+        is.null(subgroup_comparison$importance_matrix)) {
+      degraded_reasons <- c(degraded_reasons,
+        "Subgroup comparison is empty: fewer than two subgroups produced results")
+      affected_outputs <- c(affected_outputs, "Subgroup comparison")
+    }
   }
 
   # Select primary result
@@ -667,30 +722,88 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
 
   weights_g <- NULL
   weight_diagnostics_g <- NULL
+  weight_normalisation_g <- NULL
   if (!is.null(config$weight_var) && config$weight_var %in% names(data_g)) {
-    weights_g <- data_g[[config$weight_var]]
-    weights_g[is.na(weights_g)] <- 1
-    weights_g[weights_g < 0] <- 0
-    if (verbose) log_message(paste("Using weights from:", config$weight_var), "info")
+    # All four engines take weights as FREQUENCY weights, so standard errors
+    # follow the weight total rather than the sample size. Raw expansion
+    # weights therefore produced wildly overstated significance. Normalising to
+    # mean 1 at ingestion is the module's contract; the stamp below says so.
+    weight_normalisation_g <- normalise_catdriver_weights(data_g[[config$weight_var]],
+                                                          config$weight_var)
 
-    weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
-    if (!is.null(weight_diagnostics_g)) {
-      if (verbose) {
-        log_message(paste("Weight range:", round(weight_diagnostics_g$min_weight, 3),
-                          "-", round(weight_diagnostics_g$max_weight, 3)), "info")
-        log_message(paste("Effective n:", round(weight_diagnostics_g$effective_n, 0),
-                          "(design effect:", round(weight_diagnostics_g$design_effect, 2), ")"), "info")
+    if (!isTRUE(weight_normalisation_g$usable)) {
+      cat(sprintf("   [PARTIAL] Weight variable '%s' has no usable positive weights - proceeding UNWEIGHTED\n",
+                  config$weight_var))
+      local_degraded <- c(local_degraded,
+        paste0("Weight variable '", config$weight_var,
+               "' contained no usable positive weights; the analysis ran unweighted"))
+      local_affected <- c(local_affected, "All weighted estimates")
+      weight_normalisation_g <- NULL
+    } else {
+      weights_g <- weight_normalisation_g$weights
+      if (verbose) log_message(paste("Using weights from:", config$weight_var), "info")
+
+      # Every adjustment is reported, never silent.
+      for (note in weight_normalisation_g$notes) {
+        cat(sprintf("   [WEIGHTS] %s\n", note))
       }
-      if (weight_diagnostics_g$has_extreme_weights) {
-        cat("   [PARTIAL] Extreme weights detected (ratio > 10)\n")
+      if (weight_normalisation_g$n_na_imputed > 0 ||
+          weight_normalisation_g$n_negative_zeroed > 0 ||
+          (weight_normalisation_g$n_nonfinite_imputed %||% 0L) > 0) {
         local_degraded <- c(local_degraded,
-          paste0("Extreme weights detected (max/min = ", round(weight_diagnostics_g$weight_ratio, 1), ")"))
-        local_affected <- c(local_affected, "Standard errors", "Confidence intervals")
+          sprintf("Weight repairs in '%s': %d missing set to 1, %d non-finite set to 1, %d negative set to 0",
+                  config$weight_var, weight_normalisation_g$n_na_imputed,
+                  weight_normalisation_g$n_nonfinite_imputed %||% 0L,
+                  weight_normalisation_g$n_negative_zeroed))
+        local_affected <- c(local_affected, "All weighted estimates")
+      }
+      if (isTRUE(weight_normalisation_g$rescaled)) {
+        local_degraded <- c(local_degraded,
+          sprintf("Weights rescaled to mean 1 (raw mean %.4f); inference is a frequency-weight approximation and the design effect is not applied",
+                  weight_normalisation_g$raw_mean))
+        local_affected <- c(local_affected, "Standard errors", "Confidence intervals", "P-values")
+      }
+      if (weight_normalisation_g$n_zero > 0) {
+        cat(sprintf("   [WEIGHTS] %d respondent(s) carry zero weight and contribute nothing to the estimates, but still count in the reported sample size\n",
+                    weight_normalisation_g$n_zero))
+        # A console line is not a disclosure: it is gone the moment the Shiny
+        # session scrolls. The count belongs in the run status with everything
+        # else that qualifies the numbers.
+        local_degraded <- c(local_degraded,
+          sprintf("%d respondent(s) carry zero weight: they contribute nothing to the estimates but are counted in the reported sample size",
+                  weight_normalisation_g$n_zero))
+        local_affected <- c(local_affected, "Reported sample size", "Effective n")
+      }
+
+      weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
+      if (!is.null(weight_diagnostics_g)) {
+        # Keep the provenance, not the vector: results travel into the report
+        # layer and a per-respondent weight column has no business there.
+        weight_provenance_g <- weight_normalisation_g
+        weight_provenance_g$weights <- NULL
+        weight_diagnostics_g$normalisation <- weight_provenance_g
+        weight_diagnostics_g$inference_stamp <- catdriver_weighting_stamp(
+          config$weight_var, weight_diagnostics_g, weight_normalisation_g)
+
+        if (verbose) {
+          log_message(paste("Weight range:", round(weight_diagnostics_g$min_weight, 3),
+                            "-", round(weight_diagnostics_g$max_weight, 3)), "info")
+          log_message(paste("Effective n:", round(weight_diagnostics_g$effective_n, 0),
+                            "(design effect:", round(weight_diagnostics_g$design_effect, 2), ")"), "info")
+        }
+        cat(sprintf("   [WEIGHTS] %s\n", weight_diagnostics_g$inference_stamp))
+
+        if (weight_diagnostics_g$has_extreme_weights) {
+          cat("   [PARTIAL] Extreme weights detected (ratio > 10)\n")
+          local_degraded <- c(local_degraded,
+            paste0("Extreme weights detected (max/min = ", round(weight_diagnostics_g$weight_ratio, 1), ")"))
+          local_affected <- c(local_affected, "Standard errors", "Confidence intervals")
+        }
       }
     }
   }
 
-  prep_data_g <- preprocess_catdriver_data(data_g, config)
+  prep_data_g <- preprocess_catdriver_data(data_g, config, group_label = group_label)
 
   if (verbose) {
     outcome_type_label <- switch(prep_data_g$outcome_info$type,
@@ -757,7 +870,7 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
   log_step(8, "Running post-model validations...")
   guard_g <- guard_post_model(guard_g, prep_data_g, model_result_g, config)
 
-  vif_check_g <- check_multicollinearity(model_result_g$model)
+  vif_check_g <- check_multicollinearity(model_result_g$model, config)
   if (vif_check_g$checked) {
     if (vif_check_g$status == "WARNING") {
       cat("   [PARTIAL]", vif_check_g$interpretation, "\n")
@@ -775,6 +888,15 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
     for (flag in guard_status_g$stability_flags) {
       local_degraded <- c(local_degraded, flag)
     }
+    if (length(guard_status_g$stability_flags) > 0) {
+      # A PARTIAL must say what it affects: the shared run-state refuses one
+      # without an affected output, so a stability flag on its own took the run
+      # down with "TRS: PARTIAL status requires at least one affected_output".
+      # That was latent until the events-per-parameter gate started firing on
+      # designs it had been passing.
+      local_affected <- c(local_affected, "Model stability", "Standard errors",
+                          "Confidence intervals")
+    }
   } else if (verbose) {
     cat("   [OK] All quality checks passed\n")
   }
@@ -784,6 +906,35 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
   # --------------------------------------------------------------------------
   log_step(9, "Calculating variable importance...")
   importance_g <- calculate_importance(model_result_g, config)
+
+  # Provenance and honesty about what the importance table is (D5).
+  importance_degraded <- attr(importance_g, "cd_importance_degraded")
+  if (!is.null(importance_degraded)) {
+    cat(sprintf("   [PARTIAL] %s\n", importance_degraded))
+    local_degraded <- c(local_degraded, importance_degraded)
+    local_affected <- c(local_affected, "Driver importance", "Importance ranking")
+  }
+
+  missing_importance <- importance_g$variable[is.na(importance_g$chi_square)]
+  if (length(missing_importance) > 0) {
+    cat(sprintf("   [PARTIAL] No importance statistic for: %s\n",
+                paste(missing_importance, collapse = ", ")))
+    local_degraded <- c(local_degraded,
+      paste0("No importance statistic could be computed for: ",
+             paste(missing_importance, collapse = ", "),
+             ". Those drivers carry no share of the total and are not ranked against the others."))
+    local_affected <- c(local_affected, "Driver importance", "Importance ranking")
+  }
+
+  skipped_drivers <- setdiff(config$driver_vars, importance_g$variable)
+  if (length(skipped_drivers) > 0) {
+    cat(sprintf("   [PARTIAL] Drivers absent from the importance table: %s\n",
+                paste(skipped_drivers, collapse = ", ")))
+    local_degraded <- c(local_degraded,
+      paste0("Drivers configured but absent from the importance table: ",
+             paste(skipped_drivers, collapse = ", ")))
+    local_affected <- c(local_affected, "Driver importance")
+  }
 
   # Add stability flag column
   importance_g$stability_flag <- if (guard_status_g$use_with_caution) {
@@ -816,6 +967,12 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
       map_terms_to_levels(model_result_g$model, prep_data_g$data,
                           prep_data_g$model_formula)
     }
+  }, turas_refusal = function(e) {
+    # The mapper raises nine refusals of its own, each naming what it found and
+    # what to do. A TRS refusal inherits from error, so the handler below used to
+    # catch all nine and re-issue them as one generic MAPPER_TERM_MAPPING_FAILED
+    # with the original box buried inside its problem text.
+    stop(e)
   }, error = function(e) {
     catdriver_refuse(
       reason = "MAPPER_TERM_MAPPING_FAILED",
@@ -857,7 +1014,19 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
   # Bootstrap confidence intervals (optional)
   bootstrap_results_g <- NULL
   do_bootstrap <- isTRUE(as.logical(config$bootstrap_ci))
-  if (do_bootstrap && prep_data_g$outcome_info$type != "multinomial") {
+
+  # A multinomial outcome skips the bootstrap entirely. That used to happen in
+  # silence: the user asked for intervals, the block was never entered, and the
+  # run reported PASS with no bootstrap columns and no line saying why. It is
+  # the same defect A5 fixed one branch over.
+  if (do_bootstrap && prep_data_g$outcome_info$type %in% c("multinomial", "nominal")) {
+    cat("   [PARTIAL] Bootstrap intervals are not implemented for multinomial outcomes\n")
+    local_degraded <- c(local_degraded,
+      "Bootstrap confidence intervals were requested but are not implemented for multinomial outcomes; the odds ratios carry Wald intervals only")
+    local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
+  }
+
+  if (do_bootstrap && !prep_data_g$outcome_info$type %in% c("multinomial", "nominal")) {
 
     # Validate bootstrap parameters (safe defaults for missing/invalid)
     boot_reps <- config$bootstrap_reps
@@ -882,6 +1051,7 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
       paste(config$driver_vars, collapse = " + ")
     ))
 
+    boot_failure_reported <- FALSE
     bootstrap_results_g <- tryCatch({
       run_bootstrap_or(
         data = prep_data_g$data,
@@ -892,17 +1062,48 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
         conf_level = conf_level,
         progress_callback = NULL
       )
+    }, turas_refusal = function(e) {
+      # A refusal object carries its text in $problem, not $message, so the
+      # generic handler below recorded "Bootstrap CI failed: " with nothing
+      # after the colon.
+      reason <- paste0("Bootstrap CI refused (", e$code %||% "unknown", "): ",
+                       e$problem %||% conditionMessage(e))
+      cat(sprintf("   [PARTIAL] %s\n", reason))
+      local_degraded <<- c(local_degraded, reason)
+      local_affected <<- c(local_affected, "bootstrap_ci")
+      boot_failure_reported <<- TRUE
+      NULL
     }, error = function(e) {
       cat("   [PARTIAL] Bootstrap failed:", e$message, "\n")
       local_degraded <<- c(local_degraded, paste0("Bootstrap CI failed: ", e$message))
       local_affected <<- c(local_affected, "bootstrap_ci")
+      boot_failure_reported <<- TRUE
       NULL
     })
+
+    # The user asked for bootstrap intervals. If none came back, that is a
+    # degraded run, not a quiet absence of columns: before this, a weighted
+    # binary study lost every interval and still reported PASS.
+    if (is.null(bootstrap_results_g) && !boot_failure_reported) {
+      cat("   [PARTIAL] Bootstrap confidence intervals were requested but could not be produced\n")
+      local_degraded <- c(local_degraded,
+        "Bootstrap confidence intervals were requested but could not be produced; the odds ratios carry Wald intervals only")
+      local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
+    }
 
     if (!is.null(bootstrap_results_g) && isTRUE(bootstrap_results_g$n_successful > 0)) {
       if (verbose) {
         log_message(paste0("Bootstrap complete (", bootstrap_results_g$n_successful, "/",
                            bootstrap_results_g$n_boot, " successful)"), "success")
+      }
+
+      # Survivorship is disclosed, not hidden: percentile intervals computed
+      # over the resamples that survived are narrow to exactly that extent.
+      kept_flagged_n <- sum(unlist(bootstrap_results_g$kept_flag_counts %||% list()))
+      if (isTRUE(bootstrap_results_g$n_discarded > 0) || isTRUE(kept_flagged_n > 0)) {
+        local_degraded <- c(local_degraded,
+          paste0("Bootstrap survivorship: ", bootstrap_results_g$caveat))
+        local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
       }
 
       odds_ratios_g$boot_median_or <- NA_real_
@@ -1223,7 +1424,7 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
   importance  <- result$importance
   n_drivers   <- if (!is.null(importance) && is.data.frame(importance)) nrow(importance) else length(config$driver_vars)
   n_subgroups <- if (!is.null(result$subgroup_results)) length(result$subgroup_results) else 0L
-  outcome_type <- result$prep_data$outcome_info$type %||% config$outcome_type %||% "—"
+  outcome_type <- result$prep_data$outcome_info$type %||% config$outcome_type %||% "–"
   model_type_label <- switch(outcome_type,
     binary      = "Binary logistic regression (base R glm())",
     ordinal     = "Ordinal logistic regression (ordinal::clm())",
@@ -1238,7 +1439,7 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
   n_partials <- sum(vapply(run_result$events %||% list(),
                            function(e) identical(e$level, "PARTIAL"), logical(1)))
   trs_summary <- if (n_events == 0) {
-    "No events — ran cleanly"
+    "No events; ran cleanly"
   } else {
     parts <- character(0)
     if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
@@ -1248,39 +1449,115 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
     paste(parts, collapse = ", ")
   }
 
+  # D5: the method stamp comes from the path that actually ran, recorded on the
+  # importance frame where it was computed. It used to be the hardcoded string
+  # "Type II Wald chi-square (car::Anova)", which was wrong for the multinomial
+  # likelihood-ratio path, wrong for the z-squared fallback, and wrong even for
+  # glm and clm: car::Anova(type = "II") reports LIKELIHOOD-RATIO chi-squares.
+  importance_method <- if (!is.null(importance) && is.data.frame(importance) &&
+                           "method" %in% names(importance) &&
+                           any(nzchar(as.character(importance$method)))) {
+    paste(unique(as.character(importance$method[nzchar(as.character(importance$method))])),
+          collapse = "; ")
+  } else {
+    "Not recorded"
+  }
+
+  weighting_stamp <- result$weight_diagnostics$inference_stamp %||%
+    catdriver_weighting_stamp(config$weight_var, result$weight_diagnostics,
+                              result$weight_diagnostics$normalisation)
+
   assumptions <- list(
-    "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "—",
+    "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "–",
     "Drivers tested"     = as.character(n_drivers),
     "Model Type"         = model_type_label,
-    "Importance Method"  = "Type II Wald chi-square (car::Anova)",
-    "Subgroup Analysis"  = if (n_subgroups > 0) sprintf("%d subgroups", n_subgroups) else "None",
+    "Importance Method"  = importance_method,
+    "Weighting"          = weighting_stamp,
+    "Subgroup Analysis"  = if (n_subgroups > 0) {
+      n_failed <- sum(vapply(result$subgroup_results %||% list(),
+                             function(r) !isTRUE(r$status %in% c("PASS", "PARTIAL")),
+                             logical(1)))
+      if (n_failed > 0) {
+        sprintf("%d subgroups, %d of them failed", n_subgroups, n_failed)
+      } else {
+        sprintf("%d subgroups", n_subgroups)
+      }
+    } else {
+      "None"
+    },
     "TRS Status"         = run_result$status %||% "PASS",
     "TRS Events"         = trs_summary
   )
 
+  # The shared writer prints data_receipt$n_rows under DATA RECEIVED and
+  # data_used$n_respondents under "Respondents Analysed". survey_data arrives
+  # here as the post-deletion analysis frame, so taking the receipt from it
+  # printed 456 received and 500 analysed: more respondents analysed than the
+  # study received.
   data_receipt <- list(
     file_name           = basename(config$data_file %||% "unknown"),
-    n_rows              = nrow(survey_data),
+    n_rows              = as.integer(result$diagnostics$original_n %||% nrow(survey_data)),
     n_cols              = ncol(survey_data),
     questions_in_config = length(config$driver_vars)
   )
 
+  # Real counts, not zeros. n_excluded was hardcoded 0 whatever listwise
+  # deletion did, and `weighted` came from the config alone, so a typo'd weight
+  # variable shipped unweighted numbers stamped weighted.
+  rows_dropped_missing <- result$missing_report$summary$total_rows_dropped %||% 0L
+  n_analysed <- result$diagnostics$analysis_n %||%
+    (if (!is.null(result$prep_data$data)) nrow(result$prep_data$data) else NA_integer_)
+  # survey_data here is the frame the model saw, which is already post-deletion,
+  # so the original row count has to come from the diagnostics.
+  n_original <- result$diagnostics$original_n %||% nrow(survey_data)
+  n_excluded <- if (!is.na(n_analysed)) {
+    max(0L, as.integer(n_original - n_analysed))
+  } else {
+    as.integer(rows_dropped_missing)
+  }
+
+  analysed_drivers <- if (!is.null(importance) && is.data.frame(importance)) {
+    intersect(config$driver_vars, importance$variable)
+  } else {
+    character(0)
+  }
+  questions_skipped <- length(setdiff(config$driver_vars, analysed_drivers))
+
   data_used <- list(
-    n_respondents      = nrow(survey_data),
-    n_excluded         = 0L,
-    weight_variable    = config$weight_var %||% "",
-    weighted           = !is.null(config$weight_var) && nzchar(config$weight_var %||% ""),
-    questions_analysed = n_drivers,
-    questions_skipped  = 0L
+    n_respondents      = if (!is.na(n_analysed)) as.integer(n_analysed) else as.integer(n_original),
+    n_excluded         = n_excluded,
+    # Name the weight only when one was applied. This line used to print the
+    # configured name whatever happened, so a weight that could not be used
+    # still produced a Declaration reading "weighted by <name>".
+    weight_variable    = if (!is.null(result$weight_diagnostics)) config$weight_var %||% "" else "",
+    # Weighted means weights were actually applied, which the diagnostics only
+    # exist for when they were.
+    weighted           = !is.null(result$weight_diagnostics),
+    questions_analysed = length(analysed_drivers),
+    questions_skipped  = questions_skipped
   )
 
   duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
+  # The Declaration read config$project_name and friends, which nothing ever
+  # populates: the loader keeps the sheet's own keys in config$settings, so the
+  # Declaration printed a dash for settings that were present all along.
+  setting_value <- function(...) {
+    for (key in c(...)) {
+      value <- config$settings[[key]]
+      if (!is.null(value) && !all(is.na(value)) && any(nzchar(as.character(value)))) {
+        return(as.character(value)[1])
+      }
+    }
+    NULL
+  }
+
   payload <- list(
     module           = "CATDRIVER",
-    project_name     = config$project_name   %||% NULL,
-    analyst_name     = config$analyst_name   %||% NULL,
-    research_house   = config$research_house %||% NULL,
+    project_name     = setting_value("Project_Name", "project_name") %||%
+                         config$analysis_name %||% NULL,
+    analyst_name     = setting_value("Analyst_Name", "analyst_name", "researcher_name") %||% NULL,
+    research_house   = setting_value("Research_House", "research_house") %||% NULL,
     run_timestamp    = start_time,
     turas_version    = CATDRIVER_VERSION,
     r_version        = R.version$version.string,
@@ -1327,6 +1604,56 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
   data <- prep_data$data
   outcome_var <- config$outcome_var
 
+  # Predictions cover only the rows the model fitted, so the driver columns have
+  # to be cut to the same rows before they are crossed.
+  keep <- cd_estimation_rows(model_result$model, nrow(data))
+  if (!is.null(keep)) data <- data[keep, , drop = FALSE]
+
+  n_pred <- if (is.matrix(pred_probs)) nrow(pred_probs) else length(pred_probs)
+  if (n_pred != nrow(data)) {
+    cat(sprintf("   [INFO] Probability lift skipped: %d predictions for %d rows\n",
+                n_pred, nrow(data)))
+    return(NULL)
+  }
+
+  # Which outcome level the probabilities describe. This used to be the last
+  # column of the prediction matrix with nothing saying which level that was,
+  # so a multinomial table reported the alphabetically last level unlabelled.
+  outcome_levels <- levels(data[[outcome_var]])
+  # Which column to report. For an ordinal outcome the matrix is already in the
+  # declared order, so the last column is the top of the scale. For a
+  # multinomial one the columns are alphabetical, because the engine has no use
+  # for an order, so the last column would be an arbitrary level: prefer what
+  # the analyst declared in the Variables sheet.
+  declared_order <- as.character(config$outcome_order %||% character(0))
+  declared_last <- if (length(declared_order) > 0) {
+    in_matrix <- declared_order[declared_order %in% colnames(pred_probs)]
+    if (length(in_matrix) > 0) in_matrix[length(in_matrix)] else NULL
+  } else {
+    NULL
+  }
+
+  target_level <- if (is.matrix(pred_probs) && !is.null(declared_last)) {
+    declared_last
+  } else if (is.matrix(pred_probs)) {
+    cn <- colnames(pred_probs)
+    if (!is.null(cn) && nzchar(cn[ncol(pred_probs)])) {
+      cn[ncol(pred_probs)]
+    } else if (length(outcome_levels) >= ncol(pred_probs)) {
+      outcome_levels[ncol(pred_probs)]
+    } else {
+      "the highest outcome level"
+    }
+  } else if (length(outcome_levels) == 2) {
+    outcome_levels[2]
+  } else {
+    # A vector of probabilities on a 3+ category outcome is not the probability
+    # of any one level, so there is nothing honest to label and nothing honest
+    # to report.
+    cat("   [INFO] Probability lift skipped: the model returned one probability per respondent, not one per outcome level\n")
+    return(NULL)
+  }
+
   lift_list <- list()
 
   for (driver_var in config$driver_vars) {
@@ -1340,15 +1667,14 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
     for (level in driver_levels) {
       level_mask <- driver_data == level
 
-      if (sum(level_mask) == 0) next
+      if (sum(level_mask, na.rm = TRUE) == 0) next
 
       # Get mean predicted probability for this level
       if (is.matrix(pred_probs)) {
-        # Binary or ordinal: use last column (highest outcome)
-        mean_prob <- mean(pred_probs[level_mask, ncol(pred_probs)], na.rm = TRUE)
-        ref_prob <- mean(pred_probs[driver_data == ref_level, ncol(pred_probs)], na.rm = TRUE)
+        target_col <- if (target_level %in% colnames(pred_probs)) target_level else ncol(pred_probs)
+        mean_prob <- mean(pred_probs[level_mask, target_col], na.rm = TRUE)
+        ref_prob <- mean(pred_probs[driver_data == ref_level, target_col], na.rm = TRUE)
       } else if (is.vector(pred_probs)) {
-        # Binary: direct
         mean_prob <- mean(pred_probs[level_mask], na.rm = TRUE)
         ref_prob <- mean(pred_probs[driver_data == ref_level], na.rm = TRUE)
       } else {
@@ -1359,6 +1685,7 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
         driver = driver_var,
         driver_label = get_var_label(config, driver_var),
         level = level,
+        outcome_level = target_level,
         is_reference = level == ref_level,
         mean_predicted_prob = round(mean_prob, 3),
         reference_prob = round(ref_prob, 3),
