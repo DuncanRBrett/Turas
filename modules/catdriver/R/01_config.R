@@ -123,7 +123,8 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     "subgroup_include_total", "subgroup_min_n", "subgroup_var",
     "target_outcome_level",
     # read from config$settings rather than through get_setting()
-    "Generate_Stats_Pack", "Project_Name", "Analyst_Name", "Research_House"
+    "Generate_Stats_Pack", "Project_Name", "Analyst_Name", "Research_House",
+    "v2_island"
   )
   unknown <- setdiff(names(settings), c(known_settings, "", NA_character_))
   unknown <- unknown[!is.na(unknown) & nzchar(unknown)]

@@ -61,6 +61,20 @@
       }
       return out;
     };
+    // The frozen analysis tabs. Each carries a contribution estimated once, on
+    // its own study's sample, and the strip's own n belongs to the crosstab
+    // project: printing "n=200" above a panel that says "n=456" invites a
+    // reader to take one for the other. So these tabs say the filter does not
+    // apply and show no base; the base is on the panel, beside the figures it
+    // describes.
+    var FROZEN_CONTRIBUTION_TABS = ["conjoint", "maxdiff", "pricing",
+                                    "keydriver", "catdriver"];
+    if (FROZEN_CONTRIBUTION_TABS.indexOf(tab) !== -1) {
+      bits.push('<span class="aud-cut">These figures were estimated on their own ' +
+        "study's sample; the audience filter does not apply on this tab</span>");
+      if (p.wave) bits.push('<span class="aud-wave">' + fmt.escapeHtml(String(p.wave)) + "</span>");
+      return '<span class="aud-label">Audience</span>' + bits.join('<span class="aud-sep">·</span>');
+    }
     if (tab === "takeout" || tab === "moved") {
       // Patterns + Tracking deliberately ignore the live filter. They read the
       // full published sample (prior waves have no microdata to filter).
