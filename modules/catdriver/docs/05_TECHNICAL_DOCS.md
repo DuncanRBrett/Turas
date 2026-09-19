@@ -117,24 +117,23 @@ modules/catdriver/
 Files must be loaded in this order:
 
 ``` r
-source("modules/catdriver/R/07_utilities.R")     # No dependencies
-source("modules/catdriver/R/08_guard.R")         # Uses: 07_utilities
-source("modules/catdriver/R/08a_guards_hard.R")  # Uses: 08_guard
-source("modules/catdriver/R/08b_guards_soft.R")  # Uses: 08_guard
-source("modules/catdriver/R/01_config.R")        # Uses: 07, 08
-source("modules/catdriver/R/02_validation.R")    # Uses: 07, 08
-source("modules/catdriver/R/03_preprocessing.R") # Uses: 07, 08
-source("modules/catdriver/R/09_mapper.R")        # Uses: 07, 08
-source("modules/catdriver/R/10_missing.R")       # Uses: 07, 08
-source("modules/catdriver/R/04_analysis.R")      # Uses: 07, 08
-source("modules/catdriver/R/04a_ordinal.R")      # Uses: 07, 08
-source("modules/catdriver/R/04b_multinomial.R")  # Uses: 07, 08
-source("modules/catdriver/R/05_importance.R")    # Uses: 07, 08
-source("modules/catdriver/R/06a_sheets_summary.R") # Uses: 07
-source("modules/catdriver/R/06b_sheets_detail.R")  # Uses: 07
-source("modules/catdriver/R/06_output.R")        # Uses: 07, 06a, 06b
-source("modules/catdriver/R/00_main.R")          # Uses: all above
+# Do not write this list out. modules/catdriver/source_catdriver.R holds it,
+# and it is the list the GUI, the demo runner and the docs all use, so it
+# cannot drift out of step with any of them:
+source("modules/catdriver/source_catdriver.R")
 ```
+
+The order it applies, and why: utilities first because everything calls them,
+then the guard layer, then config and data preparation, then the mapper and the
+missing-data handler, then the four engines, then importance, then the output
+sheets, and `00_main.R` last because it orchestrates all of the above. The
+vector is exported as `CATDRIVER_SOURCE_ORDER` if you need to inspect it.
+
+Sourcing `R/00_main.R` on its own does NOT work and never has: it loads the TRS
+infrastructure and nothing else, so the first call fails with
+`could not find function "with_refusal_handler"`. Sourcing `R/` in alphabetical
+order is worse than useless, because it binds a different set of functions than
+the GUI does.
 
 ### External Dependencies
 
@@ -594,7 +593,7 @@ standard errors - No interaction terms - No multiple imputation
 
 ## Additional Resources
 
--   [01_README.md](01_README.md) - Quick start and overview
+-   [README.md](../README.md) - Quick start and overview
 -   [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) - Statistical methods
 -   [04_USER_MANUAL.md](04_USER_MANUAL.md) - User guide
 -   [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) - Configuration

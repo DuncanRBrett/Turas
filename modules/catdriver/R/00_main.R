@@ -1365,9 +1365,22 @@ run_catdriver_step_11_output <- function(model_result, importance, odds_ratios,
   cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
 
   # Stats pack (optional)
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
-  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+  # Three states, in order of authority: what the config says, then what the
+  # caller asked for, then the default.
+  #
+  # This used to default the setting to "Y" and then OR in the option, so the
+  # config could never turn the pack off and the GUI checkbox (which defaults to
+  # unticked) could never have any effect at all. A control that cannot change
+  # anything is worse than no control: the README describes it as opt-in.
+  stats_pack_setting <- config$settings$Generate_Stats_Pack
+  generate_stats_pack_flag <- if (!is.null(stats_pack_setting) &&
+                                  nzchar(trimws(as.character(stats_pack_setting)[1]))) {
+    as_logical_setting(stats_pack_setting, TRUE)
+  } else if (!is.null(getOption("turas.generate_stats_pack", NULL))) {
+    isTRUE(getOption("turas.generate_stats_pack"))
+  } else {
+    TRUE
+  }
 
   if (generate_stats_pack_flag) {
     cat("\nGenerating stats pack...\n")

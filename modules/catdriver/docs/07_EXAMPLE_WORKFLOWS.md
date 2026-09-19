@@ -66,8 +66,10 @@ tenure_months       | Driver  | Customer Tenure     |
 ### Step 3: Run Analysis
 
 ```r
-source("modules/catdriver/R/00_main.R")
-results <- run_categorical_keydriver("projects/churn/churn_config.xlsx")
+source("modules/catdriver/source_catdriver.R")
+results <- with_refusal_handler(
+  run_categorical_keydriver("projects/churn/churn_config.xlsx")
+)
 ```
 
 ### Step 4: Review Output
@@ -180,7 +182,7 @@ Setting              | Value
 analysis_name        | Brand Preference Drivers
 data_file            | brand_survey.csv
 output_file          | output/brand_drivers.xlsx
-outcome_type         | nominal
+outcome_type         | multinomial
 reference_category   | Brand D
 min_sample_size      | 100
 confidence_level     | 0.95
@@ -542,7 +544,7 @@ Max OR ratio: 1.8 (threshold: 1.5)
 
 **Options:**
 1. Proceed with caution (minor violation)
-2. Switch to multinomial: `outcome_type = nominal`
+2. Switch to multinomial: `outcome_type = multinomial`
 3. Investigate which predictor violates
 4. Consider partial proportional odds model (advanced)
 

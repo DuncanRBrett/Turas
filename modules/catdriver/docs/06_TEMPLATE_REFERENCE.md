@@ -35,10 +35,13 @@ CatDriver configuration template.
 
 | Sheet           | Purpose                  | Required    |
 |-----------------|--------------------------|-------------|
-| Instructions    | Usage documentation      | No          |
 | Settings        | Analysis parameters      | Yes         |
 | Variables       | Variable definitions     | Yes         |
 | Driver_Settings | Per-driver configuration | Recommended |
+| Slides          | Optional commentary slides | No        |
+
+The generated template has these four sheets. Earlier versions of this page
+listed an Instructions sheet, which the template has never contained.
 
 ------------------------------------------------------------------------
 
@@ -235,7 +238,7 @@ insights.
 -   **Purpose:** How to treat the variable
 -   **Required:** Yes
 -   **Valid Values:**
-    -   `categorical` / `nominal` - Unordered factor
+    -   `categorical` - Unordered factor (the value the code accepts; `nominal` is refused)
     -   `ordinal` - Ordered factor (treatment contrasts)
     -   `binary` - Two-level factor
 
@@ -251,10 +254,12 @@ insights.
 
 -   **Purpose:** How to handle missing values
 -   **Required:** No
--   **Default:** `drop_row`
+-   **Default:** `missing_as_level` (the value `10_missing.R` uses when a
+    driver says nothing). This page used to say `drop_row`, which changes the
+    analysis: one keeps the respondents and the other drops them.
 -   **Valid Values:**
+    -   `missing_as_level` - Create a "Missing / Not answered" category
     -   `drop_row` - Remove rows with missing
-    -   `missing_as_level` - Create "Missing" category
     -   `error_if_missing` - Refuse if any missing
 
 ------------------------------------------------------------------------
@@ -339,7 +344,7 @@ Setting              | Value
 analysis_name        | Brand Preference Drivers
 data_file            | data/brand_survey.csv
 output_file          | output/brand_drivers.xlsx
-outcome_type         | nominal
+outcome_type         | multinomial
 reference_category   | Brand D
 min_sample_size      | 100
 confidence_level     | 0.95

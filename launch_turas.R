@@ -150,7 +150,7 @@ launch_turas <- function() {
          recent_key = "project_dir"),
 
     list(id = "catdriver", name = "Categorical Driver",
-         description = "Driver analysis for categorical outcomes using logistic regression and SHAP",
+         description = "Driver analysis for categorical outcomes using logistic regression",
          category = "advanced",
          script = "modules/catdriver/run_catdriver_gui.R",
          recent_file = ".recent_catdriver_projects.rds",
