@@ -66,6 +66,15 @@ Key capabilities include likelihood-ratio chi-square importance ranking, probabi
 |----|---:|----|---:|----|
 | `generate_config_templates.R` | 762 | Generate professional Excel config template with validation dropdowns | 88/100 | Creates ready-to-fill config workbooks for end users; includes Slides sheet template (slide_order, slide_title, slide_content, slide_image_path) |
 
+`lib/html_report/js/cd_pinned_views.js` (724 lines) and
+`js/cd_slide_export.js` (579) were deleted on 2026-09-19. No R file read
+either; this document listed both as active, omitted the two that ARE embedded,
+and the report's own startup guard required the dead pair, so deleting them any
+earlier would have stopped every report from building.
+`generate_catdriver_comparison_report()` and its header builder went the same
+day: no callers, and it rendered interactive controls while embedding no
+JavaScript, so every control on the page was inert.
+
 `lib/validation/preflight_validators.R` (1,183 lines, 17 functions) was deleted
 on 2026-09-18. It was never sourced and never called anywhere in the module or
 the GUI, while this document scored it 92/100 and drew it inside the live
@@ -77,27 +86,30 @@ pipeline. Nothing replaced it: the guards in `R/08a_guards_hard.R` and
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
 | `00_html_guard.R` | 109 | Input validation for HTML report generation | 88/100 | Lightweight guard specific to report inputs |
-| `01_data_transformer.R` | 328 | Format analysis results into HTML-ready data structures | 87/100 | Bridges analysis output to report rendering |
-| `02_table_builder.R` | 402 | Generate styled HTML tables from transformed data | 86/100 | Handles formatting, significance markers, conditional color |
-| `03_page_builder.R` | 2,345 | Page layout, inline SVG charts, section assembly | 82/100 | LARGEST file in module; manages full page HTML structure; includes `build_cd_qualitative_panel()` and `build_cd_qual_slide_card()` |
+| `01_data_transformer.R` | 355 | Format analysis results into HTML-ready data structures | 87/100 | Bridges analysis output to report rendering |
+| `02_table_builder.R` | 410 | Generate styled HTML tables from transformed data | 86/100 | Handles formatting, significance markers, conditional color |
+| `03_page_builder.R` | 255 | Assembles a single-analysis page and embeds the JavaScript | 85/100 | Split long ago into 03a/03b/03c; this file is the assembler, not the largest in the module |
+| `03a_page_styling.R` | 1346 | The report stylesheet | 85/100 | Holds the paging rules; comparison sections are exempt from them, which is what stopped the unified Overview rendering |
+| `03b_page_components.R` | 817 | Section nav, header, insight areas, pin buttons, slide cards | 85/100 | The nav takes the sections a panel actually contains; slide stores are script elements so Save Report keeps them |
+| `03c_section_builders.R` | 662 | One builder per report section | 85/100 | Names the outcome level a probability lift describes |
 | `04_html_writer.R` | 112 | Write assembled HTML string to output file | 88/100 | Simple and focused; single responsibility |
-| `05_chart_builder.R` | 548 | SVG chart generation (horizontal bars, grouped bars, lines) | 86/100 | Inline SVG with Turas visual style conventions |
-| `06_comparison_report.R` | 797 | Multi-config comparison view layout and assembly | 85/100 | Side-by-side analysis results across configurations |
-| `07_unified_report.R` | 866 | Unified tabbed report for multiple configurations | 85/100 | Single HTML with tab navigation across config runs |
-| `08_subgroup_report.R` | 421 | Subgroup comparison HTML layout and rendering | 85/100 | Visual comparison of subgroup-level driver results |
-| `99_html_report_main.R` | 309 | Entry point; orchestrates HTML report generation pipeline | 88/100 | Coordinates guard, transform, build, write steps |
+| `05_chart_builder.R` | 556 | SVG chart generation (horizontal bars, grouped bars, lines) | 86/100 | Inline SVG with Turas visual style conventions |
+| `06_comparison_report.R` | 626 | Multi-config comparison view layout and assembly | 85/100 | Side-by-side analysis results across configurations |
+| `07_unified_report.R` | 879 | Unified tabbed report for multiple configurations | 85/100 | Single HTML with tab navigation across config runs |
+| `08_subgroup_report.R` | 482 | Subgroup comparison HTML layout and rendering | 85/100 | Visual comparison of subgroup-level driver results |
+| `99_html_report_main.R` | 320 | Entry point; orchestrates HTML report generation pipeline | 88/100 | Coordinates guard, transform, build, write steps |
 
 ### JavaScript (`lib/html_report/js/`)
 
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
 | `cd_insights.js` | 144 | Insights panel toggle and interaction logic | 85/100 | Manages expandable insight sections in reports |
-| `cd_navigation.js` | 527 | Report navigation, section switching, tab control | 88/100 | Core UX for navigating multi-section reports |
-| `cd_pinned_views.js` | 692 | Pinned section management and persistence | 85/100 | Allows users to pin/unpin report sections |
-| `cd_slide_export.js` | 579 | Export individual slides and views from report | 82/100 | Client-side export of report sections |
+| `cd_navigation.js` | 569 | Report navigation, section switching, tab control | 88/100 | Core UX for navigating multi-section reports |
 | `cd_unified_tabs.js` | 39 | Unified report tab switching control | 85/100 | Minimal; delegates to navigation system |
-| `cd_qualitative.js` | 520 | Qualitative slides panel: add/edit/delete slides, markdown editor, image upload, pin to pinned views | 85/100 | Manages slide lifecycle and pinning integration |
+| `cd_qualitative.js` | 550 | Qualitative slides panel: add/edit/delete slides, markdown editor, image upload, pin to pinned views | 85/100 | Manages slide lifecycle and pinning integration |
 | `cd_utils.js` | 104 | DOM utility helpers shared across report scripts | 88/100 | Small, focused utility library |
+| `cd_pins.js` | 382 | Pin buttons and the pin store, on shared TurasPins | 88/100 | Embedded by both reports; was absent from this table while two dead files were listed |
+| `cd_table_export.js` | 201 | CSV and Excel export of report tables | 88/100 | Embedded by the single report |
 
 ------------------------------------------------------------------------
 

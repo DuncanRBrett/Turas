@@ -167,7 +167,16 @@ transform_catdriver_for_html <- function(results, config) {
   }
 
   # Generate narrative insights
-  narrative <- generate_narrative_insights(importance, patterns, model_info, diagnostics)
+  # Which drivers the config declares ordinal, so the narrative can tell a
+  # graded relationship from an alphabetical coincidence.
+  ordinal_drivers <- character(0)
+  ds <- config$driver_settings
+  if (is.data.frame(ds) && all(c("driver", "type") %in% names(ds))) {
+    ordinal_drivers <- as.character(ds$driver[tolower(as.character(ds$type)) == "ordinal"])
+  }
+
+  narrative <- generate_narrative_insights(importance, patterns, model_info, diagnostics,
+                                           ordinal_drivers = ordinal_drivers)
 
   list(
     summary_lines = summary_lines,
@@ -205,7 +214,8 @@ transform_catdriver_for_html <- function(results, config) {
 #' @return List with: insights (character vector), dominant_driver (name or NULL),
 #'   dose_response_drivers (names), key_findings (list of finding structures)
 #' @keywords internal
-generate_narrative_insights <- function(importance, patterns, model_info, diagnostics) {
+generate_narrative_insights <- function(importance, patterns, model_info, diagnostics,
+                                        ordinal_drivers = character(0)) {
 
   insights <- character(0)
   key_findings <- list()
@@ -243,7 +253,14 @@ generate_narrative_insights <- function(importance, patterns, model_info, diagno
   }
 
   # --- Dose-response detection ---
+  #
+  # Only for drivers the config declares ordinal. A dose-response pattern means
+  # more of something produces more of the outcome, which requires the
+  # categories to have an order. Brand A, B, C sorted alphabetically and
+  # happening to line up is a coincidence, and calling it "a graded
+  # relationship" in a client report invents a finding.
   for (var_name in names(patterns)) {
+    if (!var_name %in% ordinal_drivers) next
     pat <- patterns[[var_name]]
     cats <- pat$categories
     if (length(cats) < 3) next

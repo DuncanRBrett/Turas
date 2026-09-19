@@ -8,118 +8,14 @@
 # This is a standalone function that takes a list of pre-run result objects
 # (each returned by run_categorical_keydriver()) along with their configs.
 # ==============================================================================
+# generate_catdriver_comparison_report() was deleted 2026-09-19.
+#
+# It had no callers, and it was broken if anyone had found one: it rendered
+# interactive controls (chips, pins, insight boxes) while embedding no
+# JavaScript at all, so every control on the page was inert. The unified report
+# in 07_unified_report.R is the live multi-analysis path and uses the builders
+# below, which is why they stay.
 
-#' Generate Multi-Outcome Comparison Report
-#'
-#' Takes multiple catdriver analysis results and produces a single HTML report
-#' comparing drivers, model fit, and key findings across outcomes.
-#'
-#' @param analyses Named list of analysis entries. Each entry should be a list
-#'   with elements: `results` (from run_categorical_keydriver()),
-#'   `config` (the config list), and optionally `label` (display name).
-#' @param output_path Path for the output HTML file
-#' @param report_title Optional title (default: "Multi-Outcome Comparison")
-#' @param brand_colour Brand colour hex string
-#' @param accent_colour Accent colour hex string
-#' @param researcher_logo_path Optional logo file path
-#' @return List with status, output_file, file_size_mb
-#' @export
-generate_catdriver_comparison_report <- function(analyses,
-                                                  output_path,
-                                                  report_title = "Multi-Outcome Comparison",
-                                                  brand_colour = "#323367",
-                                                  accent_colour = "#CC9900",
-                                                  researcher_logo_path = NULL,
-                                                  client_logo_path = NULL,
-                                                  client_name = NULL,
-                                                  company_name = "The Research Lamppost",
-                                                  researcher_name = NULL) {
-
-  start_time <- Sys.time()
-
-  cat("\n")
-  cat(paste(rep("-", 60), collapse = ""), "\n")
-  cat("  CATDRIVER COMPARISON REPORT GENERATION\n")
-  cat(paste(rep("-", 60), collapse = ""), "\n")
-
-  # --- Validation ---
-  if (!is.list(analyses) || length(analyses) < 2) {
-    cat("\n=== TURAS ERROR ===\n")
-    cat("Code: CFG_COMPARISON_MIN_ANALYSES\n")
-    cat("Message: At least 2 analyses required for comparison\n")
-    cat("==================\n\n")
-    return(list(
-      status = "REFUSED",
-      code = "CFG_COMPARISON_MIN_ANALYSES",
-      message = "At least 2 analyses required for comparison",
-      how_to_fix = "Provide a named list with at least 2 analysis entries"
-    ))
-  }
-
-  if (!requireNamespace("htmltools", quietly = TRUE)) {
-    return(list(status = "REFUSED", code = "PKG_HTMLTOOLS_MISSING",
-                message = "htmltools package required", how_to_fix = "install.packages('htmltools')"))
-  }
-
-  # --- Extract summaries and driver comparison ---
-  cat(sprintf("  Processing %d analyses...\n", length(analyses)))
-  comp_data <- extract_comparison_data(analyses)
-  summaries <- comp_data$summaries
-  driver_comparison <- comp_data$driver_comparison
-
-  # --- Build HTML ---
-  cat("  Building comparison HTML...\n")
-
-  css <- build_comparison_css(brand_colour, accent_colour)
-
-  logo_uri <- resolve_logo_uri(researcher_logo_path)
-
-  page <- htmltools::tagList(
-    htmltools::tags$head(
-      htmltools::tags$meta(charset = "utf-8"),
-      htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
-      htmltools::tags$title(report_title),
-      htmltools::tags$meta(name = "turas-report-type", content = "catdriver-comparison"),
-      htmltools::tags$style(htmltools::HTML(css))
-    ),
-    htmltools::tags$body(
-      class = "cd-body",
-      build_comparison_header(report_title, summaries, brand_colour, logo_uri,
-                              company_name = company_name,
-                              client_name = client_name,
-                              researcher_name = researcher_name),
-      htmltools::tags$div(
-        class = "cd-comp-content",
-        build_comparison_overview(summaries, brand_colour, accent_colour),
-        build_comparison_driver_matrix(summaries, driver_comparison, brand_colour),
-        build_comparison_insights(summaries, driver_comparison, brand_colour),
-        build_comparison_footer(company_name = company_name,
-                                 client_name = client_name)
-      )
-    )
-  )
-
-  page <- htmltools::browsable(page)
-
-  # --- Write file ---
-  write_result <- write_cd_html_report(page, output_path)
-
-  if (write_result$status == "REFUSED") return(write_result)
-
-  elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 1)
-  cat(sprintf("  Done! %.2f MB in %.1f seconds\n", write_result$file_size_mb, elapsed))
-  cat(paste(rep("-", 60), collapse = ""), "\n\n")
-
-  list(
-    status = "PASS",
-    message = sprintf("Comparison report: %d outcomes, %.2f MB",
-                      length(analyses), write_result$file_size_mb),
-    output_file = write_result$output_file,
-    file_size_mb = write_result$file_size_mb,
-    n_outcomes = length(analyses),
-    elapsed_seconds = elapsed
-  )
-}
 
 
 # --- Extract comparison data from analyses ---
@@ -432,76 +328,9 @@ build_comparison_css <- function(brand_colour, accent_colour) {
 
 
 # --- Comparison header ---
-build_comparison_header <- function(report_title, summaries, brand_colour, logo_uri,
-                                     company_name = NULL, client_name = NULL,
-                                     researcher_name = NULL) {
+# build_comparison_header() was deleted 2026-09-19 with its only caller, the
+# dead standalone comparison report. The unified report builds its own header.
 
-  logo_el <- NULL
-  if (!is.null(logo_uri) && nzchar(logo_uri)) {
-    logo_el <- htmltools::tags$div(
-      class = "cd-comp-logo-container",
-      htmltools::tags$img(src = logo_uri, alt = "Logo")
-    )
-  }
-
-  # "Prepared by X for Y" row
-  prepared_row <- NULL
-  prepared_parts <- c()
-  if (!is.null(company_name) && nzchar(company_name)) {
-    if (!is.null(researcher_name) && nzchar(researcher_name)) {
-      prepared_parts <- c(prepared_parts, sprintf(
-        'Prepared by <span style="font-weight:600;">%s</span> (%s)',
-        htmltools::htmlEscape(researcher_name),
-        htmltools::htmlEscape(company_name)
-      ))
-    } else {
-      prepared_parts <- c(prepared_parts, sprintf(
-        'Prepared by <span style="font-weight:600;">%s</span>',
-        htmltools::htmlEscape(company_name)
-      ))
-    }
-  }
-  if (!is.null(client_name) && nzchar(client_name)) {
-    prepared_parts <- c(prepared_parts, sprintf(
-      'for <span style="font-weight:600;">%s</span>',
-      htmltools::htmlEscape(client_name)
-    ))
-  }
-  if (length(prepared_parts) > 0) {
-    prepared_row <- htmltools::tags$div(
-      class = "cd-comp-header-prepared",
-      htmltools::HTML(paste(prepared_parts, collapse = " "))
-    )
-  }
-
-  n_outcomes <- length(summaries)
-
-  badge_items <- list(
-    htmltools::tags$span(class = "cd-comp-badge",
-      htmltools::HTML(sprintf('<span class="cd-comp-badge-val">%d</span>&nbsp;Outcomes', n_outcomes))),
-    htmltools::tags$span(class = "cd-comp-badge-sep"),
-    htmltools::tags$span(class = "cd-comp-badge",
-      format(Sys.Date(), "Created %b %Y"))
-  )
-
-  htmltools::tags$div(
-    class = "cd-comp-header",
-    htmltools::tags$div(
-      class = "cd-comp-header-inner",
-      htmltools::tags$div(
-        class = "cd-comp-header-top",
-        logo_el,
-        htmltools::tags$div(
-          htmltools::tags$div(class = "cd-comp-module-name", "Turas Catdriver"),
-          htmltools::tags$div(class = "cd-comp-module-sub", "Multi-Outcome Comparison")
-        )
-      ),
-      htmltools::tags$div(class = "cd-comp-title", report_title),
-      prepared_row,
-      htmltools::tags$div(class = "cd-comp-badges", badge_items)
-    )
-  )
-}
 
 
 # --- Overview cards ---

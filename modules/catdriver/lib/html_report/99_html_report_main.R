@@ -38,10 +38,18 @@ for (.cd_file in .cd_required_files) {
   }
 }
 
-# Check JS files
-.cd_required_js <- c("cd_navigation.js", "cd_unified_tabs.js", "cd_utils.js",
-                      "cd_insights.js", "cd_pinned_views.js", "cd_slide_export.js",
-                      "cd_qualitative.js")
+# Check JS files.
+#
+# This list required cd_pinned_views.js and cd_slide_export.js, which no
+# builder reads, and did not require cd_pins.js or cd_table_export.js, which
+# both reports embed. It was therefore checking for the wrong files: a missing
+# pin engine would have produced a report with dead buttons and no complaint,
+# while deleting either dead file would have stopped every report from
+# building. The list below is what 03_page_builder.R and 07_unified_report.R
+# actually embed; test_html_report.R keeps the two in step.
+.cd_required_js <- c("cd_utils.js", "cd_navigation.js", "cd_insights.js",
+                      "cd_pins.js", "cd_qualitative.js", "cd_table_export.js",
+                      "cd_unified_tabs.js")
 for (.cd_js in .cd_required_js) {
   if (!file.exists(file.path(.cd_html_report_dir, "js", .cd_js))) {
     .cd_missing <- c(.cd_missing, paste0("js/", .cd_js))

@@ -834,3 +834,67 @@ test_that("the pin count badge id is unique per panel", {
   expect_true(grepl('id="panel-a-cd-pin-count-badge"', a, fixed = TRUE))
   expect_true(grepl('id="panel-b-cd-pin-count-badge"', b, fixed = TRUE))
 })
+
+test_that("a dose-response claim needs an ordinal driver", {
+  skip_if(!exists("generate_narrative_insights", mode = "function"),
+          "narrative builder not loaded")
+
+  # P7. Three categories whose odds ratios happen to rise in alphabetical order
+  # are not a graded relationship. The report used to call any monotonic run a
+  # dose-response pattern "suggesting a graded relationship", for unordered
+  # factors like brand or region.
+  make_pat <- function(label) list(
+    label = label,
+    categories = list(
+      list(category = "A", is_reference = TRUE, odds_ratio = 1),
+      list(category = "B", is_reference = FALSE, odds_ratio = 1.6),
+      list(category = "C", is_reference = FALSE, odds_ratio = 2.4),
+      list(category = "D", is_reference = FALSE, odds_ratio = 3.9)
+    )
+  )
+  patterns <- list(brand = make_pat("Brand"), service = make_pat("Service rating"))
+  importance <- list(list(variable = "brand", label = "Brand", importance_pct = 55),
+                     list(variable = "service", label = "Service rating",
+                          importance_pct = 45))
+  model_info <- list(n_drivers = 2, n_observations = 400,
+                     fit_statistics = list(mcfadden_r2 = 0.2))
+
+  # Nothing declared ordinal: no dose-response claim about anything
+  none <- generate_narrative_insights(importance, patterns, model_info, list(),
+                                      ordinal_drivers = character(0))
+  expect_length(none$dose_response_drivers, 0)
+  expect_false(any(grepl("dose-response", none$insights)))
+
+  # Service declared ordinal: the claim is made about service and not brand
+  some <- generate_narrative_insights(importance, patterns, model_info, list(),
+                                      ordinal_drivers = "service")
+  expect_equal(some$dose_response_drivers, "service")
+  expect_true(any(grepl("Service rating shows a dose-response", some$insights)))
+  expect_false(any(grepl("Brand shows a dose-response", some$insights)))
+})
+
+test_that("the startup guard requires the JS the report actually embeds", {
+  main <- readLines(file.path(turas_root, "modules", "catdriver", "lib",
+                              "html_report", "99_html_report_main.R"), warn = FALSE)
+  guard_block <- main[grep("\\.cd_required_js <- c\\(", main)[1] + 0:3]
+  required <- unlist(regmatches(guard_block, gregexpr('cd_[a-z_]+\\.js', guard_block)))
+
+  read_embedded <- function(file) {
+    src <- readLines(file.path(turas_root, "modules", "catdriver", "lib",
+                               "html_report", file), warn = FALSE)
+    block <- grep("js_files <- c\\(", src)[1]
+    unlist(regmatches(src[block + 0:2], gregexpr('cd_[a-z_]+\\.js', src[block + 0:2])))
+  }
+  embedded <- unique(c(read_embedded("03_page_builder.R"),
+                       read_embedded("07_unified_report.R")))
+
+  # Every file a report embeds must be checked for, and nothing else: the guard
+  # used to require two files no builder reads while ignoring two it does.
+  expect_setequal(required, embedded)
+
+  js_dir <- file.path(turas_root, "modules", "catdriver", "lib", "html_report", "js")
+  for (f in embedded) expect_true(file.exists(file.path(js_dir, f)), info = f)
+  # and the dead pair is gone
+  expect_false(file.exists(file.path(js_dir, "cd_pinned_views.js")))
+  expect_false(file.exists(file.path(js_dir, "cd_slide_export.js")))
+})

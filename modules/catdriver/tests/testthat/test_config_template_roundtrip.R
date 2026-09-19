@@ -107,3 +107,31 @@ test_that("load_catdriver_config gets past the Settings structure check", {
     expect_type(outcome, "list")
   }
 })
+
+test_that("the template that ships in docs/templates loads, sheet by sheet", {
+  # B1 of the Session B work order. The July review found the shipped template
+  # unloadable: its headers sit on row 5 (Settings) and row 3 (Variables) while
+  # the loader read row 1, and via the broken refusal system that surfaced as an
+  # internal bug rather than a config error. The header-discovery fix landed
+  # with the shared loader; this test says so, against the committed file rather
+  # than a freshly generated one, because it is the committed file a user opens.
+  tpl <- file.path(module_root, "docs", "templates", "CatDriver_Config_Template.xlsx")
+  skip_if(!file.exists(tpl), "shipped template not found")
+
+  specs <- list(
+    list(sheet = "Settings", required = c("Setting", "Value")),
+    list(sheet = "Variables", required = "VariableName"),
+    list(sheet = "Driver_Settings", required = "driver"),
+    list(sheet = "Slides", required = "slide_title")
+  )
+
+  for (spec in specs) {
+    df <- as.data.frame(load_config_table_sheet(tpl, spec$sheet,
+                                                required_cols = spec$required))
+    expect_true(all(spec$required %in% names(df)),
+                info = paste(spec$sheet, "->", paste(names(df)[1:4], collapse = "/")))
+    expect_gt(nrow(df), 0)
+    # the banner row must not arrive as a column name
+    expect_false(any(grepl("^TURAS", names(df))), info = spec$sheet)
+  }
+})
