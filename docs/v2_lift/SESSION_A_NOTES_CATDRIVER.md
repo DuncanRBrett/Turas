@@ -169,3 +169,59 @@ restored from HEAD immediately afterwards. The test discriminates.
 - Session B items met in passing and left alone: the HTML startup guard's file
   list, the unified report's blank Overview, the OR narration ("more likely"),
   `Generate_Stats_Pack` always-on, the loader's unrecognised-setting silence.
+
+## After the independent review, 2026-09-19
+
+The review (`REVIEW_FINDINGS_CATDRIVER_SESSION_A_2026-09-19.md`) returned PASS
+WITH FIXES: 2 CRITICAL, 3 HIGH, 16 MEDIUM, 9 LOW. All 30 findings are now
+closed on this branch, in three commits: `87db7f82` (F1 to F5), `b3a89f24`
+(F6 to F30), and this one.
+
+Suite 298 tests / 1,018 passing / 0 failed / 1 skip, from 287 / 968 before the
+review fixes and 227 / 673 at the start of the session. Shared 469 / 1,330 / 0.
+
+Three things the review found that were mine, and worth remembering:
+
+1. **I stamped the ordinal importance as likelihood-ratio having checked glm
+   only.** `car::Anova` on a clm returns a Wald chi-square, column "Chisq", 120.4
+   where the LR figure is 135.4. The label is now read from the column the test
+   returned, so it cannot drift again. This was the exact failure the stamp
+   exists to prevent.
+2. **The subgroup comparison keyed on driver and level**, which is right for a
+   binary or ordinal outcome and wrong for a multinomial one, where each driver
+   level carries K-1 odds ratios. Main shipped nothing there because the feature
+   was dead, so the branch was the first to ship a WRONG table rather than none.
+3. **The ordinal probability lift was never a lift.** `predict()` on a clm with
+   no newdata returns each respondent's probability of their own observed
+   category. The numbers were the same on main; what I added was a label and a
+   client-facing callout that made them read as defined.
+
+Two defects found while verifying the fixes, neither in the review:
+
+- A positional column rename in the Subgroup Model Fit sheet gave a column the
+  name NA as soon as the frame gained one. openxlsx then wrote a workbook whose
+  shared-string table was empty: Excel would have offered to repair it and
+  reading it back segfaulted R. **Every subgroup workbook written during the fix
+  session was affected**, and nothing warned. There is now a test that reads
+  back every sheet of a subgroup workbook and checks the string table against
+  its own declared count.
+- A PARTIAL with no affected output is refused by the shared run state. A
+  stability flag was recorded as a degraded reason with nothing beside it, which
+  was unreachable until the events-per-parameter fix made the flag fire; then an
+  ordinary multinomial run died and wrote no workbook at all.
+
+Both are the same lesson as the rest of this programme: the failure was not in
+the statistics, it was in the layer around them, and only running the thing
+end to end found it.
+
+## Still open after the review
+
+- The GUI has still never been run end to end by any session.
+- F31: every expansion-weighted run is PARTIAL for the rescale alone. That is
+  locked decision 4 working as designed, not a defect.
+- F32: `test_golden_fixtures.R` fits its models directly rather than through the
+  module, so it cannot catch a module regression, and `golden_expected.rds` is
+  read by nothing. Left alone: rebuilding the goldens is its own piece of work.
+- F33: the GUI still tests `run_status == "REFUSED"` while the handler returns
+  `"REFUSE"`, so a refusal reads as success there. Session B owns it, and until
+  it lands the C3 repair only reaches someone running from R.
