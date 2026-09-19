@@ -54,7 +54,7 @@ This ensures that when users run the Shiny app and encounter errors, they can se
 | Module | Purpose | Status | Quality Score |
 |--------|---------|--------|---------------|
 | **AlchemerParser** | Parse Alchemer exports, generate configs, detect routing | Production | 87/100 |
-| **catdriver** | Categorical driver analysis (SHAP, regression) | Production | 90/100 |
+| **catdriver** | Categorical driver analysis (binary, ordinal and multinomial logistic regression) | Production | 90/100 |
 | **confidence** | Confidence intervals (Wilson, bootstrap, weighted) | Production | 93/100 |
 | **conjoint** | Choice-based conjoint analysis (HB, utilities) | Production | 92/100 |
 | **keydriver** | Key driver correlation analysis | Production | 93/100 |
