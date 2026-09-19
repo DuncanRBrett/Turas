@@ -39,31 +39,51 @@
 
 # ------------------------------------------------------------------------- H3
 
-test_that("the direction-sanity guard registers its warning instead of losing it", {
+test_that("the direction-sanity guard fires when the data order contradicts the declared Order", {
   skip_if_not_installed("ordinal")
 
-  # The guard compares fitted odds ratios with the raw pattern in the data it is
-  # shown. It fires when the two disagree, which is what a reversed Order looks
-  # like from inside the pipeline: the model was fitted on one ordering and the
-  # data carry another. Verified to fire 3/3 comparisons on this fixture.
+  # Rewritten 2026-09-19 after review finding F11. The old construction compared
+  # the model against raw proportions computed in the MODEL's own top level, so
+  # reversing the order flipped both sides and the mismatch count was zero by
+  # construction: the guard could never fire on the case it is named for. The
+  # reference point now comes from the config's declared Order, which is
+  # independent of what the model was given.
+  #
+  # Here the data reach the model as High < Mid < Low while the Variables sheet
+  # declares Low;Mid;High. That is the real defect: the odds ratios describe
+  # movement towards Low while the analyst believes they describe High.
   d <- .cd_reversed_fixture()
-  d_correct <- d
-  d_correct$satisfaction <- factor(as.character(d$satisfaction),
-                                   levels = c("Low", "Mid", "High"), ordered = TRUE)
-
-  fit <- run_ordinal_logistic_robust(satisfaction ~ service, d_correct, NULL,
-                                     .cd_ordinal_config(), guard_init())
+  config <- .cd_ordinal_config()          # declares Low;Mid;High
   prep_data <- list(
     data = d,
     outcome_info = list(type = "ordinal", categories = levels(d$satisfaction))
   )
+  fit <- run_ordinal_logistic_robust(satisfaction ~ service, d, NULL, config, guard_init())
 
-  guard <- guard_direction_sanity(guard_init(), prep_data, fit, .cd_ordinal_config())
+  guard <- guard_direction_sanity(guard_init(), prep_data, fit, config)
 
   expect_true(any(grepl("OUTCOME ORDER MAY BE REVERSED", guard$warnings)),
               info = paste(guard$warnings, collapse = " | "))
+  expect_true(any(grepl("High", guard$warnings)))       # names the declared top
   expect_true(any(grepl("possible outcome order reversal", guard$stability_flags)))
   expect_true(length(guard$soft_failures$direction_sanity) > 0)
+})
+
+test_that("the guard says nothing when there is no declared Order to check against", {
+  skip_if_not_installed("ordinal")
+
+  d <- .cd_reversed_fixture()
+  config <- .cd_ordinal_config(order = NULL)
+  prep_data <- list(
+    data = d,
+    outcome_info = list(type = "ordinal", categories = levels(d$satisfaction))
+  )
+  fit <- run_ordinal_logistic_robust(satisfaction ~ service, d, NULL, config, guard_init())
+
+  # Nothing independent to compare against. H4 refuses this config upstream, so
+  # the guard should not invent a finding out of the model's own ordering.
+  guard <- guard_direction_sanity(guard_init(), prep_data, fit, config)
+  expect_length(guard$warnings, 0)
 })
 
 test_that("the direction-sanity guard leaves a consistent model alone", {
@@ -73,14 +93,14 @@ test_that("the direction-sanity guard leaves a consistent model alone", {
   d$satisfaction <- factor(as.character(d$satisfaction),
                            levels = c("Low", "Mid", "High"), ordered = TRUE)
 
-  fit <- run_ordinal_logistic_robust(satisfaction ~ service, d, NULL,
-                                     .cd_ordinal_config(), guard_init())
+  config <- .cd_ordinal_config()          # the declared Order now matches the data
+  fit <- run_ordinal_logistic_robust(satisfaction ~ service, d, NULL, config, guard_init())
   prep_data <- list(
     data = d,
     outcome_info = list(type = "ordinal", categories = levels(d$satisfaction))
   )
 
-  guard <- guard_direction_sanity(guard_init(), prep_data, fit, .cd_ordinal_config())
+  guard <- guard_direction_sanity(guard_init(), prep_data, fit, config)
   expect_false(any(grepl("OUTCOME ORDER MAY BE REVERSED", guard$warnings)))
   expect_length(guard$stability_flags, 0)
 })

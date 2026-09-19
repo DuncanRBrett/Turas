@@ -306,13 +306,20 @@ add_importance_sheet <- function(wb, results, config, styles) {
 
   openxlsx::addWorksheet(wb, "Importance Summary")
 
-  # Prepare data
-  df <- results$importance[, c("rank", "variable", "label", "importance_pct",
-                               "chi_square", "p_value", "significance", "effect_size")]
+  # Prepare data. The method column says which statistic produced the share,
+  # which differs by engine and by whether a fallback ran; it was recorded on
+  # the frame and then printed nowhere a client could see it.
+  wanted <- c("rank", "variable", "label", "importance_pct",
+              "chi_square", "p_value", "significance", "effect_size", "method")
+  available <- intersect(wanted, names(results$importance))
+  df <- results$importance[, available, drop = FALSE]
 
   # Column names with model-based labels for transparency
-  names(df) <- c("Rank", "Factor", "Label", "Importance %", "Chi-Square",
-                 "P-Value (model-based)", "Sig.", "Effect Size")
+  pretty <- c(rank = "Rank", variable = "Factor", label = "Label",
+              importance_pct = "Importance %", chi_square = "Chi-Square",
+              p_value = "P-Value (model-based)", significance = "Sig.",
+              effect_size = "Effect Size", method = "How this was computed")
+  names(df) <- unname(pretty[available])
 
   # Format numeric columns
   df$`Chi-Square` <- round(df$`Chi-Square`, 2)

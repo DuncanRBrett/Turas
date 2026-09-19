@@ -40,25 +40,25 @@ Key capabilities include likelihood-ratio chi-square importance ranking, probabi
 
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
-| `00_main.R` | 1625 | Entry point and orchestration; TRS-compliant pipeline | 88/100 | Largest core file; coordinates full analysis lifecycle |
+| `00_main.R` | 1729 | Entry point and orchestration; TRS-compliant pipeline | 88/100 | Largest core file; coordinates full analysis lifecycle |
 | `01_config.R` | 814 | Load and validate Excel configuration workbook | 90/100 | Parses driver specs, outcome definitions, analysis options; includes `load_slides_from_config()` for Slides sheet |
-| `02_validation.R` | 489 | Load and validate input CSV data against config | 90/100 | Column existence, type checks, completeness validation |
+| `02_validation.R` | 501 | Load and validate input CSV data against config | 90/100 | Column existence, type checks, completeness validation |
 | `03_preprocessing.R` | 787 | Variable type detection, factor ordering, reference levels | 88/100 | Handles factor level consolidation and ordering logic |
-| `04_analysis.R` | 399 | Dispatcher to ordinal/multinomial/binary model engines | 92/100 | Clean routing logic; delegates to 04a/04b or internal binary |
-| `04a_ordinal.R` | 638 | Ordinal logistic regression via clm (ordinal package) | 90/100 | Proportional odds model with diagnostics |
+| `04_analysis.R` | 478 | Dispatcher to ordinal/multinomial/binary model engines | 92/100 | Clean routing logic; delegates to 04a/04b or internal binary |
+| `04a_ordinal.R` | 654 | Ordinal logistic regression via clm (ordinal package) | 90/100 | Proportional odds model with diagnostics |
 | `04b_multinomial.R` | 261 | Multinomial logistic regression via multinom (nnet) | 90/100 | Compact; handles multi-category unordered outcomes |
-| `05_importance.R` | 603 | Driver importance: likelihood-ratio chi-square shares (car::Anova type II for binary and ordinal, reduced-model refits for multinomial), with a z-squared Wald fallback that stamps itself | 88/100 | Core analytical output. Every row carries the method that produced it; the fallback degrades the run |
+| `05_importance.R` | 674 | Driver importance: likelihood-ratio chi-square shares (car::Anova type II for binary and ordinal, reduced-model refits for multinomial), with a z-squared Wald fallback that stamps itself | 88/100 | Core analytical output. Every row carries the method that produced it; the fallback degrades the run |
 | `06_output.R` | 634 | Main Excel workbook generation orchestrator | 87/100 | Coordinates sheet creation across 06a/06b/06c |
-| `06a_sheets_summary.R` | 443 | Executive summary and importance ranking sheets | 88/100 | Professional formatting with conditional styling |
-| `06b_sheets_detail.R` | 420 | Per-driver detail sheets and odds ratios | 85/100 | One sheet per driver with coefficient tables |
-| `06c_sheets_subgroup.R` | 295 | Subgroup comparison Excel output sheets | 85/100 | Side-by-side subgroup results in Excel |
-| `07_utilities.R` | 1269 | Helper functions: colors, formatting, statistical utils | 85/100 | Large file with many responsibilities; candidate for split |
+| `06a_sheets_summary.R` | 450 | Executive summary and importance ranking sheets | 88/100 | Professional formatting with conditional styling |
+| `06b_sheets_detail.R` | 491 | Per-driver detail sheets and odds ratios | 85/100 | One sheet per driver with coefficient tables |
+| `06c_sheets_subgroup.R` | 308 | Subgroup comparison Excel output sheets | 85/100 | Side-by-side subgroup results in Excel |
+| `07_utilities.R` | 1313 | Helper functions: colors, formatting, statistical utils | 85/100 | Large file with many responsibilities; candidate for split |
 | `08_guard.R` | 410 | TRS guard framework layer; guard registration/dispatch | 93/100 | The module's ONLY definition of catdriver_refuse(). 00_guard.R held a second, incompatible one and was deleted 2026-09-18 |
-| `08a_guards_hard.R` | 687 | Hard guards: REFUSE with actionable TRS messages | 93/100 | Catches fatal misconfigurations before analysis runs |
-| `08b_guards_soft.R` | 384 | Soft guards: WARN and degrade to PARTIAL status | 90/100 | Non-fatal issues that allow degraded execution |
+| `08a_guards_hard.R` | 752 | Hard guards: REFUSE with actionable TRS messages | 93/100 | Catches fatal misconfigurations before analysis runs |
+| `08b_guards_soft.R` | 412 | Soft guards: WARN and degrade to PARTIAL status | 90/100 | Non-fatal issues that allow degraded execution |
 | `09_mapper.R` | 550 | Design matrix term to driver name mapping (canonical) | 90/100 | Resolves interaction/dummy terms back to config driver names |
-| `10_missing.R` | 440 | Missing data strategies per driver | 88/100 | Strategies are drop_row, missing_as_level and error_if_missing (not listwise/pairwise/imputation) |
-| `11_subgroup_comparison.R` | 559 | Split analysis by grouping variable | 88/100 | Runs full pipeline per subgroup, collates results |
+| `10_missing.R` | 443 | Missing data strategies per driver | 88/100 | Strategies are drop_row, missing_as_level and error_if_missing (not listwise/pairwise/imputation) |
+| `11_subgroup_comparison.R` | 586 | Split analysis by grouping variable | 88/100 | Runs full pipeline per subgroup, collates results |
 
 ### Configuration and Validation (`lib/`)
 

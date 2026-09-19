@@ -295,3 +295,74 @@ test_that("the stats pack Declaration cannot analyse more respondents than it re
   expect_equal(payload$data_used$weight_variable, "")
   expect_false(payload$data_used$weighted)
 })
+
+# ============================================================== workbook safety
+
+test_that("every sheet the module writes can be read back", {
+  skip_if_not_installed("openxlsx")
+
+  # Found while verifying the review fixes: a hard-coded positional rename in
+  # the Subgroup Model Fit sheet gave one column the name NA when the frame
+  # gained a column. openxlsx wrote a header cell with no string behind it, the
+  # workbook's shared-string table came out EMPTY, Excel would have offered to
+  # repair the file, and reading it back segfaulted R. Nothing warned.
+  #
+  # A workbook whose strings cannot be read is not a deliverable, so the suite
+  # checks the whole file, not one sheet.
+  d <- .cd_f_fixture()
+  d$churn <- factor(as.integer(d$satisfaction == "High"))
+  config <- .cd_f_config("churn", "binary")
+
+  group_result <- function(dd) {
+    f <- churn ~ service
+    fit <- run_binary_logistic_robust(f, dd, NULL, config, guard_init())
+    list(status = "PASS", group_n = nrow(dd),
+         importance = calculate_importance(fit, config),
+         odds_ratios = extract_odds_ratios_mapped(fit, map_terms_to_levels(fit$model, dd, f),
+                                                  config, 0.95),
+         model_result = fit)
+  }
+  successful <- list(North = group_result(d[d$region == "North", , drop = FALSE]),
+                     South = group_result(d[d$region == "South", , drop = FALSE]))
+  cmp <- build_subgroup_comparison(successful, config)
+
+  wb <- openxlsx::createWorkbook()
+  styles <- create_output_styles()
+  add_subgroup_sheets(wb, cmp, list(), config, styles)
+
+  path <- tempfile(fileext = ".xlsx")
+  if (exists("turas_saveWorkbook", mode = "function")) {
+    turas_saveWorkbook(wb, path, overwrite = TRUE)
+  } else {
+    openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  }
+  on.exit(unlink(path), add = TRUE)
+
+  # Every sheet must read back at all. (These sheets carry a title in row 1, so
+  # the header openxlsx infers is that title; the point here is that the read
+  # succeeds and no column comes back nameless.)
+  for (sheet in openxlsx::getSheetNames(path)) {
+    back <- openxlsx::read.xlsx(path, sheet = sheet, skipEmptyRows = FALSE)
+    expect_false(any(is.na(names(back))), info = sheet)
+  }
+
+  # The header row of the model-fit table itself must be complete
+  fit_rows <- openxlsx::read.xlsx(path, sheet = "Subgroup Model Fit",
+                                  startRow = 3, skipEmptyRows = FALSE)
+  expect_false(any(is.na(names(fit_rows))))
+  expect_true("N.(analysed)" %in% names(fit_rows) || "N (analysed)" %in% names(fit_rows))
+
+  # And the string table must actually hold the strings the sheets reference
+  unzipped <- tempfile()
+  dir.create(unzipped)
+  utils::unzip(path, exdir = unzipped)
+  on.exit(unlink(unzipped, recursive = TRUE), add = TRUE)
+  shared <- file.path(unzipped, "xl", "sharedStrings.xml")
+  if (file.exists(shared)) {
+    txt <- paste(readLines(shared, warn = FALSE), collapse = "")
+    declared <- as.integer(sub('.*uniqueCount="(\\d+)".*', "\\1", txt))
+    present <- lengths(regmatches(txt, gregexpr("<si>", txt)))
+    expect_gt(present, 0)
+    expect_equal(present, declared)
+  }
+})

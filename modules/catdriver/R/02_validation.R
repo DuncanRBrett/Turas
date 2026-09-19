@@ -459,15 +459,27 @@ validate_catdriver_data <- function(data, config) {
     } else {
       weights <- data[[config$weight_var]]
 
-      if (!is.numeric(weights)) {
+      # "Not numeric" used to mean "not stored as a numeric column", so a column
+      # of numbers read as text ("0.95") was reported as unweighted while the
+      # engine parsed and applied it perfectly well. What matters is whether the
+      # values are numbers, not how the file stored them. A column with nothing
+      # numeric in it is refused upstream by guard_weight_variable_usable().
+      numeric_weights <- suppressWarnings(as.numeric(as.character(weights)))
+      parseable <- sum(is.finite(numeric_weights))
+
+      if (parseable == 0) {
         diagnostics$warnings <- c(diagnostics$warnings,
-          "Weight variable is not numeric. Proceeding unweighted.")
+          "Weight variable holds no numeric values.")
+      } else if (!is.numeric(weights)) {
+        diagnostics$warnings <- c(diagnostics$warnings,
+          paste0("Weight variable is stored as ", class(weights)[1],
+                 " and was read as numbers. Check the column in your data file."))
       } else if (any(weights < 0, na.rm = TRUE)) {
         diagnostics$warnings <- c(diagnostics$warnings,
           "Weight variable contains negative values. These will be treated as 0.")
       } else if (all(is.na(weights))) {
         diagnostics$warnings <- c(diagnostics$warnings,
-          "Weight variable is entirely missing. Proceeding unweighted.")
+          "Weight variable is entirely missing.")
       }
     }
   }

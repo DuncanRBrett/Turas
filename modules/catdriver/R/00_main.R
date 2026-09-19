@@ -335,6 +335,13 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 11: GENERATE OUTPUT & COMPLETION
   # ==========================================================================
 
+  # The number of respondents the model actually fitted. diagnostics carried
+  # original_n and complete_n but never analysis_n, so the Interpretation sheet
+  # printed "Sample size: n = " with the number missing and the effective-n line
+  # divided by nothing.
+  diagnostics$analysis_n <- model_result$n_observations %||%
+    diagnostics$complete_n %||% nrow(prep_data$data)
+
   run_catdriver_step_11_output(
     model_result = model_result,
     importance = importance,
@@ -470,6 +477,25 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
       guard, group_name, group_n, config$subgroup_min_n
     )
 
+    # subgroup_min_n is a floor. It used to be advice: a group below it was
+    # fitted anyway, sat in the comparison like any other, and the warning went
+    # into the guard's warning list, which nothing wrote to any sheet. A setting
+    # named minimum that does not exclude anything is a dead control.
+    min_n <- config$subgroup_min_n %||% 0
+    if (!identical(group_name, "Total") && is.numeric(min_n) && group_n < min_n) {
+      cat(sprintf("   [PARTIAL] Subgroup '%s' skipped: %d respondents, below the minimum of %d\n",
+                  group_name, group_n, min_n))
+      degraded_reasons <- c(degraded_reasons,
+        sprintf("Subgroup '%s' was not analysed: %d respondents, below subgroup_min_n of %d",
+                group_name, group_n, min_n))
+      affected_outputs <- c(affected_outputs, "Subgroup comparison")
+      subgroup_results[[group_name]] <- list(
+        status = "SKIPPED", group_name = group_name, group_n = group_n,
+        message = sprintf("Below subgroup_min_n (%d)", min_n)
+      )
+      next
+    }
+
     group_result <- tryCatch({
       run_catdriver_steps_4_to_10(
         group_data, config, guard, update_progress,
@@ -480,7 +506,8 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
                   group_name, conditionMessage(e)))
       guard <<- guard_check_subgroup_model_failed(guard, group_name, conditionMessage(e))
       degraded_reasons <<- c(degraded_reasons,
-        sprintf("Subgroup '%s' failed: %s", group_name, e$code %||% "UNKNOWN"))
+        sprintf("Subgroup '%s' failed (%s): %s", group_name, e$code %||% "UNKNOWN",
+                e$problem %||% conditionMessage(e)))
       list(status = "REFUSED", group_name = group_name,
            code = e$code %||% "UNKNOWN", message = conditionMessage(e))
     }, catdriver_refusal = function(e) {
@@ -488,7 +515,8 @@ run_catdriver_subgroup_analysis <- function(data, config, guard,
                   group_name, conditionMessage(e)))
       guard <<- guard_check_subgroup_model_failed(guard, group_name, conditionMessage(e))
       degraded_reasons <<- c(degraded_reasons,
-        sprintf("Subgroup '%s' failed: %s", group_name, e$code %||% "UNKNOWN"))
+        sprintf("Subgroup '%s' failed (%s): %s", group_name, e$code %||% "UNKNOWN",
+                e$problem %||% conditionMessage(e)))
       list(status = "REFUSED", group_name = group_name,
            code = e$code %||% "UNKNOWN", message = conditionMessage(e))
     }, error = function(e) {
@@ -738,6 +766,13 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
       if (weight_normalisation_g$n_zero > 0) {
         cat(sprintf("   [WEIGHTS] %d respondent(s) carry zero weight and contribute nothing to the estimates, but still count in the reported sample size\n",
                     weight_normalisation_g$n_zero))
+        # A console line is not a disclosure: it is gone the moment the Shiny
+        # session scrolls. The count belongs in the run status with everything
+        # else that qualifies the numbers.
+        local_degraded <- c(local_degraded,
+          sprintf("%d respondent(s) carry zero weight: they contribute nothing to the estimates but are counted in the reported sample size",
+                  weight_normalisation_g$n_zero))
+        local_affected <- c(local_affected, "Reported sample size", "Effective n")
       }
 
       weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
@@ -835,7 +870,7 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
   log_step(8, "Running post-model validations...")
   guard_g <- guard_post_model(guard_g, prep_data_g, model_result_g, config)
 
-  vif_check_g <- check_multicollinearity(model_result_g$model)
+  vif_check_g <- check_multicollinearity(model_result_g$model, config)
   if (vif_check_g$checked) {
     if (vif_check_g$status == "WARNING") {
       cat("   [PARTIAL]", vif_check_g$interpretation, "\n")
@@ -852,6 +887,15 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
     cat("   [PARTIAL] Stability flags:", length(guard_status_g$stability_flags), "\n")
     for (flag in guard_status_g$stability_flags) {
       local_degraded <- c(local_degraded, flag)
+    }
+    if (length(guard_status_g$stability_flags) > 0) {
+      # A PARTIAL must say what it affects: the shared run-state refuses one
+      # without an affected output, so a stability flag on its own took the run
+      # down with "TRS: PARTIAL status requires at least one affected_output".
+      # That was latent until the events-per-parameter gate started firing on
+      # designs it had been passing.
+      local_affected <- c(local_affected, "Model stability", "Standard errors",
+                          "Confidence intervals")
     }
   } else if (verbose) {
     cat("   [OK] All quality checks passed\n")
@@ -923,6 +967,12 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
       map_terms_to_levels(model_result_g$model, prep_data_g$data,
                           prep_data_g$model_formula)
     }
+  }, turas_refusal = function(e) {
+    # The mapper raises nine refusals of its own, each naming what it found and
+    # what to do. A TRS refusal inherits from error, so the handler below used to
+    # catch all nine and re-issue them as one generic MAPPER_TERM_MAPPING_FAILED
+    # with the original box buried inside its problem text.
+    stop(e)
   }, error = function(e) {
     catdriver_refuse(
       reason = "MAPPER_TERM_MAPPING_FAILED",
@@ -964,7 +1014,19 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
   # Bootstrap confidence intervals (optional)
   bootstrap_results_g <- NULL
   do_bootstrap <- isTRUE(as.logical(config$bootstrap_ci))
-  if (do_bootstrap && prep_data_g$outcome_info$type != "multinomial") {
+
+  # A multinomial outcome skips the bootstrap entirely. That used to happen in
+  # silence: the user asked for intervals, the block was never entered, and the
+  # run reported PASS with no bootstrap columns and no line saying why. It is
+  # the same defect A5 fixed one branch over.
+  if (do_bootstrap && prep_data_g$outcome_info$type %in% c("multinomial", "nominal")) {
+    cat("   [PARTIAL] Bootstrap intervals are not implemented for multinomial outcomes\n")
+    local_degraded <- c(local_degraded,
+      "Bootstrap confidence intervals were requested but are not implemented for multinomial outcomes; the odds ratios carry Wald intervals only")
+    local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
+  }
+
+  if (do_bootstrap && !prep_data_g$outcome_info$type %in% c("multinomial", "nominal")) {
 
     # Validate bootstrap parameters (safe defaults for missing/invalid)
     boot_reps <- config$bootstrap_reps
@@ -1000,6 +1062,17 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
         conf_level = conf_level,
         progress_callback = NULL
       )
+    }, turas_refusal = function(e) {
+      # A refusal object carries its text in $problem, not $message, so the
+      # generic handler below recorded "Bootstrap CI failed: " with nothing
+      # after the colon.
+      reason <- paste0("Bootstrap CI refused (", e$code %||% "unknown", "): ",
+                       e$problem %||% conditionMessage(e))
+      cat(sprintf("   [PARTIAL] %s\n", reason))
+      local_degraded <<- c(local_degraded, reason)
+      local_affected <<- c(local_affected, "bootstrap_ci")
+      boot_failure_reported <<- TRUE
+      NULL
     }, error = function(e) {
       cat("   [PARTIAL] Bootstrap failed:", e$message, "\n")
       local_degraded <<- c(local_degraded, paste0("Bootstrap CI failed: ", e$message))
@@ -1026,7 +1099,8 @@ run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
 
       # Survivorship is disclosed, not hidden: percentile intervals computed
       # over the resamples that survived are narrow to exactly that extent.
-      if (isTRUE(bootstrap_results_g$n_discarded > 0)) {
+      kept_flagged_n <- sum(unlist(bootstrap_results_g$kept_flag_counts %||% list()))
+      if (isTRUE(bootstrap_results_g$n_discarded > 0) || isTRUE(kept_flagged_n > 0)) {
         local_degraded <- c(local_degraded,
           paste0("Bootstrap survivorship: ", bootstrap_results_g$caveat))
         local_affected <- c(local_affected, "Bootstrap confidence intervals", "Sign stability")
@@ -1546,7 +1620,22 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
   # column of the prediction matrix with nothing saying which level that was,
   # so a multinomial table reported the alphabetically last level unlabelled.
   outcome_levels <- levels(data[[outcome_var]])
-  target_level <- if (is.matrix(pred_probs)) {
+  # Which column to report. For an ordinal outcome the matrix is already in the
+  # declared order, so the last column is the top of the scale. For a
+  # multinomial one the columns are alphabetical, because the engine has no use
+  # for an order, so the last column would be an arbitrary level: prefer what
+  # the analyst declared in the Variables sheet.
+  declared_order <- as.character(config$outcome_order %||% character(0))
+  declared_last <- if (length(declared_order) > 0) {
+    in_matrix <- declared_order[declared_order %in% colnames(pred_probs)]
+    if (length(in_matrix) > 0) in_matrix[length(in_matrix)] else NULL
+  } else {
+    NULL
+  }
+
+  target_level <- if (is.matrix(pred_probs) && !is.null(declared_last)) {
+    declared_last
+  } else if (is.matrix(pred_probs)) {
     cn <- colnames(pred_probs)
     if (!is.null(cn) && nzchar(cn[ncol(pred_probs)])) {
       cn[ncol(pred_probs)]
@@ -1582,8 +1671,9 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
 
       # Get mean predicted probability for this level
       if (is.matrix(pred_probs)) {
-        mean_prob <- mean(pred_probs[level_mask, ncol(pred_probs)], na.rm = TRUE)
-        ref_prob <- mean(pred_probs[driver_data == ref_level, ncol(pred_probs)], na.rm = TRUE)
+        target_col <- if (target_level %in% colnames(pred_probs)) target_level else ncol(pred_probs)
+        mean_prob <- mean(pred_probs[level_mask, target_col], na.rm = TRUE)
+        ref_prob <- mean(pred_probs[driver_data == ref_level, target_col], na.rm = TRUE)
       } else if (is.vector(pred_probs)) {
         mean_prob <- mean(pred_probs[level_mask], na.rm = TRUE)
         ref_prob <- mean(pred_probs[driver_data == ref_level], na.rm = TRUE)

@@ -358,13 +358,20 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
     active_class <- if (i == 1) " active" else ""
     label <- pl[[var_name]]$label
     ref <- pl[[var_name]]$reference
+    outcome_level <- pl[[var_name]]$outcome_level
 
     htmltools::tags$div(
       class = paste0("cd-factor-panel", active_class),
       id = paste0(id_prefix, "cd-panel-", safe_id),
       htmltools::tags$h3(
         class = "cd-panel-heading-label",
-        sprintf("%s (reference: %s)", label, ref)
+        # Name the outcome level the probabilities describe. Without it the
+        # table reads as the probability of something the reader has to guess.
+        if (!is.null(outcome_level) && nzchar(outcome_level)) {
+          sprintf("%s (reference: %s), probability of %s", label, ref, outcome_level)
+        } else {
+          sprintf("%s (reference: %s)", label, ref)
+        }
       ),
       tables$probability_lifts[[var_name]]
     )

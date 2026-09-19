@@ -185,6 +185,27 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
   outcome_levels <- levels(prep_data$data[[outcome_var]])
   n_levels <- length(outcome_levels)
 
+  # The reference point has to come from OUTSIDE the model, or the check is
+  # tautological: reversing the Order flips both the model's "highest" level and
+  # the raw proportions computed against it, so the mismatch count is zero by
+  # construction and the guard could never fire on the case it is named for.
+  # config$outcome_order is what the analyst declared in the Variables sheet, so
+  # the top of that list is the level the analyst means by "high".
+  declared_order <- config$outcome_order
+  declared_top <- if (!is.null(declared_order) && length(declared_order) > 0 &&
+                      any(nzchar(as.character(declared_order)))) {
+    declared <- as.character(declared_order)
+    declared <- declared[declared %in% outcome_levels]
+    if (length(declared) > 0) declared[length(declared)] else NULL
+  } else {
+    NULL
+  }
+  if (is.null(declared_top)) {
+    # Nothing independent to check against. H4 refuses an ordinal outcome with
+    # no declared Order, so this is only reachable on a hand-built config.
+    return(guard)
+  }
+
   # Get top driver(s)
   coefs <- model_result$coefficients
   if (is.null(coefs) || nrow(coefs) == 0) {
@@ -204,9 +225,9 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
 
     ref_level <- driver_levels[1]
 
-    # Calculate raw proportion in highest outcome category
+    # Raw proportion in the level the ANALYST called highest
     outcome_data <- prep_data$data[[outcome_var]]
-    high_level <- outcome_levels[n_levels]
+    high_level <- declared_top
 
     # Reference group proportion in high
     ref_prop <- mean(outcome_data[driver_data == ref_level] == high_level, na.rm = TRUE)
@@ -247,7 +268,8 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
     # three-argument call threw "unused argument" the moment the check fired,
     # which aborted the run.
     message_text <- paste0(
-      "OUTCOME ORDER MAY BE REVERSED: Odds ratio directions do not align with raw data patterns ",
+      "OUTCOME ORDER MAY BE REVERSED: the odds ratios point away from the raw pattern in '",
+      declared_top, "', the level the Variables sheet lists last, ",
       "for ", mismatches, "/", checked, " comparisons. ",
       "Check the 'Order' column for your outcome variable. ",
       "Ensure Low values are listed BEFORE High values (e.g. 'Dissatisfied;Neutral;Satisfied'). ",
@@ -366,7 +388,12 @@ guard_post_model <- function(guard, prep_data, model_result, config) {
 
   # Sample size checks
   n_obs <- nrow(prep_data$data)
-  n_params <- prep_data$n_terms
+  # The parameter count must be the number the model actually fitted, not the
+  # number of dummy columns. An ordinal fit adds its thresholds and a
+  # multinomial fit carries a full set of coefficients per non-reference outcome
+  # level, so on the demo the old count of 12 understated a multinomial model's
+  # 24 by half and the gate passed a design it should have flagged.
+  n_params <- cd_fitted_parameter_count(model_result$model) %||% prep_data$n_terms
   outcome_values <- if (!is.null(config$outcome_var) &&
                         config$outcome_var %in% names(prep_data$data)) {
     prep_data$data[[config$outcome_var]]

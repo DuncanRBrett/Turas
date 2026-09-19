@@ -451,7 +451,11 @@ build_model_fit_summary <- function(successful) {
 
     data.frame(
       subgroup = grp,
-      n = res$group_n %||% NA_integer_,
+      # The number the model fitted, not the number the group started with.
+      # group_n is the pre-deletion count, so a group of 147 that lost 14 rows
+      # to missing data reported 147 beside a McFadden computed on 133.
+      n = res$model_result$n_observations %||% res$group_n %||% NA_integer_,
+      n_before_missing = res$group_n %||% NA_integer_,
       mcfadden_r2 = round(fit$mcfadden_r2 %||% NA_real_, 4),
       aic = round(fit$aic %||% NA_real_, 1),
       convergence = if (isTRUE(mr$convergence)) "Yes" else "No",

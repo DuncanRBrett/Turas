@@ -239,6 +239,40 @@ test_that("missing_as_level creates Missing category correctly", {
 })
 
 
+test_that("a mixed strategy config treats each driver by its own rule", {
+  # The third of the ported tests (review finding F27): with two drivers on
+  # different strategies, one recodes and the other drops, and neither
+  # interferes with the other.
+  data <- generate_missing_data(300)
+  data$driver2 <- data$driver1
+  set.seed(5)
+  data$driver2[sample(nrow(data), 25)] <- NA
+
+  config <- list(
+    outcome_var = "outcome",
+    driver_vars = c("driver1", "driver2"),
+    weight_var = NULL,
+    driver_settings = data.frame(
+      driver = c("driver1", "driver2"),
+      type = "nominal",
+      missing_strategy = c("missing_as_level", "drop_row"),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  result <- handle_missing_data(data, config)
+
+  expect_true("Missing / Not answered" %in% levels(result$data$driver1))
+  expect_equal(sum(is.na(result$data$driver1)), 0)
+  expect_equal(sum(is.na(result$data$driver2)), 0)
+  # the dropped rows are driver2's missing ones, not driver1's
+  expect_lt(nrow(result$data), nrow(data))
+  expect_equal(result$missing_report$drivers$driver1$strategy, "missing_as_level")
+  expect_equal(result$missing_report$drivers$driver2$strategy, "drop_row")
+  expect_gt(result$missing_report$drivers$driver1$n_recoded, 0)
+  expect_gt(result$missing_report$drivers$driver2$n_rows_dropped, 0)
+})
+
 test_that("error_if_missing strategy produces hard error", {
   data <- generate_missing_data(300)
 

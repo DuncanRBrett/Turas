@@ -723,6 +723,36 @@ safe_rbind <- function(...) {
 #'   - design_effect: Kish design effect = n / effective_n
 #'   - has_extreme_weights: TRUE if max/min > 10
 #' @export
+#' How Many Parameters the Model Fitted
+#'
+#' Events per parameter is only meaningful against the parameters that were
+#' estimated. glm and polr report them through \code{coef()}; clm adds its
+#' thresholds (\code{alpha}); multinom holds a matrix with one row per
+#' non-reference outcome level.
+#'
+#' @param model A fitted model object.
+#' @return Integer count, or NULL when the shape is unfamiliar.
+#' @keywords internal
+cd_fitted_parameter_count <- function(model) {
+  if (is.null(model)) return(NULL)
+
+  if (inherits(model, "multinom")) {
+    cf <- tryCatch(coef(model), error = function(e) NULL)
+    if (is.null(cf)) return(NULL)
+    return(as.integer(length(cf)))
+  }
+  if (inherits(model, "clm")) {
+    return(as.integer(length(model$beta %||% coef(model)) + length(model$alpha %||% 0)))
+  }
+  if (inherits(model, "polr")) {
+    return(as.integer(length(coef(model)) + length(model$zeta %||% 0)))
+  }
+  cf <- tryCatch(coef(model), error = function(e) NULL)
+  if (is.null(cf)) return(NULL)
+  as.integer(sum(!is.na(cf)))
+}
+
+
 #' The Outcome Values the Model Actually Fitted
 #'
 #' Predictions come back only for the rows the fit used, while the caller's
@@ -890,7 +920,7 @@ normalise_catdriver_weights <- function(raw, weight_var = "weight") {
                               n_neg, weight_var))
   }
   if (rescaled) {
-    notes <- c(notes, sprintf("Weights rescaled to mean 1 (raw mean %.4f, factor %.6g); without this, standard errors would follow the weight total rather than the sample size",
+    notes <- c(notes, sprintf("Weights rescaled to mean 1 over the respondents carrying a positive weight (raw mean %.4f, factor %.6g); without this, standard errors would follow the weight total rather than the sample size",
                               raw_mean, scale_factor))
   }
 
@@ -929,7 +959,12 @@ catdriver_weighting_stamp <- function(weight_var = NULL, diagnostics = NULL,
     return("Unweighted analysis. Standard errors, confidence intervals and p-values assume simple random sampling.")
   }
 
-  parts <- sprintf("Weighted by '%s', applied as frequency weights normalised to mean 1.", weight_var)
+  # "Mean 1" is true of the respondents who carry a weight. Zero-weight rows stay
+  # in the frame and in the reported sample size, so the delivered vector's own
+  # mean is below 1 whenever there are any, and saying "mean 1" flatly would be
+  # a small untruth in a stamp whose whole job is precision.
+  parts <- sprintf("Weighted by '%s', applied as frequency weights normalised to mean 1 across the respondents with a positive weight.",
+                   weight_var)
 
   if (!is.null(normalisation) && isTRUE(normalisation$rescaled)) {
     parts <- paste(parts, sprintf("Raw weights had mean %.4f and were rescaled by %.6g.",
@@ -1094,7 +1129,9 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
       # draw from a sparse region, and dropping it is what biased the old
       # intervals narrow. It is counted so the caveat can say so.
       if (length(boot_fit$flags) > 0) {
-        kept_flagged <- c(kept_flagged, boot_fit$flags)
+        # One resample, however many warning classes it raised. Counting the
+        # flags made a single fit that warned twice look like two resamples.
+        kept_flagged <- c(kept_flagged, paste(sort(unique(boot_fit$flags)), collapse = "+"))
       }
     } else {
       discard_reasons <- c(discard_reasons, boot_fit$status %||% "error")

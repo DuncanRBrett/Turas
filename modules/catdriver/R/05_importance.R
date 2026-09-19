@@ -26,6 +26,13 @@ calculate_importance <- function(model_result, config) {
   # TRS refusal is an error condition, so a missing package silently became a
   # different statistic instead of a refusal. Every refusal raised anywhere
   # below the car::Anova call had the same fate.
+  if (model_result$model_type == "multinomial_logistic") {
+    # The multinomial path uses likelihood-ratio refits, not car::Anova, so it
+    # must not be gated on a package it never calls. Its refusals travel because
+    # it is called outside the fallback handler below.
+    return(calculate_multinomial_importance(model_result, config))
+  }
+
   if (!requireNamespace("car", quietly = TRUE)) {
     catdriver_refuse(
       reason = "PKG_CAR_MISSING",
@@ -34,12 +41,6 @@ calculate_importance <- function(model_result, config) {
       why_it_matters = "Variable importance uses likelihood-ratio chi-square tests from car::Anova.",
       fix = "Install the package with: install.packages('car')"
     )
-  }
-
-  if (model_result$model_type == "multinomial_logistic") {
-    # Multinomial has its own likelihood-ratio path, and its refusals must
-    # travel, so it is called outside the fallback handler.
-    return(calculate_multinomial_importance(model_result, config))
   }
 
   anova_result <- tryCatch(
@@ -57,6 +58,34 @@ calculate_importance <- function(model_result, config) {
 
   if (inherits(anova_result, "cd_anova_failed")) {
     importance_df <- calculate_fallback_importance(model_result, config)
+
+    # The fallback aggregates dummy terms back to their drivers, and it can only
+    # do that with a term mapping. It used to be called without one, so the
+    # Importance Summary listed twelve per-level rows like
+    # "service_qualityExcellent" and the run separately reported that every
+    # configured driver was missing from the table. A table nobody can read is
+    # not a fallback, so if the mapping did not resolve, refuse.
+    unresolved <- setdiff(importance_df$variable, config$driver_vars)
+    if (length(unresolved) > 0) {
+      catdriver_refuse(
+        reason = "CALC_IMPORTANCE_FALLBACK_UNMAPPED",
+        title = "IMPORTANCE COULD NOT BE REPORTED BY DRIVER",
+        problem = paste0(
+          "car::Anova failed (", anova_result$reason,
+          ") and the fallback could not aggregate its coefficients back to drivers: ",
+          paste(utils::head(unresolved, 8), collapse = ", "),
+          if (length(unresolved) > 8) ", ..." else ""
+        ),
+        why_it_matters = paste0(
+          "The fallback would otherwise report one row per dummy coefficient, which is not ",
+          "driver importance and cannot be compared with any other run."
+        ),
+        fix = paste0(
+          "Check that the 'car' package is installed and current: install.packages('car').\n",
+          "If it is, simplify the model (fewer drivers, or collapse rare levels) and run again."
+        )
+      )
+    }
     # D5: the output says which statistic produced it, and the run says so too.
     importance_df$method <- "z-squared share (Wald, car::Anova unavailable)"
     attr(importance_df, "cd_importance_degraded") <- paste0(
@@ -410,8 +439,21 @@ calculate_fallback_importance <- function(model_result, config) {
     )
   }
 
-  # Map dummy variables back to original factors
-  importance_df <- aggregate_dummy_importance(importance_df, config)
+  # Map dummy variables back to original factors. Without a mapping this
+  # aggregation cannot resolve a term like "service_qualityExcellent", so build
+  # one from the model itself where the module's own mapper can read it.
+  mapping <- tryCatch({
+    data <- model_result$estimation_data %||% model_result$analysis_data
+    formula <- model_result$formula
+    if (is.null(data) || is.null(formula)) stop("no frame to map against")
+    if (identical(model_result$model_type, "multinomial_logistic")) {
+      map_multinomial_terms(model_result$model, data, formula, config$outcome_var)
+    } else {
+      map_terms_to_levels(model_result$model, data, formula)
+    }
+  }, error = function(e) NULL)
+
+  importance_df <- aggregate_dummy_importance(importance_df, config, mapping = mapping)
 
   # Calculate relative importance
   total_chisq <- sum(importance_df$chi_square, na.rm = TRUE)
