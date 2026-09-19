@@ -743,6 +743,47 @@ format_output_value <- function(value, type = "frequency",
 }
 
 
+#' Read a CatDriver Contribution For This Project
+#'
+#' The catdriver module writes `{output}_cd_island.json` when its `v2_island`
+#' setting is on. A tabs run embeds it when `catdriver_island` names it.
+#' Returns NULL for every ordinary tabs run, so nothing about a report without
+#' a categorical driver study changes.
+#'
+#' @param config_obj The tabs config object.
+#' @return A single JSON string, or NULL.
+#' @keywords internal
+.read_catdriver_contribution <- function(config_obj) {
+  path <- config_obj$catdriver_island
+  if (is.null(path) || !nzchar(trimws(as.character(path)))) return(NULL)
+
+  path <- as.character(path)
+  if (!file.exists(path)) {
+    cat(sprintf(paste0("\n[WARNING] catdriver_island points at a file that is not there: %s\n",
+                       "  The report is built without the Categorical drivers tab.\n\n"), path))
+    return(NULL)
+  }
+
+  txt <- tryCatch(paste(readLines(path, warn = FALSE), collapse = ""),
+                  error = function(e) NULL)
+  if (is.null(txt) || !nzchar(trimws(txt))) return(NULL)
+
+  ok <- tryCatch({
+    parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+    identical(parsed$meta$kind, "catdriver")
+  }, error = function(e) FALSE)
+
+  if (!isTRUE(ok)) {
+    cat(sprintf(paste0("\n[WARNING] %s is not a catdriver contribution file.\n",
+                       "  The report is built without the Categorical drivers tab.\n\n"),
+                basename(path)))
+    return(NULL)
+  }
+
+  txt
+}
+
+
 #' Read a Conjoint Contribution For This Project
 #'
 #' The conjoint module writes `{output}_cj_island.json` when it runs. A tabs run
@@ -1325,6 +1366,8 @@ if (.html_report_v2_on) {
       pr_json_main <- .read_pricing_contribution(config_result$config_obj)
       # And a key driver study's, the same way again (13_v2_island.R).
       kd_json_main <- .read_keydriver_contribution(config_result$config_obj)
+      # And a categorical driver study's, the same way again (13_v2_island.R).
+      cd_json_main <- .read_catdriver_contribution(config_result$config_obj)
 
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
                            sub("\\.xlsx$", "_report.html", v2_out),
@@ -1335,7 +1378,8 @@ if (.html_report_v2_on) {
                            cj_json = cj_json_main,
                            md_json = md_json_main,
                            pr_json = pr_json_main,
-                           kd_json = kd_json_main)
+                           kd_json = kd_json_main,
+                           cd_json = cd_json_main)
     }, error = function(e) {
       cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
       cat("  The Excel and HTML outputs were not affected.\n\n")

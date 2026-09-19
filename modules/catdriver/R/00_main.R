@@ -1394,6 +1394,22 @@ run_catdriver_step_11_output <- function(model_result, importance, odds_ratios,
     )
   }
 
+  # The contribution to the interactive report (TR.CD). A separate file beside
+  # the workbook: a later tabs run for the same project embeds it when its
+  # catdriver_island setting names it. Off by default, because a project with
+  # no tabs report has no use for it.
+  if (isTRUE(as_logical_setting(config$settings$v2_island %||% FALSE, FALSE)) ||
+      isTRUE(getOption("turas.catdriver_island", FALSE))) {
+    if (exists("write_catdriver_island", mode = "function")) {
+      island <- write_catdriver_island(results, config, verbose = TRUE)
+      results$v2_island <- island$output_file
+    } else {
+      cat(paste0("   [WARNING] v2_island is on but write_catdriver_island() is not ",
+                 "loaded, so no contribution was written. Load the module through ",
+                 "modules/catdriver/source_catdriver.R.\n"))
+    }
+  }
+
   print_console_summary(results, config, output_file = config$output_file)
 
   invisible(results)

@@ -63,6 +63,9 @@ The v2 renderer carries three JSON islands:
 - **`data-kd`** (`TR.KD`): the **key driver** island, written by the keydriver
   module. Present → the Key drivers tab appears. Frozen, like the other module
   contributions.
+- **`data-cd`** (`TR.CD`): the **categorical driver** island, written by the
+  catdriver module. Present → the Categorical drivers tab appears. Frozen, for
+  the same reason: a logistic regression cannot be re-fitted in the browser.
 
 Published figures are always the record; recomputed (filtered / custom-banner /
 historical) figures are badged as computed.
@@ -285,6 +288,114 @@ IN, because a reader needs them to judge what they are looking at.
 
 ---
 
+### The categorical driver island contract (`TR.CD`)
+
+Written by `modules/catdriver/R/13_v2_island.R` as `{output}_cd_island.json`
+when the catdriver config's `v2_island` setting is on; embedded when the tabs
+config's `catdriver_island` names the file.
+
+```jsonc
+{
+  "meta": {
+    "schema_version": 1, "kind": "catdriver",
+    "analysis_name": "Demo: Customer Churn Analysis",
+    "outcome": { "var": "churn", "label": "Customer Churn", "type": "binary",
+                 "levels": ["Retained", "Churned"] },
+    "run_status": "PARTIAL",
+    "degraded_reasons": ["Sparse cells in service_quality (min cell: 1)"],
+    "weighted": true, "weight_var": "survey_weight",
+    "n_drivers": 4, "has_odds_ratios": true, "has_lifts": true,
+    "has_subgroups": true,
+    "frozen": true, "filter_note": "Report filters do not apply here. ...",
+    "confidence_level": 0.95
+  },
+  "importance": {
+    // D5: the method that produced the share, read from the path that ran.
+    // car::Anova is a likelihood-ratio test on glm and a WALD test on clm.
+    "method": "LR chi-square share (car::Anova type II on glm)",
+    "rows": [ { "driver": "service_quality", "label": "Service Quality",
+                "pct": 58.2, "statistic": 91.4, "df": 3, "p": 1.2e-19,
+                "rank": 1, "effect": "Very Large" } ]
+  },
+  "odds_ratios": {
+    "interval_kind": "wald",   // or "wald_and_bootstrap"
+    "bootstrap": false,        // the view draws a bootstrap whisker only if true
+    "rows": [ { "driver": "service_quality", "label": "Service Quality",
+                "level": "Excellent", "reference": "Poor",
+                "outcome_level": "Premium", "vs_outcome": "Basic",
+                "or": 11.36, "lo": 5.2, "hi": 24.8, "p": 3.5e-06,
+                "boot_lo": null, "boot_hi": null, "sign_stability": null } ]
+  },
+  "lifts": {
+    "outcome_level": "Churned",
+    "basis": "Difference in mean fitted probability ... Not an average marginal effect ...",
+    "rows": [ { "driver": "service_quality", "level": "Excellent",
+                "is_reference": false, "prob": 0.195, "ref_prob": 0.715,
+                "lift": -0.52, "lift_pp": -52.1 } ]
+  },
+  "patterns": [ { "driver": "service_quality", "label": "Service Quality",
+                  "reference": "Poor", "outcome_levels": ["Retained", "Churned"],
+                  "rows": [ { "level": "Poor", "n": 55, "pct_of_total": 12.1,
+                              "is_reference": true,
+                              "shares": [ { "level": "Churned", "pct": 69.1 } ] } ] } ],
+  "fit": { "engine": "glm", "model_type": "binary_logistic",
+           "mcfadden_r2": 0.133, "aic": 552.1, "lr": 84.9, "lr_df": 5,
+           "accuracy": 0.72, "converged": true,
+           "n": 456, "n_original": 500, "n_excluded": 44,
+           "n_eff": 409.3, "design_effect": 1.11,
+           "weighting": "Weighted by 'survey_weight' ... the design effect is reported but NOT applied ...",
+           "proportional_odds": { "checked": true, "status": "PASS",
+                                  "method": "ordinal::nominal_test", "interpretation": "..." },
+           "multicollinearity": { "checked": true, "status": "PASS",
+                                  "method": "GVIF on an auxiliary linear model of the design matrix",
+                                  "interpretation": "..." } },
+  "subgroups": {
+    "variable": "age_group", "groups": ["Total", "18-30"], "n_groups": 2,
+    "importance": [ { "driver": "service_quality", "classification": "Universal",
+                      "groups": [ { "group": "Total", "rank": 1, "pct": 58.2 } ] } ],
+    "fit": [ { "group": "18-30", "n": 133, "n_before_missing": 147,
+               "mcfadden_r2": 0.181, "status": "PARTIAL" } ],
+    "odds_ratios": [ { "driver": "service_quality", "level": "Excellent",
+                       "outcome_level": null, "ratio": 2.16, "notable": "Yes",
+                       "groups": [ { "group": "Total", "or": 0.09,
+                                     "ci": "0.04-0.19", "p": 3.5e-06 } ] } ],
+    "insights": ["Service Quality is a universal driver across all subgroups."]
+  }
+}
+```
+
+Rules this island keeps, and why:
+
+- **A block the run did not produce is ABSENT, not empty.** Same reason as
+  `TR.KD`: `jsonlite` writes a NULL element as `{}`, which is truthy.
+- **An absent bootstrap is not a zero-width interval.** The bootstrap is
+  optional and never runs for a multinomial outcome. `bootstrap: false` is what
+  stops the view drawing a whisker, and the Wald interval is shown instead,
+  labelled for what it is.
+- **The level travels with the interval.** `confidence_level` is the study's
+  own, so a 90% study is never labelled 95% by a renderer that assumed one.
+- **Odds are not likelihood.** The island names the quantity and the view says
+  odds. An odds ratio of 5 is not five times the chance, and the probability
+  lift block is where the probability scale lives, with its basis stated: a
+  difference in mean fitted probability between two groups of real respondents,
+  not an average marginal effect.
+- **A multinomial outcome carries `outcome_level` on every odds ratio.** Each
+  driver level has K-1 of them, one per outcome level; without the column they
+  collapse into one row and the table reports one of several as the answer.
+- **`n_eff` comes only from `calculate_effective_n`** (the shared Kish), carried
+  from the run's weight diagnostics and never recomputed in the island.
+- **Nothing routes through the significance engine**, and the tab carries no
+  significance letter. The interval is the uncertainty statement.
+- **No per-respondent data.** Fitted probabilities are model estimates of a
+  tabs-native outcome column with artificially reduced variance; a test asserts
+  the island carries no vector the length of the sample.
+
+**Curated drop-list (logged against V2_MIGRATION_PLAN section 7).** Per-level
+coefficient tables, the missing-data and collapse reports, and the bootstrap
+resample matrix stay in the Excel deliverable.
+
+---
+
 ## Enabling each option (Settings sheet keys)
 
 Set these in the project's `Crosstab_Config…xlsx` **Settings** sheet (or via the
@@ -299,6 +410,7 @@ GUI tick-box for option 2):
 | `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…), robust to renames, and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
 | `wave` | *(blank)* | Wave label shown in the header and used as the trend label. |
 | `wave_order` | *(blank)* | Numeric x-axis order key for this wave (e.g. `2025.5`). Blank → a 4-digit year is parsed from the `wave` label. |
+| `catdriver_island` | *(blank)* | Path to a categorical driver study's `{output}_cd_island.json` (written by catdriver when its own `v2_island` setting is on). Named → the report gains a **Categorical drivers** tab. Blank → no tab, and the report is unchanged. |
 | `researcher_logo_path` / `client_logo_path` | *(blank)* | Logos embedded (base64) into the v2 header. |
 | `sampling_method` | `Not_Specified` | Drives honest CI vocabulary (probability → CI/MOE; otherwise stability/PE). |
 

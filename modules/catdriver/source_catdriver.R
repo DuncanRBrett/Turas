@@ -73,6 +73,7 @@ CATDRIVER_SOURCE_ORDER <- c(
   "06a_sheets_summary.R", "06b_sheets_detail.R", "06_output.R",
   "06c_sheets_subgroup.R",
   "11_subgroup_comparison.R",
+  "13_v2_island.R",
   "00_main.R"
 )
 
