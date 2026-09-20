@@ -437,6 +437,25 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   generate_action_cards <- get_logical_config(config, "generate_action_cards", default_value = FALSE)
   scale_max <- get_numeric_config(config, "scale_max", default_value = 10, min = 1, max = 100)
 
+  # Both of these were parsed nowhere and therefore dropped by the assembly
+  # below, so the template's Y/N and the GUI checkbox controlled nothing and
+  # the Declaration sheet never received the name the user typed (H3).
+  generate_stats_pack <- toupper(as.character(
+    get_config_value(config, "generate_stats_pack", default_value = "Y") %||% "Y"))
+  if (!generate_stats_pack %in% c("Y", "N")) {
+    segment_refuse(
+      code = "CFG_INVALID_STATS_PACK",
+      title = "Invalid generate_stats_pack Value",
+      problem = sprintf("generate_stats_pack is '%s'.", generate_stats_pack),
+      why_it_matters = "The stats pack is a contractual deliverable, so this setting is not guessed at.",
+      how_to_fix = "Set generate_stats_pack to Y or N.",
+      expected = c("Y", "N"),
+      observed = generate_stats_pack
+    )
+  }
+  research_house <- as.character(
+    get_config_value(config, "research_house", default_value = "") %||% "")
+
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
@@ -468,6 +487,8 @@ parse_segment_feature_params <- function(config, clustering_vars) {
     stability_n_runs = stability_n_runs, generate_rules = generate_rules,
     rules_max_depth = rules_max_depth, generate_action_cards = generate_action_cards,
     scale_max = scale_max,
+    generate_stats_pack = generate_stats_pack,
+    research_house = if (nzchar(trimws(research_house))) research_house else NULL,
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file
@@ -549,6 +570,59 @@ refuse_removed_settings <- function(config) {
 }
 
 
+#' Warn About Config Settings That Did Not Survive Validation
+#'
+#' `validate_segment_config` rebuilds its result from explicit lists, so any
+#' key it does not enumerate disappears. That is how two documented controls
+#' came to be dead (`generate_stats_pack`, `research_house`), and it would
+#' have happened to the next one added to the template and not to the
+#' enumeration. Review H3.
+#'
+#' This does not refuse. A stray key is usually a typo or an old template,
+#' neither of which should stop a run, and the point is that the user finds
+#' out rather than that the run dies. It prints to the console because that
+#' is where a Shiny user reads anything (project CLAUDE.md).
+#'
+#' @param raw_config The configuration as read from the workbook
+#' @param validated_config The assembled, validated configuration
+#' @return invisible character vector of the settings that did not survive
+#' @keywords internal
+segment_warn_unused_settings <- function(raw_config, validated_config) {
+
+  raw_keys <- names(raw_config) %||% character(0)
+  raw_keys <- raw_keys[nzchar(raw_keys) & !grepl("^[.]", raw_keys)]
+
+  # Read by the validators under another name, or consumed as a side effect.
+  consumed_elsewhere <- c(
+    "k_range",               # split into k_min / k_max
+    "question_labels_file",  # loaded into question_labels
+    "segment_names"          # handled with the naming style
+  )
+
+  unused <- setdiff(raw_keys, c(names(validated_config), consumed_elsewhere))
+  if (length(unused) == 0) return(invisible(character(0)))
+
+  cat("\n")
+  cat("+--- SEGMENT: settings that did not survive validation ---+\n")
+  for (k in unused) {
+    cat(sprintf("| %-55s |\n", k))
+  }
+  cat("| These were read from the Config sheet and are not used by  |\n")
+  cat("| the run. Check the spelling against the template, or       |\n")
+  cat("| delete them. Nothing below reads them.                     |\n")
+  cat("+------------------------------------------------------------+\n\n")
+
+  if (exists("showNotification", mode = "function")) {
+    try(showNotification(
+      paste("Segment: unused config settings:", paste(unused, collapse = ", ")),
+      type = "warning", duration = NULL
+    ), silent = TRUE)
+  }
+
+  invisible(unused)
+}
+
+
 validate_segment_config <- function(config) {
   cat("Validating configuration...\n")
 
@@ -597,6 +671,9 @@ validate_segment_config <- function(config) {
   if (req$method == "hclust") cat(sprintf("  Linkage: %s\n", req$linkage_method))
   if (req$method == "gmm" && !is.null(req$gmm_model_type)) cat(sprintf("  GMM model: %s\n", req$gmm_model_type))
   if (features$html_report) cat("  HTML report: enabled\n")
+
+  # Last, so the list it checks is the one the run will actually use.
+  segment_warn_unused_settings(config, validated_config)
 
   validated_config
 }
