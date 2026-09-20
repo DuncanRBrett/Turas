@@ -625,11 +625,23 @@ run("an IN FOCUS card states its own base, and the no-story note ends on the fin
   // figure group reads "1 200" rather than "1200".
   assert(page.indexOf("n = 1\u202F200") !== -1 || page.indexOf("n = " + TR.fmt.base(1200)) !== -1,
     "the base is formatted, not concatenated");
+  // The no-story note is authored in the callout registry, so its sentences
+  // belong to the report author and cannot be pinned here. What the code owns
+  // is the substitution and the end of the block: the note must be the
+  // authored text with the groups that got no card named, their bases
+  // formatted, and NOTHING appended after it. That is the durable form of
+  // "ends on the finding". Duncan removed a closing editorial line from the
+  // catalogue on 18 Sep 2026; putting it back is his call to make and must not
+  // turn this suite red.
   const note = blockOf(page, "patterns.no_story");
-  assert(note.indexOf("No consistent story held up beyond chance") !== -1,
-    "the note still says what was tested and what came back");
-  assert(note.indexOf("honest reporting") === -1,
-    "the closing editorial sentence is gone (Duncan, 18 Sep 2026)");
+  const skipped = t.noStory || [];
+  assert(skipped.length === 1 && skipped[0].subject === "FlatSmall" && skipped[0].base === 60,
+    "the fixture leaves exactly one group without a card (got " +
+    skipped.map((g) => g.subject).join(",") + ")");
+  assert(note === TXT("patterns.no_story", {
+    names: "FlatSmall (n = " + TR.fmt.base(60) + ")",
+    it_them: "it"
+  }), "the note is the authored text, substituted, and ends there: " + JSON.stringify(note));
 });
 
 run("census floor needs real coverage. A 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {
