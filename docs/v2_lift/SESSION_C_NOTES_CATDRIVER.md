@@ -32,11 +32,12 @@ has no banner.
 
 The gate directory also holds four files that are not suites: `_text.mjs`,
 `parity_engine_modules.mjs`, `pptx_visual_qa.mjs`, and `mutate_text_check.mjs`.
-The last one is a policy check, and it reports one failure, in
-`takeout_tests.mjs`, for asserting on wording the report author owns. That
-failure is **not from this session**: it reproduces identically at `9a541ff8`,
-the commit this branch was cut from. It comes from the Patterns card-base work
-and is still open on main.
+The last one is a policy check. At the time of this session it reported one
+failure, in `takeout_tests.mjs`, for asserting on wording the report author
+owns. That failure was **not from this session**: it reproduced identically at
+`9a541ff8`, the commit this branch was cut from, and came from the Patterns
+card-base work. It was fixed separately on 20 Sep 2026 (`2a16e1ca`, merged as
+`85cdab0b`), and the mutation check now passes.
 
 The tabs suite caught the one thing I had missed: `catdriver_island` was in the
 config object before it was in the tabs template, and the test that binds the
