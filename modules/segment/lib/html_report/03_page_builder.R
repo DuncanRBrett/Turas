@@ -204,14 +204,6 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$div(id = "seg-pinned-cards-container")
   )
 
-  # Hidden insight store
-  insight_store <- htmltools::tags$textarea(
-    class = "seg-insight-store",
-    id = "seg-insight-store",
-    `data-seg-prefix` = "",
-    style = "display:none;",
-    "{}"
-  )
 
   # Hidden pinned views data store
   pinned_store <- htmltools::tags$script(
@@ -359,7 +351,6 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
           build_seg_about_section(config, html_data),
           footer_section
         ),
-        insight_store,
         pinned_store
       ),
       js_tags

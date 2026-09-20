@@ -204,13 +204,6 @@ build_seg_combined_page <- function(method_html_data,
   )
 
   # --- Hidden data stores ---
-  insight_store <- htmltools::tags$textarea(
-    class = "seg-insight-store",
-    id = "seg-insight-store",
-    `data-seg-prefix` = "",
-    style = "display:none;",
-    "{}"
-  )
 
   pinned_store <- htmltools::tags$script(
     id = "seg-pinned-views-data",
@@ -257,7 +250,6 @@ build_seg_combined_page <- function(method_html_data,
           build_seg_about_section(config, method_html_data[[1]]),
           footer
         ),
-        insight_store,
         pinned_store
       ),
       js_tags,

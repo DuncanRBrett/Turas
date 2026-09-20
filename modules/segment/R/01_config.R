@@ -231,7 +231,10 @@ validate_segment_required_and_method <- function(config) {
 
   if (length(clustering_vars) < 2) {
     segment_refuse(
-      code = "CFG_INSUFFICIENT_VARS",
+      # Was CFG_INSUFFICIENT_VARS. The hard guard refuses the same
+      # condition as CFG_INSUFFICIENT_VARIABLES, and two codes for one
+      # condition split the trail a user follows (L2).
+      code = "CFG_INSUFFICIENT_VARIABLES",
       title = "Insufficient Clustering Variables",
       problem = sprintf("Only %d clustering variable(s) specified.", length(clustering_vars)),
       why_it_matters = "Segmentation requires at least 2 variables to find meaningful clusters.",

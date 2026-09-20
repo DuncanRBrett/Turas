@@ -562,7 +562,7 @@ This functionality requires no external CDN or library -- it is self-contained w
 
 ### Insight Editors
 
-Each section includes a collapsible "Add insight" area where analysts can type contextual notes directly in the report. These notes are stored in a hidden `<textarea>` element (`seg-insight-store`) and are included when the section is pinned or exported.
+Each section includes a collapsible "Add insight" area where analysts can type contextual notes directly in the report. The notes live in the report's own editable elements (contentEditable, serialised through outerHTML when the report is saved), which is why they survive Save a Copy, and they are included when the section is pinned or exported. An older hidden `seg-insight-store` textarea was removed in September 2026; nothing had read it for some time.
 
 **Insight editor improvements (v11.1):**
 
