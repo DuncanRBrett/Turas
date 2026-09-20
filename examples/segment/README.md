@@ -14,7 +14,9 @@ source("launch_turas.R"); launch_turas()
 
 Pick **Segment**, then browse to
 `examples/segment/Thornhill_Segment_Config.xlsx`. Outputs land in
-`examples/segment/Output/`.
+`examples/segment/Output/`, which is not committed, so the first run creates
+it. A run takes about four seconds and writes five files: the HTML report, the
+Excel report, the segment assignments, the saved model and the stats pack.
 
 `Thornhill_Segment_Config_Explore.xlsx` is the same study in exploration mode,
 k = 2 to 6, if you want to see how it chooses k rather than being told.
@@ -31,7 +33,7 @@ and wrong if you launch from somewhere else.
 | `Thornhill_Segment_Data.xlsx` | 1,200 shoppers, sheet `Data` |
 | `Thornhill_Segment_Config.xlsx` | final mode, k fixed at 3 |
 | `Thornhill_Segment_Config_Explore.xlsx` | exploration mode, k = 2 to 6 |
-| `Output/` | a committed run, so you can look without running |
+| `Output/` | where a run lands. Not committed: `.gitignore` ignores `output/` |
 
 Six attitude statements scored 1 to 10 do the clustering. Five further
 variables are along for profiling only: `age_band`, `region` and
