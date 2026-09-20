@@ -62,6 +62,54 @@ build_seg_section_nav <- function(brand_colour = "#323367", sections_config = li
 # HEADER
 # ==============================================================================
 
+#' Who the report says it was prepared by
+#'
+#' The header and the footer each carried their own hardcoded company name and
+#' the two disagreed: "The Research Lamppost" here, "The Research LampPost
+#' (Pty) Ltd" in the footer. Both read `config$company_name`, which nothing
+#' sets: it is not parsed in 01_config.R and the template does not offer it, so
+#' the misspelled fallback printed on every segment report, for every client.
+#'
+#' Rather than add `company_name` and `researcher_name` as new settings, these
+#' read the settings the template already carries for exactly these two things:
+#' `research_house` for the organisation and `analyst_name` for the person.
+#' `config$company_name` is still honoured first so that anything already
+#' setting it keeps working.
+#'
+#' @param config Configuration list
+#' @return A single non-empty string, or NULL where there is nothing to say
+#' @keywords internal
+.seg_report_company <- function(config) {
+  .seg_first_text(config$company_name, config$research_house,
+                  "The Research LampPost (Pty) Ltd")
+}
+
+#' @rdname dot-seg_report_company
+#' @keywords internal
+.seg_report_researcher <- function(config) {
+  .seg_first_text(config$researcher_name, config$analyst_name)
+}
+
+#' First value that is a non-empty string
+#'
+#' `%||%` only falls through on NULL. A config read from a workbook can hold
+#' an empty string just as easily, and an empty company name printed a bare
+#' "Prepared by".
+#'
+#' @param ... Candidates, in order of preference
+#' @return The first non-empty string, or NULL
+#' @keywords internal
+.seg_first_text <- function(...) {
+  for (v in list(...)) {
+    if (!is.null(v) && length(v) >= 1 && !is.na(v[1]) && nzchar(trimws(as.character(v[1])))) {
+      return(as.character(v[1]))
+    }
+  }
+  NULL
+}
+
+
+
 #' Build Header Section
 #'
 #' Creates the gradient banner header with module name, report title,
@@ -142,9 +190,9 @@ build_seg_header <- function(html_data, config, brand_colour, report_title) {
 
   # --- Prepared by / for text ---
   prepared_row <- NULL
-  company_name <- config$company_name %||% "The Research Lamppost"
-  client_name <- config$client_name %||% NULL
-  researcher_name <- config$researcher_name %||% NULL
+  company_name <- .seg_report_company(config)
+  client_name <- .seg_first_text(config$client_name)
+  researcher_name <- .seg_report_researcher(config)
   prepared_parts <- c()
 
   if (!is.null(company_name) && nzchar(company_name)) {

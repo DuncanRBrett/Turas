@@ -229,9 +229,10 @@ write_segment_config <- function(path, mode = c("final", "exploration")) {
     golden_questions_n     = "3",
 
     project_name           = "Thornhill Grocers shopper segmentation",
-    analyst_name           = "Turas worked example",
+    analyst_name           = "Example analyst",
     description            = "1,200 shoppers, six attitude statements, three segments by construction.",
-    research_house         = "The Research LampPost"
+    research_house         = "The Research LampPost",
+    client_name            = "Thornhill Grocers"
   )
 
   # An empty k_fixed is how the module is told to explore. Writing the row with

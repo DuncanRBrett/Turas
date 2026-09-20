@@ -1674,8 +1674,10 @@ build_seg_guide_section <- function(brand_colour = "#323367") {
 #' @return htmltools tag
 #' @keywords internal
 build_seg_footer <- function(config = list()) {
-  company_name <- config$company_name %||% "The Research LampPost (Pty) Ltd"
-  client_name <- config$client_name %||% NULL
+  # Same resolver as the header (03b), so the two can no longer disagree about
+  # who produced the report.
+  company_name <- .seg_report_company(config)
+  client_name <- .seg_first_text(config$client_name)
 
   prepared <- company_name
   if (!is.null(client_name) && nzchar(client_name)) {

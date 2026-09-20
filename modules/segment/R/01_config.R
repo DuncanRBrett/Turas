@@ -456,6 +456,12 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   research_house <- as.character(
     get_config_value(config, "research_house", default_value = "") %||% "")
 
+  # Who the report is for. The report layer already had a "Prepared for X"
+  # branch in both the header and the footer, reading config$client_name,
+  # which nothing set: unreachable code rather than a working control.
+  client_name <- as.character(
+    get_config_value(config, "client_name", default_value = "") %||% "")
+
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
@@ -489,6 +495,7 @@ parse_segment_feature_params <- function(config, clustering_vars) {
     scale_max = scale_max,
     generate_stats_pack = generate_stats_pack,
     research_house = if (nzchar(trimws(research_house))) research_house else NULL,
+    client_name = if (nzchar(trimws(client_name))) client_name else NULL,
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file
