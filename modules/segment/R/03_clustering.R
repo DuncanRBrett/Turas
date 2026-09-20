@@ -150,14 +150,24 @@ run_kmeans_dispatch <- function(data_list, config, guard) {
   # Choose standard vs mini-batch based on size
   use_minibatch <- n > 10000
 
+  # Mini-batch takes no nstart: it runs a single start by design, and passing
+  # one killed every study over 10,000 rows (V2 lift review 2026-07-11, C1).
+  # Multi-start was deliberately NOT added to it; mini-batch is an approximate
+  # method and a multi-start search would undo the reason it is chosen here.
+  # The seed is passed so the run reproduces on the study's own seed rather
+  # than on the function's default.
+  minibatch_seed <- config$seed %||% 123
+  minibatch_batch <- min(1000, n)
+
   if (use_minibatch) {
-    cat(sprintf("    Using mini-batch k-means (n=%d > 10000)\n", n))
+    cat(sprintf("    Using mini-batch k-means (n=%d > 10000, seed=%d)\n",
+                n, minibatch_seed))
     model <- run_minibatch_kmeans(
       data = scaled_data,
       k = k,
-      batch_size = min(1000, n),
+      batch_size = minibatch_batch,
       max_iter = 100,
-      nstart = config$nstart %||% 50
+      seed = minibatch_seed
     )
   } else {
     model <- kmeans(
@@ -188,7 +198,11 @@ run_kmeans_dispatch <- function(data_list, config, guard) {
     convergence_warning = conv_warn,
     method_info = list(
       algorithm = if (use_minibatch) "mini-batch" else "Hartigan-Wong",
-      nstart = config$nstart %||% 50,
+      # NA, not the config value: mini-batch runs one start, so reporting the
+      # configured nstart described a search that did not happen.
+      nstart = if (use_minibatch) NA_integer_ else (config$nstart %||% 50),
+      seed = if (use_minibatch) minibatch_seed else NULL,
+      batch_size = if (use_minibatch) minibatch_batch else NULL,
       totss = model$totss,
       withinss = model$withinss,
       tot_withinss = model$tot.withinss,
