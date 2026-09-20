@@ -5,6 +5,77 @@
 # Part of Turas Segmentation Module
 # ==============================================================================
 
+# ==============================================================================
+
+#' Guard: Scoring and Typing Need a K-means Model
+#'
+#' Every scoring entry point assigns by nearest Euclidean centroid. That is the
+#' k-means rule, and it is only the k-means rule. Until September 2026 the
+#' guard here covered LCA alone, so a saved GMM or hclust model was scored by
+#' the k-means rule under normal-looking output (V2 lift review 2026-07-11,
+#' H2).
+#'
+#' Scoring a GMM by posterior probability is a real feature and a reasonable
+#' thing to want. It is not implemented, so this refuses rather than
+#' approximating it.
+#'
+#' @param method The saved model's method, or NULL for older k-means models
+#' @param entry_point Name of the calling function, for the message
+#' @return invisible(TRUE), or a refusal
+#' @keywords internal
+guard_scoring_is_kmeans <- function(method, entry_point) {
+
+  method <- tolower(as.character(method %||% "kmeans"))
+  if (identical(method, "kmeans")) return(invisible(TRUE))
+
+  why <- switch(
+    method,
+    gmm = paste(
+      "A GMM assigns a respondent by posterior probability under the fitted",
+      "covariances, not by distance to a centre. Nearest-centroid can disagree",
+      "with the model's own training assignments, so the same respondent could",
+      "be scored into one segment here and sit in another in the study the",
+      "model came from."
+    ),
+    hclust = paste(
+      "Hierarchical clustering has no centroid assignment rule. Its segments",
+      "come from the linkage that built the tree, and a centre computed after",
+      "the fact does not reproduce them for a new respondent."
+    ),
+    lca = paste(
+      "This model was saved by a version of the module that carried latent",
+      "class analysis. LCA has since been removed, and it never assigned by",
+      "distance in any case."
+    ),
+    paste0(
+      "Nearest-centroid assignment is the k-means rule. It has no standing for a ",
+      method, " model, so anything it produced here would look like an ",
+      "assignment without being one."
+    )
+  )
+
+  cat(sprintf("\n[SEGMENT] %s() refused: the saved model is %s, not k-means.\n",
+              entry_point, method))
+
+  segment_refuse(
+    code = "MODEL_TYPE_MISMATCH",
+    title = "Scoring Needs a K-means Model",
+    problem = sprintf(
+      "The saved model was fitted with %s. %s() assigns by nearest centroid, which is the k-means rule.",
+      method, entry_point
+    ),
+    why_it_matters = why,
+    how_to_fix = c(
+      "Score with a model fitted by k-means.",
+      sprintf("Or re-run the original respondents through the %s model itself and use its own assignments.", method),
+      "Posterior scoring for GMM is not implemented. It would have to be commissioned."
+    ),
+    expected = "kmeans",
+    observed = method
+  )
+}
+
+
 #' Score New Data with Saved Segmentation Model
 #'
 #' Applies a saved k-means model to new respondents, assigning them to segments
@@ -63,6 +134,10 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
       )
     )
   }
+
+  # Until September 2026 this entry point had no method check at all, so a
+  # saved GMM or hclust model was scored by the k-means rule (H2).
+  guard_scoring_is_kmeans(model_data$method, "score_new_data")
 
   config <- model_data$config
   clustering_vars <- model_data$clustering_vars
@@ -275,11 +350,22 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
   # Assign to nearest center
   assignments <- apply(distances, 1, which.min)
 
-  # Get minimum distances (for confidence scoring)
+  # Get minimum distances (reported alongside the assignment)
   min_distances <- apply(distances, 1, min)
 
-  # Calculate assignment confidence (inverse of distance, normalized)
-  confidence <- 1 / (1 + min_distances)
+  # Assignment confidence: softmax over the negative distances to every
+  # centre, which is the formula type_respondent() and
+  # type_respondents_batch() already used. This entry point reported
+  # 1/(1 + d_min) instead, so one respondent had two different confidences
+  # depending on which door they came through (M7). The two are not the same
+  # question: 1/(1 + d_min) falls with absolute distance, so a respondent
+  # sitting squarely inside one segment far from the origin scored lower than
+  # one sitting midway between two nearby centres. The softmax answers the
+  # question the column is named for, how much closer to this segment than to
+  # the others.
+  exp_neg_distances <- exp(-distances)
+  confidence <- exp_neg_distances[cbind(seq_len(nrow(distances)), assignments)] /
+    rowSums(exp_neg_distances)
 
   cat(sprintf("✓ Assigned %d respondents to %d segments\n",
               length(assignments), nrow(centers)))
@@ -451,15 +537,7 @@ type_respondent <- function(answers, model_file) {
   method <- model_data$method
   if (is.null(method)) method <- "kmeans"
 
-  if (method == "lca") {
-    segment_refuse(
-      code = "MODEL_TYPE_MISMATCH",
-      title = "Wrong Model Type",
-      problem = "This is an LCA model.",
-      why_it_matters = "type_respondent() only works with k-means models.",
-      how_to_fix = "Use type_respondent_lca() for LCA models instead."
-    )
-  }
+  guard_scoring_is_kmeans(method, "type_respondent")
 
   # Extract required components
   centers <- model_data$centers
@@ -628,15 +706,7 @@ type_respondents_batch <- function(data, model_file, id_var) {
   method <- model_data$method
   if (is.null(method)) method <- "kmeans"
 
-  if (method == "lca") {
-    segment_refuse(
-      code = "MODEL_TYPE_MISMATCH",
-      title = "Wrong Model Type",
-      problem = "This is an LCA model.",
-      why_it_matters = "type_respondents_batch() only works with k-means models.",
-      how_to_fix = "Use type_respondents_batch_lca() for LCA models instead."
-    )
-  }
+  guard_scoring_is_kmeans(method, "type_respondents_batch")
 
   # Extract required components
   centers <- model_data$centers
