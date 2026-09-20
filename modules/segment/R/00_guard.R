@@ -383,3 +383,113 @@ segment_status_partial <- function(degraded_reasons,
 segment_status_refuse <- function(code = NULL, reason = NULL) {
   trs_status_refuse(module = "SEGMENT", code = code, reason = reason)
 }
+
+
+# ==============================================================================
+# GUI OUTCOME CLASSIFICATION
+# ==============================================================================
+# turas_segment_from_config() runs under a refusal handler, so a refusal is
+# CAUGHT and RETURNED rather than thrown. Anything deciding whether a run
+# worked must therefore look at what came back, not at whether an error was
+# raised. The Shiny GUI did the latter and called every refusal a success
+# (V2 lift review 2026-07-11, H1).
+
+#' Classify What a Segment Run Returned
+#'
+#' @param result The value returned by turas_segment_from_config()
+#' @return A list with:
+#'   \item{success}{TRUE only for a real result}
+#'   \item{status}{"PASS", "REFUSED" or "ERROR"}
+#'   \item{code}{TRS code, empty for a pass}
+#'   \item{title}{Short heading for the UI}
+#'   \item{problem}{What went wrong}
+#'   \item{how_to_fix}{Character vector of remedies}
+#'   \item{message}{Full text, for the console}
+#'   \item{result}{The original object}
+#' @export
+segment_gui_outcome <- function(result) {
+
+  blank <- function(x, fallback = "") {
+    if (is.null(x) || length(x) == 0) return(fallback)
+    if (is.logical(x)) return(fallback)
+    as.character(x)
+  }
+
+  is_refusal_shaped <- inherits(result, "turas_refusal_result") ||
+    isTRUE(result$refused) ||
+    identical(blank(result$run_status)[1], "REFUSE")
+
+  is_error_shaped <- inherits(result, "turas_error_result") ||
+    identical(blank(result$run_status)[1], "ERROR")
+
+  if (is.null(result) || !is.list(result)) {
+    return(list(
+      success = FALSE, status = "ERROR", code = "BUG_NO_RESULT",
+      title = "The run returned nothing",
+      problem = "The segmentation returned no result object at all.",
+      how_to_fix = "Read the console output above. This is a bug; report it.",
+      message = "The segmentation returned no result object at all.",
+      result = result
+    ))
+  }
+
+  if (is_refusal_shaped) {
+    return(list(
+      success = FALSE,
+      status = "REFUSED",
+      code = blank(result$code, "CFG_REFUSED"),
+      title = blank(result$title, "Analysis refused"),
+      problem = paste(blank(result$problem, "The run was refused."), collapse = " "),
+      how_to_fix = blank(result$how_to_fix, "Read the console output above."),
+      message = blank(result$message, blank(result$problem)),
+      result = result
+    ))
+  }
+
+  if (is_error_shaped) {
+    return(list(
+      success = FALSE,
+      status = "ERROR",
+      code = blank(result$code, "BUG_INTERNAL_ERROR"),
+      title = blank(result$title, "Unexpected error"),
+      problem = paste(blank(result$message, "An unexpected error occurred."), collapse = " "),
+      how_to_fix = c("Read the console output above.",
+                     "This is a bug rather than a configuration problem. Report it."),
+      message = paste(blank(result$message, "An unexpected error occurred."), collapse = " "),
+      result = result
+    ))
+  }
+
+  list(
+    success = TRUE, status = "PASS", code = "", title = "Analysis complete",
+    problem = "", how_to_fix = character(0), message = "", result = result
+  )
+}
+
+
+#' Print a Refusal or Error Where a Shiny User Will Find It
+#'
+#' Turas runs behind a Shiny app and its users debug from the console the app
+#' was launched in, so a refusal has to be legible there and not only in the
+#' browser (project CLAUDE.md).
+#'
+#' @param outcome The list returned by segment_gui_outcome()
+#' @return invisible(NULL)
+#' @export
+segment_gui_console_block <- function(outcome) {
+  if (isTRUE(outcome$success)) return(invisible(NULL))
+
+  line <- strrep("-", 74)
+  cat("\n", line, "\n", sep = "")
+  cat(sprintf("  SEGMENT %s\n", outcome$status))
+  cat(line, "\n", sep = "")
+  cat(sprintf("  Code:    %s\n", outcome$code))
+  cat(sprintf("  Title:   %s\n", outcome$title))
+  cat(sprintf("  Problem: %s\n", outcome$problem))
+  if (length(outcome$how_to_fix) > 0 && nzchar(outcome$how_to_fix[1])) {
+    cat("  How to fix:\n")
+    for (fix in outcome$how_to_fix) cat(sprintf("    - %s\n", fix))
+  }
+  cat(line, "\n\n", sep = "")
+  invisible(NULL)
+}

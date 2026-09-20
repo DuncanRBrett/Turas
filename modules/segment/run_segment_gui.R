@@ -365,7 +365,18 @@ run_segment_gui <- function() {
         analysis_result_data <- tryCatch({
           # Run segmentation
           result <- turas_segment_from_config(config_file(), verbose = TRUE)
-          list(success = TRUE, result = result)
+
+          # A refusal is CAUGHT by the module's own handler and RETURNED, so
+          # nothing is thrown and the tryCatch below never fires. Until
+          # September 2026 that made every refusal a success here, complete
+          # with the tick and the green toast (H1). Ask what came back.
+          outcome <- segment_gui_outcome(result)
+
+          # Printed inside the sink, so it lands in the console pane the user
+          # is looking at as well as the terminal behind the app.
+          segment_gui_console_block(outcome)
+
+          list(success = outcome$success, result = result, outcome = outcome)
 
         }, error = function(e) {
           # Capture detailed error information
@@ -375,7 +386,13 @@ run_segment_gui <- function() {
             "\n\nCall Stack:\n",
             paste(deparse(e$call), collapse = "\n")
           )
-          list(success = FALSE, error = error_msg)
+          list(success = FALSE, error = error_msg, outcome = list(
+            success = FALSE, status = "ERROR", code = "BUG_UNCAUGHT_ERROR",
+            title = "Unexpected error", problem = error_msg,
+            how_to_fix = c("Read the console output above.",
+                           "This is a bug rather than a configuration problem. Report it."),
+            message = error_msg
+          ))
 
         }, finally = {
           # Always restore console output
@@ -412,18 +429,25 @@ run_segment_gui <- function() {
                           type = "message", duration = 5)
 
         } else {
-          # Store error result
-          analysis_result(list(error = analysis_result_data$error))
+          # Refusal or error. Store the classified outcome, not a bare string:
+          # the results panel renders its fields rather than reading $mode and
+          # $k, which a refusal does not have (H1).
+          outcome <- analysis_result_data$outcome
+          analysis_result(list(turas_outcome = outcome,
+                               error = outcome$problem))
 
-          # Append error to console
           console_output(paste0(
             console_output(),
-            sprintf("\n\n%s\nERROR\n%s\n%s\n",
-                   strrep("=", 80), strrep("=", 80), analysis_result_data$error)
+            sprintf("\n\n%s\nSEGMENT %s: %s\n%s\n%s\n",
+                    strrep("=", 80), outcome$status, outcome$code,
+                    strrep("=", 80), outcome$problem)
           ))
 
-          showNotification(paste("Error:", analysis_result_data$error),
-                          type = "error", duration = 10)
+          # duration = NULL so a refusal stays on screen until it is read.
+          showNotification(
+            paste0(outcome$code, ": ", outcome$title),
+            type = "error", duration = NULL
+          )
         }
 
       }, error = function(e) {
@@ -444,8 +468,40 @@ run_segment_gui <- function() {
 
       result <- analysis_result()
 
-      if (!is.null(result$error)) {
-        # Error occurred
+      if (!is.null(result$turas_outcome)) {
+        # A refusal or an error. Its own fields are rendered: a refusal says
+        # what it refused and how to fix it, and reading result$mode here (as
+        # this panel used to) died on a field refusals do not carry (H1).
+        outcome <- result$turas_outcome
+        refused <- identical(outcome$status, "REFUSED")
+
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Step 5: Results"),
+          div(class = "turas-status-error",
+            strong(if (refused) "✗ Analysis refused" else "✗ Analysis error"), br(),
+            hr(style = "margin: 10px 0;"),
+            p(strong("Code: "), outcome$code),
+            p(strong("What happened: "), outcome$title),
+            p(style = "white-space: pre-wrap;", outcome$problem),
+            if (length(outcome$how_to_fix) > 0 && nzchar(outcome$how_to_fix[1])) {
+              tagList(
+                hr(style = "margin: 10px 0;"),
+                p(strong("How to fix:")),
+                tags$ul(lapply(outcome$how_to_fix, function(f) tags$li(f)))
+              )
+            },
+            hr(style = "margin: 10px 0;"),
+            p(strong("Note:"),
+              if (refused) {
+                " Nothing was written. Fix the configuration or the data and run again."
+              } else {
+                " Check the console output above. Output files may still have been generated."
+              })
+          )
+        )
+      } else if (!is.null(result$error)) {
+        # Older shape, kept so a stored result from before this change still
+        # renders rather than falling into the success branch.
         div(class = "turas-card",
           h3(class = "turas-card-title", "Step 5: Results"),
           div(class = "turas-status-error",
@@ -466,7 +522,7 @@ run_segment_gui <- function() {
             strong("✓ Analysis Complete!"), br(),
             hr(style = "margin: 10px 0;"),
 
-            if (result$mode == "exploration") {
+            if (identical(result$mode, "exploration")) {
               tagList(
                 strong("Recommended K: "), result$recommendation$recommended_k, br(),
                 strong("Silhouette Score: "),
@@ -529,8 +585,20 @@ run_segment_gui <- function() {
 
       result <- analysis_result()
 
+      # A refused run wrote nothing and has no $mode, so there is no folder to
+      # open. The button is not rendered in that case, but the handler is still
+      # registered, and an unguarded comparison here would die the same way the
+      # results panel used to (H1).
+      if (!is.null(result$turas_outcome) || is.null(result$output_files)) {
+        showNotification(
+          "No output folder: the run did not produce any files.",
+          type = "warning", duration = 6
+        )
+        return(invisible(NULL))
+      }
+
       # Get output folder from result
-      if (result$mode == "exploration") {
+      if (identical(result$mode, "exploration")) {
         output_path <- dirname(result$output_files$report)
       } else {
         output_path <- dirname(result$output_files$assignments)
