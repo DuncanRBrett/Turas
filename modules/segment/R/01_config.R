@@ -436,7 +436,6 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   rules_max_depth <- get_numeric_config(config, "rules_max_depth", default_value = 3, min = 1, max = 5)
   generate_action_cards <- get_logical_config(config, "generate_action_cards", default_value = FALSE)
   scale_max <- get_numeric_config(config, "scale_max", default_value = 10, min = 1, max = 100)
-  use_lca <- get_logical_config(config, "use_lca", default_value = FALSE)
 
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
@@ -468,15 +467,94 @@ parse_segment_feature_params <- function(config, clustering_vars) {
     demographic_vars = demographic_vars, run_stability_check = run_stability_check,
     stability_n_runs = stability_n_runs, generate_rules = generate_rules,
     rules_max_depth = rules_max_depth, generate_action_cards = generate_action_cards,
-    scale_max = scale_max, use_lca = use_lca,
+    scale_max = scale_max,
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file
   )
 }
 
+#' Refuse Settings for Removed Features
+#'
+#' LCA and ensemble clustering were removed by the V2 lift (review
+#' 2026-07-11, C2 and M1). Both were config-exposed and documented but
+#' unreachable from any production path: a user who followed the README and
+#' set `use_lca = TRUE` got ordinary k-means, with no warning, no refusal and
+#' no note. Deleting the implementations without this check would leave
+#' exactly that bug in place, so a config still asking for either is refused
+#' here, before anything else in validation runs.
+#'
+#' `use_lca = FALSE` is NOT refused. An old template carrying the default
+#' must stay runnable.
+#'
+#' @param config Raw configuration list
+#' @return invisible(TRUE), or a refusal
+#' @keywords internal
+refuse_removed_settings <- function(config) {
+
+  lca_tuning <- grep("^lca_", tolower(names(config) %||% character(0)), value = TRUE)
+  wants_lca <- isTRUE(get_logical_config(config, "use_lca", default_value = FALSE)) ||
+    length(lca_tuning) > 0
+
+  if (wants_lca) {
+    cat("\n[SEGMENT] Config asks for latent class analysis, which has been removed.\n")
+    segment_refuse(
+      code = "CFG_LCA_REMOVED",
+      title = "Latent Class Analysis Has Been Removed",
+      problem = paste0(
+        "This config asks for latent class analysis (",
+        paste(c(if (isTRUE(get_logical_config(config, "use_lca", default_value = FALSE))) "use_lca",
+                lca_tuning), collapse = ", "),
+        "). LCA was removed from the segment module in September 2026."
+      ),
+      why_it_matters = paste(
+        "The setting never did anything. It was accepted by the config parser and",
+        "read by nothing else, so every run that asked for LCA silently produced",
+        "ordinary k-means under a report that named k-means. Refusing is how you",
+        "find that out instead of inheriting someone else's silent substitution."
+      ),
+      how_to_fix = c(
+        "Delete the use_lca and lca_* rows from the Config sheet.",
+        "Choose one of the methods that is really implemented: kmeans, hclust, gmm.",
+        "If you need LCA as a real feature, it has to be commissioned and validated against poLCA."
+      ),
+      expected = "no use_lca or lca_* setting",
+      observed = paste(c(if (isTRUE(get_logical_config(config, "use_lca", default_value = FALSE))) "use_lca", lca_tuning), collapse = ", ")
+    )
+  }
+
+  method_raw <- tolower(as.character(get_config_value(config, "method", default_value = "") %||% ""))
+  methods <- trimws(unlist(strsplit(method_raw, ",")))
+  if ("ensemble" %in% methods) {
+    cat("\n[SEGMENT] Config asks for the ensemble method, which has been removed.\n")
+    segment_refuse(
+      code = "CFG_ENSEMBLE_REMOVED",
+      title = "Ensemble Clustering Has Been Removed",
+      problem = "This config sets method = ensemble. Ensemble clustering was removed from the segment module in September 2026.",
+      why_it_matters = paste(
+        "Three layers disagreed about whether it existed: the parser refused it,",
+        "the hard guard allowed it and advertised it, and the dispatcher had no arm",
+        "for it. The implementation had no production caller at all."
+      ),
+      how_to_fix = c(
+        "Set method to one or more of: kmeans, hclust, gmm.",
+        "To compare methods, list several: method = kmeans,hclust,gmm."
+      ),
+      expected = c("kmeans", "hclust", "gmm"),
+      observed = method_raw
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 validate_segment_config <- function(config) {
   cat("Validating configuration...\n")
+
+  # Step 0: refuse settings for features that no longer exist, before any
+  # other complaint. A removed knob must be named, never quietly ignored.
+  refuse_removed_settings(config)
 
   # Step 1: Required params + clustering method
   req <- validate_segment_required_and_method(config)

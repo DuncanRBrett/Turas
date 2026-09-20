@@ -33,7 +33,10 @@ test_that("check_segment_dependencies features list has expected keys", {
   result <- check_segment_dependencies(verbose = FALSE)
 
   expect_true("kmeans" %in% names(result$features))
-  expect_true("lca" %in% names(result$features))
+  # No "lca" key: LCA was removed (V2 lift C2). The dependency report used to
+  # print "Latent Class Analysis: Available" whenever poLCA happened to be
+  # installed, for a feature no production path could reach.
+  expect_false("lca" %in% names(result$features))
   expect_true("outlier_mahalanobis" %in% names(result$features))
   expect_true("decision_rules" %in% names(result$features))
   expect_true("radar_charts" %in% names(result$features))
@@ -66,7 +69,7 @@ test_that("get_full_install_cmd returns install command string", {
   cmd <- capture.output(result <- get_full_install_cmd())
   expect_type(result, "character")
   expect_true(grepl("install.packages", result))
-  expect_true(grepl("poLCA", result))
+  expect_false(grepl("poLCA", result))
   expect_true(grepl("ggplot2", result))
 })
 

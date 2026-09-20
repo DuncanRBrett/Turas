@@ -334,8 +334,6 @@ appear in the Slides tab in the same order as the rows in the sheet.
     -   Comma-separated values (e.g., `kmeans,hclust,gmm`) or `all` -
         Run multiple methods and produce a combined tabbed HTML report
         with per-method results and a comparison tab
-    -   **LCA** is not a `method` value. To include LCA, set
-        `use_lca = TRUE` separately.
 
 #### k_fixed
 
@@ -409,40 +407,6 @@ appear in the Slides tab in the same order as the rows in the sheet.
         orientation)
     -   `EEE` constrains all components to have the same covariance
     -   Ignored when method is not gmm
-
-#### lca_n_classes
-
--   **Purpose:** Number of latent classes for LCA
--   **Required:** No (only used when method = lca)
--   **Data Type:** Integer or blank
--   **Default:** Uses `k_fixed` (final mode) or `k_min:k_max` range
-    (exploration mode)
--   **Notes:**
-    -   If set, overrides k_fixed/k_min/k_max for LCA specifically
-    -   Ignored when method is not lca
-
-#### lca_max_iter
-
--   **Purpose:** Maximum EM iterations for LCA estimation
--   **Required:** No (only used when method = lca)
--   **Data Type:** Integer
--   **Valid Values:** 100-10000
--   **Default:** `1000`
--   **Notes:**
-    -   Increase if model fails to converge
-    -   Ignored when method is not lca
-
-#### lca_n_rep
-
--   **Purpose:** Number of random starting values for LCA
--   **Required:** No (only used when method = lca)
--   **Data Type:** Integer
--   **Valid Values:** 1-100
--   **Default:** `10`
--   **Notes:**
-    -   Higher values reduce risk of local optima but increase runtime
-    -   Analogous to `nstart` for K-means
-    -   Ignored when method is not lca
 
 ------------------------------------------------------------------------
 
@@ -865,7 +829,7 @@ appear in the Slides tab in the same order as the rows in the sheet.
 |-----------------------------|-------------------------------------------|
 | seg_final_report.xlsx | Summary, Profiles, Statistics, Validation |
 | seg_final_report.html | Interactive HTML with all configured sections |
-| seg_assignments.xlsx | ID + segment_id + segment_name (+ probabilities if GMM or LCA) |
+| seg_assignments.xlsx | ID + segment_id + segment_name (+ probabilities if GMM) |
 | seg_model.rds | Saved model object |
 
 ### Assignments File Detail
@@ -878,7 +842,7 @@ appear in the Slides tab in the same order as the rows in the sheet.
 | segment_id   | Integer | Numeric segment assignment (1, 2, 3, ...) |
 | segment_name | Text    | Segment label                             |
 
-**Additional columns (GMM and LCA):**
+**Additional columns (GMM only):**
 
 | Column          | Type    | Description                           |
 |-----------------|---------|---------------------------------------|
@@ -1020,36 +984,6 @@ generate_action_cards  | TRUE
 project_name           | Gaussian Mixture Model Analysis
 ```
 
-### LCA Configuration
-
-```         
-Setting                | Value
------------------------|--------------------------------
-data_file              | data/satisfaction_survey.csv
-id_variable            | ResponseID
-clustering_vars        | Q02,Q03,Q04,Q05,Q06,Q07,Q08
-k_fixed                | 4
-method                 | lca
-lca_max_iter           | 1000
-lca_n_rep              | 10
-seed                   | 123
-missing_data           | listwise_deletion
-standardize            | FALSE
-segment_names          | auto
-save_model             | TRUE
-output_folder          | output/lca/
-output_prefix          | seg_
-html_report            | TRUE
-brand_colour           | #16A085
-report_title           | LCA Segmentation
-generate_action_cards  | TRUE
-project_name           | Latent Class Analysis
-```
-
-**Notes:** LCA works best with categorical or ordinal variables (e.g.,
-Likert scales). Set `standardize = FALSE` since LCA operates on raw
-categorical values, not z-scores.
-
 ### Variable Selection Configuration
 
 ```         
@@ -1122,7 +1056,6 @@ html_show_guide          | FALSE
 |----------------------|------------------------------|--------------------|
 | hclust | Dataset must be under \~15,000 rows | `guard_require_hclust_size()` |
 | gmm | Package `mclust` must be installed | `guard_require_method_packages()` |
-| lca | Package `poLCA` must be installed; variables should be categorical/ordinal | `guard_require_method_packages()` |
 | kmeans | No specific constraints | \- |
 
 ### Sample Size Validation

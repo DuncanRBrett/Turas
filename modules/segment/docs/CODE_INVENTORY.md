@@ -33,7 +33,6 @@ All files sourced by `R/00_main.R` in sequence. This is the active code path.
 | `09_output.R` | 823 | Excel export: assignments, exploration reports, final reports (openxlsx formatted) |
 | `09a_excel_styles.R` | 313 | Shared Excel style definitions: branded headers, conditional formatting, helpers |
 | `10_utilities.R` | 1,827 | Utilities: config templates, package management, seed handling, quick-run helpers |
-| `11_lca.R` | 801 | Latent Class Analysis via poLCA: categorical data clustering |
 | `12_executive_summary.R` | 878 | Executive summary generator: headline, findings, quality, descriptions, recommendations |
 | `13_vulnerability.R` | 650 | Vulnerability/switching analysis: confidence scores, switching matrix |
 
@@ -131,7 +130,6 @@ Legacy/support library files. Most functionality has been consolidated into R/ f
 | Package | Feature | Purpose |
 |---------|---------|---------|
 | `mclust` | GMM clustering | Gaussian Mixture Models via EM |
-| `poLCA` | LCA | Latent Class Analysis |
 | `rpart` | Classification rules | Decision tree segment rules |
 | `randomForest` | Golden questions | Variable importance for prediction |
 | `fastcluster` | Large hclust | Faster hierarchical clustering |

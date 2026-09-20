@@ -285,7 +285,6 @@ modules/segment/
 | 09_output.R | Excel output | `write_segment_results()` |
 | 09a_excel_styles.R | Excel formatting styles | `seg_write_xlsx()`, branded style definitions |
 | 10_utilities.R | Utilities & Quick Run | `run_segment_quick()`, `generate_config_template()` |
-| 11_lca.R | Latent Class Analysis | `run_lca_analysis()` |
 | 12_executive_summary.R | Narrative insights | `generate_segment_executive_summary()` |
 
 ---

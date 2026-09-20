@@ -234,7 +234,6 @@ Phase 1: EXPLORATION                 Phase 2: FINAL
 | **K-Means** | Continuous | 100+ | Low | Default choice for scales |
 | **Hierarchical** | Continuous | 100-15,000 | Medium | Need dendrogram, nested structures |
 | **GMM** | Continuous | 200+ | Medium | Need soft assignments, elliptical clusters |
-| **LCA** | Categorical | 200+ | Medium | Binary/ordinal data |
 
 ### Linkage Methods (Hierarchical Clustering)
 
@@ -315,7 +314,6 @@ install.packages("MASS")
 install.packages(c("ggplot2", "fmsb"))
 
 # Latent Class Analysis
-install.packages("poLCA")
 
 # Classification rules
 install.packages("rpart")

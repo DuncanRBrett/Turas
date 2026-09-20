@@ -124,9 +124,8 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
 #   - readxl     (CRAN)      - read Excel config files
 #   - writexl    (CRAN)      - write Excel output files
 #
-# FULL INSTALL (all features including LCA):
+# FULL INSTALL (all features):
 #   - All minimum packages, plus:
-#   - poLCA      (CRAN)      - Latent Class Analysis
 #   - MASS       (built-in)  - Mahalanobis distance for outliers
 #   - rpart      (built-in)  - Decision tree segment rules
 #   - psych      (CRAN)      - Factor analysis, reliability
@@ -162,7 +161,6 @@ check_segment_dependencies <- function(verbose = TRUE, install_missing = FALSE) 
   )
 
   optional_packages <- list(
-    poLCA       = "Latent Class Analysis (alternative to k-means)",
     MASS        = "Mahalanobis distance for outlier detection",
     rpart       = "Decision tree classification rules",
     psych       = "Factor analysis and reliability metrics",
@@ -235,8 +233,6 @@ check_segment_dependencies <- function(verbose = TRUE, install_missing = FALSE) 
     # Feature availability based on packages
     cat("FEATURE AVAILABILITY:\n")
     cat(sprintf("  K-means clustering:      %s\n", if (ready) "Available" else "Unavailable"))
-    cat(sprintf("  Latent Class Analysis:   %s\n",
-                if ("poLCA" %in% available_optional) "Available" else "Unavailable (install poLCA)"))
     cat(sprintf("  Mahalanobis outliers:    %s\n",
                 if (check_pkg("MASS")) "Available" else "Unavailable"))
     cat(sprintf("  Decision tree rules:     %s\n",
@@ -265,7 +261,6 @@ check_segment_dependencies <- function(verbose = TRUE, install_missing = FALSE) 
     missing_optional = missing_optional,
     features = list(
       kmeans = ready,
-      lca = "poLCA" %in% available_optional,
       outlier_mahalanobis = check_pkg("MASS"),
       decision_rules = check_pkg("rpart"),
       radar_charts = "fmsb" %in% available_optional,
@@ -293,12 +288,12 @@ get_minimum_install_cmd <- function() {
 #' Get Full Install Command
 #'
 #' Returns the R command to install all packages for full segmentation
-#' functionality including LCA and advanced features.
+#' functionality including all advanced features.
 #'
 #' @return Character string with install.packages() command
 #' @export
 get_full_install_cmd <- function() {
-  cmd <- 'install.packages(c("cluster", "readxl", "openxlsx", "poLCA", "psych", "fmsb", "ggplot2", "randomForest", "haven"))'
+  cmd <- 'install.packages(c("cluster", "readxl", "openxlsx", "psych", "fmsb", "ggplot2", "randomForest", "haven"))'
   cat("Full install (all features):\n")
   cat(paste0("  ", cmd, "\n"))
   invisible(cmd)
@@ -1734,7 +1729,6 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_field("run_stability_check", "FALSE",  "Optional", "Run bootstrap stability check? Computationally expensive.", "TRUE, FALSE"),
     add_field("stability_n_runs", "5",         "Optional", "Number of bootstrap runs for stability analysis", "3-20"),
     add_field("golden_questions_n", "3",       "Optional", "Number of golden questions to identify for typing tool", "1-100"),
-    add_field("use_lca",          "FALSE",     "Optional", "Enable latent class analysis (experimental). Requires poLCA package.", "TRUE, FALSE"),
     # --- METADATA ---
     add_section("METADATA"),
     add_field("project_name",     sv("My Segmentation Project"), "Optional", "Project name for report headers and stats pack", "Text"),
@@ -1831,7 +1825,6 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     bool_settings <- c("standardize", "outlier_detection", "variable_selection",
                        "create_dated_folder", "save_model", "html_report",
                        "generate_rules", "generate_action_cards", "run_stability_check",
-                       "use_lca",
                        "html_show_exec_summary", "html_show_overview", "html_show_validation",
                        "html_show_importance", "html_show_profiles", "html_show_demographics",
                        "html_show_rules", "html_show_cards", "html_show_stability",
