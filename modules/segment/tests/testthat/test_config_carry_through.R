@@ -64,3 +64,24 @@ test_that("a clean config warns about nothing (H3)", {
   joined <- paste(out, collapse = " ")
   expect_false(grepl("did not survive|not carried|ignored setting", joined, ignore.case = TRUE))
 })
+
+test_that("an unticked GUI checkbox can switch the stats pack off (H3a)", {
+  # The GUI sets options(turas.generate_stats_pack = ...) on every run. Read
+  # with a FALSE default and OR'd against the config, an unticked box could
+  # only ever be ignored: the config's "Y" default won, and the pack
+  # generated anyway. Whoever set the option last is the person who just
+  # clicked something, so when it is set it decides.
+  old <- getOption("turas.generate_stats_pack", NULL)
+  on.exit(options(turas.generate_stats_pack = old), add = TRUE)
+
+  options(turas.generate_stats_pack = FALSE)
+  expect_false(segment_should_write_stats_pack(list(generate_stats_pack = "Y")))
+
+  options(turas.generate_stats_pack = TRUE)
+  expect_true(segment_should_write_stats_pack(list(generate_stats_pack = "N")))
+
+  options(turas.generate_stats_pack = NULL)
+  expect_false(segment_should_write_stats_pack(list(generate_stats_pack = "N")))
+  expect_true(segment_should_write_stats_pack(list(generate_stats_pack = "Y")))
+  expect_true(segment_should_write_stats_pack(list()))
+})

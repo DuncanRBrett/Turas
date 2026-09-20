@@ -495,6 +495,27 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   )
 }
 
+#' Should This Run Write a Stats Pack?
+#'
+#' One answer for two controls. The config's Y/N is the study's setting; the
+#' GUI checkbox writes `turas.generate_stats_pack` and is a decision someone
+#' just made with a mouse, so when the option is set it wins.
+#'
+#' Before September 2026 the option was read with a FALSE default and OR'd
+#' against the config, which made it force-on only: an unticked box could
+#' never switch the pack off, and neither could the config, because
+#' validation dropped the setting before anything read it (H3).
+#'
+#' @param config The validated configuration
+#' @return TRUE if the stats pack should be written
+#' @keywords internal
+segment_should_write_stats_pack <- function(config) {
+  gui_choice <- getOption("turas.generate_stats_pack", NULL)
+  if (!is.null(gui_choice)) return(isTRUE(gui_choice))
+  isTRUE(toupper(as.character(config$generate_stats_pack %||% "Y")) == "Y")
+}
+
+
 #' Refuse Settings for Removed Features
 #'
 #' LCA and ensemble clustering were removed by the V2 lift (review

@@ -579,9 +579,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   # ==========================================================================
   # STATS PACK (Optional)
   # ==========================================================================
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$generate_stats_pack %||% "Y") == "Y"
-  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+  generate_stats_pack_flag <- segment_should_write_stats_pack(config)
 
   if (generate_stats_pack_flag) {
     cat("  Generating stats pack...\n")
