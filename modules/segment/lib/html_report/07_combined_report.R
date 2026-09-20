@@ -240,10 +240,15 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
 
   cat("  Step 4: Building comparison content...\n")
 
+  # <<- not <-. These three handlers are closures, so `warnings <- ` assigned
+  # to a local that died with the closure: the failure never reached the
+  # warnings list, never reached the console, and never turned the run
+  # PARTIAL. The comparison table was throwing on every combined run (see the
+  # NA best-index note in 07a) and nothing said so anywhere (M5).
   comparison_table <- tryCatch(
     build_seg_method_comparison_table(method_html_data),
     error = function(e) {
-      warnings <- c(warnings, sprintf("Comparison table: %s", e$message))
+      warnings <<- c(warnings, sprintf("Comparison table: %s", e$message))
       NULL
     }
   )
@@ -251,7 +256,7 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
   comparison_chart <- tryCatch(
     build_seg_method_comparison_chart(method_html_data, brand_colour),
     error = function(e) {
-      warnings <- c(warnings, sprintf("Comparison chart: %s", e$message))
+      warnings <<- c(warnings, sprintf("Comparison chart: %s", e$message))
       NULL
     }
   )
@@ -259,7 +264,7 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
   agreement_matrix <- tryCatch(
     build_seg_agreement_matrix(method_results, active_methods),
     error = function(e) {
-      warnings <- c(warnings, sprintf("Agreement matrix: %s", e$message))
+      warnings <<- c(warnings, sprintf("Agreement matrix: %s", e$message))
       NULL
     }
   )
@@ -267,7 +272,9 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
   comparison_content <- list(
     table = comparison_table,
     chart = comparison_chart,
-    agreement = agreement_matrix
+    agreement = agreement_matrix,
+    # Named in the report itself, not only on a console that closes (M5).
+    skipped = build_seg_combined_skipped_note(warnings)
   )
 
   # ==========================================================================

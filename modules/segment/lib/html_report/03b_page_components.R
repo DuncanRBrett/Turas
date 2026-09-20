@@ -62,6 +62,24 @@ build_seg_section_nav <- function(brand_colour = "#323367", sections_config = li
 # HEADER
 # ==============================================================================
 
+#' Say That a Report Section or Column Was Left Out
+#'
+#' Exploration and combined modes were never swept after the 2026-06 bug
+#' audit, and both are full of `return(NULL)` guards that drop a section with
+#' no trace: the report simply comes out shorter and nobody knows a section
+#' was considered (V2 lift review 2026-07-11, M5). Turas runs behind Shiny and
+#' its users read the console, so that is where this goes.
+#'
+#' @param what Name of the section or column
+#' @param why Plain reason it could not be built
+#' @return invisible(NULL), so a guard can `return(.seg_report_skipped(...))`
+#' @keywords internal
+.seg_report_skipped <- function(what, why) {
+  cat(sprintf("  [SEGMENT] Report section skipped: %s (%s)\n", what, why))
+  invisible(NULL)
+}
+
+
 #' Who the report says it was prepared by
 #'
 #' The header and the footer each carried their own hardcoded company name and
