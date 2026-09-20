@@ -466,3 +466,140 @@ test_that("compare_segment_distributions handles original distribution", {
 
   unlink(model_path)
 })
+
+
+# ==============================================================================
+# H2 + M7 - scoring honesty (V2 lift review 2026-07-11)
+# ==============================================================================
+# Every entry point assigned by nearest Euclidean centroid regardless of what
+# fitted the model. That rule is correct for k-means and wrong for the others:
+# a GMM assigns by posterior probability under fitted covariances, so
+# nearest-centroid can disagree with the model's own training assignments, and
+# an hclust model has no centroid rule at all. The output looked normal.
+#
+# M7: the same concept was computed two ways. score_new_data reported
+# 1/(1+d) and the typing entry points reported a softmax, so one respondent
+# got two different confidences depending on which door they came through.
+
+.mock_model_of_method <- function(method) {
+  path <- .create_mock_model_file()
+  model <- readRDS(path)
+  model$method <- method
+  out <- file.path(tempdir(), paste0("test_model_method_", method, ".rds"))
+  saveRDS(model, out)
+  out
+}
+
+.mock_scoring_data <- function(n = 20) {
+  set.seed(11)
+  data.frame(
+    id = seq_len(n),
+    q1 = rnorm(n), q2 = rnorm(n), q3 = rnorm(n),
+    stringsAsFactors = FALSE
+  )
+}
+
+for (.bad_method in c("gmm", "hclust")) {
+  local({
+    bad <- .bad_method
+
+    test_that(paste0("score_new_data refuses a ", bad, " model (H2)"), {
+      path <- .mock_model_of_method(bad)
+      on.exit(unlink(path), add = TRUE)
+
+      err <- tryCatch(
+        capture.output(score_new_data(model_file = path,
+                                      new_data = .mock_scoring_data(),
+                                      id_variable = "id")),
+        turas_refusal = function(e) e
+      )
+      expect_s3_class(err, "turas_refusal")
+      expect_true(grepl(bad, conditionMessage(err), ignore.case = TRUE))
+    })
+
+    test_that(paste0("type_respondent refuses a ", bad, " model (H2)"), {
+      path <- .mock_model_of_method(bad)
+      on.exit(unlink(path), add = TRUE)
+
+      err <- tryCatch(
+        capture.output(type_respondent(answers = c(q1 = 0.2, q2 = -0.4, q3 = 1.1),
+                                       model_file = path)),
+        turas_refusal = function(e) e
+      )
+      expect_s3_class(err, "turas_refusal")
+      expect_true(grepl(bad, conditionMessage(err), ignore.case = TRUE))
+    })
+
+    test_that(paste0("type_respondents_batch refuses a ", bad, " model (H2)"), {
+      path <- .mock_model_of_method(bad)
+      on.exit(unlink(path), add = TRUE)
+
+      err <- tryCatch(
+        capture.output(type_respondents_batch(data = .mock_scoring_data(),
+                                              model_file = path, id_var = "id")),
+        turas_refusal = function(e) e
+      )
+      expect_s3_class(err, "turas_refusal")
+      expect_true(grepl(bad, conditionMessage(err), ignore.case = TRUE))
+    })
+  })
+}
+
+test_that("the refusal says why nearest-centroid is not a substitute (H2)", {
+  path <- .mock_model_of_method("gmm")
+  on.exit(unlink(path), add = TRUE)
+
+  err <- tryCatch(
+    capture.output(type_respondent(answers = c(q1 = 0.2, q2 = -0.4, q3 = 1.1),
+                                   model_file = path)),
+    turas_refusal = function(e) e
+  )
+  msg <- conditionMessage(err)
+  expect_true(grepl("centroid|nearest", msg, ignore.case = TRUE))
+  expect_true(grepl("k-means|kmeans", msg, ignore.case = TRUE))
+})
+
+test_that("a k-means model still scores through every entry point (H2 regression)", {
+  path <- .mock_model_of_method("kmeans")
+  on.exit(unlink(path), add = TRUE)
+  newdata <- .mock_scoring_data()
+
+  capture.output(scored <- score_new_data(model_file = path, new_data = newdata,
+                                          id_variable = "id"))
+  capture.output(one <- type_respondent(answers = c(q1 = 0.2, q2 = -0.4, q3 = 1.1),
+                                        model_file = path))
+  capture.output(batch <- type_respondents_batch(data = newdata, model_file = path,
+                                                 id_var = "id"))
+
+  expect_equal(nrow(scored$assignments %||% scored), nrow(newdata))
+  expect_true(is.numeric(one$confidence))
+  expect_equal(nrow(batch), nrow(newdata))
+})
+
+test_that("one respondent gets one confidence, whichever door they use (M7)", {
+  path <- .mock_model_of_method("kmeans")
+  on.exit(unlink(path), add = TRUE)
+  answers <- c(q1 = 0.2, q2 = -0.4, q3 = 1.1)
+  one_row <- data.frame(id = 1L, q1 = 0.2, q2 = -0.4, q3 = 1.1)
+
+  capture.output(scored <- score_new_data(model_file = path, new_data = one_row,
+                                          id_variable = "id"))
+  capture.output(typed <- type_respondent(answers = answers, model_file = path))
+  capture.output(batched <- type_respondents_batch(data = one_row, model_file = path,
+                                                   id_var = "id"))
+
+  frame <- scored$assignments %||% scored
+  # ignore_attr: type_respondent returns a NAMED scalar for both fields (the
+  # name is the segment label, carried through from the distance vector),
+  # while the frame-shaped entry points return bare values. That is a
+  # cosmetic difference in the return shape, not a difference in the number,
+  # and it is deliberately left alone here.
+  # unname(): one of these entry points carries the segment label through as a
+  # vector name and the others do not. That is a cosmetic difference in the
+  # return shape, not a difference in the number, and it is left alone here.
+  expect_equal(unname(frame$segment[1]), unname(typed$segment))
+  expect_equal(unname(round(frame$assignment_confidence[1], 3)),
+               unname(round(typed$confidence, 3)))
+  expect_equal(unname(round(batched$confidence[1], 3)),
+               unname(round(typed$confidence, 3)))
+})

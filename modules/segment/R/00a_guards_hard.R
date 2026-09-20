@@ -197,7 +197,9 @@ guard_require_sample_size <- function(n_cases, k, n_vars) {
 #' @param method Method string from config
 #' @keywords internal
 guard_require_valid_method <- function(method) {
-  allowed <- c("kmeans", "hclust", "gmm", "ensemble")
+  # "ensemble" was removed in September 2026 (V2 lift review, M1). It was
+  # listed here, refused by the config parser, and had no dispatcher arm.
+  allowed <- c("kmeans", "hclust", "gmm")
 
   if (is.null(method) || !(tolower(method) %in% allowed)) {
     segment_refuse(

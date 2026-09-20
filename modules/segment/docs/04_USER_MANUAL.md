@@ -585,8 +585,8 @@ The module supports four clustering algorithms. In most cases, K-means is the ri
 
 ### Comparison Table
 
-| Factor | K-means | Hierarchical | GMM | LCA |
-|--------|---------|-------------|-----|-----|
+| Factor | K-means | Hierarchical | GMM |
+|--------|---------|-------------|-----|
 | **Best for** | Most surveys | Exploring nested structure | Overlapping segments | Categorical data |
 | **Data type** | Continuous (scales, ratings) | Continuous | Continuous | Categorical / ordinal |
 | **Speed** | Fast | Moderate | Slower | Moderate |
@@ -653,22 +653,6 @@ gmm_model_type  |
 
 Leave `gmm_model_type` blank to let the algorithm automatically select the best covariance structure via BIC. If you know what you want, valid values include `VVV` (most flexible), `EEE` (all clusters same shape), and others from the mclust documentation.
 
-### Latent Class Analysis (LCA)
-
-**When to use:** Your clustering variables are purely categorical (yes/no, multiple choice, coded open-ends). Standard K-means on categorical data produces poor results because Euclidean distance is not meaningful for category labels.
-
-**How it works:** LCA assumes respondents belong to one of k unobserved ("latent") classes, each characterised by a distinct pattern of response probabilities. It estimates these probabilities using maximum likelihood and assigns each respondent to their most probable class.
-
-**Requires:** The `poLCA` R package.
-
-**Config example:**
-
-```
-use_lca  | TRUE
-```
-
-**Note:** LCA is not set via the `method` parameter. It is enabled separately because it requires a fundamentally different data format (categorical rather than continuous).
-
 ### Multi-Method Comparison
 
 Not sure which method is best? Run them all side-by-side:
@@ -695,12 +679,10 @@ Q: Is your data numeric (ratings, scales)?
    YES --> Q: Is your sample under 15,000?
             YES --> K-means (default) or Hierarchical
             NO  --> K-means (auto mini-batch)
-   NO  --> Q: Is your data categorical?
-            YES --> LCA
-            NO  --> Convert to numeric or categorical first
+   NO  --> Recode or score the variables first. Every method here needs numbers.
 
 Q: Do you need soft (probabilistic) assignments?
-   YES --> GMM or LCA
+   YES --> GMM
    NO  --> K-means or Hierarchical
 
 Q: Do you need a deterministic result (no randomness)?
@@ -748,7 +730,6 @@ All parameters available in the Config sheet, organised by category. Parameters 
 | `nstart` | integer | `50` | 1-200 | Random starts for K-means. Higher = more stable |
 | `linkage_method` | text | `ward.D2` | `ward.D`, `ward.D2`, `single`, `complete`, `average`, `mcquitty`, `median`, `centroid` | Linkage for hierarchical clustering |
 | `gmm_model_type` | text | *(auto)* | mclust model names (e.g., `VVV`, `EEE`) | GMM covariance structure. Blank = auto-select by BIC |
-| `use_lca` | logical | `FALSE` | `TRUE`, `FALSE` | Enable Latent Class Analysis (requires `poLCA`) |
 
 ### Data Handling
 
@@ -1137,7 +1118,6 @@ These packages enable additional features and are loaded on demand:
 | Package | Purpose | Required When |
 |---------|---------|---------------|
 | `mclust` | Gaussian Mixture Models (GMM) | `method = gmm` |
-| `poLCA` | Latent Class Analysis (LCA) | `use_lca = TRUE` |
 | `rpart` | Decision tree classification rules | `generate_rules = TRUE` |
 | `randomForest` | Golden questions (variable importance via Random Forest) | Golden questions feature (always attempted in final mode) |
 | `fastcluster` | Faster hierarchical clustering for large datasets | `method = hclust` with large n (auto-detected) |

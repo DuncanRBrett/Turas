@@ -76,7 +76,7 @@ Where:
 |------------|-------------|------------|
 | Spherical clusters | Clusters are roughly circular | Check silhouette plot; consider GMM for elliptical |
 | Equal variance | Clusters have similar spread | Standardize variables |
-| Continuous data | Variables are numeric | Use LCA for categorical |
+| Continuous data | Variables are numeric | Recode or score categorical variables first |
 | No outliers | Extreme values distort centroids | Enable outlier detection |
 
 ---
@@ -712,53 +712,6 @@ Where:
 **Interpretation:**
 - P-value < 0.05 -> Significant distribution change
 - Consider re-segmenting if substantial drift
-
----
-
-## Latent Class Analysis
-
-### When to Use LCA
-
-| Scenario | Method |
-|----------|--------|
-| Continuous ratings (1-10) | K-Means, Hierarchical, or GMM |
-| Binary variables (Yes/No) | LCA |
-| Ordinal scales (1-5) | Either (LCA often better for ordinal) |
-| Mixed types | Consider separate analyses |
-
-### LCA Model
-
-**Probability Model:**
-```
-P(x) = Sigma_k pi_k * Product_j P(x_j | class = k)
-```
-
-Where:
-- pi_k = probability of belonging to class k
-- P(x_j | class = k) = conditional probability of response pattern
-
-### Model Selection
-
-**Bayesian Information Criterion (BIC):**
-```
-BIC = -2 * log(L) + p * log(n)
-```
-
-Where:
-- L = likelihood
-- p = number of parameters
-- n = sample size
-
-**Lower BIC = Better model fit**
-
-**Entropy:**
-```
-E = 1 - [Sigma_i Sigma_k p_ik * log(p_ik)] / [n * log(k)]
-```
-
-**Interpretation:**
-- E > 0.8 = Good classification certainty
-- E < 0.6 = Poor classification, high uncertainty
 
 ---
 

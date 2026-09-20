@@ -104,3 +104,92 @@ test_that("profile_demographics handles categorical variables", {
   expect_true(length(result$categorical_profiles) >= 1)
   expect_true(!is.null(result$chi_sq_tests))
 })
+
+
+# ==============================================================================
+# M3 - a nominal variable was tested as if it were ordered
+# ==============================================================================
+# test_segment_differences() sent anything with fewer than 10 distinct values
+# to kruskal.test. Its own comment promised "Chi-square or Kruskal-Wallis",
+# but chi-square was never called. Kruskal-Wallis ranks its input, so region
+# coded 1 to 9 was tested as though 9 were more than 1, and a genuinely
+# nominal variable got a p-value that assumed an order nobody claimed.
+
+.m3_frame <- function(n = 180, seed = 8) {
+  set.seed(seed)
+  clusters <- rep(1:3, length.out = n)
+  data.frame(
+    region_chr = ifelse(clusters == 1, "North",
+                 ifelse(clusters == 2, "South", "East")),
+    region_fct = factor(ifelse(clusters == 1, "North",
+                        ifelse(clusters == 2, "South", "East"))),
+    grade_ord  = factor(pmin(5, pmax(1, round(clusters + rnorm(n, 0, 0.4)))),
+                        ordered = TRUE),
+    score_few  = pmin(5, pmax(1, round(clusters + rnorm(n, 0, 0.4)))),
+    score_cont = clusters + rnorm(n),
+    clusters   = clusters,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("a character variable is tested with chi-square, not Kruskal-Wallis (M3)", {
+  d <- .m3_frame()
+  capture.output(res <- test_segment_differences(d, d$clusters, "region_chr"))
+
+  expect_equal(nrow(res), 1)
+  expect_equal(res$Test[1], "Chi-square")
+})
+
+test_that("an unordered factor is tested with chi-square (M3)", {
+  d <- .m3_frame()
+  capture.output(res <- test_segment_differences(d, d$clusters, "region_fct"))
+
+  expect_equal(res$Test[1], "Chi-square")
+})
+
+test_that("a numeric variable with few values keeps Kruskal-Wallis (M3)", {
+  # The fix must not swallow the case Kruskal-Wallis is right for: a 1-5
+  # rating has an order, and ranking it is the point.
+  d <- .m3_frame()
+  capture.output(res <- test_segment_differences(d, d$clusters, "score_few"))
+
+  expect_equal(res$Test[1], "Kruskal-Wallis")
+})
+
+test_that("an ordered factor keeps Kruskal-Wallis (M3)", {
+  d <- .m3_frame()
+  capture.output(res <- test_segment_differences(d, d$clusters, "grade_ord"))
+
+  expect_equal(res$Test[1], "Kruskal-Wallis")
+})
+
+test_that("a continuous variable still gets ANOVA (M3 regression)", {
+  d <- .m3_frame()
+  capture.output(res <- test_segment_differences(d, d$clusters, "score_cont"))
+
+  expect_equal(res$Test[1], "ANOVA")
+})
+
+test_that("the chi-square effect size is Cramer's V, bounded and ordered (M3)", {
+  d <- .m3_frame()
+  set.seed(3)
+  d$region_noise <- sample(c("North", "South", "East"), nrow(d), replace = TRUE)
+
+  capture.output(res <- test_segment_differences(d, d$clusters,
+                                                 c("region_chr", "region_noise")))
+
+  v <- setNames(res$Effect_Size, res$Variable)
+  expect_true(all(v >= 0 & v <= 1))
+  # region_chr is the segment, recoded. Noise is not.
+  expect_true(v[["region_chr"]] > v[["region_noise"]])
+})
+
+test_that("a variable with too many categories is reported, not silently dropped (M3)", {
+  d <- .m3_frame()
+  d$open_end <- paste0("answer_", seq_len(nrow(d)))
+
+  out <- capture.output(res <- test_segment_differences(d, d$clusters, "open_end"))
+
+  expect_equal(nrow(res), 0)
+  expect_true(grepl("open_end", paste(out, collapse = " ")))
+})

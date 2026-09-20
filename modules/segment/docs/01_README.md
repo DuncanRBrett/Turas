@@ -13,7 +13,7 @@ Multi-algorithm clustering segmentation for survey data with exploration and fin
 The Turas Segmentation Module provides a standardized, repeatable approach to clustering survey respondents into meaningful segments based on behavioral, attitudinal, or satisfaction data.
 
 **Core Capabilities:**
-- Multi-algorithm clustering: **K-means**, **Hierarchical (hclust)**, **Gaussian Mixture Models (GMM)**, and **Latent Class Analysis (LCA)**
+- Multi-algorithm clustering: **K-means**, **Hierarchical (hclust)** and **Gaussian Mixture Models (GMM)**
 - Excel-based configuration
 - Interactive GUI interface with real-time console output
 - Exploration mode (compare multiple k values across all methods)
@@ -27,7 +27,7 @@ The Turas Segmentation Module provides a standardized, repeatable approach to cl
 - Segment vulnerability/switching analysis with assignment confidence scores
 - Segment profiling, classification rules, and action cards
 - Stability assessment for solution robustness
-- Segment assignment output (Excel with ID, segment_id, segment_name, and GMM/LCA probabilities)
+- Segment assignment output (Excel with ID, segment_id, segment_name, and GMM probabilities)
 - Model scoring for new data
 - Golden question identification for simplified segment typing
 - `merge_segment_to_data()` utility to merge segment assignments back to original data
@@ -168,15 +168,12 @@ modules/segment/
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm` or `all` which expands to `kmeans,hclust,gmm`). LCA is not a `method` value -- use `use_lca = TRUE` separately. |
+| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm` or `all` which expands to `kmeans,hclust,gmm`). |
 | `k_fixed` | (blank) | Fixed k for final run; blank = exploration |
 | `k_min` | 3 | Minimum k to test in exploration |
 | `k_max` | 6 | Maximum k to test |
 | `linkage_method` | ward.D2 | Linkage for hclust: ward.D2, complete, average, etc. |
 | `gmm_model_type` | (auto) | GMM covariance structure: VVV, EEE, etc. (NULL = auto) |
-| `lca_n_classes` | (from k) | Number of latent classes (requires `use_lca = TRUE`; defaults to k_fixed or k_min:k_max range) |
-| `lca_max_iter` | 1000 | Maximum EM iterations for LCA (requires `use_lca = TRUE`) |
-| `lca_n_rep` | 10 | Number of random starts for LCA (requires `use_lca = TRUE`) |
 | `missing_data` | listwise_deletion | How to handle missing data |
 | `standardize` | TRUE | Standardize variables before clustering |
 | `outlier_detection` | FALSE | Enable outlier detection |
@@ -202,7 +199,6 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 | **K-means** | Default choice, continuous scales | Fast, scalable, well-understood | Assumes spherical clusters |
 | **Hierarchical** | Exploring nested structures | Dendrogram, no k needed upfront | O(n^2) memory, max ~15k rows |
 | **GMM** | Overlapping segments, soft assignment | Probability-based, handles elliptical clusters | Requires `mclust` package, heavier |
-| **LCA** | Categorical/ordinal data (e.g., Likert scales) | Probabilistic, fit indices (AIC/BIC), no normality assumption | Requires `poLCA` package, categorical inputs |
 
 ---
 
@@ -238,9 +234,7 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 | Between/Total | 0 to 1 | > 0.6 | Separation quality |
 | Calinski-Harabasz | 0+ | Higher is better | Cluster separation |
 | Cophenetic Corr. | 0 to 1 | > 0.7 | Dendrogram fit (hclust only) |
-| BIC | varies | Lower is better | Model fit (GMM and LCA) |
-| AIC | varies | Lower is better | Model fit (LCA) |
-| Entropy R-sq | 0 to 1 | > 0.80 | Classification certainty (LCA) |
+| BIC | varies | Lower is better | Model fit (GMM) |
 
 ---
 
@@ -262,7 +256,6 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 - `fmsb` - Spider plots
 - `ggplot2` - Enhanced visualizations
 - `rpart` - Classification rules (decision trees)
-- `poLCA` - Latent Class Analysis (required for method = lca; handled gracefully if missing)
 
 ---
 

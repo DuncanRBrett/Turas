@@ -277,3 +277,115 @@ test_that("run_clustering_exploration() works with hclust", {
   expect_equal(result$method, "hclust")
   expect_true(result$n_successful >= 1)
 })
+
+
+# ==============================================================================
+# C1 - the mini-batch path (V2 lift review 2026-07-11)
+# ==============================================================================
+# run_kmeans_dispatch auto-selects mini-batch above 10,000 rows. No test ever
+# crossed that threshold, so a call passing an argument run_minibatch_kmeans
+# does not have shipped: final mode died with a raw R error, and exploration
+# mode swallowed it per k and refused with MODEL_ALL_K_FAILED, naming nothing.
+# These tests cross the threshold.
+
+.make_big_clustering_fixtures <- function(n = 10500, p = 3, k = 3, seed = 42) {
+  set.seed(seed)
+  centers <- matrix(0, nrow = k, ncol = p)
+  for (i in seq_len(k)) centers[i, ] <- rnorm(p, mean = (i - 1) * 4, sd = 0.2)
+
+  sizes <- rep(floor(n / k), k)
+  sizes[k] <- n - sum(sizes[-k])
+  rows <- lapply(seq_len(k), function(i) {
+    matrix(rnorm(sizes[i] * p, mean = rep(centers[i, ], each = sizes[i]), sd = 0.5),
+           ncol = p)
+  })
+  scaled_data <- do.call(rbind, rows)
+  colnames(scaled_data) <- paste0("v", seq_len(p))
+
+  list(
+    data_list = list(
+      scaled_data = scaled_data,
+      complete_data = as.data.frame(scaled_data),
+      n_complete = n,
+      clustering_vars = paste0("v", seq_len(p))
+    ),
+    config = list(method = "kmeans", mode = "final", k_fixed = k,
+                  k_min = 2, k_max = 4, nstart = 10, seed = 42),
+    guard = segment_guard_init()
+  )
+}
+
+test_that("a study over 10,000 rows clusters in final mode (C1)", {
+  fx <- .make_big_clustering_fixtures(n = 10500, p = 3, k = 3)
+
+  result <- run_clustering(fx$data_list, fx$config, fx$guard)
+
+  expect_equal(result$method, "kmeans")
+  expect_equal(result$k, 3)
+  expect_equal(length(result$clusters), 10500)
+  expect_true(all(result$clusters %in% 1:3))
+  expect_equal(result$method_info$algorithm, "mini-batch")
+})
+
+test_that("exploration over 10,000 rows returns solutions, not MODEL_ALL_K_FAILED (C1)", {
+  fx <- .make_big_clustering_fixtures(n = 10200, p = 3, k = 3)
+  fx$config$mode <- "exploration"
+
+  result <- run_clustering_exploration(fx$data_list, fx$config, fx$guard)
+
+  expect_equal(result$mode, "exploration")
+  expect_equal(result$n_successful, length(seq(fx$config$k_min, fx$config$k_max)))
+  expect_true(all(vapply(result$results, function(r) r$method_info$algorithm,
+                         character(1)) == "mini-batch"))
+})
+
+test_that("the mini-batch dispatch passes config's seed and no nstart (C1, M8)", {
+  # Two defects in one call. nstart is an argument run_minibatch_kmeans does not
+  # take. seed was never passed, so a fixed dispatcher would silently cluster on
+  # the hard-coded default instead of the seed the study was run with.
+  fx <- .make_big_clustering_fixtures(n = 10100, p = 3, k = 3)
+  fx$config$seed <- 4321
+
+  captured <- NULL
+  original <- run_minibatch_kmeans
+  on.exit(assign("run_minibatch_kmeans", original, envir = globalenv()), add = TRUE)
+  assign("run_minibatch_kmeans", function(...) {
+    captured <<- list(...)
+    n <- nrow(list(...)$data)
+    list(cluster = rep_len(1:3, n), centers = matrix(0, nrow = 3, ncol = 3),
+         ifault = 0, totss = 1, withinss = c(1, 1, 1), tot.withinss = 3,
+         betweenss = 1, iter = 5, size = as.integer(table(rep_len(1:3, n))))
+  }, envir = globalenv())
+
+  run_kmeans_dispatch(fx$data_list, fx$config, fx$guard)
+
+  expect_false("nstart" %in% names(captured))
+  expect_equal(captured$seed, 4321)
+})
+
+test_that("the same seed reproduces the same mini-batch assignments (M8)", {
+  fx <- .make_big_clustering_fixtures(n = 10100, p = 3, k = 3)
+  fx$config$seed <- 777
+
+  first <- run_clustering(fx$data_list, fx$config, fx$guard)
+  second <- run_clustering(fx$data_list, fx$config, fx$guard)
+
+  expect_identical(first$clusters, second$clusters)
+})
+
+test_that("mini-batch does not report an nstart it never used (C1 tail)", {
+  # It runs one start. Reporting the config's nstart described a multi-start
+  # search that did not happen.
+  fx <- .make_big_clustering_fixtures(n = 10100, p = 3, k = 3)
+  fx$config$nstart <- 50
+
+  big <- run_clustering(fx$data_list, fx$config, fx$guard)
+  small <- run_clustering(
+    .make_big_clustering_fixtures(n = 300, p = 3, k = 3)$data_list,
+    fx$config, fx$guard
+  )
+
+  expect_true(is.na(big$method_info$nstart))
+  expect_equal(big$method_info$seed, fx$config$seed)
+  expect_equal(small$method_info$nstart, 50)
+})

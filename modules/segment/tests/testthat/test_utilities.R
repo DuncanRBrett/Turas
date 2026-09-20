@@ -33,7 +33,10 @@ test_that("check_segment_dependencies features list has expected keys", {
   result <- check_segment_dependencies(verbose = FALSE)
 
   expect_true("kmeans" %in% names(result$features))
-  expect_true("lca" %in% names(result$features))
+  # No "lca" key: LCA was removed (V2 lift C2). The dependency report used to
+  # print "Latent Class Analysis: Available" whenever poLCA happened to be
+  # installed, for a feature no production path could reach.
+  expect_false("lca" %in% names(result$features))
   expect_true("outlier_mahalanobis" %in% names(result$features))
   expect_true("decision_rules" %in% names(result$features))
   expect_true("radar_charts" %in% names(result$features))
@@ -66,7 +69,7 @@ test_that("get_full_install_cmd returns install command string", {
   cmd <- capture.output(result <- get_full_install_cmd())
   expect_type(result, "character")
   expect_true(grepl("install.packages", result))
-  expect_true(grepl("poLCA", result))
+  expect_false(grepl("poLCA", result))
   expect_true(grepl("ggplot2", result))
 })
 
@@ -151,28 +154,18 @@ test_that("validate_input_data detects non-numeric variables", {
     stringsAsFactors = FALSE
   )
 
-  # The function may error when trying to compute variance on a non-numeric
-  # column, so we wrap in tryCatch and verify the issue was detected
-  out <- tryCatch({
-    capture.output(
-      res <- validate_input_data(data, "id", c("q1", "q2"))
-    )
-    res
-  }, error = function(e) {
-    # If the function errors during variance check on non-numeric column,
-    # that's acceptable -- it still detected the non-numeric issue
-    NULL
-  })
+  # Was a skip until September 2026: validate_input_data ran var() over a
+  # character column, so it died on the very case it was being asked about.
+  # The suite green-skipped around it and called it a known source issue.
+  # It now returns the finding it had already made (M4).
+  capture.output(res <- validate_input_data(data, "id", c("q1", "q2")))
 
-  if (!is.null(out)) {
-    expect_false(out$valid)
-    expect_true(any(grepl("not numeric", unlist(out$issues), ignore.case = TRUE)))
-  } else {
-    # The function errored, which means it was unable to handle the
-    # non-numeric column gracefully. We skip this as a known source issue.
-    skip("validate_input_data errors on non-numeric variance check - source code issue")
-  }
+  expect_false(res$valid)
+  expect_true(any(grepl("not numeric", unlist(res$issues), ignore.case = TRUE)))
+  # And without a coercion warning on the way, which was the suite's only one.
+  expect_silent(capture.output(validate_input_data(data, "id", c("q1", "q2"))))
 })
+
 
 test_that("validate_input_data detects zero-variance variables", {
   data <- data.frame(

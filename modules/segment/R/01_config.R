@@ -436,7 +436,25 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   rules_max_depth <- get_numeric_config(config, "rules_max_depth", default_value = 3, min = 1, max = 5)
   generate_action_cards <- get_logical_config(config, "generate_action_cards", default_value = FALSE)
   scale_max <- get_numeric_config(config, "scale_max", default_value = 10, min = 1, max = 100)
-  use_lca <- get_logical_config(config, "use_lca", default_value = FALSE)
+
+  # Both of these were parsed nowhere and therefore dropped by the assembly
+  # below, so the template's Y/N and the GUI checkbox controlled nothing and
+  # the Declaration sheet never received the name the user typed (H3).
+  generate_stats_pack <- toupper(as.character(
+    get_config_value(config, "generate_stats_pack", default_value = "Y") %||% "Y"))
+  if (!generate_stats_pack %in% c("Y", "N")) {
+    segment_refuse(
+      code = "CFG_INVALID_STATS_PACK",
+      title = "Invalid generate_stats_pack Value",
+      problem = sprintf("generate_stats_pack is '%s'.", generate_stats_pack),
+      why_it_matters = "The stats pack is a contractual deliverable, so this setting is not guessed at.",
+      how_to_fix = "Set generate_stats_pack to Y or N.",
+      expected = c("Y", "N"),
+      observed = generate_stats_pack
+    )
+  }
+  research_house <- as.character(
+    get_config_value(config, "research_house", default_value = "") %||% "")
 
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
@@ -468,15 +486,170 @@ parse_segment_feature_params <- function(config, clustering_vars) {
     demographic_vars = demographic_vars, run_stability_check = run_stability_check,
     stability_n_runs = stability_n_runs, generate_rules = generate_rules,
     rules_max_depth = rules_max_depth, generate_action_cards = generate_action_cards,
-    scale_max = scale_max, use_lca = use_lca,
+    scale_max = scale_max,
+    generate_stats_pack = generate_stats_pack,
+    research_house = if (nzchar(trimws(research_house))) research_house else NULL,
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file
   )
 }
 
+#' Should This Run Write a Stats Pack?
+#'
+#' One answer for two controls. The config's Y/N is the study's setting; the
+#' GUI checkbox writes `turas.generate_stats_pack` and is a decision someone
+#' just made with a mouse, so when the option is set it wins.
+#'
+#' Before September 2026 the option was read with a FALSE default and OR'd
+#' against the config, which made it force-on only: an unticked box could
+#' never switch the pack off, and neither could the config, because
+#' validation dropped the setting before anything read it (H3).
+#'
+#' @param config The validated configuration
+#' @return TRUE if the stats pack should be written
+#' @keywords internal
+segment_should_write_stats_pack <- function(config) {
+  gui_choice <- getOption("turas.generate_stats_pack", NULL)
+  if (!is.null(gui_choice)) return(isTRUE(gui_choice))
+  isTRUE(toupper(as.character(config$generate_stats_pack %||% "Y")) == "Y")
+}
+
+
+#' Refuse Settings for Removed Features
+#'
+#' LCA and ensemble clustering were removed by the V2 lift (review
+#' 2026-07-11, C2 and M1). Both were config-exposed and documented but
+#' unreachable from any production path: a user who followed the README and
+#' set `use_lca = TRUE` got ordinary k-means, with no warning, no refusal and
+#' no note. Deleting the implementations without this check would leave
+#' exactly that bug in place, so a config still asking for either is refused
+#' here, before anything else in validation runs.
+#'
+#' `use_lca = FALSE` is NOT refused. An old template carrying the default
+#' must stay runnable.
+#'
+#' @param config Raw configuration list
+#' @return invisible(TRUE), or a refusal
+#' @keywords internal
+refuse_removed_settings <- function(config) {
+
+  lca_tuning <- grep("^lca_", tolower(names(config) %||% character(0)), value = TRUE)
+  wants_lca <- isTRUE(get_logical_config(config, "use_lca", default_value = FALSE)) ||
+    length(lca_tuning) > 0
+
+  if (wants_lca) {
+    cat("\n[SEGMENT] Config asks for latent class analysis, which has been removed.\n")
+    segment_refuse(
+      code = "CFG_LCA_REMOVED",
+      title = "Latent Class Analysis Has Been Removed",
+      problem = paste0(
+        "This config asks for latent class analysis (",
+        paste(c(if (isTRUE(get_logical_config(config, "use_lca", default_value = FALSE))) "use_lca",
+                lca_tuning), collapse = ", "),
+        "). LCA was removed from the segment module in September 2026."
+      ),
+      why_it_matters = paste(
+        "The setting never did anything. It was accepted by the config parser and",
+        "read by nothing else, so every run that asked for LCA silently produced",
+        "ordinary k-means under a report that named k-means. Refusing is how you",
+        "find that out instead of inheriting someone else's silent substitution."
+      ),
+      how_to_fix = c(
+        "Delete the use_lca and lca_* rows from the Config sheet.",
+        "Choose one of the methods that is really implemented: kmeans, hclust, gmm.",
+        "If you need LCA as a real feature, it has to be commissioned and validated against poLCA."
+      ),
+      expected = "no use_lca or lca_* setting",
+      observed = paste(c(if (isTRUE(get_logical_config(config, "use_lca", default_value = FALSE))) "use_lca", lca_tuning), collapse = ", ")
+    )
+  }
+
+  method_raw <- tolower(as.character(get_config_value(config, "method", default_value = "") %||% ""))
+  methods <- trimws(unlist(strsplit(method_raw, ",")))
+  if ("ensemble" %in% methods) {
+    cat("\n[SEGMENT] Config asks for the ensemble method, which has been removed.\n")
+    segment_refuse(
+      code = "CFG_ENSEMBLE_REMOVED",
+      title = "Ensemble Clustering Has Been Removed",
+      problem = "This config sets method = ensemble. Ensemble clustering was removed from the segment module in September 2026.",
+      why_it_matters = paste(
+        "Three layers disagreed about whether it existed: the parser refused it,",
+        "the hard guard allowed it and advertised it, and the dispatcher had no arm",
+        "for it. The implementation had no production caller at all."
+      ),
+      how_to_fix = c(
+        "Set method to one or more of: kmeans, hclust, gmm.",
+        "To compare methods, list several: method = kmeans,hclust,gmm."
+      ),
+      expected = c("kmeans", "hclust", "gmm"),
+      observed = method_raw
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Warn About Config Settings That Did Not Survive Validation
+#'
+#' `validate_segment_config` rebuilds its result from explicit lists, so any
+#' key it does not enumerate disappears. That is how two documented controls
+#' came to be dead (`generate_stats_pack`, `research_house`), and it would
+#' have happened to the next one added to the template and not to the
+#' enumeration. Review H3.
+#'
+#' This does not refuse. A stray key is usually a typo or an old template,
+#' neither of which should stop a run, and the point is that the user finds
+#' out rather than that the run dies. It prints to the console because that
+#' is where a Shiny user reads anything (project CLAUDE.md).
+#'
+#' @param raw_config The configuration as read from the workbook
+#' @param validated_config The assembled, validated configuration
+#' @return invisible character vector of the settings that did not survive
+#' @keywords internal
+segment_warn_unused_settings <- function(raw_config, validated_config) {
+
+  raw_keys <- names(raw_config) %||% character(0)
+  raw_keys <- raw_keys[nzchar(raw_keys) & !grepl("^[.]", raw_keys)]
+
+  # Read by the validators under another name, or consumed as a side effect.
+  consumed_elsewhere <- c(
+    "k_range",               # split into k_min / k_max
+    "question_labels_file",  # loaded into question_labels
+    "segment_names"          # handled with the naming style
+  )
+
+  unused <- setdiff(raw_keys, c(names(validated_config), consumed_elsewhere))
+  if (length(unused) == 0) return(invisible(character(0)))
+
+  cat("\n")
+  cat("+--- SEGMENT: settings that did not survive validation ---+\n")
+  for (k in unused) {
+    cat(sprintf("| %-55s |\n", k))
+  }
+  cat("| These were read from the Config sheet and are not used by  |\n")
+  cat("| the run. Check the spelling against the template, or       |\n")
+  cat("| delete them. Nothing below reads them.                     |\n")
+  cat("+------------------------------------------------------------+\n\n")
+
+  if (exists("showNotification", mode = "function")) {
+    try(showNotification(
+      paste("Segment: unused config settings:", paste(unused, collapse = ", ")),
+      type = "warning", duration = NULL
+    ), silent = TRUE)
+  }
+
+  invisible(unused)
+}
+
+
 validate_segment_config <- function(config) {
   cat("Validating configuration...\n")
+
+  # Step 0: refuse settings for features that no longer exist, before any
+  # other complaint. A removed knob must be named, never quietly ignored.
+  refuse_removed_settings(config)
 
   # Step 1: Required params + clustering method
   req <- validate_segment_required_and_method(config)
@@ -519,6 +692,9 @@ validate_segment_config <- function(config) {
   if (req$method == "hclust") cat(sprintf("  Linkage: %s\n", req$linkage_method))
   if (req$method == "gmm" && !is.null(req$gmm_model_type)) cat(sprintf("  GMM model: %s\n", req$gmm_model_type))
   if (features$html_report) cat("  HTML report: enabled\n")
+
+  # Last, so the list it checks is the one the run will actually use.
+  segment_warn_unused_settings(config, validated_config)
 
   validated_config
 }

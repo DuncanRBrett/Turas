@@ -75,10 +75,8 @@ source(file.path(.seg_r_dir, "08_scoring.R"))
 source(file.path(.seg_r_dir, "09_output.R"))
 source(file.path(.seg_r_dir, "09a_excel_styles.R"))
 source(file.path(.seg_r_dir, "10_utilities.R"))
-source(file.path(.seg_r_dir, "11_lca.R"))
 source(file.path(.seg_r_dir, "12_executive_summary.R"))
 source(file.path(.seg_r_dir, "13_vulnerability.R"))
-source(file.path(.seg_r_dir, "14_ensemble.R"))
 
 # Preflight validators
 .seg_validation_dir <- file.path(turas_root, "modules/segment/lib/validation")
@@ -581,9 +579,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   # ==========================================================================
   # STATS PACK (Optional)
   # ==========================================================================
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$generate_stats_pack %||% "Y") == "Y"
-  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+  generate_stats_pack_flag <- segment_should_write_stats_pack(config)
 
   if (generate_stats_pack_flag) {
     cat("  Generating stats pack...\n")

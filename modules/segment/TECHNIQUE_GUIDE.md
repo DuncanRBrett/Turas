@@ -427,7 +427,13 @@ Always ask: "Can I describe each segment? Can I act on each segment?"
 LCA is a model-based alternative to k-means for categorical data. Where
 k-means clusters on distances between continuous variables, LCA
 estimates the probability of response patterns given class membership.
-Turas has an experimental LCA implementation (config: `use_lca = TRUE`).
+
+Turas does NOT have LCA. An implementation was carried in the module until
+September 2026, exposed as `use_lca = TRUE` and documented as a fourth method,
+but nothing in the production path ever called it: a config that asked for it
+was given ordinary k-means. It was removed rather than wired up, because
+wiring it would have meant shipping an estimator no one had validated. A
+config that still sets it is now refused by name.
 
 LCA is particularly useful when the input variables are genuinely
 categorical (yes/no behaviours, multi-choice brand lists) rather than
@@ -435,10 +441,15 @@ continuous ratings.
 
 ### Ensemble approaches
 
-Turas includes an ensemble mode that combines multiple clustering
-methods (k-means, hierarchical, GMM) and computes consensus assignments.
-This is more robust than any single method because it averages out each
-method's biases.
+An ensemble combines several clustering methods (k-means, hierarchical,
+GMM) and computes consensus assignments. It can be more robust than any
+single method because it averages out each method's biases.
+
+Turas does NOT have this either. A 370-line implementation sat in the module
+until September 2026 with no production caller: the config parser refused the
+method, the hard guard allowed it, and the dispatcher had no arm for it. The
+maths was reviewed and found sound, so it is recoverable from git if it is
+ever commissioned properly.
 
 Ensemble segmentation is worth using when the single-method solutions
 disagree — if k-means and hierarchical produce similar segments,
