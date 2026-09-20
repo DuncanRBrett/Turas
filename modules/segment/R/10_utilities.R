@@ -557,6 +557,13 @@ validate_input_data <- function(data, id_variable, clustering_vars) {
   cat("5. Checking variable variance...\n")
   
   for (var in intersect(clustering_vars, names(data))) {
+    # Step 3 already reported any non-numeric variable. Running var() over it
+    # here raised a coercion warning and then a raw R error, so the validator
+    # died instead of returning the finding it had already made (M4). The
+    # module's own test suite skipped past this, calling it a known source
+    # issue.
+    if (!is.numeric(data[[var]])) next
+
     var_data <- data[[var]][!is.na(data[[var]])]
     if (length(var_data) > 0) {
       var_variance <- var(var_data)

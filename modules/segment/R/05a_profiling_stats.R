@@ -7,8 +7,11 @@
 
 #' Calculate Statistical Significance of Segment Differences
 #'
-#' Performs ANOVA/Kruskal-Wallis tests to determine which variables
-#' significantly differentiate segments
+#' Determines which variables differentiate the segments, choosing the test
+#' from what the variable is: chi-square with Cramer's V for a nominal
+#' variable (character or unordered factor), Kruskal-Wallis with
+#' epsilon-squared for an ordered variable with few distinct values, and
+#' ANOVA with eta-squared for a continuous one.
 #'
 #' IMPORTANT NOTE: P-values are DESCRIPTIVE, not inferential. Since segments
 #' are defined using these variables (or correlates), statistical tests are
@@ -55,8 +58,58 @@ test_segment_differences <- function(data, clusters, variables, alpha = 0.05) {
     var_complete <- var_data[complete_idx]
     clusters_complete <- clusters[complete_idx]
     
-    if (length(unique(var_complete)) < 10) {
-      # Categorical or few unique values: Chi-square or Kruskal-Wallis
+    # A nominal variable has categories, not an order. Kruskal-Wallis ranks
+    # its input, so sending region coded 1 to 9 there tested whether 9 was
+    # "more" than 1. The comment here promised chi-square and never called it
+    # (M3). Numeric few-value variables stay with Kruskal-Wallis: a 1-5 rating
+    # does have an order, and ranking it is the point.
+    is_nominal <- is.character(var_complete) ||
+      (is.factor(var_complete) && !is.ordered(var_complete))
+
+    if (is_nominal) {
+      n_levels <- length(unique(var_complete))
+
+      if (n_levels < 2 || n_levels > 30) {
+        cat(sprintf(
+          "  [SEGMENT] '%s' skipped: %d categories is %s for a chi-square across segments.\n",
+          var, n_levels, if (n_levels < 2) "too few" else "too many"
+        ))
+        next
+      }
+
+      contingency <- table(var_complete, clusters_complete)
+      test_result <- tryCatch(
+        suppressWarnings(chisq.test(contingency)),
+        error = function(e) NULL
+      )
+
+      if (!is.null(test_result)) {
+        if (any(test_result$expected < 5)) {
+          cat(sprintf(
+            "  [SEGMENT] '%s': some expected counts are under 5, so its p-value is approximate.\n",
+            var
+          ))
+        }
+
+        # Cramer's V, the standard effect size for a chi-square of this
+        # shape. Range [0, 1], and unlike the raw statistic it does not grow
+        # with the size of the table.
+        n_obs <- sum(contingency)
+        denom <- n_obs * max(1, min(dim(contingency)) - 1)
+        cramers_v <- if (denom > 0) sqrt(as.numeric(test_result$statistic) / denom) else NA_real_
+
+        results <- rbind(results, data.frame(
+          Variable = var,
+          Test = "Chi-square",
+          Statistic = round(as.numeric(test_result$statistic), 3),
+          P_Value = round(test_result$p.value, 4),
+          Significant = test_result$p.value < alpha,
+          Effect_Size = round(max(0, min(1, cramers_v)), 3),
+          stringsAsFactors = FALSE
+        ))
+      }
+    } else if (length(unique(var_complete)) < 10) {
+      # Few distinct values, but ordered: Kruskal-Wallis
       test_result <- tryCatch({
         kruskal.test(var_complete ~ clusters_complete)
       }, error = function(e) NULL)

@@ -599,8 +599,11 @@ calculate_validation_metrics <- function(data, model, k, clusters = NULL,
 
   # Optionally calculate gap statistic (Tibshirani et al. 2001)
   if (calculate_gap) {
+    # `clustering_data` does not exist in this function: the parameter is
+    # `data`. The tryCatch below turned that into a quiet NA, so the flag
+    # looked supported and returned nothing (M2).
     gap_result <- tryCatch(
-      calculate_gap_statistic(clustering_data, clusters, k),
+      calculate_gap_statistic(data, clusters, k),
       error = function(e) {
         cat(sprintf("  [SEGMENT] Gap statistic failed: %s\n", e$message))
         list(gap = NA_real_, se = NA_real_)

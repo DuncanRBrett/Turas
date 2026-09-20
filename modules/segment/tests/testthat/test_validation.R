@@ -287,3 +287,51 @@ test_that("totss approximately equals betweenss + tot_withinss", {
   expected_totss <- metrics$betweenss + metrics$tot_withinss
   expect_equal(metrics$totss, expected_totss, tolerance = 1e-6)
 })
+
+
+# ==============================================================================
+# M2 - the gap statistic flag was a no-op (V2 lift review 2026-07-11)
+# ==============================================================================
+# calculate_validation_metrics() takes `data`, and the gap branch inside it
+# referenced `clustering_data`, which exists nowhere in that function. The call
+# sits in a tryCatch, so asking for the gap statistic did not fail: it
+# returned NA, quietly, under a metrics list that looked complete. Nothing
+# noticed because all three production call sites pass calculate_gap = FALSE.
+
+test_that("asking for the gap statistic returns a number, not a silent NA (M2)", {
+  set.seed(4)
+  k <- 3
+  centres <- matrix(c(0, 0, 4, 4, -4, 4), nrow = k, byrow = TRUE)
+  rows <- lapply(seq_len(k), function(i) {
+    matrix(rnorm(40 * 2, mean = rep(centres[i, ], each = 40), sd = 0.6), ncol = 2)
+  })
+  d <- as.data.frame(do.call(rbind, rows))
+  names(d) <- c("v1", "v2")
+  km <- kmeans(scale(d), centers = k, nstart = 10)
+
+  capture.output(
+    metrics <- calculate_validation_metrics(
+      data = scale(d), model = km, k = k, clusters = km$cluster,
+      calculate_gap = TRUE
+    )
+  )
+
+  expect_true("gap_statistic" %in% names(metrics))
+  expect_false(is.na(metrics$gap_statistic))
+  expect_true(is.finite(metrics$gap_statistic))
+})
+
+test_that("the gap statistic stays off unless it is asked for (M2)", {
+  # The default is deliberately unchanged: the gap statistic is expensive and
+  # the three production call sites do not want it.
+  set.seed(5)
+  d <- data.frame(v1 = rnorm(60), v2 = rnorm(60))
+  km <- kmeans(scale(d), centers = 2, nstart = 10)
+
+  capture.output(
+    metrics <- calculate_validation_metrics(data = scale(d), model = km, k = 2,
+                                            clusters = km$cluster)
+  )
+
+  expect_false("gap_statistic" %in% names(metrics))
+})
