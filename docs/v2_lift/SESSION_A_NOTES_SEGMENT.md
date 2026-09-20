@@ -1,8 +1,9 @@
 # Segment Session A — implementation notes
 
 **Branch:** `feature/segment-correctness`, cut from main `c1151cf2` on
-2026-09-20. Six commits, one per work item plus a tail. **Not merged, not
-pushed**, per the handover's rule that Duncan merges after his own eyeball.
+2026-09-20. Six commits, one per work item plus a tail. **Merged and pushed on
+2026-09-20 at Duncan's instruction**, origin/main `226bb952`, ahead of the
+`launch_turas()` eyeball the handover assumes.
 **Work order:** `docs/v2_lift/HANDOVER_SEGMENT_FOR_OPUS.md` section 2.
 **Findings:** `docs/v2_lift/SEGMENT_PRODUCTION_REVIEW_2026-07-11.md`.
 
