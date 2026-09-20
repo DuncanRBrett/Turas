@@ -384,3 +384,105 @@ test_that(".seg-th-num has wrap rules for long segment names", {
               grepl("\\.seg-th-num\\s*\\{[^}]*overflow-wrap", contents),
               info = ".seg-th-num must declare wrap behaviour")
 })
+
+
+# ==============================================================================
+# The report's "Prepared by" line
+# ==============================================================================
+# The header and the footer each carried their own hardcoded company name and
+# the two disagreed: the header said "The Research Lamppost" with a lowercase
+# p, the footer said "The Research LampPost (Pty) Ltd". Worse, the three keys
+# both of them read (company_name, client_name, researcher_name) were set by
+# nothing at all. They are not parsed in 01_config.R and the template does not
+# offer them, so the misspelled fallback printed on every segment report ever
+# produced, for every client, and the "(researcher)" and "for client" branches
+# were unreachable code.
+
+.prepared_html <- function(config) {
+  skip_if_not(exists("build_seg_header", mode = "function"),
+              "HTML report layer not loaded")
+  as.character(build_seg_header(
+    html_data = list(), config = config,
+    brand_colour = "#323367", report_title = "Test report"
+  ))
+}
+
+test_that("the company name is spelled the way the company spells it", {
+  header <- .prepared_html(list())
+
+  expect_true(grepl("LampPost", header, fixed = TRUE))
+  expect_false(grepl("Lamppost", header, fixed = TRUE))
+})
+
+test_that("the header and the footer name the same company", {
+  skip_if_not(exists("build_seg_footer", mode = "function"),
+              "HTML report layer not loaded")
+
+  for (cfg in list(list(), list(research_house = "Acme Insights"))) {
+    header <- .prepared_html(cfg)
+    footer <- as.character(build_seg_footer(cfg))
+    company <- cfg$research_house %||% "LampPost"
+    expect_true(grepl(company, header, fixed = TRUE))
+    expect_true(grepl(company, footer, fixed = TRUE))
+  }
+})
+
+test_that("research_house drives the prepared-by line", {
+  # The template already carries the organisation under this name, and A4 made
+  # it survive validation. The report inventing a second key for the same
+  # thing is what left it unsettable.
+  header <- .prepared_html(list(research_house = "Acme Insights"))
+
+  expect_true(grepl("Prepared by", header, fixed = TRUE))
+  expect_true(grepl("Acme Insights", header, fixed = TRUE))
+  expect_false(grepl("LampPost", header, fixed = TRUE))
+})
+
+test_that("analyst_name names the researcher beside the company", {
+  header <- .prepared_html(list(research_house = "Acme Insights",
+                                analyst_name = "T. Mokoena"))
+
+  expect_true(grepl("T. Mokoena", header, fixed = TRUE))
+  expect_true(grepl("Acme Insights", header, fixed = TRUE))
+})
+
+test_that("client_name reaches the header and the footer", {
+  skip_if_not(exists("build_seg_footer", mode = "function"),
+              "HTML report layer not loaded")
+  header <- .prepared_html(list(client_name = "Thornhill Grocers"))
+  footer <- as.character(build_seg_footer(list(client_name = "Thornhill Grocers")))
+
+  expect_true(grepl("Thornhill Grocers", header, fixed = TRUE))
+  expect_true(grepl("Thornhill Grocers", footer, fixed = TRUE))
+})
+
+test_that("a client name with markup in it is escaped, not rendered", {
+  header <- .prepared_html(list(client_name = "<script>alert(1)</script>"))
+
+  expect_false(grepl("<script>", header, fixed = TRUE))
+  expect_true(grepl("&lt;script&gt;", header, fixed = TRUE))
+})
+
+test_that("client_name survives validation and is offered by the template", {
+  skip_if_not(exists("validate_segment_config", mode = "function"),
+              "Segment module not loaded")
+
+  d <- data.frame(respondent_id = 1:40, q1 = rnorm(40), q2 = rnorm(40), q3 = rnorm(40))
+  path <- tempfile(fileext = ".xlsx")
+  openxlsx::write.xlsx(d, path)
+  raw <- list(data_file = path, id_variable = "respondent_id",
+              clustering_vars = "q1,q2,q3", k_fixed = "3", method = "kmeans",
+              client_name = "Thornhill Grocers")
+
+  out <- capture.output(cfg <- validate_segment_config(raw))
+
+  expect_equal(cfg$client_name, "Thornhill Grocers")
+  expect_false(grepl("did not survive validation", paste(out, collapse = " ")))
+
+  tpl <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tpl), add = TRUE)
+  capture.output(generate_segment_config_template(output_path = tpl))
+  settings <- tolower(as.character(
+    openxlsx::read.xlsx(tpl, sheet = "Config", skipEmptyRows = FALSE)[[1]]))
+  expect_true("client_name" %in% settings)
+})

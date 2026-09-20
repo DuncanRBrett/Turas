@@ -1745,7 +1745,8 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_field("segment_names_file",   "",      "Optional", "Path to Excel file with edited segment names (Step 3 workflow)", ".xlsx file path"),
     # --- STUDY IDENTIFICATION ---
     add_section("STUDY IDENTIFICATION"),
-    add_field("research_house",   "",          "Optional", "Research organisation name for stats pack Declaration sheet", "Text")
+    add_field("research_house",   "",          "Optional", "Research organisation name. Appears on the report header and footer and on the stats pack Declaration sheet.", "Text"),
+    add_field("client_name",      "",          "Optional", "Client the report was prepared for. Appears on the report header and footer.", "Text")
   )
 
   params <- do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
