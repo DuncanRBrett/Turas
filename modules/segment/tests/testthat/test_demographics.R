@@ -274,12 +274,12 @@ test_that("the profile percentages match a recomputation from the assignments fi
   seg_cols <- setdiff(names(got), c("Category", "Overall"))
   expect_setequal(seg_cols, colnames(expected))
 
+  # An ABSOLUTE comparison. testthat's tolerance is relative, so
+  # tolerance = 0.1 on a cell of 30 would accept anything from 27 to 33 and
+  # this test would pass on percentages that are plainly wrong.
   for (sn in seg_cols) {
     for (i in seq_len(nrow(got))) {
-      expect_equal(got[[sn]][i],
-                   unname(expected[got$Category[i], sn]),
-                   tolerance = 0.1,
-                   info = sprintf("%s / %s", sn, got$Category[i]))
+      expect_lt(abs(got[[sn]][i] - unname(expected[got$Category[i], sn])), 0.051)
     }
   }
 })
@@ -310,7 +310,8 @@ test_that("the profile base is the clustered respondents, not the data file", {
   # Every segment column still adds to 100 across its categories.
   reg <- prof$categorical_profiles$region
   seg_cols <- setdiff(names(reg), c("Category", "Overall"))
-  for (sn in seg_cols) expect_equal(sum(reg[[sn]]), 100, tolerance = 0.2)
+  # Absolute again: a relative 0.2 here would accept a column summing to 80.
+  for (sn in seg_cols) expect_lt(abs(sum(reg[[sn]]) - 100), 0.25)
 })
 
 
@@ -377,4 +378,43 @@ test_that("a numeric demographic reaches its own sheet and block", {
                           warn = FALSE), collapse = "\n")
   expect_true(grepl("seg-demographics-numeric-section", html, fixed = TRUE))
   expect_true(grepl("Numeric demographics", html, fixed = TRUE))
+})
+
+
+# ------------------------------------------------------------------------------
+# 9. Exploration mode chooses no k, so it says the section is not written there.
+# ------------------------------------------------------------------------------
+
+test_that("exploration mode names demographic profiling as skipped", {
+  out_dir <- file.path(tempdir(), paste0("demo_expl_", as.integer(runif(1) * 1e6)))
+  cfg <- .demographics_config(output_folder = out_dir, html_report = "FALSE")
+  cfg$k_fixed <- NULL
+  cfg$k_min <- "3"
+  cfg$k_max <- "4"
+  out <- capture.output(suppressMessages(
+    res <- turas_segment_from_config(.demographics_write_config(cfg), verbose = FALSE)))
+
+  expect_false(inherits(res, "turas_refusal_result"))
+  joined <- paste(out, collapse = " ")
+  expect_true(grepl("Report section skipped: demographic profiles", joined, fixed = TRUE))
+  expect_true(grepl("after you fix k", joined, fixed = TRUE))
+})
+
+test_that("an all-numeric set of demographics does not name a sheet that is absent", {
+  hd <- .demographics_html_data()
+  hd$enhanced$demographic_profiles$categorical_profiles <- list()
+  hd$enhanced$demographic_profiles$chi_sq_tests <- NULL
+  hd$enhanced$demographic_profiles$numeric_profiles <- list(age_years = data.frame(
+    Segment = c("Savers", "Spenders", "Overall"),
+    N = c(60L, 40L, 100L), Mean = c(51.2, 33.4, 44.1),
+    Median = c(50, 32, 43), SD = c(9.1, 8.2, 11.9),
+    Min = c(30, 19, 19), Max = c(72, 55, 72), stringsAsFactors = FALSE))
+
+  tables <- list(demographics = build_seg_demographics_table(hd),
+                 demographics_numeric = build_seg_demographics_numeric_table(hd))
+  html <- as.character(build_seg_demographics_section(tables, hd))
+
+  expect_true(grepl("age_years", html, fixed = TRUE))
+  expect_false(grepl("Demographics_Tests", html, fixed = TRUE))
+  expect_true(grepl("respondents who were clustered", html, fixed = TRUE))
 })

@@ -766,6 +766,18 @@ run_exploration_pipeline <- function(data_list, config, guard, trs_state, start_
   cat(sprintf("\n  Mode: EXPLORATION (k = %d to %d, method = %s)\n",
               config$k_min, config$k_max, toupper(config$method)))
 
+  # Exploration compares values of k and chooses none, so there is no one set
+  # of segments to cross-tabulate a demographic against. The shipped
+  # exploration example names three demographic variables, so say where they
+  # are profiled rather than dropping them without a word.
+  if (length(config$demographic_vars %||% character(0)) > 0) {
+    cat(sprintf(paste0(
+      "  [SEGMENT] Report section skipped: demographic profiles ",
+      "(%d variable(s) named; the Demographics section and its workbook ",
+      "sheets are written by the single-method final run made after you ",
+      "fix k)\n"), length(config$demographic_vars)))
+  }
+
   # Run clustering for multiple k values
   exploration_result <- run_clustering_exploration(data_list, config, guard)
 

@@ -773,14 +773,22 @@ build_seg_demographics_section <- function(tables, html_data) {
     htmltools::tags$p(
       class = "seg-footnote",
       style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
-      paste(
-        base_note,
-        "The chi-square p-values in the workbook's Demographics_Tests sheet are",
-        "descriptive. The segments are a grouping derived from this same sample,",
-        "so a p-value here describes this data rather than testing a claim made",
-        "before the segmentation, and a table with expected counts under five is",
-        "flagged in that sheet as approximate."
-      )
+      # The chi-square sentence only when there is a chi-square. An all-numeric
+      # set of demographics produces no tests and no Demographics_Tests sheet,
+      # and a footnote naming a sheet the workbook does not have is worse than
+      # no footnote.
+      if (!is.null(demo$chi_sq_tests) && nrow(demo$chi_sq_tests) > 0) {
+        paste(
+          base_note,
+          "The chi-square p-values in the workbook's Demographics_Tests sheet are",
+          "descriptive. The segments are a grouping derived from this same sample,",
+          "so a p-value here describes this data rather than testing a claim made",
+          "before the segmentation, and a table with expected counts under five is",
+          "flagged in that sheet as approximate."
+        )
+      } else {
+        base_note
+      }
     )
   )
 }

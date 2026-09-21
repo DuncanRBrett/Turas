@@ -175,6 +175,42 @@ committed):
 
 Suite after these two additions: FAIL 0, WARN 0, SKIP 0, PASS 1339.
 
+## Mutation test of the recompute, and three late items
+
+The recompute test (handover test 6) originally compared with
+`expect_equal(..., tolerance = 0.1)`. testthat's tolerance is RELATIVE, so on
+a cell of 30 that accepts anything between 27 and 33, and the column-sum check
+at `tolerance = 0.2` accepted a column summing to 80. The test had only ever
+been watched failing on an absent result, not on a wrong number.
+
+Executed: `pct_tab <- prop.table(cross_tab, margin = 2) * 100` in
+`05_profiling.R` was mutated to `+ 1`. The old test caught only three cells,
+all of them small ones; every cell of 10 or more passed. Both comparisons were
+changed to absolute (`expect_lt(abs(got - expected), 0.051)` and
+`expect_lt(abs(sum - 100), 0.25)`). The mutation was then reduced to `+ 0.2`,
+a fifth of a percentage point, and the file failed 16 times. The mutation was
+reverted (`grep MUTATION` returns nothing) and the file is green at 80
+expectations.
+
+Three late items, after an outside read of the branch:
+
+- **Exploration mode** now prints the same skipped-section note as combined
+  mode. `Thornhill_Segment_Config_Explore.xlsx` names all three demographics,
+  and exploration compares values of k and chooses none, so there is no one
+  set of segments to cross-tabulate against. Tested.
+- **`tabs_export = Y` in exploration mode is still silently ignored.** The
+  exploration pipeline returns before the export block, exactly as combined
+  mode did. This is F14's shape on a third path. It is NOT fixed here: the
+  shipped exploration example sets `tabs_export = N`, and extending the new
+  refusal to a third mode is a ruling rather than an implementation detail.
+  Flagged for Duncan.
+- **The section's chi-square sentence is now conditional.** With an
+  all-numeric set of demographics there are no chi-square results and no
+  `Demographics_Tests` sheet, and the footnote was naming a sheet the workbook
+  does not have. Tested.
+
+Suite after these: FAIL 0, WARN 0, SKIP 0, PASS 1345.
+
 ## Accident, and what it cost
 
 While updating `V2_LIFT_PROGRAM.md` a Python one-liner evaluated
@@ -184,8 +220,8 @@ lost: the file was committed and unmodified at that point.
 
 ## State at the end
 
-Branch `feature/segment-demographics`, four commits, NOT merged and NOT
-pushed. Final suite from the repo root: FAIL 0, WARN 0, SKIP 0, PASS 1339,
+Branch `feature/segment-demographics`, six commits, NOT merged and NOT
+pushed. Final suite from the repo root: FAIL 0, WARN 0, SKIP 0, PASS 1345,
 against a 1258 baseline. `review/segment-v2-lift` is still unmerged underneath it. Duncan owes
 the independent review in `REVIEW_BRIEF_SEGMENT_D.md`, a `launch_turas()`
 eyeball, and then the merges.
