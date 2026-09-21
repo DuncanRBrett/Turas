@@ -1,7 +1,7 @@
 # Segment Session B — implementation notes
 
 **Branch:** `feature/segment-gui-and-report-fixes`, cut from main `45031a17` on
-2026-09-20. Three commits, one per work item. **Not merged, not pushed.**
+2026-09-20. Five commits. **MERGED and PUSHED 2026-09-21**, origin/main `4cdfc0bf`.
 **Work order:** `docs/v2_lift/HANDOVER_SEGMENT_FOR_OPUS.md` section 3.
 **Findings:** `docs/v2_lift/SEGMENT_PRODUCTION_REVIEW_2026-07-11.md`.
 
@@ -118,9 +118,13 @@ named constant `SEGMENT_GOLDEN_QUESTION_TREES` instead of an invisible knob.
 
 ## Not done, not verified
 
-- **The Shiny GUI was not launched.** B1 is verified at the function level and
-  by reading the file. Duncan's `launch_turas()` pass is the real test, and a
-  refusing config is the thing to try.
+- **Duncan ran `launch_turas()` on the worked example on 21 Sep and it was
+  fine.** He first saw "Segment: unused config settings: client_name", which
+  was a Shiny session holding a copy of the module sourced before
+  `client_name` was parsed; it cleared on a clean R restart. A gate now runs
+  both shipped configs through validation so a real drop cannot reach him
+  silently. A **refusing** config through the GUI has still not been tried,
+  which is the case B1 is actually about.
 - **CH and DB are still computed by nothing.** `k_selection_metrics` in the
   template offers `calinski_harabasz` and `davies_bouldin` as choices, and the
   setting is parsed but read by no code at all, so those are dead options in a
