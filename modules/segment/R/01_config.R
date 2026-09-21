@@ -465,6 +465,24 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   client_name <- as.character(
     get_config_value(config, "client_name", default_value = "") %||% "")
 
+  # The tabs banner bridge. Off by default: a project with no crosstabs run
+  # does not want two more files beside its workbook.
+  tabs_export <- toupper(as.character(
+    get_config_value(config, "tabs_export", default_value = "N") %||% "N"))
+  if (!tabs_export %in% c("Y", "N")) {
+    segment_refuse(
+      code = "CFG_INVALID_TABS_EXPORT",
+      title = "Invalid tabs_export Value",
+      problem = sprintf("tabs_export is '%s'.", tabs_export),
+      why_it_matters = "Whether the segment column is written back into the survey file is not something to guess at.",
+      how_to_fix = "Set tabs_export to Y or N.",
+      expected = c("Y", "N"),
+      observed = tabs_export
+    )
+  }
+  allow_partial_join <- isTRUE(get_logical_config(config, "allow_partial_join",
+                                                  default_value = FALSE))
+
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
@@ -499,6 +517,8 @@ parse_segment_feature_params <- function(config, clustering_vars) {
     generate_stats_pack = generate_stats_pack,
     research_house = if (nzchar(trimws(research_house))) research_house else NULL,
     client_name = if (nzchar(trimws(client_name))) client_name else NULL,
+    tabs_export = tabs_export,
+    allow_partial_join = allow_partial_join,
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file

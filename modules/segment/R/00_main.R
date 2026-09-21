@@ -77,6 +77,7 @@ source(file.path(.seg_r_dir, "09a_excel_styles.R"))
 source(file.path(.seg_r_dir, "10_utilities.R"))
 source(file.path(.seg_r_dir, "12_executive_summary.R"))
 source(file.path(.seg_r_dir, "13_vulnerability.R"))
+source(file.path(.seg_r_dir, "15_tabs_export.R"))
 
 # Preflight validators
 .seg_validation_dir <- file.path(turas_root, "modules/segment/lib/validation")
@@ -491,6 +492,44 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     outlier_flags = data_list$outlier_flags,
     probabilities = cluster_result$method_info$probabilities
   )
+
+  # Export the tabs banner bridge, when the study asked for it. The docstring
+  # on export_segment_assignments() has promised this workflow since it was
+  # written; until September 2026 nothing implemented it and the merge was
+  # done by hand (V2 lift review section 7a).
+  tabs_export_result <- NULL
+  if (identical(toupper(as.character(config$tabs_export %||% "N")), "Y")) {
+    tabs_data_path <- file.path(
+      output_folder, paste0(config$output_prefix, "tabs_data.xlsx"))
+    tabs_stub_path <- file.path(
+      output_folder, paste0(config$output_prefix, "tabs_banner_stub.xlsx"))
+
+    assignments_df <- data.frame(
+      id = data_list$data[[config$id_variable]],
+      segment_name = {
+        nm <- segment_names[cluster_result$clusters]
+        nm[is.na(nm)] <- "Unassigned"
+        nm
+      },
+      stringsAsFactors = FALSE
+    )
+    names(assignments_df)[1] <- config$id_variable
+
+    tabs_export_result <- segment_export_for_tabs(
+      assignments = assignments_df,
+      survey_file = config$data_file,
+      survey_sheet = config$data_sheet %||% "Data",
+      id_variable = config$id_variable,
+      output_file = tabs_data_path,
+      allow_partial_join = isTRUE(config$allow_partial_join)
+    )
+
+    segment_write_banner_stub(
+      segments = tabs_export_result$segments,
+      column_name = tabs_export_result$segment_column,
+      output_file = tabs_stub_path
+    )
+  }
 
   # Export full report (Excel)
   report_filename <- paste0(config$output_prefix, "segmentation_report.xlsx")

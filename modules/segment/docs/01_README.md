@@ -30,6 +30,7 @@ The Turas Segmentation Module provides a standardized, repeatable approach to cl
 - Segment assignment output (Excel with ID, segment_id, segment_name, and GMM probabilities)
 - Model scoring for new data
 - Golden question identification for simplified segment typing
+- `tabs_export = Y` writes the segment column onto your survey file plus a tabs banner stub (see below)
 - `merge_segment_to_data()` utility to merge segment assignments back to original data
 
 ---
@@ -274,3 +275,41 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 ---
 
 **Part of the Turas Analytics Platform**
+
+---
+
+## Segment to Tabs: the segment as a banner
+
+Set `tabs_export = Y` in the config. A run then writes two files beside the
+others:
+
+| File | What it is |
+|---|---|
+| `{prefix}tabs_data.xlsx` | your survey file with one column added, `segment_name` |
+| `{prefix}tabs_banner_stub.xlsx` | the rows tabs needs in order to treat that column as a banner |
+
+The stub has a `How_to_use` sheet saying where each block goes: the
+`Questions` and `Options` rows into your `Survey_Structure.xlsx`, the
+`Selection` row into your tabs config. Point tabs at the exported data file
+and every question in the study can be cut by segment, recomputed live rather
+than frozen into the segmentation report.
+
+The join is by `id_variable` and it is strict. If any survey row has no
+segment, the export refuses and tells you how many, because those rows would
+otherwise become an "Unassigned" banner column that reads like a finding about
+people when it is really a record of what the join lost. If the gap is real
+and expected, set `allow_partial_join = Y` and they are labelled Unassigned on
+purpose.
+
+Three things travel deliberately and three do not. The segment name travels.
+The numeric segment id, the outlier flag and the GMM membership probabilities
+stay in `segment_assignments.xlsx`: probabilities are model estimates, and in
+the survey file they would be one join away from being used as weights.
+
+Read the stub's `Provenance` sheet before you present a crosstab by segment.
+Segment membership is a model-derived grouping from unweighted clustering, not
+something a respondent answered. Significance tests across segments on the
+clustering variables themselves are in-sample and will flatter the solution.
+And because clustering is unweighted, a weighted tabs run will show different
+segment sizes from the segmentation report.
+

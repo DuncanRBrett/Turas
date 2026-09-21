@@ -200,6 +200,10 @@ write_segment_config <- function(path, mode = c("final", "exploration")) {
     create_dated_folder    = "FALSE",
     save_model             = "TRUE",
     generate_stats_pack    = "Y",
+    # The tabs bridge: writes the segment column back onto the survey file and
+    # a banner stub beside it. Off in the template, on here so the example
+    # exercises it.
+    tabs_export            = if (mode == "final") "Y" else "N",
     segment_names          = "auto",
     auto_name_style        = "descriptive",
     scale_max              = "10",
