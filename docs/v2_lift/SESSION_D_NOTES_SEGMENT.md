@@ -131,3 +131,39 @@ restored from a copy.
 - The CSV export button and the section pin were not clicked. They are built
   from the same helpers every other section uses, and the wrapper structure was
   read rather than exercised in a browser.
+
+## D3. Three wording items
+
+- **F8** (`run_segment_gui.R`): the comment claimed the console block lands in
+  the terminal behind the app as well as the pane. The sink has no `split`, so
+  it does not. The comment now says so and says why splitting it would be
+  worse. No behaviour change.
+- **F9** (`R/03_clustering.R`): a convergence warning on a mini-batch run told
+  the user to raise `nstart`, which mini-batch does not take. The advice now
+  branches on `use_minibatch` and names batch size or the seed. `ifault` is
+  returned by both paths (`03a_kmeans.R` sets it 0 or 1), so the mini-batch
+  branch is reachable.
+- **F17** (`lib/html_report/03c_section_builders.R`): the Variable Importance
+  intro promised that a variable with 25% contributes a quarter of the total
+  distinction, which the F-statistic basis does not deliver. It now says the
+  percentages rank the variables and leaves the basis to the footnote under
+  the table, which already states it from the data. The rewrite also dropped
+  the `&mdash;` in that paragraph. Other `&mdash;` entities elsewhere in the
+  file were left alone, being outside this work order.
+
+Suite after D3: FAIL 0, WARN 0, SKIP 0, PASS 1328. No test pinned any of the
+three strings (grepped before changing them).
+
+## Accident, and what it cost
+
+While updating `V2_LIFT_PROGRAM.md` a Python one-liner evaluated
+`open(path, "w")` before `open(path).read()`, truncating the file to zero
+bytes. It was restored with `git checkout HEAD --` and rewritten. Nothing was
+lost: the file was committed and unmodified at that point.
+
+## State at the end
+
+Branch `feature/segment-demographics`, three commits, NOT merged and NOT
+pushed. `review/segment-v2-lift` is still unmerged underneath it. Duncan owes
+the independent review in `REVIEW_BRIEF_SEGMENT_D.md`, a `launch_turas()`
+eyeball, and then the merges.

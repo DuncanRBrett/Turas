@@ -374,8 +374,11 @@ run_segment_gui <- function() {
           # with the tick and the green toast (H1). Ask what came back.
           outcome <- segment_gui_outcome(result)
 
-          # Printed inside the sink, so it lands in the console pane the user
-          # is looking at as well as the terminal behind the app.
+          # Printed inside the sink, so it lands in the console pane the
+          # user is looking at. The sink is not split, so it does NOT also
+          # reach the terminal the app was launched from. Splitting it would
+          # double every line for anyone who launched from a terminal, which
+          # is worse than one place to read.
           segment_gui_console_block(outcome)
 
           list(success = outcome$success, result = result, outcome = outcome)

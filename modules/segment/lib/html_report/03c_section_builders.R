@@ -595,11 +595,13 @@ build_seg_importance_section <- function(tables, charts, html_data) {
     insight_area,
     htmltools::tags$p(
       class = "seg-section-intro",
-      htmltools::HTML(paste0(
-        "Variables ranked by their contribution to segment differentiation. ",
-        "The percentage shows each variable&rsquo;s share of the total discriminating power &mdash; ",
-        "a variable with 25% contributes one quarter of the total distinction between segments."
-      ))
+      paste(
+        "Variables ranked by how sharply they separate the segments.",
+        "The percentages rank the variables against each other and sum to 100",
+        "by construction. Read them as an order of strength rather than as a",
+        "share of the difference each variable explains. The note under the",
+        "table says what the percentages are calculated from."
+      )
     ),
     chart_el,
     table_el,

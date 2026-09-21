@@ -183,9 +183,16 @@ run_kmeans_dispatch <- function(data_list, config, guard) {
   conv_warn <- NULL
   if (!is.null(model$ifault) && model$ifault != 0) {
     conv_warn <- sprintf("ifault=%d", model$ifault)
+    # Mini-batch takes no nstart, so telling its user to raise one was advice
+    # about a setting the run ignores (independent review 2026-09-21, F9).
+    lever <- if (use_minibatch) {
+      "Raise batch_size or try another seed; mini-batch takes no nstart."
+    } else {
+      "Consider increasing nstart."
+    }
     cat(sprintf(
-      "[SEGMENT WARNING] K-means convergence issue for k=%d: %s. Results may be suboptimal. Consider increasing nstart.\n",
-      k, conv_warn
+      "[SEGMENT WARNING] K-means convergence issue for k=%d: %s. Results may be suboptimal. %s\n",
+      k, conv_warn, lever
     ))
   }
 
