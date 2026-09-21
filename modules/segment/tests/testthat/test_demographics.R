@@ -330,3 +330,51 @@ test_that("combined mode names demographic profiling as skipped", {
   expect_true(grepl("Report section skipped: demographic profiles", joined, fixed = TRUE))
   expect_true(grepl("single-method final run", joined, fixed = TRUE))
 })
+
+
+# ------------------------------------------------------------------------------
+# 8. A demographic nobody answered is named, not dropped in silence.
+# ------------------------------------------------------------------------------
+
+test_that("an empty demographic is named in the section and in the tests sheet", {
+  d <- .demographics_fixture()
+  d$empty_var <- NA_character_
+  run <- .demographics_run(data = d, html_report = "TRUE",
+                           demographic_vars = "region,empty_var")
+  res <- run$res
+
+  expect_false(inherits(res, "turas_refusal_result"))
+  # The chi-square row survives the failed test rather than vanishing.
+  tests <- res$enhanced$demographic_profiles$chi_sq_tests
+  expect_true("empty_var" %in% tests$Variable)
+  expect_true(is.na(tests$Chi_Sq[tests$Variable == "empty_var"]))
+  expect_equal(ncol(tests), 6L)
+
+  html <- paste(readLines(file.path(run$out_dir, "seg_segmentation_report.html"),
+                          warn = FALSE), collapse = "\n")
+  expect_true(grepl("no clustered respondent answered: empty_var",
+                    html, fixed = TRUE))
+  # region is still shown normally.
+  expect_true(grepl("seg-demo-var-title\">region<", html, fixed = TRUE))
+})
+
+test_that("a numeric demographic reaches its own sheet and block", {
+  set.seed(3)
+  d <- .demographics_fixture()
+  d$age_years <- sample(18:75, nrow(d), TRUE)
+  run <- .demographics_run(data = d, html_report = "TRUE",
+                           demographic_vars = "region,age_years")
+  dp <- run$res$enhanced$demographic_profiles
+
+  expect_equal(names(dp$categorical_profiles), "region")
+  expect_equal(names(dp$numeric_profiles), "age_years")
+
+  sheets <- openxlsx::getSheetNames(
+    file.path(run$out_dir, "seg_segmentation_report.xlsx"))
+  expect_true("Demo_age_years" %in% sheets)
+
+  html <- paste(readLines(file.path(run$out_dir, "seg_segmentation_report.html"),
+                          warn = FALSE), collapse = "\n")
+  expect_true(grepl("seg-demographics-numeric-section", html, fixed = TRUE))
+  expect_true(grepl("Numeric demographics", html, fixed = TRUE))
+})

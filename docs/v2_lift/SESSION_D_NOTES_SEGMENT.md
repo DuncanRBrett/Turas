@@ -154,6 +154,27 @@ restored from a copy.
 Suite after D3: FAIL 0, WARN 0, SKIP 0, PASS 1328. No test pinned any of the
 three strings (grepped before changing them).
 
+## Adversarial pass, after the three commits
+
+Four cases were run end to end through the pipeline (probe script, not
+committed):
+
+1. **A demographic that is entirely NA.** `chisq.test()` refuses the table,
+   the console warns, the variable keeps an all-NA row in `Demographics_Tests`
+   (which it would have lost before the error-branch repair), its empty frame
+   is dropped from the sheets and the tables, and the run is PASS. The section
+   now names it: "Not shown, because no clustered respondent answered:
+   empty_var." Added after the probe, with a test.
+2. **A numeric demographic with many values** routes to `numeric_profiles`,
+   gets its own `Demo_age_years` sheet and its own rendered block. Tested.
+3. **A clustering variable named as a demographic** works and profiles as
+   numeric. No refusal, no double-counting; it is the user's choice to make.
+4. **Outlier removal on.** The columns still add to 100 within rounding
+   (99.9, 100, 100.1, 100 on the probe), which is why the section's wording
+   says "give or take rounding" rather than a flat 100.
+
+Suite after these two additions: FAIL 0, WARN 0, SKIP 0, PASS 1339.
+
 ## Accident, and what it cost
 
 While updating `V2_LIFT_PROGRAM.md` a Python one-liner evaluated

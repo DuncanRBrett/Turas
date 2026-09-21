@@ -710,6 +710,25 @@ build_seg_demographics_section <- function(tables, html_data) {
     "Base: the respondents who were clustered."
   }
 
+  # A variable with no answers at all among the clustered respondents
+  # profiles to an empty frame, which the table builders drop. Name it rather
+  # than letting it disappear between the config and the page.
+  all_frames <- c(demo$categorical_profiles %||% list(),
+                  demo$numeric_profiles %||% list())
+  empty_vars <- names(all_frames)[vapply(all_frames, function(f) {
+    is.null(f) || !is.data.frame(f) || nrow(f) == 0
+  }, logical(1))]
+
+  empty_note <- if (length(empty_vars) > 0) {
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      sprintf(
+        "Not shown, because no clustered respondent answered: %s.",
+        paste(empty_vars, collapse = ", "))
+    )
+  }
+
   numeric_heading <- if (!is.null(num_el)) {
     htmltools::tags$h3(
       class = "seg-subsection-title",
@@ -741,14 +760,16 @@ build_seg_demographics_section <- function(tables, html_data) {
       paste(
         "How each demographic variable is spread within each segment.",
         "Percentages are column percentages: they read down a segment and add",
-        "to 100 within it, across the respondents who answered that question.",
-        "The Overall column is the same calculation on the whole clustered sample."
+        "to 100 within it, give or take rounding, across the respondents who",
+        "answered that question. The Overall column is the same calculation on",
+        "the whole clustered sample."
       )
     ),
     cat_el,
     numeric_heading,
     num_el,
     numeric_note,
+    empty_note,
     htmltools::tags$p(
       class = "seg-footnote",
       style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
