@@ -792,8 +792,8 @@
       "page": "Qualitative"
     },
     "cube.picker.none": {
-      "title": "No cuts available in this report",
-      "text": "This report carries aggregate figures only, and it was not built to cut by any question. The tables and every banner still work. To add cuts, name the questions on the Settings sheet under html_report_v2_filter_vars and rebuild.",
+      "title": "Filtering is disabled in this report",
+      "text": "To preserve respondent confidentiality, live filtering has been disabled in this report.",
       "context": "Aggregate build. Shown when the filter or banner picker has nothing to offer",
       "page": "Crosstabs"
     },
