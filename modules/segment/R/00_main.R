@@ -113,6 +113,16 @@ if (.seg_html_available) {
 #' @param verbose Logical, print progress messages (default: TRUE)
 #' @return List with segmentation results
 #' @export
+#' Trees in the golden-questions random forest
+#'
+#' Was read as config$golden_questions_trees, which is parsed nowhere and is
+#' not offered by the template, so it could only ever be its default: an
+#' invisible knob (V2 lift review 2026-07-11, L1). It is an internal tuning
+#' constant rather than a study setting, so it is named here instead of being
+#' added to the config surface. 500 is what every run has always used.
+SEGMENT_GOLDEN_QUESTION_TREES <- 500
+
+
 turas_segment_from_config <- function(config_file, verbose = TRUE) {
   segment_with_refusal_handler({
     turas_segment_impl(config_file, verbose)
@@ -398,7 +408,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
         clusters = cluster_result$clusters,
         segment_names = segment_names,
         n_top = config$golden_questions_n %||% 5,
-        n_trees = config$golden_questions_trees %||% 500
+        n_trees = SEGMENT_GOLDEN_QUESTION_TREES
       )
       if (gq$status == "SKIPPED") {
         cat(sprintf("    Skipped: %s\n", gq$message))

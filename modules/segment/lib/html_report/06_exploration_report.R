@@ -184,17 +184,41 @@ generate_segment_exploration_html_report <- function(results, config, output_pat
 build_seg_exploration_metrics_table <- function(html_data) {
 
   metrics_df <- html_data$metrics_df
-  if (is.null(metrics_df) || nrow(metrics_df) == 0) return(NULL)
+  if (is.null(metrics_df) || nrow(metrics_df) == 0) {
+    return(.seg_report_skipped("k-selection metrics table",
+                               "no metrics were computed for any k"))
+  }
 
   # Find available columns
   k_col <- intersect(names(metrics_df), c("k", "K", "n_clusters"))[1]
-  sil_col <- intersect(names(metrics_df), c("avg_silhouette", "silhouette", "avg_sil"))[1]
+  # avg_silhouette_width FIRST: it is what the engine writes (04_validation.R)
+  # and what recommend_k() maximises. Its absence from this list dropped the
+  # silhouette column from every k-selection report (M5).
+  sil_col <- intersect(names(metrics_df),
+                       c("avg_silhouette_width", "avg_silhouette", "silhouette", "avg_sil"))[1]
   wss_col <- intersect(names(metrics_df), c("tot_withinss", "tot.withinss", "withinss"))[1]
   ch_col <- intersect(names(metrics_df), c("ch_index", "calinski_harabasz", "CH"))[1]
   db_col <- intersect(names(metrics_df), c("db_index", "davies_bouldin", "DB"))[1]
   bss_col <- intersect(names(metrics_df), c("betweenss_totss", "bss_tss_ratio", "bss_ratio"))[1]
 
-  if (is.na(k_col)) return(NULL)
+  if (is.na(k_col)) {
+    return(.seg_report_skipped(
+      "k-selection metrics table",
+      sprintf("no k column found; the metrics carry: %s",
+              paste(names(metrics_df), collapse = ", "))))
+  }
+
+  # Columns the table cannot fill are dropped below. Saying WHICH matters:
+  # the silhouette column used to vanish here over a name mismatch, in the one
+  # report whose job is choosing k, and nothing said so (M5).
+  wanted <- c(Silhouette = sil_col, `Within-SS` = wss_col,
+              `Calinski-Harabasz` = ch_col, `Davies-Bouldin` = db_col,
+              `BSS/TSS` = bss_col)
+  absent <- names(wanted)[is.na(wanted)]
+  if (length(absent) > 0) {
+    cat(sprintf("  [SEGMENT] k-selection table: no data for %s\n",
+                paste(absent, collapse = ", ")))
+  }
 
   rec_k <- NULL
   if (!is.null(html_data$recommendation)) {
@@ -286,7 +310,10 @@ build_seg_exploration_metrics_table <- function(html_data) {
 build_seg_k_comparison_table <- function(html_data) {
 
   k_summaries <- html_data$k_summaries
-  if (is.null(k_summaries) || length(k_summaries) == 0) return(NULL)
+  if (is.null(k_summaries) || length(k_summaries) == 0) {
+    return(.seg_report_skipped("segment-size comparison across k",
+                               "no per-k summaries were produced"))
+  }
 
   rec_k <- NULL
   if (!is.null(html_data$recommendation)) {
@@ -647,10 +674,15 @@ build_seg_exploration_header <- function(html_data, config, brand_colour, report
 build_seg_recommendation_section <- function(html_data, accent_colour) {
 
   rec <- html_data$recommendation
-  if (is.null(rec)) return(NULL)
+  if (is.null(rec)) {
+    return(.seg_report_skipped("recommendation", "no recommendation was produced"))
+  }
 
   rec_k <- rec$recommended_k %||% rec$k %||% NULL
-  if (is.null(rec_k)) return(NULL)
+  if (is.null(rec_k)) {
+    return(.seg_report_skipped("recommendation",
+                               "a recommendation was produced but carries no k"))
+  }
 
   reason <- rec$reason %||% rec$rationale %||% ""
   score <- rec$score %||% NULL

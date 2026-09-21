@@ -428,6 +428,44 @@ build_seg_validation_section <- function(tables, charts, html_data) {
 # IMPORTANCE SECTION
 # ==============================================================================
 
+#' Say What the Importance Percentages Are Made Of
+#'
+#' "Importance %" is a share of a total, but of WHICH total depends on what
+#' the profiling produced. Eta-squared is a proportion of variance and shares
+#' of it decompose honestly. F statistics do not: they are a ratio of mean
+#' squares, so a share of their sum ranks variables without being a variance
+#' decomposition, and a reader who takes "18%" as "explains 18% of the
+#' difference" is being misled by arithmetic that adds to 100 anyway (V2 lift
+#' review 2026-07-11, L5).
+#'
+#' @param vi The variable_importance data frame
+#' @return An htmltools tag, or NULL when there is nothing to qualify
+#' @keywords internal
+build_seg_importance_footnote <- function(vi) {
+  if (is.null(vi) || !is.data.frame(vi) || nrow(vi) == 0) return(NULL)
+
+  text <- if ("eta_squared" %in% names(vi)) {
+    paste("Importance is each variable's eta-squared as a share of the total.",
+          "Eta-squared is a proportion of variance, so these shares add up and",
+          "can be read as relative contribution.")
+  } else if ("f_statistic" %in% names(vi)) {
+    paste("Importance is each variable's F statistic as a share of the total.",
+          "F statistics are ratios of mean squares and are not additively",
+          "decomposable, so read this as a RANKING of how sharply each variable",
+          "separates the segments, not as the share of difference it explains.",
+          "The column sums to 100% by construction either way.")
+  } else {
+    return(NULL)
+  }
+
+  htmltools::tags$p(
+    class = "seg-footnote",
+    style = "margin:6px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+    text
+  )
+}
+
+
 #' Build Variable Importance Section
 #'
 #' Displays variable importance bars and table showing which variables
@@ -533,12 +571,16 @@ build_seg_importance_section <- function(tables, charts, html_data) {
       htmltools::HTML(paste0(
         "Variables ranked by their contribution to segment differentiation. ",
         "The percentage shows each variable&rsquo;s share of the total discriminating power &mdash; ",
-        "a variable with 25% contributes one quarter of the total distinction between segments. ",
-        "Based on one-way ANOVA effect sizes (eta-squared)."
+        "a variable with 25% contributes one quarter of the total distinction between segments."
       ))
     ),
     chart_el,
     table_el,
+    # What the percentages are made of, stated from the data rather than
+    # asserted. This paragraph used to end "Based on one-way ANOVA effect
+    # sizes (eta-squared)" whatever the profiling had actually produced, and
+    # the fallback basis is the F statistic, which does not decompose (L5).
+    build_seg_importance_footnote(html_data$variable_importance),
     reduction_el
   )
 }
@@ -1180,7 +1222,10 @@ build_seg_golden_questions_section <- function(charts, html_data) {
       htmltools::tags$strong(style = "color:var(--seg-brand);",
                             "Why do these percentages differ from Variable Importance? "),
       htmltools::HTML(paste0(
-        "Variable Importance (above) uses ANOVA eta-squared &mdash; ",
+        # Not "uses eta-squared": on a run where profiling produced only F
+        # statistics, that was simply untrue. The basis is named in the
+        # Importance section's own footnote, from the data (L5).
+        "Variable Importance (above) measures a one-way analysis of variance across the segments &mdash; ",
         "it measures how much each variable <em>explains the differences</em> between segments. ",
         "Golden Questions use Random Forest MeanDecreaseAccuracy &mdash; ",
         "it measures how much each variable <em>helps predict</em> which segment a respondent belongs to. ",

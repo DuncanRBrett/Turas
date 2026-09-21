@@ -136,7 +136,7 @@ launch_turas <- function() {
          recent_key = NULL),
 
     list(id = "segment", name = "Segment",
-         description = "K-means clustering segmentation with automatic variable selection",
+         description = "K-means, hierarchical and GMM segmentation with validation, profiling and typing tools",
          category = "advanced",
          script = "modules/segment/run_segment_gui.R",
          recent_file = ".recent_segment_projects.rds",

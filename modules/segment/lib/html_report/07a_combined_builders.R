@@ -204,13 +204,6 @@ build_seg_combined_page <- function(method_html_data,
   )
 
   # --- Hidden data stores ---
-  insight_store <- htmltools::tags$textarea(
-    class = "seg-insight-store",
-    id = "seg-insight-store",
-    `data-seg-prefix` = "",
-    style = "display:none;",
-    "{}"
-  )
 
   pinned_store <- htmltools::tags$script(
     id = "seg-pinned-views-data",
@@ -257,7 +250,6 @@ build_seg_combined_page <- function(method_html_data,
           build_seg_about_section(config, method_html_data[[1]]),
           footer
         ),
-        insight_store,
         pinned_store
       ),
       js_tags,
@@ -1025,6 +1017,12 @@ build_seg_combined_page <- function(method_html_data,
             length(active_methods))
   )
 
+  # Directly under the intro, so a reader learns a method is missing before
+  # they read the comparison and assume it is complete (M5).
+  if (!is.null(comparison_content$skipped)) {
+    sections$skipped <- comparison_content$skipped
+  }
+
   # --- Metrics comparison table ---
   if (!is.null(comparison_content$table)) {
     sections$metrics <- htmltools::tags$div(
@@ -1032,7 +1030,12 @@ build_seg_combined_page <- function(method_html_data,
       htmltools::tags$h4(class = "seg-combined-section-title", "Metrics Comparison"),
       htmltools::tags$p(
         class = "seg-combined-section-desc",
-        "Best value per metric is highlighted. Higher silhouette, CH index, and BSS/TSS indicate better separation. Larger minimum segment size indicates more balanced solutions."
+        paste0(
+          "Best value per metric is highlighted. Higher silhouette",
+          if (grepl("CH Index", as.character(comparison_content$table), fixed = TRUE)) ", CH index" else "",
+          " and BSS/TSS indicate better separation. Larger minimum segment ",
+          "size indicates more balanced solutions."
+        )
       ),
       comparison_content$table
     )
@@ -1311,12 +1314,22 @@ build_seg_method_comparison_table <- function(method_html_data) {
   best_ch <- .find_best_index(metrics, "ch_index", higher = TRUE)
   best_min <- .find_best_index(metrics, "min_segment_n", higher = TRUE)
 
+  # A column no method can fill is left out rather than printed as a row of
+  # dashes. The CH column read diag$ch_index, which the transformer has never
+  # written (nothing in the module computes Calinski-Harabasz for a run:
+  # calculate_separation_metrics() has no callers), so every combined report
+  # showed a metric the reader would assume had been weighed (M5).
+  show_ch <- any(vapply(metrics, function(m) !is.na(m$ch_index), logical(1)))
+  if (!show_ch) {
+    cat("  [SEGMENT] Method comparison: CH Index column omitted, no method reported one.\n")
+  }
+
   # Header row
   header <- htmltools::tags$tr(
     htmltools::tags$th("Method"),
     htmltools::tags$th("Avg Silhouette"),
     htmltools::tags$th("BSS/TSS"),
-    htmltools::tags$th("CH Index"),
+    if (show_ch) htmltools::tags$th("CH Index"),
     htmltools::tags$th("Min Segment"),
     htmltools::tags$th("Min %")
   )
@@ -1325,10 +1338,23 @@ build_seg_method_comparison_table <- function(method_html_data) {
   rows <- lapply(seq_along(metrics), function(i) {
     met <- metrics[[i]]
 
-    sil_class <- if (i == best_sil) "seg-comparison-best" else ""
-    bss_class <- if (i == best_bss) "seg-comparison-best" else ""
-    ch_class <- if (i == best_ch) "seg-comparison-best" else ""
-    min_class <- if (i == best_min) "seg-comparison-best" else ""
+    # .find_best_index() returns NA when every method is NA for a metric, and
+    # `if (i == NA)` is an error, not FALSE. Because ch_index was never
+    # populated, that error fired on EVERY combined run: the whole comparison
+    # table threw, the caller's tryCatch turned it into a warning, and the
+    # combined report simply had no comparison table in it. A missing metric
+    # must not take the table with it (M5).
+    best_class <- function(best) {
+      if (!is.na(best) && identical(as.integer(i), as.integer(best))) {
+        "seg-comparison-best"
+      } else {
+        ""
+      }
+    }
+    sil_class <- best_class(best_sil)
+    bss_class <- best_class(best_bss)
+    ch_class <- best_class(best_ch)
+    min_class <- best_class(best_min)
 
     htmltools::tags$tr(
       htmltools::tags$td(
@@ -1345,7 +1371,7 @@ build_seg_method_comparison_table <- function(method_html_data) {
         style = "font-family:monospace;",
         if (!is.na(met$betweenss_totss)) sprintf("%.0f%%", met$betweenss_totss * 100) else "-"
       ),
-      htmltools::tags$td(
+      if (show_ch) htmltools::tags$td(
         class = ch_class,
         style = "font-family:monospace;",
         if (!is.na(met$ch_index)) sprintf("%.1f", met$ch_index) else "-"
@@ -1690,4 +1716,31 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 });
 '
+}
+
+
+#' Name the Methods a Combined Run Left Out
+#'
+#' The combined builder already prints its warnings to the console and returns
+#' them with a PARTIAL status, so a dropped method is not strictly silent. But
+#' the console note goes when the terminal closes and the HTML file is what the
+#' client keeps: a comparison of two methods where three were asked for has to
+#' say so in itself (V2 lift review 2026-07-11, M5).
+#'
+#' @param warnings Character vector of warnings from the combined build
+#' @return An htmltools tag, or NULL when there is nothing to report
+#' @keywords internal
+build_seg_combined_skipped_note <- function(warnings) {
+  if (is.null(warnings) || length(warnings) == 0) return(NULL)
+
+  htmltools::tags$div(
+    class = "seg-combined-skipped",
+    style = paste("margin:16px 0;padding:12px 16px;border-left:4px solid #CC9900;",
+                  "background:#FFF8E6;font-size:13px;"),
+    htmltools::tags$strong("Not included in this comparison"),
+    htmltools::tags$ul(
+      style = "margin:8px 0 0 0;padding-left:20px;",
+      lapply(warnings, function(w) htmltools::tags$li(htmltools::htmlEscape(w)))
+    )
+  )
 }

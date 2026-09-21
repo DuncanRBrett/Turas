@@ -231,7 +231,10 @@ validate_segment_required_and_method <- function(config) {
 
   if (length(clustering_vars) < 2) {
     segment_refuse(
-      code = "CFG_INSUFFICIENT_VARS",
+      # Was CFG_INSUFFICIENT_VARS. The hard guard refuses the same
+      # condition as CFG_INSUFFICIENT_VARIABLES, and two codes for one
+      # condition split the trail a user follows (L2).
+      code = "CFG_INSUFFICIENT_VARIABLES",
       title = "Insufficient Clustering Variables",
       problem = sprintf("Only %d clustering variable(s) specified.", length(clustering_vars)),
       why_it_matters = "Segmentation requires at least 2 variables to find meaningful clusters.",
@@ -638,6 +641,9 @@ segment_warn_unused_settings <- function(raw_config, validated_config) {
   cat("| These were read from the Config sheet and are not used by  |\n")
   cat("| the run. Check the spelling against the template, or       |\n")
   cat("| delete them. Nothing below reads them.                     |\n")
+  cat("|                                                            |\n")
+  cat("| If a setting here IS documented, the module in memory is    |\n")
+  cat("| older than the one on disk: quit R and launch again.        |\n")
   cat("+------------------------------------------------------------+\n\n")
 
   if (exists("showNotification", mode = "function")) {
