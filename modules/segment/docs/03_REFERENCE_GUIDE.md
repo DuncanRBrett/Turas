@@ -19,8 +19,7 @@ This document provides comprehensive technical reference for the statistical met
 7. [Validation Metrics](#validation-metrics)
 8. [Segment Profiling Statistics](#segment-profiling-statistics)
 9. [Model Scoring](#model-scoring)
-10. [Latent Class Analysis](#latent-class-analysis)
-11. [Method Selection Guide](#method-selection-guide)
+10. [Method Selection Guide](#method-selection-guide)
 
 ---
 

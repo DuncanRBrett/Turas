@@ -231,7 +231,6 @@ modules/segment/
 │   ├── 09_output.R                   # Excel export
 │   ├── 09a_excel_styles.R            # Excel formatting styles (openxlsx)
 │   ├── 10_utilities.R                # Utilities & quick run
-│   ├── 11_lca.R                      # Latent Class Analysis
 │   └── 12_executive_summary.R        # Executive summary generator
 ├── lib/                               # Supporting libraries
 │   ├── html_report/                   # HTML report pipeline

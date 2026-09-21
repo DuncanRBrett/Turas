@@ -35,11 +35,19 @@ test_that("generate_stats_pack defaults to Y when unset (H3a)", {
 })
 
 test_that("the N in the config actually switches the stats pack off (H3a)", {
-  # 00_main reads config$generate_stats_pack. With the setting dropped it read
-  # NULL, fell to its "Y" default, and generated the pack on every run.
-  cfg <- list(generate_stats_pack = "N")
-  flag <- isTRUE(toupper(cfg$generate_stats_pack %||% "Y") == "Y")
-  expect_false(flag)
+  # Through the real parser and the real decision helper, with no GUI option
+  # set: the earlier version of this test evaluated a copied expression
+  # against a hand-built list and called no module code at all (independent
+  # review 2026-09-21, F7).
+  old <- getOption("turas.generate_stats_pack", NULL)
+  on.exit(options(turas.generate_stats_pack = old), add = TRUE)
+  options(turas.generate_stats_pack = NULL)
+
+  capture.output(cfg <- validate_segment_config(.carry_through_config(generate_stats_pack = "N")))
+  expect_false(segment_should_write_stats_pack(cfg))
+
+  capture.output(cfg_y <- validate_segment_config(.carry_through_config(generate_stats_pack = "Y")))
+  expect_true(segment_should_write_stats_pack(cfg_y))
 })
 
 test_that("research_house survives validation (H3b)", {

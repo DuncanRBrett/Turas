@@ -90,7 +90,7 @@ Open the exploration report (Excel and/or HTML) and review:
 Update config: `k_fixed = 4` then re-run.
 
 **Outputs:**
-- `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ probabilities if method = gmm or lca)
+- `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ probabilities if method = gmm)
 - `seg_segmentation_report.xlsx` - Comprehensive multi-tab report
 - `seg_segmentation_report.html` - Interactive HTML report with SVG charts and navigation
 - `seg_model.rds` - Saved model for scoring new data
@@ -122,7 +122,6 @@ modules/segment/
 │   ├── 08_scoring.R                  # Score new data
 │   ├── 09_output.R                   # Excel export functions
 │   ├── 10_utilities.R                # Utilities & quick run
-│   ├── 11_lca.R                      # Latent Class Analysis
 │   ├── 12_executive_summary.R        # Auto-generated narrative summary
 │   └── 13_vulnerability.R           # Segment vulnerability/switching analysis
 ├── lib/                               # Supporting libraries
@@ -186,7 +185,7 @@ modules/segment/
 | `generate_rules` | FALSE | Generate classification rules |
 | `generate_action_cards` | FALSE | Generate segment action cards |
 | `run_stability_check` | FALSE | Run stability assessment |
-| `generate_stats_pack` | N | Generate a diagnostic stats pack workbook (`{output}_stats_pack.xlsx`) with audit trail of data received, methods used, assumptions, and reproducibility. The random seed is captured in the Reproducibility sheet. |
+| `generate_stats_pack` | Y | Generate a diagnostic stats pack workbook (`{output}_stats_pack.xlsx`) with audit trail of data received, methods used, assumptions, and reproducibility. The random seed is captured in the Reproducibility sheet. |
 | `research_house` | (blank) | Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name. |
 
 See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter list.
