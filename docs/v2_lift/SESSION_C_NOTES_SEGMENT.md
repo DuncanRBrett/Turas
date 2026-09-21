@@ -1,7 +1,7 @@
 # Segment Session C — implementation notes
 
 **Branch:** `feature/segment-tabs-export`, cut from main `34186c13` on
-2026-09-21. **Not merged, not pushed.**
+2026-09-21. **MERGED and PUSHED**, origin/main `421572bc`.
 **Work order:** `docs/v2_lift/HANDOVER_SEGMENT_FOR_OPUS.md` section 4.
 Not gated on OPUS-0: no v2 island, no shared-socket dependency.
 
