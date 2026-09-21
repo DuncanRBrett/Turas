@@ -202,8 +202,44 @@
     return Array.isArray(s) ? s : [];
   };
 
+  /** An authored slide's body. The text is the report author's, so it is
+   *  escaped like every other authored value and NO markup is honoured. What
+   *  the renderer does read is the shape the author typed: a run of blank
+   *  lines starts a new paragraph, and a line opening "- " or "* " is a bullet.
+   *  That is the difference between an executive summary and a wall of text in
+   *  a box, and it costs the author nothing but the way they already type.
+   *  Pure string in, string out. */
+  report.slideBodyHtml = function (text) {
+    var src = String(text == null ? "" : text);
+    if (!src.trim()) return "";
+    var out = [], bullets = [];
+    var flush = function () {
+      if (!bullets.length) return;
+      out.push("<ul>" + bullets.map(function (b) {
+        return "<li>" + fmt.escapeHtml(b) + "</li>";
+      }).join("") + "</ul>");
+      bullets = [];
+    };
+    src.split(/\n\s*\n/).forEach(function (block) {
+      block.split("\n").forEach(function (line) {
+        var s = line.trim();
+        if (!s) return;
+        if (/^[-*]\s+/.test(s)) { bullets.push(s.replace(/^[-*]\s+/, "")); return; }
+        flush();
+        out.push("<p>" + fmt.escapeHtml(s) + "</p>");
+      });
+      flush();
+    });
+    return out.join("");
+  };
+
   /** One card per authored slide, each individually pinnable. A pure function of
-   *  the data island ("" when the config authored none) so it is unit-testable. */
+   *  the data island ("" when the config authored none) so it is unit-testable.
+   *
+   *  The title leads the card rather than trailing it as a grey caption. A
+   *  study slide is an exhibit with a heading, and the old footer caption read
+   *  as an afterthought while every card opened by repeating its own title in
+   *  body text. */
   report.studySlidesHtml = function () {
     var list = report.slides();
     if (!list.length) return "";
@@ -212,16 +248,17 @@
       "to this report can be found here.</p>" +
       '<div class="added-slides">' + list.map(function (sl, i) {
         var title = String(sl.title || "");
-        return '<div class="added-slide" data-snap-card>' +
-          (sl.image
-            ? '<img src="' + fmt.escapeHtml(sl.image) + '" alt="' +
-              fmt.escapeHtml(title || "Study slide") + '">' : "") +
-          (sl.text ? '<div class="as-text">' + fmt.escapeHtml(sl.text) + "</div>" : "") +
-          '<div class="as-foot"><span class="as-cap">' + fmt.escapeHtml(title) +
+        return '<div class="added-slide as-authored" data-snap-card>' +
+          '<div class="as-head"><span class="as-cap">' + fmt.escapeHtml(title) +
           '</span><button class="snap-pin" data-snap-pin data-snap-source="slide" ' +
           'data-snap-slide="' + i + '" data-snap-title="' + fmt.escapeHtml(title) +
           '" title="Pin this slide to the story" ' +
-          'aria-label="Pin slide to story">📌</button></div></div>';
+          'aria-label="Pin slide to story">📌</button></div>' +
+          (sl.image
+            ? '<img src="' + fmt.escapeHtml(sl.image) + '" alt="' +
+              fmt.escapeHtml(title || "Study slide") + '">' : "") +
+          (sl.text ? '<div class="as-body">' + report.slideBodyHtml(sl.text) +
+            "</div>" : "") + "</div>";
       }).join("") + "</div></div>";
   };
 

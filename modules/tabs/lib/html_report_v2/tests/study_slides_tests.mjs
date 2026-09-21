@@ -124,10 +124,17 @@ run("S1: no authored slides -> no card at all", () => {
 run("S1: one card per row. Picture, words and caption", () => {
   const html = slideSandbox({}).TR.report.studySlidesHtml();
   at(html, "<h3>Study slides</h3>", "the card is headed as authored slides");
-  eq(html.split('class="added-slide"').length - 1, 3, "one tile per sheet row");
+  eq(html.split('class="added-slide as-authored"').length - 1, 3,
+    "one tile per sheet row");
   at(html, 'src="data:image/png;base64,', "the picture is embedded");
   at(html, "Six focus groups, March.", "the row's text renders");
-  at(html, '<span class="as-cap">Method note</span>', "the caption is static text");
+  // The title LEADS the tile. It used to trail as a grey footer caption, which
+  // read as an afterthought and left every author repeating the title in the
+  // body text. The pin moves up with it so the head carries both.
+  at(html, '<div class="as-head"><span class="as-cap">Method note</span>',
+    "the title leads the tile as its heading");
+  assert(html.indexOf('class="as-foot"') === -1,
+    "an authored tile has no footer. Its caption is the heading");
   assert(html.indexOf('class="as-title"') === -1,
     "no editable caption input. The report author owns these");
   // a text-only row is a slide too
@@ -135,6 +142,34 @@ run("S1: one card per row. Picture, words and caption", () => {
     .TR.report.studySlidesHtml();
   at(textOnly, "Just words", "a row with no image still renders");
   assert(textOnly.indexOf("<img") === -1, "…and no empty img tag");
+});
+
+run("S1: the body reads the shape the author typed, and nothing else", () => {
+  const body = slideSandbox({}).TR.report.slideBodyHtml;
+  eq(body("One line."), "<p>One line.</p>", "a line is a paragraph");
+  eq(body("One.\n\nTwo."), "<p>One.</p><p>Two.</p>", "a blank line starts a new one");
+  eq(body("Lead:\n- a\n- b"), "<p>Lead:</p><ul><li>a</li><li>b</li></ul>",
+    "a line opening '- ' is a bullet, and the run becomes one list");
+  eq(body("* a\n* b"), "<ul><li>a</li><li>b</li></ul>", "'* ' works too");
+  eq(body("   "), "", "whitespace authors nothing");
+  eq(body(null), "", "and neither does a missing value");
+  // The text is the AUTHOR's, not the reader's, but it is still escaped: a
+  // config is edited by hand and an stray angle bracket must not become markup.
+  eq(body("5 < 6 & 7"), "<p>5 &lt; 6 &amp; 7</p>", "the text is escaped");
+  assert(body("**bold**").indexOf("<strong>") === -1,
+    "markdown is NOT honoured. The config template's claim that it is has been wrong since the sheet shipped");
+});
+
+run("S1: the reader's own added slides keep their editable footer", () => {
+  // The two grids share .added-slide but not their furniture: the reader's
+  // caption is an input they type into, so it cannot move into a heading bar.
+  // Asserted on the module source because rendering the whole tab needs the
+  // shell, the text catalogue and the AI module; what matters here is only
+  // that moving the AUTHORED caption did not touch the reader's branch.
+  // That the AUTHORED tile carries neither is asserted on its output above.
+  const src = readFileSync(path.join(JS_DIR, "32_report.js"), "utf8");
+  at(src, 'class="as-title"', "the reader's tile still emits its input");
+  at(src, '"as-foot"', "…inside a footer");
 });
 
 run("S1: authored slides never enter the reader's own Added-slides store", () => {
