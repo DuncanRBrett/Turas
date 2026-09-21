@@ -282,9 +282,11 @@ run_segment_gui <- function() {
         h3(class = "turas-card-title", "Step 3: Run Analysis"),
         p("Click the button below to start the segmentation analysis. This may take a few moments."),
 
+        # Starts as the config's generate_stats_pack; a click overrides it
+        # for this run (F5).
         checkboxInput("generate_stats_pack",
                       "Generate stats pack (diagnostic workbook for advanced review)",
-                      value = FALSE),
+                      value = segment_gui_stats_pack_default(config_file())),
 
         actionButton("run_analysis_btn", "Run Segmentation Analysis",
                     class = "turas-btn-run",

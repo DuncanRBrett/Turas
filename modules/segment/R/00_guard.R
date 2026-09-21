@@ -529,6 +529,27 @@ segment_gui_partial_reasons <- function(result) {
 }
 
 
+#' What the Stats-pack Checkbox Should Start As
+#'
+#' The GUI writes the checkbox into an option on every run, and the option
+#' wins over the config (segment_should_write_stats_pack). With the box
+#' always starting unticked, the config's generate_stats_pack was never
+#' consulted from the GUI (independent review 2026-09-21, F5). The box now
+#' starts as the study's setting and a click overrides it for that run.
+#'
+#' @param config_file Path to the config workbook, or NULL
+#' @return TRUE unless the config says generate_stats_pack = N
+#' @export
+segment_gui_stats_pack_default <- function(config_file) {
+  if (is.null(config_file) || !nzchar(config_file) || !file.exists(config_file)) return(TRUE)
+  value <- tryCatch({
+    raw <- read_segment_config(config_file)
+    toupper(trimws(as.character(raw$generate_stats_pack %||% "Y")))
+  }, error = function(e) "Y")
+  !identical(value, "N")
+}
+
+
 #' Print a Refusal or Error Where a Shiny User Will Find It
 #'
 #' Turas runs behind a Shiny app and its users debug from the console the app

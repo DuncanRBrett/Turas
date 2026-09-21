@@ -560,11 +560,11 @@ appear in the Slides tab in the same order as the rows in the sheet.
 
 #### k_selection_metrics
 
--   **Purpose:** Metrics for choosing optimal k
+-   **Purpose:** Columns of the k-selection table in exploration mode. Silhouette (the recommendation basis) and elbow (within-SS) are always shown; naming `calinski_harabasz` and `davies_bouldin` adds those columns. Any other name is refused.
 -   **Required:** No
 -   **Data Type:** Text (comma-separated)
--   **Default:** `silhouette,elbow`
--   **Valid Values:** `silhouette`, `elbow`, `gap`
+-   **Default:** `silhouette,elbow,calinski_harabasz,davies_bouldin`
+-   **Valid Values:** `silhouette`, `elbow`, `calinski_harabasz`, `davies_bouldin`
 
 ------------------------------------------------------------------------
 

@@ -183,7 +183,7 @@ write_segment_config <- function(path, mode = c("final", "exploration")) {
     k_fixed                = if (mode == "final") "3" else "",
     k_min                  = "2",
     k_max                  = "6",
-    k_selection_metrics    = "silhouette,elbow",
+    k_selection_metrics    = "silhouette,elbow,calinski_harabasz,davies_bouldin",
     nstart                 = "50",
     seed                   = "2026",
 

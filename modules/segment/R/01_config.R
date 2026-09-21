@@ -352,8 +352,37 @@ validate_segment_analysis_params <- function(config, clustering_vars) {
   varsel_max_correlation <- get_numeric_config(config, "varsel_max_correlation", default_value = 0.8, min = 0.5, max = 0.95)
 
   # Validation metrics
-  k_selection_metrics_str <- get_char_config(config, "k_selection_metrics", default_value = "silhouette,elbow")
-  k_selection_metrics <- trimws(unlist(strsplit(k_selection_metrics_str, ",")))
+  k_selection_metrics_str <- get_char_config(
+    config, "k_selection_metrics",
+    default_value = "silhouette,elbow,calinski_harabasz,davies_bouldin")
+  k_selection_metrics <- tolower(trimws(unlist(strsplit(k_selection_metrics_str, ","))))
+  k_selection_metrics <- k_selection_metrics[nzchar(k_selection_metrics)]
+
+  # Only names the module computes. The template used to offer gap_statistic
+  # here while nothing read the setting at all, so any spelling passed
+  # (independent review 2026-09-21, F4). Silhouette and elbow are always
+  # computed because the recommendation is made on silhouette; the two
+  # separation indices are added to the k-selection table when named.
+  known_metrics <- c("silhouette", "elbow", "calinski_harabasz", "davies_bouldin")
+  unknown_metrics <- setdiff(k_selection_metrics, known_metrics)
+  if (length(unknown_metrics) > 0) {
+    segment_refuse(
+      code = "CFG_INVALID_K_SELECTION_METRIC",
+      title = "Unknown k-selection metric",
+      problem = sprintf("k_selection_metrics names %s, which the module does not compute.",
+                        paste(unknown_metrics, collapse = ", ")),
+      why_it_matters = paste(
+        "A metric named here appears in the k-selection report. Naming one that",
+        "nothing computes would leave a column the reader assumes was weighed."
+      ),
+      how_to_fix = c(
+        "Use any of: silhouette, elbow, calinski_harabasz, davies_bouldin.",
+        "The gap statistic is not offered here: it is expensive and stays behind calculate_gap in code."
+      ),
+      expected = known_metrics,
+      observed = unknown_metrics
+    )
+  }
 
   # Output settings
   output_folder <- get_char_config(config, "output_folder", default_value = "output/")

@@ -313,6 +313,33 @@ build_seg_validation_section <- function(tables, charts, html_data) {
     )))
   }
 
+  # Calinski-Harabasz card. No fixed quality bands: the index scales with n
+  # and is read by comparing solutions, so the note says that.
+  if (!is.null(diag$ch_index) && !is.na(diag$ch_index)) {
+    fit_cards <- c(fit_cards, list(htmltools::tags$div(
+      class = "seg-fit-card",
+      htmltools::tags$div(class = "seg-fit-card-value", sprintf("%.1f", diag$ch_index)),
+      htmltools::tags$div(class = "seg-fit-card-label", "Calinski-Harabasz"),
+      htmltools::tags$div(class = "seg-fit-card-quality", "Higher is better"),
+      htmltools::tags$div(class = "seg-fit-card-note",
+                          "Ratio of between-segment to within-segment dispersion. It grows with sample size, so compare it across solutions of the same study rather than against a fixed scale.")
+    )))
+  }
+
+  # Davies-Bouldin card
+  if (!is.null(diag$db_index) && !is.na(diag$db_index)) {
+    db_val <- diag$db_index
+    db_label <- if (db_val < 1.0) "Well separated" else if (db_val < 1.5) "Moderate" else "Overlapping"
+    fit_cards <- c(fit_cards, list(htmltools::tags$div(
+      class = "seg-fit-card",
+      htmltools::tags$div(class = "seg-fit-card-value", sprintf("%.3f", db_val)),
+      htmltools::tags$div(class = "seg-fit-card-label", "Davies-Bouldin"),
+      htmltools::tags$div(class = "seg-fit-card-quality", db_label),
+      htmltools::tags$div(class = "seg-fit-card-note",
+                          "Average, over segments, of the worst ratio of within-segment spread to between-centre distance. Lower is better; under 1.0 is usually read as well separated.")
+    )))
+  }
+
   # Number of variables card
   if (!is.null(diag$n_variables) && !is.na(diag$n_variables)) {
     fit_cards <- c(fit_cards, list(htmltools::tags$div(

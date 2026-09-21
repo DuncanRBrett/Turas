@@ -126,7 +126,11 @@ load_segment_data <- function(config) {
     clustering_data = clustering_data,
     profile_data = profile_data,
     config = config,
-    n_original = nrow(data)
+    n_original = nrow(data),
+    # Every respondent as loaded, before missing-data handling and outlier
+    # removal, so the tabs export can tell a row the module dropped from a
+    # row the join lost (independent review 2026-09-21, F1).
+    original_ids = data[[config$id_variable]]
   ))
 }
 

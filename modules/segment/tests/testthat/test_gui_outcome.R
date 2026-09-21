@@ -264,3 +264,32 @@ test_that("the GUI announces a PARTIAL run as completed with warnings, not succe
   # The results panel asks the classifier again rather than assuming PASS.
   expect_true(grepl("partial_outcome <- segment_gui_outcome(result)", src, fixed = TRUE))
 })
+
+
+# ------------------------------------------------------------------------------
+# F5: the stats-pack checkbox starts as the config's setting.
+# ------------------------------------------------------------------------------
+
+test_that("the stats-pack checkbox default follows the config (F5)", {
+  make <- function(value) {
+    path <- tempfile(fileext = ".xlsx")
+    wb <- openxlsx::createWorkbook(); openxlsx::addWorksheet(wb, "Config")
+    rows <- data.frame(Setting = c("data_file", "id_variable", "clustering_vars", "k_fixed", "method"),
+                       Value = c("x.xlsx", "id", "q1,q2,q3", "3", "kmeans"), stringsAsFactors = FALSE)
+    if (!is.null(value)) rows <- rbind(rows, data.frame(Setting = "generate_stats_pack", Value = value))
+    openxlsx::writeData(wb, "Config", rows)
+    openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+    path
+  }
+  expect_false(segment_gui_stats_pack_default(make("N")))
+  expect_true(segment_gui_stats_pack_default(make("Y")))
+  expect_true(segment_gui_stats_pack_default(make(NULL)))
+  expect_true(segment_gui_stats_pack_default(NULL))
+  expect_true(segment_gui_stats_pack_default("/no/such/file.xlsx"))
+})
+
+test_that("the GUI checkbox reads that default rather than FALSE (F5)", {
+  src <- .segment_gui_src()
+  expect_true(grepl("value = segment_gui_stats_pack_default(config_file())", src, fixed = TRUE))
+  expect_false(grepl('"generate_stats_pack",\n                      "Generate stats pack (diagnostic workbook for advanced review)",\n                      value = FALSE', src, fixed = TRUE))
+})

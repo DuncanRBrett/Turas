@@ -264,6 +264,18 @@ build_seg_validation_table <- function(html_data) {
     ))
   }
 
+  # -- Calinski-Harabasz and Davies-Bouldin (F4) --
+  if (!is.null(diag$ch_index) && !is.na(diag$ch_index)) {
+    metric_rows <- c(metric_rows, list(
+      .build_seg_validation_row("Calinski-Harabasz", sprintf("%.1f", diag$ch_index), "Higher is better")
+    ))
+  }
+  if (!is.null(diag$db_index) && !is.na(diag$db_index)) {
+    metric_rows <- c(metric_rows, list(
+      .build_seg_validation_row("Davies-Bouldin", sprintf("%.3f", diag$db_index), "Lower is better")
+    ))
+  }
+
   # -- Method --
   method_val <- diag$method
   if (!is.null(method_val) && nzchar(method_val)) {

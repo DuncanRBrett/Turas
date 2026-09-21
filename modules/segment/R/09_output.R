@@ -252,6 +252,12 @@ export_exploration_report <- function(exploration_result, metrics_result,
   metrics_df$tot.withinss <- round(metrics_df$tot.withinss, 1)
   metrics_df$betweenss_totss <- round(metrics_df$betweenss_totss, 3)
   metrics_df$min_segment_pct <- round(metrics_df$min_segment_pct, 1)
+  if ("calinski_harabasz" %in% names(metrics_df)) {
+    metrics_df$calinski_harabasz <- round(metrics_df$calinski_harabasz, 1)
+  }
+  if ("davies_bouldin" %in% names(metrics_df)) {
+    metrics_df$davies_bouldin <- round(metrics_df$davies_bouldin, 3)
+  }
   
   # Prepare profiles for each k
   profile_sheets <- list()
@@ -570,6 +576,8 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     sprintf("Method: %s clustering", toupper(final_result$method %||% "kmeans")),
     sprintf("Average silhouette: %.3f", validation_metrics$avg_silhouette),
     sprintf("Between/Total SS ratio: %.3f", validation_metrics$betweenss_totss),
+    sprintf("Calinski-Harabasz: %s", if (is.null(validation_metrics$calinski_harabasz) || is.na(validation_metrics$calinski_harabasz)) "NA" else sprintf("%.1f", validation_metrics$calinski_harabasz)),
+    sprintf("Davies-Bouldin: %s", if (is.null(validation_metrics$davies_bouldin) || is.na(validation_metrics$davies_bouldin)) "NA" else sprintf("%.3f", validation_metrics$davies_bouldin)),
     "",
     "SEGMENTS IDENTIFIED",
     "-------------------"
@@ -644,13 +652,17 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       "Average Silhouette",
       "Total Within-cluster SS",
       "Total Between-cluster SS",
-      "Between/Total SS ratio"
+      "Between/Total SS ratio",
+      "Calinski-Harabasz (higher is better)",
+      "Davies-Bouldin (lower is better)"
     ),
     Value = c(
       round(validation_metrics$avg_silhouette, 3),
       round(validation_metrics$tot_withinss, 1),
       round(validation_metrics$betweenss, 1),
-      round(validation_metrics$betweenss_totss, 3)
+      round(validation_metrics$betweenss_totss, 3),
+      round(validation_metrics$calinski_harabasz %||% NA_real_, 1),
+      round(validation_metrics$davies_bouldin %||% NA_real_, 3)
     ),
     stringsAsFactors = FALSE
   )

@@ -515,13 +515,20 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     )
     names(assignments_df)[1] <- config$id_variable
 
+    # Respondents the module itself removed before clustering. They have no
+    # segment by the module's own doing and are labelled Unassigned; only a
+    # row the segmentation never saw is a join failure (F1).
+    dropped_ids <- setdiff(as.character(data_list$original_ids %||% character(0)),
+                           as.character(data_list$data[[config$id_variable]]))
+
     tabs_export_result <- segment_export_for_tabs(
       assignments = assignments_df,
       survey_file = config$data_file,
       survey_sheet = config$data_sheet %||% "Data",
       id_variable = config$id_variable,
       output_file = tabs_data_path,
-      allow_partial_join = isTRUE(config$allow_partial_join)
+      allow_partial_join = isTRUE(config$allow_partial_join),
+      dropped_ids = dropped_ids
     )
 
     segment_write_banner_stub(
@@ -529,6 +536,24 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
       column_name = tabs_export_result$segment_column,
       output_file = tabs_stub_path
     )
+
+    # An export with Unassigned rows makes the run PARTIAL, and says why, in
+    # the run state the Excel Run_Status sheet and the stats pack read from
+    # (F21). The status was decided above, before the export, so it is
+    # amended here rather than recomputed.
+    if ((tabs_export_result$n_unmatched %||% 0) > 0) {
+      reason <- sprintf(
+        "%d of %d survey rows are Unassigned in the tabs export (%d removed before clustering, %d never seen by the segmentation)",
+        tabs_export_result$n_unmatched, tabs_export_result$n_rows,
+        tabs_export_result$n_removed_by_module, tabs_export_result$n_never_seen)
+      run_status$run_status <- "PARTIAL"
+      run_status$degraded_reasons <- unique(c(run_status$degraded_reasons, reason))
+      if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(trs_state, code = "TABS_EXPORT_UNASSIGNED",
+                                title = "Unassigned rows in the tabs export", problem = reason)
+        run_result <- turas_run_state_result(trs_state)
+      }
+    }
   }
 
   # Export full report (Excel)
@@ -714,7 +739,11 @@ run_exploration_pipeline <- function(data_list, config, guard, trs_state, start_
   exploration_result <- run_clustering_exploration(data_list, config, guard)
 
   # Calculate metrics for each k
-  metrics_result <- calculate_exploration_metrics(exploration_result)
+  metrics_result <- calculate_exploration_metrics(
+    exploration_result,
+    metrics = config$k_selection_metrics %||% c("silhouette", "elbow",
+                                                 "calinski_harabasz", "davies_bouldin")
+  )
 
   # Recommend optimal k
   recommendation <- recommend_k(metrics_result$metrics_df, config$min_segment_size_pct)
