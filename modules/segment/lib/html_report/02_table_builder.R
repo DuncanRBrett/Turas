@@ -415,13 +415,21 @@ build_seg_demographics_table <- function(html_data) {
       )
     })
 
+    # One wrapper per variable, each holding exactly one table. The CSV
+    # export button reads the first table inside its own .seg-table-wrapper,
+    # so a single wrapper around all the variables would export the first one
+    # and call it the section.
     htmltools::tags$div(
       class = "seg-demo-block",
       htmltools::tags$h4(class = "seg-demo-var-title", var_name),
-      htmltools::tags$table(
-        class = "seg-table seg-demographics-table",
-        htmltools::tags$thead(header),
-        htmltools::tags$tbody(rows)
+      htmltools::tags$div(
+        class = "seg-table-wrapper",
+        build_seg_table_export_toolbar(paste0("demographics_", var_name)),
+        htmltools::tags$table(
+          class = "seg-table seg-demographics-table",
+          htmltools::tags$thead(header),
+          htmltools::tags$tbody(rows)
+        )
       )
     )
   })
@@ -432,6 +440,83 @@ build_seg_demographics_table <- function(html_data) {
   if (length(sub_tables) == 0) return(NULL)
 
   htmltools::tags$div(class = "seg-demographics-section", sub_tables)
+}
+
+
+#' Build Numeric Demographics Table
+#'
+#' One table per numeric demographic variable: the mean, median, spread and
+#' range within each segment, plus an Overall row. `profile_demographics()`
+#' sends a numeric variable with more than ten distinct values down this
+#' route, so an age in years lands here while an age band lands in the
+#' categorical tables.
+#'
+#' The frames carry no p-value. `profile_demographics()` runs a one-way ANOVA
+#' per numeric variable and prints the result to the console without returning
+#' it, so there is no test statistic to render without changing that
+#' function's return. The section says these tables are descriptive.
+#'
+#' @param html_data Transformed data from transform_segment_for_html()
+#' @return htmltools tag list, or NULL if there are no numeric demographics
+#' @keywords internal
+build_seg_demographics_numeric_table <- function(html_data) {
+
+  enhanced <- html_data$enhanced %||% list()
+  demo_data <- enhanced$demographic_profiles %||% NULL
+  if (is.null(demo_data)) return(NULL)
+
+  num_profiles <- demo_data$numeric_profiles %||% NULL
+  if (is.null(num_profiles) || length(num_profiles) == 0) return(NULL)
+
+  cols <- c("Segment", "N", "Mean", "Median", "SD", "Min", "Max")
+
+  sub_tables <- lapply(names(num_profiles), function(var_name) {
+
+    stats_df <- num_profiles[[var_name]]
+    if (is.null(stats_df) || nrow(stats_df) == 0) return(NULL)
+
+    present <- intersect(cols, names(stats_df))
+    if (length(present) < 2) return(NULL)
+
+    header <- htmltools::tags$tr(lapply(seq_along(present), function(j) {
+      htmltools::tags$th(
+        present[j],
+        class = if (j == 1) "seg-th seg-th-label" else "seg-th seg-th-num")
+    }))
+
+    rows <- lapply(seq_len(nrow(stats_df)), function(i) {
+      is_overall <- identical(as.character(stats_df[[present[1]]][i]), "Overall")
+      htmltools::tags$tr(
+        class = if (is_overall) "seg-tr seg-tr-total" else "seg-tr",
+        lapply(seq_along(present), function(j) {
+          val <- stats_df[[present[j]]][i]
+          display <- if (length(val) == 0 || is.na(val)) "-" else as.character(val)
+          htmltools::tags$td(
+            display,
+            class = if (j == 1) "seg-td seg-td-label" else "seg-td seg-td-num")
+        })
+      )
+    })
+
+    htmltools::tags$div(
+      class = "seg-demo-block",
+      htmltools::tags$h4(class = "seg-demo-var-title", var_name),
+      htmltools::tags$div(
+        class = "seg-table-wrapper",
+        build_seg_table_export_toolbar(paste0("demographics_", var_name)),
+        htmltools::tags$table(
+          class = "seg-table seg-demographics-table",
+          htmltools::tags$thead(header),
+          htmltools::tags$tbody(rows)
+        )
+      )
+    )
+  })
+
+  sub_tables <- Filter(Negate(is.null), sub_tables)
+  if (length(sub_tables) == 0) return(NULL)
+
+  htmltools::tags$div(class = "seg-demographics-numeric-section", sub_tables)
 }
 
 

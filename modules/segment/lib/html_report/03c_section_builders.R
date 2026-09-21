@@ -669,6 +669,101 @@ build_seg_profiles_section <- function(tables, charts, html_data) {
 
 
 # ==============================================================================
+# DEMOGRAPHICS SECTION
+# ==============================================================================
+
+#' Build Demographic Profiles Section
+#'
+#' Shows how each demographic variable is distributed within each segment.
+#' The tables come from `profile_demographics()`, which the orchestrator calls
+#' when the config names any `demographic_vars`. Before September 2026 nothing
+#' called it and this section did not exist (independent review 2026-09-21,
+#' F2).
+#'
+#' @param tables Named list of table objects
+#' @param html_data Transformed HTML data
+#' @return htmltools tag, or NULL when there are no demographic profiles
+#' @keywords internal
+build_seg_demographics_section <- function(tables, html_data) {
+
+  demo <- html_data$enhanced$demographic_profiles %||% NULL
+  if (is.null(demo)) return(NULL)
+
+  cat_el <- tables$demographics
+  num_el <- tables$demographics_numeric
+  if (is.null(cat_el) && is.null(num_el)) return(NULL)
+
+  title_row <- build_seg_section_title_row("Demographics", "demographics")
+  insight_area <- build_seg_insight_area("demographics")
+
+  # The base. Demographics are profiled on the respondents who were
+  # clustered, which is not everyone in the data file when listwise deletion
+  # or outlier removal took rows out.
+  sizes <- html_data$segment_sizes
+  base_note <- if (!is.null(sizes) && nrow(sizes) > 0) {
+    sprintf("Base: %d respondents who were clustered (%s).",
+            sum(sizes$n),
+            paste(sprintf("%s n=%d", sizes$segment_name, sizes$n), collapse = ", "))
+  } else {
+    "Base: the respondents who were clustered."
+  }
+
+  numeric_heading <- if (!is.null(num_el)) {
+    htmltools::tags$h3(
+      class = "seg-subsection-title",
+      style = "margin:24px 0 10px; font-size:16px;",
+      "Numeric demographics"
+    )
+  }
+
+  numeric_note <- if (!is.null(num_el)) {
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:6px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      paste(
+        "The numeric tables are descriptive: they carry no test.",
+        "A variable with more than ten distinct numeric values is summarised",
+        "this way rather than cross-tabulated."
+      )
+    )
+  }
+
+  htmltools::tags$div(
+    class = "seg-section",
+    id = "seg-demographics",
+    `data-seg-section` = "demographics",
+    title_row,
+    insight_area,
+    htmltools::tags$p(
+      class = "seg-section-intro",
+      paste(
+        "How each demographic variable is spread within each segment.",
+        "Percentages are column percentages: they read down a segment and add",
+        "to 100 within it, across the respondents who answered that question.",
+        "The Overall column is the same calculation on the whole clustered sample."
+      )
+    ),
+    cat_el,
+    numeric_heading,
+    num_el,
+    numeric_note,
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      paste(
+        base_note,
+        "The chi-square p-values in the workbook's Demographics_Tests sheet are",
+        "descriptive. The segments are a grouping derived from this same sample,",
+        "so a p-value here describes this data rather than testing a claim made",
+        "before the segmentation, and a table with expected counts under five is",
+        "flagged in that sheet as approximate."
+      )
+    )
+  )
+}
+
+
+# ==============================================================================
 # RULES SECTION
 # ==============================================================================
 

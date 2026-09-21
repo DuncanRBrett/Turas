@@ -356,6 +356,37 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     })
   }
 
+  # Demographic profiles
+  # Until September 2026 demographic_vars was parsed, carried through
+  # validation, offered by the template and consumed by nothing (independent
+  # review 2026-09-21, F2). This is the call that makes it real.
+  #
+  # Two things about the shape of this block. The data passed is
+  # data_list$data, which is the post-preparation data, so the demographics
+  # are profiled on the respondents who were clustered and not on the ones
+  # listwise deletion or outlier removal took out; the report section says so.
+  # And the tryCatch below also catches a TRS refusal, which inherits from
+  # error, so a refusal here would become a warning rather than stopping the
+  # run. That is acceptable only because load_segment_data() now refuses a
+  # demographic variable the data does not carry, which makes
+  # profile_demographics()'s own refusal unreachable from this path.
+  if (length(config$demographic_vars %||% character(0)) > 0) {
+    enhanced$demographic_profiles <- tryCatch({
+      cat("  Profiling demographics...\n")
+      keep <- !is.na(cluster_result$clusters)
+      profile_demographics(
+        data = data_list$data[keep, , drop = FALSE],
+        clusters = cluster_result$clusters[keep],
+        demo_vars = config$demographic_vars,
+        segment_names = segment_names
+      )
+    }, error = function(e) {
+      guard <<- guard_warn(guard, paste("Demographic profiling failed:", e$message),
+                           "demographics")
+      NULL
+    })
+  }
+
   # Stability check
   if (config$run_stability_check) {
     enhanced$stability <- tryCatch({
@@ -836,6 +867,19 @@ run_multi_method_pipeline <- function(data_list, config, guard, trs_state, start
 
   methods <- config$methods
   cat(sprintf("\n  Multi-method mode: running %s\n", paste(toupper(methods), collapse = ", ")))
+
+  # Demographic profiling is a final-mode deliverable: the comparison report
+  # has its own page builder with no Demographics section, and the per-method
+  # workbooks would carry three different answers for the same question. Say
+  # so rather than letting the setting look as though it ran (independent
+  # review 2026-09-21, F2 and F14 are the same shape).
+  if (length(config$demographic_vars %||% character(0)) > 0) {
+    cat(sprintf(paste0(
+      "  [SEGMENT] Report section skipped: demographic profiles ",
+      "(%d variable(s) named; the Demographics section and its workbook ",
+      "sheets are written by the single-method final run made after you ",
+      "choose a method)\n"), length(config$demographic_vars)))
+  }
 
   method_results <- list()
 

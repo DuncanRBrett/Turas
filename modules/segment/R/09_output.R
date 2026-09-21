@@ -785,6 +785,42 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   }
 
   # ===========================================================================
+  # SHEETS: Demographic profiles (optional)
+  # ===========================================================================
+  # One sheet of chi-square results, then one sheet per demographic variable.
+  # Built the way export_demographic_profiles() builds its own workbook, into
+  # this report rather than into a second file (independent review 2026-09-21,
+  # F2).
+
+  demo <- enhanced$demographic_profiles
+  if (!is.null(demo) && is.list(demo)) {
+
+    tests_df <- demo$chi_sq_tests
+    if (!is.null(tests_df) && is.data.frame(tests_df) && nrow(tests_df) > 0) {
+      sheets[["Demographics_Tests"]] <- tests_df
+    }
+
+    demo_frames <- c(demo$categorical_profiles %||% list(),
+                     demo$numeric_profiles %||% list())
+    for (var in names(demo_frames)) {
+      frame <- demo_frames[[var]]
+      if (is.null(frame) || !is.data.frame(frame) || nrow(frame) == 0) next
+      # Excel caps a sheet name at 31 characters, so two long variable names
+      # can truncate to the same sheet and the second would overwrite the
+      # first without a word.
+      sheet_name <- substr(paste0("Demo_", var), 1, 31)
+      if (sheet_name %in% names(sheets)) {
+        suffix <- 2L
+        while (paste0(substr(sheet_name, 1, 29), "_", suffix) %in% names(sheets)) {
+          suffix <- suffix + 1L
+        }
+        sheet_name <- paste0(substr(sheet_name, 1, 29), "_", suffix)
+      }
+      sheets[[sheet_name]] <- frame
+    }
+  }
+
+  # ===========================================================================
   # SHEET: GMM Membership (optional)
   # ===========================================================================
 

@@ -575,13 +575,22 @@ profile_demographics <- function(data, clusters, demo_vars,
       }
 
     }, error = function(e) {
+      # Two defects here until September 2026, both invisible while nothing
+      # called this function. The assignment was local to the handler, so a
+      # failed test left the variable out of the table altogether rather than
+      # in it with an empty result; and the row it built had five columns
+      # against the successful row's six, which would have made do.call(rbind)
+      # fail for a run where one variable tested and another did not. A
+      # demographic that is empty among the clustered respondents reaches this
+      # branch: chisq.test() refuses a table with no positive entry.
       cat(sprintf("  Warning: Chi-squared test failed: %s\n", e$message))
-      chi_sq_tests[[var]] <- data.frame(
+      chi_sq_tests[[var]] <<- data.frame(
         Variable = var,
-        Chi_Sq = NA,
-        DF = NA,
-        P_Value = NA,
+        Chi_Sq = NA_real_,
+        DF = NA_real_,
+        P_Value = NA_character_,
         Significant = NA,
+        Low_Expected = NA,
         stringsAsFactors = FALSE
       )
     })

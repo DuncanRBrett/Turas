@@ -96,6 +96,7 @@ Each major section of the HTML report can be toggled on or off via a config flag
 | `html_show_validation` | TRUE | Cluster Validation (silhouette chart + metrics table) |
 | `html_show_importance` | TRUE | Variable Importance (eta-squared bar chart) |
 | `html_show_profiles` | TRUE | Segment Profiles (heatmap + profile table) |
+| `html_show_demographics` | TRUE | Demographics (requires `demographic_vars`) |
 | `html_show_rules` | FALSE | Classification Rules (requires enhanced features) |
 | `html_show_cards` | TRUE | Segment Action Cards |
 | `html_show_guide` | TRUE | Interpretation Guide |
@@ -233,6 +234,29 @@ The core analytical section showing how segments differ across all clustering va
    - Index 105--120: light blue highlight
    - Index 80--95: light amber highlight
    - Index < 80: light red highlight
+
+### Demographics
+
+**Config flag:** `html_show_demographics`
+
+One table per variable named in `demographic_vars`, showing how that variable
+is spread within each segment. Categorical variables (character, factor, or
+numeric with ten or fewer distinct values) show column percentages: each
+segment's column adds to 100 across the categories, beside an Overall column
+computed the same way on the whole clustered sample. Numeric variables with
+more than ten distinct values get a second block of tables showing N, mean,
+median, SD, minimum and maximum per segment, with an Overall row.
+
+The chi-square results are in the Excel report's `Demographics_Tests` sheet
+rather than on the page, and each variable also gets a `Demo_<variable>`
+sheet. The section's footnote states the base, which is the respondents who
+were clustered rather than every row in the data file, and says that the
+p-values are descriptive because the segments are derived from the same
+sample.
+
+This section only appears when `demographic_vars` names at least one variable
+that the data carries. A name the data does not carry is refused at load,
+before clustering.
 
 ### Classification Rules
 

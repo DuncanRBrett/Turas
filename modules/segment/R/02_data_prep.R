@@ -78,6 +78,44 @@ load_segment_data <- function(config) {
     )
   }
 
+  # Validate demographic variables exist.
+  # These are profiled after clustering, at the far end of a run. Until
+  # September 2026 nothing consumed them at all (independent review
+  # 2026-09-21, F2); now that they reach a report section, a name that is not
+  # in the data has to be found here rather than as a missing table after the
+  # clustering has been paid for.
+  demo_vars <- config$demographic_vars %||% character(0)
+  if (length(demo_vars) > 0) {
+    missing_demo <- setdiff(demo_vars, names(data))
+    if (length(missing_demo) > 0) {
+      cat("\n[SEGMENT] Demographic variables named in the config are not in the data file.\n")
+      segment_refuse(
+        code = "CFG_DEMOGRAPHIC_VARS_MISSING",
+        title = "Demographic Variables Not Found",
+        problem = sprintf(
+          "%d of %d demographic variable(s) are not columns in the data: %s.",
+          length(missing_demo), length(demo_vars),
+          paste(missing_demo, collapse = ", ")),
+        why_it_matters = paste(
+          "Demographic profiling is a report section and a set of workbook",
+          "sheets. A name the data does not carry would produce a section with",
+          "the variable silently absent, which reads as a variable that does",
+          "not separate the segments rather than one that was never profiled."
+        ),
+        how_to_fix = c(
+          "Check the spelling against the data file's column names, including case.",
+          "Remove the name from demographic_vars if the study does not carry it.",
+          sprintf("The data file's first columns are: %s",
+                  paste(head(names(data), 12), collapse = ", "))
+        ),
+        expected = head(names(data), 12),
+        observed = demo_vars,
+        missing = missing_demo
+      )
+    }
+    cat(sprintf("\u2713 All %d demographic variables found\n", length(demo_vars)))
+  }
+
   # Extract clustering data
   clustering_data <- data[, config$clustering_vars, drop = FALSE]
 

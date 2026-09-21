@@ -313,6 +313,26 @@ appear in the Slides tab in the same order as the rows in the sheet.
 -   **Default:** All non-clustering variables
 -   **Example:** `age,tenure_years,gender`
 
+#### demographic_vars
+
+-   **Purpose:** Categorical variables to cross-tabulate against the
+    segments, in their own report section and workbook sheets
+-   **Required:** No
+-   **Data Type:** Text (comma-separated column names)
+-   **Default:** None, and no Demographics section
+-   **Example:** `age_band,region,shops_online`
+-   **Notes:**
+    -   A name the data file does not carry is refused at load
+        (`CFG_DEMOGRAPHIC_VARS_MISSING`), before clustering
+    -   Character, factor, or numeric with ten or fewer distinct values:
+        column percentages by segment plus a chi-square test
+    -   Numeric with more than ten distinct values: means, medians and
+        spread by segment, with no test
+    -   Profiled on the respondents who were clustered, so rows removed
+        by listwise deletion or outlier removal are not in the base
+    -   Hide the report section with `html_show_demographics = FALSE`;
+        the workbook sheets are written either way
+
 ------------------------------------------------------------------------
 
 ## Clustering Algorithm Settings {#clustering-algorithm-settings}
@@ -702,6 +722,17 @@ appear in the Slides tab in the same order as the rows in the sheet.
 -   **Required:** No
 -   **Data Type:** TRUE/FALSE
 -   **Default:** `TRUE`
+
+#### html_show_demographics
+
+-   **Purpose:** Show Demographics section (one table per variable named
+    in `demographic_vars`)
+-   **Required:** No
+-   **Data Type:** TRUE/FALSE
+-   **Default:** `TRUE`
+-   **Notes:** Requires `demographic_vars` to name at least one variable.
+    Hiding the section does not remove the workbook's `Demographics_Tests`
+    and `Demo_<variable>` sheets
 
 #### html_show_rules
 

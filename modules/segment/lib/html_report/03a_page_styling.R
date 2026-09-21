@@ -391,6 +391,23 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-profile-table td.seg-td-label,
 .seg-overlap-table td.seg-td-label { text-align: left; }
 
+/* Demographics — one titled block per variable.
+   .seg-th-num caps a header cell at 110px, which in a full-width table
+   leaves the header box narrower than its column: the heading then centres
+   inside that box and sits left of the figures below it. These tables were
+   never rendered before September 2026, so the mismatch had never shown. */
+.seg-demographics-table th.seg-th-num,
+.seg-demographics-table td.seg-td-num { text-align: center; max-width: none; }
+/* Demographics — one titled block per variable */
+.seg-demo-block { margin-bottom: 22px; }
+.seg-demo-var-title {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--seg-brand);
+}
+.seg-tr-total { font-weight: 600; background: #f3f4f6; }
+
 /* Heatmap legend strip */
 .seg-heatmap-legend {
   display: flex; gap: 20px; align-items: center;
