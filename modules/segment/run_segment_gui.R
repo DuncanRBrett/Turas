@@ -513,7 +513,7 @@ run_segment_gui <- function() {
             hr(style = "margin: 10px 0;"),
             p(strong("Note:"),
               if (refused) {
-                " Nothing was written. Fix the configuration or the data and run again."
+                " Nothing further was written. Files from earlier steps of this run, if any, are in the output folder. Fix the configuration or the data and run again."
               } else {
                 " Check the console output above. Output files may still have been generated."
               })

@@ -155,3 +155,88 @@ test_that("the skipped-methods note actually reaches the rendered panel (M5)", {
   expect_true(grepl("gmm", html, fixed = TRUE))
   expect_true(grepl("Not included in this comparison", html, fixed = TRUE))
 })
+
+
+# ------------------------------------------------------------------------------
+# Guards added by the independent review (2026-09-21). Mutation testing found
+# that the `<<-` in the combined report's comparison handlers, the `skipped`
+# entry it feeds the panel, and the footnote's call site in the importance
+# section could all be reverted without any test noticing (review F13).
+# ------------------------------------------------------------------------------
+
+.silent_drop_method_result <- function(method, k = 3) {
+  td <- generate_segment_test_data(n = 100, k_true = k, n_vars = 5, seed = 42)
+  data <- td$data
+  clustering_vars <- td$clustering_vars
+  config <- generate_test_config(td, method = method, k_fixed = k)
+  config$scale_max <- 10
+  numeric_data <- data[, clustering_vars, drop = FALSE]
+  for (col in clustering_vars) {
+    med <- median(numeric_data[[col]], na.rm = TRUE)
+    numeric_data[[col]][is.na(numeric_data[[col]])] <- med
+  }
+  scaled <- scale(numeric_data)
+  data_list <- list(
+    original_data = data, scaled_data = scaled, clustering_vars = clustering_vars,
+    config = config,
+    scale_params = list(center = attr(scaled, "scaled:center"), scale = attr(scaled, "scaled:scale"))
+  )
+  cr <- run_clustering(data_list, config, segment_guard_init())
+  vm <- calculate_validation_metrics(scaled, cr, k)
+  pr <- create_full_segment_profile(data = data, clusters = cr$clusters,
+                                    clustering_vars = clustering_vars)
+  list(
+    mode = "final", method = method, cluster_result = cr, validation_metrics = vm,
+    profile_result = pr, segment_names = paste("Segment", 1:k),
+    data_list = data_list, config = config
+  )
+}
+
+test_that("a comparison builder that throws is named in the combined REPORT, not lost (M5, F13)", {
+  skip_if_not(exists("generate_segment_combined_html_report", mode = "function"),
+              "combined report layer not loaded")
+
+  capture.output({
+    km <- .silent_drop_method_result("kmeans")
+    hc <- .silent_drop_method_result("hclust")
+  })
+  results <- list(mode = "combined", methods = c("kmeans", "hclust"),
+                  method_results = list(kmeans = km, hclust = hc))
+  config <- km$config
+  config$brand_colour <- "#323367"; config$accent_colour <- "#CC9900"
+
+  # Make the comparison table throw, the way it did on every combined run
+  # before Session B. Before that session the handler wrote to a local that
+  # died with the closure, so the failure reached neither the warnings list
+  # nor the report.
+  original <- build_seg_method_comparison_table
+  on.exit(assign("build_seg_method_comparison_table", original, envir = globalenv()),
+          add = TRUE)
+  assign("build_seg_method_comparison_table",
+         function(...) stop("boom from the comparison table"), envir = globalenv())
+
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(out), add = TRUE)
+  capture.output(res <- generate_segment_combined_html_report(results, config, out))
+
+  expect_equal(res$status, "PARTIAL")
+  expect_true(any(grepl("Comparison table: boom", res$warnings, fixed = TRUE)))
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl("Not included in this comparison", html, fixed = TRUE))
+  expect_true(grepl("boom from the comparison table", html, fixed = TRUE))
+})
+
+test_that("the importance footnote is in the rendered section, not only in its builder (L5, F13)", {
+  skip_if_not(exists("build_seg_importance_section", mode = "function"),
+              "report layer not loaded")
+
+  vi <- data.frame(variable = c("a", "b", "c"), f_statistic = c(40, 20, 10),
+                   rank = 1:3, importance_pct = c(57.1, 28.6, 14.3),
+                   stringsAsFactors = FALSE)
+  html <- as.character(build_seg_importance_section(
+    tables = list(), charts = list(), html_data = list(variable_importance = vi)))
+
+  expect_true(grepl("seg-footnote", html, fixed = TRUE))
+  expect_true(grepl("F statistic", html, fixed = TRUE))
+})

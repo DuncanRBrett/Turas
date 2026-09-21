@@ -15,8 +15,11 @@ source("launch_turas.R"); launch_turas()
 Pick **Segment**, then browse to
 `examples/segment/Thornhill_Segment_Config.xlsx`. Outputs land in
 `examples/segment/Output/`, which is not committed, so the first run creates
-it. A run takes about four seconds and writes five files: the HTML report, the
-Excel report, the segment assignments, the saved model and the stats pack.
+it. A run takes about four seconds and writes seven files: the HTML report, the
+Excel report, the segment assignments, the saved model, the stats pack, and,
+because the config sets `tabs_export = Y`, the survey file with a
+`segment_name` column plus the tabs banner stub (see the module README,
+"Segment to Tabs").
 
 `Thornhill_Segment_Config_Explore.xlsx` is the same study in exploration mode,
 k = 2 to 6, if you want to see how it chooses k rather than being told.

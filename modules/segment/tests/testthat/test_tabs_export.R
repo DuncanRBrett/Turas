@@ -50,8 +50,12 @@ test_that("the joined file carries every survey row and the segment column", {
 
 test_that("the join keeps the survey's own row order", {
   # tabs matches rows by position in several places, so a reordered file is a
-  # silently different study.
-  fx <- .tabs_export_fixture()
+  # silently different study. The IDs are shuffled on purpose: with sorted IDs
+  # a merge() that reorders is indistinguishable from match() (independent
+  # review 2026-09-21, F13).
+  set.seed(57)
+  fx <- .tabs_export_fixture(ids = sample(sprintf("R%03d", 1:60)))
+  expect_false(identical(fx$survey$respondent_id, sort(fx$survey$respondent_id)))
   out <- tempfile(fileext = ".xlsx")
 
   capture.output(segment_export_for_tabs(
