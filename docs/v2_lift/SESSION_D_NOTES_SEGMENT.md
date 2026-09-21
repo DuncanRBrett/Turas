@@ -184,7 +184,8 @@ lost: the file was committed and unmodified at that point.
 
 ## State at the end
 
-Branch `feature/segment-demographics`, three commits, NOT merged and NOT
-pushed. `review/segment-v2-lift` is still unmerged underneath it. Duncan owes
+Branch `feature/segment-demographics`, four commits, NOT merged and NOT
+pushed. Final suite from the repo root: FAIL 0, WARN 0, SKIP 0, PASS 1339,
+against a 1258 baseline. `review/segment-v2-lift` is still unmerged underneath it. Duncan owes
 the independent review in `REVIEW_BRIEF_SEGMENT_D.md`, a `launch_turas()`
 eyeball, and then the merges.
