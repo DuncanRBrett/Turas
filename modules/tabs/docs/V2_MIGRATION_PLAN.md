@@ -88,6 +88,30 @@ individual-level HB utilities · confidence intervals · MCMC convergence diagno
 
 Under a *curated* bar (Decision 1) some of these legitimately stay in the classic Excel deliverable, but that must be a **choice**, logged, not an accident.
 
+### Logged choices: segment
+
+Segment does not get a frozen island or a dedicated v2 view. Its per-respondent
+assignment is tabs-native microdata, so it enters as a BANNER and every profile
+recomputes live under the existing row kinds. Freezing a per-segment island
+would freeze data that should stay live. Zero new row kinds.
+
+**Travels** (into the survey file, via `tabs_export = Y`): the segment name,
+one column, declared as a Single_Response banner question with its provenance
+in the stub.
+
+**Stays in the classic deliverable, deliberately:**
+
+- **GMM membership probabilities.** Model estimates. In the survey file they
+  would be one join away from being used as weights, which D5 refuses. They
+  stay in `segment_assignments.xlsx`.
+- **Silhouette, dendrograms and the validation battery.** Diagnostics about
+  the solution, not about respondents. Nothing in a crosstab can cut them.
+- **The golden-questions screener.** A standalone instrument for typing new
+  respondents, not a study result.
+- **The typing tool.** Standalone, in the spirit of D2's ruling on simulators.
+- **The numeric segment id and the outlier flag.** The name is what a banner
+  needs; the id invites arithmetic on a nominal code.
+
 ### Logged choices
 
 **catdriver, 2026-09-19 (Session C).** The `TR.CD` island carries driver

@@ -1746,7 +1746,9 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     # --- STUDY IDENTIFICATION ---
     add_section("STUDY IDENTIFICATION"),
     add_field("research_house",   "",          "Optional", "Research organisation name. Appears on the report header and footer and on the stats pack Declaration sheet.", "Text"),
-    add_field("client_name",      "",          "Optional", "Client the report was prepared for. Appears on the report header and footer.", "Text")
+    add_field("client_name",      "",          "Optional", "Client the report was prepared for. Appears on the report header and footer.", "Text"),
+    add_field("tabs_export",      "N",         "Optional", "Write the segment column back onto the survey file, plus a banner stub for tabs.", "Y, N"),
+    add_field("allow_partial_join", "N",       "Optional", "Allow the tabs export when some survey rows have no segment. They become 'Unassigned'.", "Y, N")
   )
 
   params <- do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
@@ -1823,6 +1825,14 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     }
 
     # Y/N validation for stats pack
+    for (yn_setting in c("tabs_export", "allow_partial_join")) {
+      yn_row <- find_row(yn_setting)
+      if (!is.null(yn_row)) {
+        openxlsx::dataValidation(wb, "Config", col = 2, rows = yn_row,
+          type = "list", value = '"Y,N"')
+      }
+    }
+
     stats_pack_row <- find_row("generate_stats_pack")
     if (!is.null(stats_pack_row)) {
       openxlsx::dataValidation(wb, "Config", col = 2, rows = stats_pack_row,
