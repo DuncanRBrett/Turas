@@ -135,6 +135,39 @@ steps_builtin_manifests <- function() {
     ),
 
     list(
+      id          = "derived_comment_columns_build",
+      name        = "Comment Appendix - derive the sentiment and comparison columns",
+      description = paste("Write the per-question comment-sentiment columns, and any",
+                          "comment-vs-rating comparison columns, into the survey data",
+                          "file so they report as ordinary questions."),
+      runtime     = "python3",
+      entry       = "scripts/build_derived_comment_columns.py",
+      requires    = c("openpyxl"),
+      docs        = "scripts/README_comment_appendix.md",
+      args = list(
+        list(id = "data", label = "Survey data file (.xlsx)",
+             type = "file", required = TRUE, must_exist = TRUE, cli = "--data",
+             help = paste("The workbook the columns are written into. A dated backup is",
+                          "made beside it before anything is changed.")),
+
+        list(id = "appendix", label = "Comment appendix workbook (.xlsx)",
+             type = "file", required = TRUE, must_exist = TRUE, cli = "--appendix",
+             help = "The coded workbook the Overall Sentiment is read from."),
+
+        list(id = "mapping", label = "Column mapping (.json)",
+             type = "file", required = TRUE, must_exist = TRUE, cli = "--mapping",
+             help = paste("Declares which appendix sheet feeds which data column, and how",
+                          "any comparison column bands its rating. Lives beside the config",
+                          "so it travels with the project.")),
+
+        list(id = "dry_run", label = "Dry run (report only, write nothing)",
+             type = "flag", required = FALSE, cli = "--dry-run",
+             help = paste("Prints the distribution of every column and how many values",
+                          "would change, then stops. Run this first."))
+      )
+    ),
+
+    list(
       id          = "comment_appendix_report_changes",
       name        = "Comment Appendix - report changed comments",
       description = "Write a review list of verbatims whose text differs between the data and the appendix. Changes nothing.",
