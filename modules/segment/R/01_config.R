@@ -722,6 +722,36 @@ validate_segment_config <- function(config) {
   # Step 3: HTML report + enhanced features
   features <- parse_segment_feature_params(config, req$clustering_vars)
 
+  # Step 3a: the tabs export belongs to the single-method final run. The
+  # multi-method output block has no reader for tabs_export, so a combined run
+  # with the setting on wrote no files and said nothing (independent review
+  # 2026-09-21, F14). Refuse it here, before a run starts, rather than at the
+  # end of one.
+  if (isTRUE(req$is_multi_method) &&
+      identical(toupper(as.character(features$tabs_export %||% "N")), "Y")) {
+    cat("\n[SEGMENT] Config asks for the tabs export while comparing methods, where nothing writes it.\n")
+    segment_refuse(
+      code = "CFG_TABS_EXPORT_COMBINED",
+      title = "The Tabs Export Is Not Written in Combined Mode",
+      problem = sprintf(
+        "This config compares %d methods (method = %s) and sets tabs_export = Y.",
+        length(req$methods), paste(req$methods, collapse = ", ")),
+      why_it_matters = paste(
+        "Combined mode compares methods and does not choose between them, so",
+        "there is no single segment column to write back onto the survey file.",
+        "The export belongs to the single-method run you make after choosing",
+        "one. Until now the setting was read on the single-method path only and",
+        "ignored in silence here, which looked like an export that had happened."
+      ),
+      how_to_fix = c(
+        "Set tabs_export to N for this comparison run.",
+        "Then set method to the one method you chose, keep tabs_export = Y, and run again."
+      ),
+      expected = "tabs_export = N while method names more than one method",
+      observed = sprintf("method = %s, tabs_export = Y", paste(req$methods, collapse = ", "))
+    )
+  }
+
   # Assemble validated config
   validated_config <- c(
     req,

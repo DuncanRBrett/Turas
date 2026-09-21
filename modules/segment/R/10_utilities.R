@@ -1747,7 +1747,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_section("STUDY IDENTIFICATION"),
     add_field("research_house",   "",          "Optional", "Research organisation name. Appears on the report header and footer and on the stats pack Declaration sheet.", "Text"),
     add_field("client_name",      "",          "Optional", "Client the report was prepared for. Appears on the report header and footer.", "Text"),
-    add_field("tabs_export",      "N",         "Optional", "Write the segment column back onto the survey file, plus a banner stub for tabs.", "Y, N"),
+    add_field("tabs_export",      "N",         "Optional", "Write the segment column back onto the survey file, plus a banner stub for tabs. Single-method final mode only.", "Y, N"),
     add_field("allow_partial_join", "N",       "Optional", "Allow the tabs export when some survey rows have no segment. They become 'Unassigned'.", "Y, N")
   )
 

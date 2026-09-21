@@ -523,3 +523,37 @@ test_that("a full run with missing answers exports every row, marks the run PART
   probs <- vapply(res$run_result$events, function(e) as.character(e$problem %||% ""), character(1))
   expect_true(any(grepl("5 of 400 survey rows are Unassigned", probs, fixed = TRUE)))
 })
+
+
+# ------------------------------------------------------------------------------
+# F14: combined mode has no reader for tabs_export. The setting was silently
+# ignored there, which is the shape this programme exists to remove.
+# ------------------------------------------------------------------------------
+
+test_that("tabs_export in combined mode is refused by name (F14)", {
+  err <- tryCatch(
+    capture.output(validate_segment_config(
+      .tabs_export_config(method = "kmeans,hclust", tabs_export = "Y"))),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "CFG_TABS_EXPORT_COMBINED")
+  expect_true(grepl("combined", conditionMessage(err), ignore.case = TRUE))
+})
+
+test_that("combined mode without the export still validates", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(method = "kmeans,hclust", tabs_export = "N")))
+
+  expect_true(isTRUE(cfg$is_multi_method))
+  expect_equal(toupper(as.character(cfg$tabs_export)), "N")
+})
+
+test_that("a single-method config with the export still validates", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(method = "kmeans", tabs_export = "Y")))
+
+  expect_false(isTRUE(cfg$is_multi_method))
+  expect_equal(toupper(as.character(cfg$tabs_export)), "Y")
+})
