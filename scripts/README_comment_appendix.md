@@ -207,3 +207,95 @@ python3 scripts/test_build_comment_appendix.py
 Known-answer tests: column detection (explicit / pattern / auto), the non-destructive
 incremental update (preservation + idempotency + new-record append), id-header handling
 (`ID` vs `ResponseID`), and the empty/guard cases.
+
+---
+
+# Deriving the sentiment and comparison columns
+
+`scripts/build_derived_comment_columns.py`
+
+Once the appendix is coded, its Overall Sentiment can be carried back into the
+survey data as ordinary questions, so the report can cut "how people wrote" by
+any banner alongside "how they scored".
+
+Two kinds of column:
+
+- **sentiment**, one per coded sheet, valued `Positive` / `Mixed` / `Negative`
+  / `Did not comment`.
+- **comparison**, one per declared pair, setting that sentiment against a
+  rating: `Says what they score`, `Writes more critically than they score`,
+  `Writes more warmly than they score`, `Did not comment`.
+
+The comparison ranks the sentiment (Negative 1, Mixed 2, Positive 3), bands the
+rating on two cut points, and compares the two ranks. Equal means the comment
+matches the score, below means the person writes more critically than they
+rate, above means more warmly.
+
+## The mapping file
+
+A small `.json` beside the config, so it travels with the project:
+
+```json
+{
+  "sentiment": { "Culture": "Q27S", "Satisfaction": "Q29S" },
+  "comparison": [
+    { "column": "Q29D", "sentiment": "Q29S",
+      "rating": ["Q28"], "bands": [2.5, 3.5] }
+  ]
+}
+```
+
+`rating` may name one column or many; several are averaged first, which is how
+a composite index is compared. `bands` are the two cut points: below the first
+is low, below the second is the middle, and from the second up is high.
+
+Band a **composite** on its own scale, for example `[3.5, 4.0]`. Band a
+**single 1-5 item** on the scale points, `[2.5, 3.5]`, so 1-2, 3 and 4-5. The
+composite cuts would leave no middle band for whole numbers.
+
+## Running it
+
+```bash
+python3 scripts/build_derived_comment_columns.py \
+    --data     "03_Data/<study>_data.xlsx" \
+    --appendix "03_Data/<study> Comment Appendix.xlsx" \
+    --mapping  "derived_comment_columns.json" \
+    --dry-run
+```
+
+`--dry-run` prints every column's distribution and, for a column that already
+exists, how many values would change. Run it first: on a file whose columns are
+already correct it should report zero changes.
+
+Drop `--dry-run` to write. A dated backup is made beside the data file first.
+A column that already exists is rewritten in place, so the script is safe to
+re-run and never duplicates a column.
+
+## Why it edits the workbook by hand
+
+Loading and saving an `.xlsx` with openpyxl drops the shared string table and
+escapes every non-ASCII character as a numeric reference. openxlsx, which R
+uses to read the data, does not decode those, so `don't` comes back as
+`don&#8217;t`. This script splices cells into the sheet XML and leaves every
+other byte alone. It follows whichever storage the file already uses, shared
+strings or inline, because mixing the two in one sheet is what corrupts a
+workbook.
+
+## Registering the questions
+
+The columns are only half the job. Each one also needs a row in
+Survey_Structure `Questions`, its response options in `Options`, and a row in
+the Crosstab_Config `Selection` sheet. Copy an existing derived question's rows
+and change the code; the `Source` and `Formula` cells on the Selection row are
+what put the "Derived" note on the question in the report.
+
+## Tests
+
+```bash
+python3 scripts/test_build_derived_comment_columns.py
+```
+
+Known-answer tests: the banding at every boundary, the comparison in all nine
+sentiment-by-band combinations, and the writer's two safety properties, that it
+leaves every other cell untouched and does not change how the workbook stores
+text.
