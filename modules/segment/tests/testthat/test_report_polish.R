@@ -463,6 +463,27 @@ test_that("a client name with markup in it is escaped, not rendered", {
   expect_true(grepl("&lt;script&gt;", header, fixed = TRUE))
 })
 
+test_that("neither shipped example config trips the unused-settings warning", {
+  # A permanent gate. Duncan saw "Segment: unused config settings: client_name"
+  # in launch_turas on 21 Sep 2026, from a Shiny session that had sourced the
+  # module before client_name was parsed. The committed files were clean, and
+  # this keeps them that way: it checks BOTH configs and BOTH strings the
+  # warning can appear as, the console block and the Shiny notification.
+  skip_if_not(nzchar(Sys.getenv("TURAS_ROOT")), "TURAS_ROOT not set")
+  dir <- file.path(Sys.getenv("TURAS_ROOT"), "examples", "segment")
+  skip_if_not(dir.exists(dir), "segment example not present")
+
+  for (f in c("Thornhill_Segment_Config.xlsx", "Thornhill_Segment_Config_Explore.xlsx")) {
+    raw <- read_segment_config(file.path(dir, f))
+    out <- paste(capture.output(cfg <- validate_segment_config(raw)), collapse = " ")
+
+    expect_false(grepl("did not survive validation", out), info = f)
+    expect_false(grepl("unused config settings", out), info = f)
+    # And the setting really is carried, not merely unmentioned.
+    expect_equal(cfg$client_name, "Thornhill Grocers", info = f)
+  }
+})
+
 test_that("client_name survives validation and is offered by the template", {
   skip_if_not(exists("validate_segment_config", mode = "function"),
               "Segment module not loaded")

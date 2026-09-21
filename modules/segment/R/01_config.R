@@ -641,6 +641,9 @@ segment_warn_unused_settings <- function(raw_config, validated_config) {
   cat("| These were read from the Config sheet and are not used by  |\n")
   cat("| the run. Check the spelling against the template, or       |\n")
   cat("| delete them. Nothing below reads them.                     |\n")
+  cat("|                                                            |\n")
+  cat("| If a setting here IS documented, the module in memory is    |\n")
+  cat("| older than the one on disk: quit R and launch again.        |\n")
   cat("+------------------------------------------------------------+\n\n")
 
   if (exists("showNotification", mode = "function")) {
