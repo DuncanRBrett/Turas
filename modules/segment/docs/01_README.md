@@ -90,7 +90,7 @@ Open the exploration report (Excel and/or HTML) and review:
 Update config: `k_fixed = 4` then re-run.
 
 **Outputs:**
-- `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ probabilities if method = gmm or lca)
+- `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ probabilities if method = gmm)
 - `seg_segmentation_report.xlsx` - Comprehensive multi-tab report
 - `seg_segmentation_report.html` - Interactive HTML report with SVG charts and navigation
 - `seg_model.rds` - Saved model for scoring new data
@@ -122,7 +122,6 @@ modules/segment/
 │   ├── 08_scoring.R                  # Score new data
 │   ├── 09_output.R                   # Excel export functions
 │   ├── 10_utilities.R                # Utilities & quick run
-│   ├── 11_lca.R                      # Latent Class Analysis
 │   ├── 12_executive_summary.R        # Auto-generated narrative summary
 │   └── 13_vulnerability.R           # Segment vulnerability/switching analysis
 ├── lib/                               # Supporting libraries
@@ -294,12 +293,26 @@ The stub has a `How_to_use` sheet saying where each block goes: the
 and every question in the study can be cut by segment, recomputed live rather
 than frozen into the segmentation report.
 
-The join is by `id_variable` and it is strict. If any survey row has no
-segment, the export refuses and tells you how many, because those rows would
-otherwise become an "Unassigned" banner column that reads like a finding about
-people when it is really a record of what the join lost. If the gap is real
-and expected, set `allow_partial_join = Y` and they are labelled Unassigned on
-purpose.
+The join is by `id_variable`. Respondents the module itself removed before
+clustering (missing answers under listwise deletion, outliers under
+`outlier_handling = remove`) have no segment by the module's own doing: they
+are labelled "Unassigned" in the export, the run is marked PARTIAL and the
+Run_Status sheet says how many. Blank rows in the survey sheet are dropped
+from the export. What the export refuses is a survey row the segmentation
+never saw, an ID that is neither assigned nor removed, because that means the
+assignments came from another file or another ID column and an "Unassigned"
+label would hide it. If you really want those rows labelled Unassigned, set
+`allow_partial_join = Y`.
+
+The export is written by a single-method final run only, and the other two
+modes refuse it at validation rather than ignoring it. A config that compares
+methods (`method = kmeans,hclust,gmm`) with `tabs_export = Y` is refused
+`CFG_TABS_EXPORT_COMBINED`, because a comparison chooses no method and so has
+no one segment column to write back. A config that explores k (no `k_fixed`,
+just `k_min` and `k_max`) with `tabs_export = Y` is refused
+`CFG_TABS_EXPORT_EXPLORATION`, for the same reason one step along: exploration
+chooses no k. Compare or explore first, then run the method and the k you
+chose with the export on.
 
 Three things travel deliberately and three do not. The segment name travels.
 The numeric segment id, the outlier flag and the GMM membership probabilities

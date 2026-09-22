@@ -465,7 +465,8 @@ make_names_unique <- function(names) {
 #'   demo_vars = c("gender", "age_group", "region", "income_bracket")
 #' )
 profile_demographics <- function(data, clusters, demo_vars,
-                                  segment_names = NULL) {
+                                  segment_names = NULL,
+                                  clustering_vars = NULL) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -501,17 +502,57 @@ profile_demographics <- function(data, clusters, demo_vars,
     )
   }
 
-  # Separate categorical and numeric variables
+  # Separate categorical and numeric variables.
+  #
+  # Two corrections here, both from the independent review of 2026-09-22.
+  #
+  # The distinct-value count is taken over the ANSWERS. It used to be
+  # length(unique(x)), and unique() counts NA as a value, so a ten-point coded
+  # demographic was cross-tabulated while the same variable with one blank had
+  # eleven "distinct values" and was summarised as means instead. A blank is
+  # not an eleventh answer (D3).
+  #
+  # And a variable that is neither factor, character nor numeric, with more
+  # than ten distinct answers, used to match no branch at all: it entered
+  # neither list, got no table, no sheet and no chi-square row, and the
+  # section's "nobody answered" note could not name it because it never
+  # reached the frames. A date column, which readxl::read_excel produces for a
+  # date-formatted cell, is the live case. It is collected here and named
+  # below instead of vanishing (D2).
   categorical_vars <- character(0)
   numeric_vars <- character(0)
+  unsupported_vars <- character(0)
 
   for (var in available_vars) {
-    if (is.factor(data[[var]]) || is.character(data[[var]]) ||
-        length(unique(data[[var]])) <= 10) {
+    n_distinct <- length(unique(data[[var]][!is.na(data[[var]])]))
+    if (is.factor(data[[var]]) || is.character(data[[var]]) || n_distinct <= 10) {
       categorical_vars <- c(categorical_vars, var)
     } else if (is.numeric(data[[var]])) {
       numeric_vars <- c(numeric_vars, var)
+    } else {
+      unsupported_vars <- c(unsupported_vars, var)
     }
+  }
+
+  # A demographic that is also a clustering variable separates the segments by
+  # construction, because the segments were built from it. That is the user's
+  # choice to make, but the report should not present the separation as a
+  # finding about people (independent review 2026-09-22, D7).
+  circular_vars <- intersect(available_vars, clustering_vars %||% character(0))
+  if (length(circular_vars) > 0) {
+    cat(sprintf(
+      "  Note: %s also built the segments, so any separation shown is circular: %s\n",
+      if (length(circular_vars) == 1) "this demographic" else "these demographics",
+      paste(circular_vars, collapse = ", ")))
+  }
+
+  if (length(unsupported_vars) > 0) {
+    cat(sprintf(
+      "  Not profiled, because the column is a %s with more than ten distinct answers: %s\n",
+      paste(unique(vapply(unsupported_vars,
+                          function(v) class(data[[v]])[1], character(1))),
+            collapse = "/"),
+      paste(unsupported_vars, collapse = ", ")))
   }
 
   cat(sprintf("Profiling %d categorical and %d numeric demographics...\n\n",
@@ -523,6 +564,7 @@ profile_demographics <- function(data, clusters, demo_vars,
 
   categorical_profiles <- list()
   chi_sq_tests <- list()
+  bases <- list()
 
   for (var in categorical_vars) {
     cat(sprintf("Analyzing: %s\n", var))
@@ -552,7 +594,53 @@ profile_demographics <- function(data, clusters, demo_vars,
 
     categorical_profiles[[var]] <- profile_df
 
-    # Chi-squared test
+    # The base these percentages rest on. sum(cross_tab) is exactly the
+    # respondents counted, because table() drops a blank in either margin, so
+    # it is the answered n and not the clustered n (independent review
+    # 2026-09-22, D1).
+    bases[[var]] <- data.frame(
+      Variable = var,
+      N_Clustered = length(clusters),
+      N_Answered = as.integer(sum(cross_tab)),
+      N_Blank = as.integer(length(clusters) - sum(cross_tab)),
+      stringsAsFactors = FALSE
+    )
+
+    # Chi-squared test.
+    #
+    # A one-row table has to be skipped rather than tested. chisq.test() on a
+    # one-row table does not test association, because with one category
+    # there is nothing to associate; it silently runs a goodness-of-fit test
+    # against equal expected counts instead, which asks whether the SEGMENTS
+    # are the same size. Segments almost never are, so a demographic every
+    # respondent answered identically came back significant: with segments of
+    # 532, 263 and 405 it returned p = 2.18e-20 and wrote Significant = TRUE,
+    # next to a profile frame reading 100 in every column (independent review
+    # 2026-09-22, D9).
+    # A table with no rows at all is the variable nobody answered, which
+    # reaches the same skip by a different road and must not be told it has
+    # one category.
+    if (nrow(cross_tab) < 2) {
+      skip_note <- if (nrow(cross_tab) == 0) {
+        "Not tested: no clustered respondent answered this question."
+      } else {
+        paste("Not tested: only one category, so there is nothing to",
+              "compare between segments.")
+      }
+      cat(sprintf("    %s\n", skip_note))
+      chi_sq_tests[[var]] <- data.frame(
+        Variable = var,
+        Chi_Sq = NA_real_,
+        DF = NA_real_,
+        P_Value = NA_character_,
+        Significant = NA,
+        Low_Expected = NA,
+        Note = skip_note,
+        stringsAsFactors = FALSE
+      )
+      next
+    }
+
     tryCatch({
       chi_result <- suppressWarnings(chisq.test(cross_tab))
       # Check expected frequency assumption (cells < 5 invalidate chi-sq approximation)
@@ -564,6 +652,7 @@ profile_demographics <- function(data, clusters, demo_vars,
         P_Value = format(chi_result$p.value, scientific = TRUE, digits = 3),
         Significant = chi_result$p.value < 0.05,
         Low_Expected = low_expected,
+        Note = "",
         stringsAsFactors = FALSE
       )
 
@@ -575,13 +664,23 @@ profile_demographics <- function(data, clusters, demo_vars,
       }
 
     }, error = function(e) {
+      # Two defects here until September 2026, both invisible while nothing
+      # called this function. The assignment was local to the handler, so a
+      # failed test left the variable out of the table altogether rather than
+      # in it with an empty result; and the row it built had five columns
+      # against the successful row's six, which would have made do.call(rbind)
+      # fail for a run where one variable tested and another did not. A
+      # demographic that is empty among the clustered respondents reaches this
+      # branch: chisq.test() refuses a table with no positive entry.
       cat(sprintf("  Warning: Chi-squared test failed: %s\n", e$message))
-      chi_sq_tests[[var]] <- data.frame(
+      chi_sq_tests[[var]] <<- data.frame(
         Variable = var,
-        Chi_Sq = NA,
-        DF = NA,
-        P_Value = NA,
+        Chi_Sq = NA_real_,
+        DF = NA_real_,
+        P_Value = NA_character_,
         Significant = NA,
+        Low_Expected = NA,
+        Note = paste("Not tested:", conditionMessage(e)),
         stringsAsFactors = FALSE
       )
     })
@@ -592,6 +691,7 @@ profile_demographics <- function(data, clusters, demo_vars,
   # ===========================================================================
 
   numeric_profiles <- list()
+  numeric_tests <- list()
 
   if (length(numeric_vars) > 0) {
     for (var in numeric_vars) {
@@ -637,11 +737,35 @@ profile_demographics <- function(data, clusters, demo_vars,
 
       numeric_profiles[[var]] <- stats_df
 
-      # ANOVA test
+      bases[[var]] <- data.frame(
+        Variable = var,
+        N_Clustered = length(clusters),
+        N_Answered = length(all_data),
+        N_Blank = as.integer(length(clusters) - length(all_data)),
+        stringsAsFactors = FALSE
+      )
+
+      # ANOVA test.
+      #
+      # Until September 2026 this was computed, printed and thrown away, so
+      # the numeric tables reached the report with no test at all and the
+      # section had to say they carried none (independent review 2026-09-22,
+      # D8). The result is returned now.
       tryCatch({
         anova_result <- aov(data[[var]] ~ as.factor(clusters))
-        anova_summary <- summary(anova_result)
-        p_value <- anova_summary[[1]]$`Pr(>F)`[1]
+        anova_summary <- summary(anova_result)[[1]]
+        p_value <- anova_summary$`Pr(>F)`[1]
+
+        numeric_tests[[var]] <- data.frame(
+          Variable = var,
+          F_Stat = round(anova_summary$`F value`[1], 2),
+          DF_Between = anova_summary$Df[1],
+          DF_Within = anova_summary$Df[2],
+          P_Value = format(p_value, scientific = TRUE, digits = 3),
+          Significant = p_value < 0.05,
+          Note = "",
+          stringsAsFactors = FALSE
+        )
 
         if (p_value < 0.05) {
           cat(sprintf("  ✓ Significant difference (p < 0.05)\n"))
@@ -649,7 +773,17 @@ profile_demographics <- function(data, clusters, demo_vars,
           cat(sprintf("    Not significant (p = %.3f)\n", p_value))
         }
       }, error = function(e) {
-        cat(sprintf("  Warning: ANOVA test failed\n"))
+        cat(sprintf("  Warning: ANOVA test failed: %s\n", conditionMessage(e)))
+        numeric_tests[[var]] <<- data.frame(
+          Variable = var,
+          F_Stat = NA_real_,
+          DF_Between = NA_real_,
+          DF_Within = NA_real_,
+          P_Value = NA_character_,
+          Significant = NA,
+          Note = paste("Not tested:", conditionMessage(e)),
+          stringsAsFactors = FALSE
+        )
       })
     }
   }
@@ -657,6 +791,26 @@ profile_demographics <- function(data, clusters, demo_vars,
   # ===========================================================================
   # COMBINE CHI-SQUARED TESTS
   # ===========================================================================
+
+  # A variable of an unhandled class is named in the same frame the user reads
+  # for "what happened to each demographic", rather than being absent from
+  # every output the run produces (independent review 2026-09-22, D2).
+  for (var in unsupported_vars) {
+    chi_sq_tests[[var]] <- data.frame(
+      Variable = var,
+      Chi_Sq = NA_real_,
+      DF = NA_real_,
+      P_Value = NA_character_,
+      Significant = NA,
+      Low_Expected = NA,
+      Note = sprintf(
+        paste("Not profiled: the column is a %s with more than ten distinct",
+              "answers, which is neither a category to cross-tabulate nor a",
+              "number to average."),
+        class(data[[var]])[1]),
+      stringsAsFactors = FALSE
+    )
+  }
 
   chi_sq_combined <- do.call(rbind, chi_sq_tests)
 
@@ -666,13 +820,24 @@ profile_demographics <- function(data, clusters, demo_vars,
   cat(rep("=", 80), "\n", sep = "")
   cat("\n")
 
+  # The denominator is the variables that were actually tested, not every
+  # categorical one. A constant demographic and one nobody answered are both
+  # counted as untested and named, rather than quietly widening the
+  # denominator or, worse, being announced as significant (independent review
+  # 2026-09-22, D9).
   n_sig <- sum(chi_sq_combined$Significant, na.rm = TRUE)
-  cat(sprintf("Categorical variables with significant segment differences: %d/%d\n",
-              n_sig, length(categorical_vars)))
+  n_tested <- sum(!is.na(chi_sq_combined$Significant))
+  cat(sprintf("Categorical variables with significant segment differences: %d/%d tested\n",
+              n_sig, n_tested))
 
   if (n_sig > 0) {
-    sig_vars <- chi_sq_combined$Variable[chi_sq_combined$Significant == TRUE]
+    sig_vars <- chi_sq_combined$Variable[which(chi_sq_combined$Significant)]
     cat(sprintf("  Significant: %s\n", paste(sig_vars, collapse = ", ")))
+  }
+
+  untested <- chi_sq_combined$Variable[is.na(chi_sq_combined$Significant)]
+  if (length(untested) > 0) {
+    cat(sprintf("  Not tested: %s\n", paste(untested, collapse = ", ")))
   }
 
   cat("\n")
@@ -681,6 +846,9 @@ profile_demographics <- function(data, clusters, demo_vars,
     categorical_profiles = categorical_profiles,
     numeric_profiles = numeric_profiles,
     chi_sq_tests = chi_sq_combined,
+    numeric_tests = do.call(rbind, numeric_tests),
+    bases = do.call(rbind, bases),
+    circular_vars = circular_vars,
     segment_names = segment_names
   ))
 }

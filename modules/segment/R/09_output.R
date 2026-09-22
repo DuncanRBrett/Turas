@@ -252,6 +252,12 @@ export_exploration_report <- function(exploration_result, metrics_result,
   metrics_df$tot.withinss <- round(metrics_df$tot.withinss, 1)
   metrics_df$betweenss_totss <- round(metrics_df$betweenss_totss, 3)
   metrics_df$min_segment_pct <- round(metrics_df$min_segment_pct, 1)
+  if ("calinski_harabasz" %in% names(metrics_df)) {
+    metrics_df$calinski_harabasz <- round(metrics_df$calinski_harabasz, 1)
+  }
+  if ("davies_bouldin" %in% names(metrics_df)) {
+    metrics_df$davies_bouldin <- round(metrics_df$davies_bouldin, 3)
+  }
   
   # Prepare profiles for each k
   profile_sheets <- list()
@@ -570,6 +576,8 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     sprintf("Method: %s clustering", toupper(final_result$method %||% "kmeans")),
     sprintf("Average silhouette: %.3f", validation_metrics$avg_silhouette),
     sprintf("Between/Total SS ratio: %.3f", validation_metrics$betweenss_totss),
+    sprintf("Calinski-Harabasz: %s", if (is.null(validation_metrics$calinski_harabasz) || is.na(validation_metrics$calinski_harabasz)) "NA" else sprintf("%.1f", validation_metrics$calinski_harabasz)),
+    sprintf("Davies-Bouldin: %s", if (is.null(validation_metrics$davies_bouldin) || is.na(validation_metrics$davies_bouldin)) "NA" else sprintf("%.3f", validation_metrics$davies_bouldin)),
     "",
     "SEGMENTS IDENTIFIED",
     "-------------------"
@@ -644,13 +652,17 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       "Average Silhouette",
       "Total Within-cluster SS",
       "Total Between-cluster SS",
-      "Between/Total SS ratio"
+      "Between/Total SS ratio",
+      "Calinski-Harabasz (higher is better)",
+      "Davies-Bouldin (lower is better)"
     ),
     Value = c(
       round(validation_metrics$avg_silhouette, 3),
       round(validation_metrics$tot_withinss, 1),
       round(validation_metrics$betweenss, 1),
-      round(validation_metrics$betweenss_totss, 3)
+      round(validation_metrics$betweenss_totss, 3),
+      round(validation_metrics$calinski_harabasz %||% NA_real_, 1),
+      round(validation_metrics$davies_bouldin %||% NA_real_, 3)
     ),
     stringsAsFactors = FALSE
   )
@@ -769,6 +781,58 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       sheets[["Classification_Rules"]] <- data.frame(
         Rule = enhanced$rules$rules_text, stringsAsFactors = FALSE
       )
+    }
+  }
+
+  # ===========================================================================
+  # SHEETS: Demographic profiles (optional)
+  # ===========================================================================
+  # One sheet of chi-square results, then one sheet per demographic variable.
+  # Built the way export_demographic_profiles() builds its own workbook, into
+  # this report rather than into a second file (independent review 2026-09-21,
+  # F2).
+
+  demo <- enhanced$demographic_profiles
+  if (!is.null(demo) && is.list(demo)) {
+
+    tests_df <- demo$chi_sq_tests
+    if (!is.null(tests_df) && is.data.frame(tests_df) && nrow(tests_df) > 0) {
+      sheets[["Demographics_Tests"]] <- tests_df
+    }
+
+    # The base each variable's percentages rest on. Percentages are computed
+    # among the respondents who answered, so a demographic with blanks has a
+    # smaller base than the clustered n, and the workbook has to say which
+    # (independent review 2026-09-22, D1).
+    bases_df <- demo$bases
+    if (!is.null(bases_df) && is.data.frame(bases_df) && nrow(bases_df) > 0) {
+      sheets[["Demographics_Bases"]] <- bases_df
+    }
+
+    # The one-way ANOVA per numeric demographic, which used to be printed to
+    # the console and discarded (independent review 2026-09-22, D8).
+    num_tests <- demo$numeric_tests
+    if (!is.null(num_tests) && is.data.frame(num_tests) && nrow(num_tests) > 0) {
+      sheets[["Demographics_Numeric_Tests"]] <- num_tests
+    }
+
+    demo_frames <- c(demo$categorical_profiles %||% list(),
+                     demo$numeric_profiles %||% list())
+    for (var in names(demo_frames)) {
+      frame <- demo_frames[[var]]
+      if (is.null(frame) || !is.data.frame(frame) || nrow(frame) == 0) next
+      # Excel caps a sheet name at 31 characters, so two long variable names
+      # can truncate to the same sheet and the second would overwrite the
+      # first without a word.
+      sheet_name <- substr(paste0("Demo_", var), 1, 31)
+      if (sheet_name %in% names(sheets)) {
+        suffix <- 2L
+        while (paste0(substr(sheet_name, 1, 29), "_", suffix) %in% names(sheets)) {
+          suffix <- suffix + 1L
+        }
+        sheet_name <- paste0(substr(sheet_name, 1, 29), "_", suffix)
+      }
+      sheets[[sheet_name]] <- frame
     }
   }
 

@@ -192,6 +192,12 @@ generate_segment_html_report <- function(results, config, output_path) {
     NULL
   })
 
+  tables$demographics_numeric <- tryCatch(
+    build_seg_demographics_numeric_table(html_data), error = function(e) {
+      warnings <<- c(warnings, paste("Numeric demographics table:", e$message))
+      NULL
+    })
+
   tables$rules <- tryCatch(build_seg_rules_table(html_data), error = function(e) {
     warnings <<- c(warnings, paste("Rules table:", e$message))
     NULL

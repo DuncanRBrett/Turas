@@ -43,7 +43,12 @@ SEGMENT_EXPORT_BLOCKED <- c("^prob_", "^max_probability$", "^uncertainty$",
 #' @param survey_sheet Sheet name within the survey file
 #' @param id_variable The respondent key, which must be in BOTH files
 #' @param output_file Where to write the joined survey file
-#' @param allow_partial_join TRUE to permit rows with no segment
+#' @param allow_partial_join TRUE to permit rows the join LOST (an ID in the
+#'   survey file that is neither assigned nor in `dropped_ids`)
+#' @param dropped_ids IDs the module itself removed before clustering
+#'   (listwise deletion, outlier removal). These rows are expected to have no
+#'   segment: they become "Unassigned" without a refusal, and the result is
+#'   PARTIAL so the run says so. NULL means nothing was dropped.
 #' @param verbose Print progress
 #' @return A list with status ("PASS" or "PARTIAL"), the counts and the paths
 #' @export
@@ -53,6 +58,7 @@ segment_export_for_tabs <- function(assignments,
                                     id_variable,
                                     output_file,
                                     allow_partial_join = FALSE,
+                                    dropped_ids = NULL,
                                     verbose = TRUE) {
 
   if (verbose) cat("\n  Building the tabs banner export...\n")
@@ -97,8 +103,19 @@ segment_export_for_tabs <- function(assignments,
     )
   }
 
+  # A row with nothing in it is a blank line in the sheet, not a respondent.
+  # Written back it would be an "Unassigned" person with no ID (independent
+  # review 2026-09-21, F1). Dropped, and said so.
+  blank_rows <- rowSums(!is.na(survey)) == 0
+  if (any(blank_rows)) {
+    if (verbose) cat(sprintf("  [SEGMENT] %d blank row(s) in the survey sheet dropped from the export.\n",
+                             sum(blank_rows)))
+    survey <- survey[!blank_rows, , drop = FALSE]
+  }
+
   survey_ids <- as.character(survey[[id_variable]])
   assign_ids <- as.character(assignments[[id_variable]])
+  dropped_ids <- as.character(dropped_ids %||% character(0))
 
   # --- uniqueness ------------------------------------------------------------
   for (side in list(list(ids = assign_ids, what = "segment assignments"),
@@ -130,7 +147,19 @@ segment_export_for_tabs <- function(assignments,
   # position in several places, so a reordered file is a different study.
   idx <- match(survey_ids, assign_ids)
   n_matched <- sum(!is.na(idx))
-  n_unmatched <- length(survey_ids) - n_matched
+  unmatched <- is.na(idx)
+  n_unmatched <- sum(unmatched)
+
+  # Two kinds of unmatched row, and they must not be confused. A row the
+  # MODULE removed (missing answers, an outlier, an ID it could not read) is
+  # expected to have no segment; that is a fact about the study and reads
+  # honestly as "Unassigned". A row the JOIN lost (an ID in this file that
+  # the module never saw) means the assignments came from somewhere else,
+  # and labelling it "Unassigned" would hide that. Only the second refuses.
+  expected_gap <- unmatched & (is.na(survey[[id_variable]]) | survey_ids %in% dropped_ids)
+  lost <- unmatched & !expected_gap
+  n_expected <- sum(expected_gap)
+  n_lost <- sum(lost)
 
   segment_col <- rep(NA_character_, length(survey_ids))
   segment_col[!is.na(idx)] <- as.character(assignments$segment_name[idx[!is.na(idx)]])
@@ -138,33 +167,35 @@ segment_export_for_tabs <- function(assignments,
   # "Unassigned" in the banner, which is the same word 09_output.R uses.
   segment_col[is.na(segment_col)] <- "Unassigned"
 
-  if (n_unmatched > 0) {
-    pct <- 100 * n_unmatched / length(survey_ids)
-    if (!isTRUE(allow_partial_join)) {
-      segment_refuse(
-        code = "DATA_PARTIAL_JOIN",
-        title = "Not Every Respondent Got a Segment",
-        problem = sprintf(
-          "%d of %d survey rows (%.1f%%) have no segment: their '%s' is not in the assignments.",
-          n_unmatched, length(survey_ids), pct, id_variable),
-        why_it_matters = paste(
-          "Those rows would become an 'Unassigned' banner column that reads",
-          "like a finding about people, when it is really a record of what the",
-          "join lost. Nothing downstream can tell the two apart."
-        ),
-        how_to_fix = c(
-          "Check that the segmentation ran on this same survey file.",
-          "Check the ID variable matches in type and formatting, for example leading zeros.",
-          "If the gap is real and expected, such as respondents excluded by missing data, set allow_partial_join = YES in the config."
-        ),
-        expected = sprintf("%d matched", length(survey_ids)),
-        observed = sprintf("%d matched, %d not", n_matched, n_unmatched)
-      )
-    }
-    if (verbose) {
-      cat(sprintf("  [SEGMENT] Partial join allowed: %d of %d rows (%.1f%%) are Unassigned.\n",
-                  n_unmatched, length(survey_ids), pct))
-    }
+  if (n_lost > 0 && !isTRUE(allow_partial_join)) {
+    segment_refuse(
+      code = "DATA_PARTIAL_JOIN",
+      title = "Survey Rows the Segmentation Never Saw",
+      problem = sprintf(
+        "%d of %d survey rows (%.1f%%) have an '%s' that is not in the assignments and was not removed by the segmentation.",
+        n_lost, length(survey_ids), 100 * n_lost / length(survey_ids), id_variable),
+      why_it_matters = paste(
+        "Rows the module itself removed (missing answers, outliers) are labelled",
+        "Unassigned without complaint. These rows are different: the segmentation",
+        "never saw them, so the assignments were made on another file or another",
+        "ID column. Labelled Unassigned they would read like a finding about people."
+      ),
+      how_to_fix = c(
+        "Check that the segmentation ran on this same survey file and sheet.",
+        "Check the ID variable matches in type and formatting, for example leading zeros or spaces.",
+        "If you really do want them labelled Unassigned, set allow_partial_join = Y in the config."
+      ),
+      expected = sprintf("%d matched or removed by the module", length(survey_ids)),
+      observed = sprintf("%d matched, %d removed by the module, %d never seen", n_matched, n_expected, n_lost)
+    )
+  }
+
+  if (verbose && n_expected > 0) {
+    cat(sprintf("  [SEGMENT] %d of %d rows (%.1f%%) were removed before clustering and are Unassigned in the export.\n",
+                n_expected, length(survey_ids), 100 * n_expected / length(survey_ids)))
+  }
+  if (verbose && n_lost > 0) {
+    cat(sprintf("  [SEGMENT] Partial join allowed: %d row(s) the segmentation never saw are Unassigned.\n", n_lost))
   }
 
   # --- write the joined survey file -----------------------------------------
@@ -191,6 +222,9 @@ segment_export_for_tabs <- function(assignments,
     n_rows = nrow(out),
     n_matched = n_matched,
     n_unmatched = n_unmatched,
+    n_removed_by_module = n_expected,
+    n_never_seen = n_lost,
+    n_blank_rows = sum(blank_rows),
     segment_column = "segment_name",
     segments = sort(unique(segment_col))
   )

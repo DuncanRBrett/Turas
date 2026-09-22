@@ -415,12 +415,20 @@ segment_gui_outcome <- function(result) {
     as.character(x)
   }
 
+  # The engine returns its verdict as `status` (00_main.R, the final and
+  # exploration return lists); the refusal handler's structure calls it
+  # `run_status`. Read both. Reading only `run_status` classified every
+  # PARTIAL run as a clean PASS (independent review 2026-09-21, F12).
+  verdict <- toupper(blank(result$status %||% result$run_status)[1])
+
   is_refusal_shaped <- inherits(result, "turas_refusal_result") ||
     isTRUE(result$refused) ||
-    identical(blank(result$run_status)[1], "REFUSE")
+    identical(verdict, "REFUSE")
 
   is_error_shaped <- inherits(result, "turas_error_result") ||
-    identical(blank(result$run_status)[1], "ERROR")
+    identical(verdict, "ERROR")
+
+  is_partial_shaped <- identical(verdict, "PARTIAL")
 
   if (is.null(result) || !is.list(result)) {
     return(list(
@@ -460,10 +468,85 @@ segment_gui_outcome <- function(result) {
     ))
   }
 
+  if (is_partial_shaped) {
+    reasons <- segment_gui_partial_reasons(result)
+    return(list(
+      success = TRUE,
+      status = "PARTIAL",
+      code = "QUALITY_DEGRADED",
+      title = sprintf("Analysis completed with %d warning(s)", length(reasons)),
+      problem = paste(reasons, collapse = " "),
+      how_to_fix = c(
+        "Read the warnings above and the Run_Status sheet of the Excel report.",
+        "Decide whether the solution is usable before it is reported."
+      ),
+      message = paste(reasons, collapse = "\n"),
+      warnings = reasons,
+      result = result
+    ))
+  }
+
   list(
     success = TRUE, status = "PASS", code = "", title = "Analysis complete",
-    problem = "", how_to_fix = character(0), message = "", result = result
+    problem = "", how_to_fix = character(0), message = "", warnings = character(0),
+    result = result
   )
+}
+
+
+#' The Reasons a Run Came Back PARTIAL
+#'
+#' Read from the TRS run state's PARTIAL events first, then from the guard
+#' summary's warnings, so the GUI can name them instead of announcing a clean
+#' success over a degraded solution.
+#'
+#' @param result The engine's result list
+#' @return Character vector, never empty
+#' @keywords internal
+segment_gui_partial_reasons <- function(result) {
+  reasons <- character(0)
+
+  events <- result$run_result$events
+  if (is.list(events) && length(events) > 0) {
+    for (ev in events) {
+      if (!is.list(ev)) next
+      if (!identical(toupper(as.character(ev$level %||% "")), "PARTIAL")) next
+      txt <- as.character(ev$problem %||% ev$title %||% "")
+      if (length(txt) > 0 && nzchar(txt[1])) reasons <- c(reasons, txt[1])
+    }
+  }
+
+  if (length(reasons) == 0) {
+    gw <- result$guard_summary$warnings
+    if (!is.null(gw) && length(gw) > 0) reasons <- as.character(unlist(gw))
+  }
+
+  reasons <- unique(reasons[nzchar(reasons)])
+  if (length(reasons) == 0) {
+    reasons <- "The run reported PARTIAL without naming a reason. Read the Run_Status sheet."
+  }
+  reasons
+}
+
+
+#' What the Stats-pack Checkbox Should Start As
+#'
+#' The GUI writes the checkbox into an option on every run, and the option
+#' wins over the config (segment_should_write_stats_pack). With the box
+#' always starting unticked, the config's generate_stats_pack was never
+#' consulted from the GUI (independent review 2026-09-21, F5). The box now
+#' starts as the study's setting and a click overrides it for that run.
+#'
+#' @param config_file Path to the config workbook, or NULL
+#' @return TRUE unless the config says generate_stats_pack = N
+#' @export
+segment_gui_stats_pack_default <- function(config_file) {
+  if (is.null(config_file) || !nzchar(config_file) || !file.exists(config_file)) return(TRUE)
+  value <- tryCatch({
+    raw <- read_segment_config(config_file)
+    toupper(trimws(as.character(raw$generate_stats_pack %||% "Y")))
+  }, error = function(e) "Y")
+  !identical(value, "N")
 }
 
 
@@ -477,6 +560,15 @@ segment_gui_outcome <- function(result) {
 #' @return invisible(NULL)
 #' @export
 segment_gui_console_block <- function(outcome) {
+  if (identical(outcome$status, "PARTIAL")) {
+    line <- strrep("-", 74)
+    cat("\n", line, "\n", sep = "")
+    cat("  SEGMENT PARTIAL: analysis completed with warnings\n")
+    cat(line, "\n", sep = "")
+    for (w in outcome$warnings %||% character(0)) cat(sprintf("  - %s\n", w))
+    cat(line, "\n\n", sep = "")
+    return(invisible(NULL))
+  }
   if (isTRUE(outcome$success)) return(invisible(NULL))
 
   line <- strrep("-", 74)

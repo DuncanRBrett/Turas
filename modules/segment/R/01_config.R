@@ -352,8 +352,37 @@ validate_segment_analysis_params <- function(config, clustering_vars) {
   varsel_max_correlation <- get_numeric_config(config, "varsel_max_correlation", default_value = 0.8, min = 0.5, max = 0.95)
 
   # Validation metrics
-  k_selection_metrics_str <- get_char_config(config, "k_selection_metrics", default_value = "silhouette,elbow")
-  k_selection_metrics <- trimws(unlist(strsplit(k_selection_metrics_str, ",")))
+  k_selection_metrics_str <- get_char_config(
+    config, "k_selection_metrics",
+    default_value = "silhouette,elbow,calinski_harabasz,davies_bouldin")
+  k_selection_metrics <- tolower(trimws(unlist(strsplit(k_selection_metrics_str, ","))))
+  k_selection_metrics <- k_selection_metrics[nzchar(k_selection_metrics)]
+
+  # Only names the module computes. The template used to offer gap_statistic
+  # here while nothing read the setting at all, so any spelling passed
+  # (independent review 2026-09-21, F4). Silhouette and elbow are always
+  # computed because the recommendation is made on silhouette; the two
+  # separation indices are added to the k-selection table when named.
+  known_metrics <- c("silhouette", "elbow", "calinski_harabasz", "davies_bouldin")
+  unknown_metrics <- setdiff(k_selection_metrics, known_metrics)
+  if (length(unknown_metrics) > 0) {
+    segment_refuse(
+      code = "CFG_INVALID_K_SELECTION_METRIC",
+      title = "Unknown k-selection metric",
+      problem = sprintf("k_selection_metrics names %s, which the module does not compute.",
+                        paste(unknown_metrics, collapse = ", ")),
+      why_it_matters = paste(
+        "A metric named here appears in the k-selection report. Naming one that",
+        "nothing computes would leave a column the reader assumes was weighed."
+      ),
+      how_to_fix = c(
+        "Use any of: silhouette, elbow, calinski_harabasz, davies_bouldin.",
+        "The gap statistic is not offered here: it is expensive and stays behind calculate_gap in code."
+      ),
+      expected = known_metrics,
+      observed = unknown_metrics
+    )
+  }
 
   # Output settings
   output_folder <- get_char_config(config, "output_folder", default_value = "output/")
@@ -650,13 +679,26 @@ segment_warn_unused_settings <- function(raw_config, validated_config) {
     "segment_names"          # handled with the naming style
   )
 
-  unused <- setdiff(raw_keys, c(names(validated_config), consumed_elsewhere))
+  known <- c(names(validated_config), consumed_elsewhere)
+  unused <- setdiff(raw_keys, known)
   if (length(unused) == 0) return(invisible(character(0)))
+
+  # A key that differs from a real one only in case is the commonest cause,
+  # and naming it alone sends the user looking for a setting that does not
+  # exist. Say which one it nearly is (independent review 2026-09-22, D12).
+  near <- vapply(unused, function(k) {
+    hit <- known[tolower(known) == tolower(k)]
+    if (length(hit) > 0) hit[1] else NA_character_
+  }, character(1))
 
   cat("\n")
   cat("+--- SEGMENT: settings that did not survive validation ---+\n")
   for (k in unused) {
     cat(sprintf("| %-55s |\n", k))
+    if (!is.na(near[[k]])) {
+      cat(sprintf("| %-55s |\n",
+                  sprintf("  did you mean '%s'? Case must match.", near[[k]])))
+    }
   }
   cat("| These were read from the Config sheet and are not used by  |\n")
   cat("| the run. Check the spelling against the template, or       |\n")
@@ -667,10 +709,14 @@ segment_warn_unused_settings <- function(raw_config, validated_config) {
   cat("+------------------------------------------------------------+\n\n")
 
   if (exists("showNotification", mode = "function")) {
-    try(showNotification(
-      paste("Segment: unused config settings:", paste(unused, collapse = ", ")),
-      type = "warning", duration = NULL
-    ), silent = TRUE)
+    msg <- paste("Segment: unused config settings:", paste(unused, collapse = ", "))
+    if (any(!is.na(near))) {
+      msg <- paste0(msg, ". Close to: ",
+                    paste(sprintf("%s -> %s", names(near)[!is.na(near)],
+                                  near[!is.na(near)]), collapse = ", "),
+                    " (case must match)")
+    }
+    try(showNotification(msg, type = "warning", duration = NULL), silent = TRUE)
   }
 
   invisible(unused)
@@ -692,6 +738,73 @@ validate_segment_config <- function(config) {
 
   # Step 3: HTML report + enhanced features
   features <- parse_segment_feature_params(config, req$clustering_vars)
+
+  # Step 3a: the tabs export belongs to the single-method final run, and to no
+  # other path. Only that path has a reader for tabs_export, so combined mode
+  # ran with the setting on and wrote nothing (independent review 2026-09-21,
+  # F14), and so did exploration mode, which the fix for F14 did not cover
+  # (independent review 2026-09-22, D10). Refuse both here, before a run
+  # starts, rather than at the end of one.
+  #
+  # The two are checked separately because the reasons differ: combined mode
+  # has no one method to export from, exploration mode has no one k. A config
+  # that is both is refused once, by the combined branch, whose fix text then
+  # names k as well so the user is not walked into a second refusal.
+  tabs_export_on <- identical(toupper(as.character(features$tabs_export %||% "N")), "Y")
+  is_exploration <- is.null(analysis$k_fixed)
+
+  if (tabs_export_on && isTRUE(req$is_multi_method)) {
+    cat("\n[SEGMENT] Config asks for the tabs export while comparing methods, where nothing writes it.\n")
+    segment_refuse(
+      code = "CFG_TABS_EXPORT_COMBINED",
+      title = "The Tabs Export Is Not Written in Combined Mode",
+      problem = sprintf(
+        "This config compares %d methods (method = %s) and sets tabs_export = Y.",
+        length(req$methods), paste(req$methods, collapse = ", ")),
+      why_it_matters = paste(
+        "Combined mode compares methods and does not choose between them, so",
+        "there is no single segment column to write back onto the survey file.",
+        "The export belongs to the single-method run you make after choosing",
+        "one. Until now the setting was read on the single-method path only and",
+        "ignored in silence here, which looked like an export that had happened."
+      ),
+      how_to_fix = c(
+        "Set tabs_export to N for this comparison run.",
+        if (is_exploration) {
+          "Then set method to the one method you chose and k_fixed to the k you chose, keep tabs_export = Y, and run again."
+        } else {
+          "Then set method to the one method you chose, keep tabs_export = Y, and run again."
+        }
+      ),
+      expected = "tabs_export = N while method names more than one method",
+      observed = sprintf("method = %s, tabs_export = Y", paste(req$methods, collapse = ", "))
+    )
+  }
+
+  if (tabs_export_on && is_exploration) {
+    cat("\n[SEGMENT] Config asks for the tabs export while exploring values of k, where nothing writes it.\n")
+    segment_refuse(
+      code = "CFG_TABS_EXPORT_EXPLORATION",
+      title = "The Tabs Export Is Not Written in Exploration Mode",
+      problem = sprintf(
+        "This config explores k from %s to %s and sets tabs_export = Y.",
+        as.character(analysis$k_min), as.character(analysis$k_max)),
+      why_it_matters = paste(
+        "Exploration compares values of k and chooses none, so there is no one",
+        "segment column to write back onto the survey file. The export belongs",
+        "to the final run you make after you fix k. Until now the setting was",
+        "read on the final path only and ignored in silence here, which looked",
+        "like an export that had happened."
+      ),
+      how_to_fix = c(
+        "Set tabs_export to N for this exploration run.",
+        "Then set k_fixed to the k you chose, keep tabs_export = Y, and run again."
+      ),
+      expected = "tabs_export = N while k_fixed is empty",
+      observed = sprintf("k_min = %s, k_max = %s, tabs_export = Y",
+                         as.character(analysis$k_min), as.character(analysis$k_max))
+    )
+  }
 
   # Assemble validated config
   validated_config <- c(

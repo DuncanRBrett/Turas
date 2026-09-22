@@ -70,7 +70,10 @@ transform_final_for_html <- function(results, config) {
     avg_silhouette = vm$avg_silhouette %||% NA_real_,
     betweenss_totss = vm$betweenss_totss %||% NA_real_,
     tot_withinss = vm$tot_withinss %||% NA_real_,
-    betweenss = vm$betweenss %||% NA_real_
+    betweenss = vm$betweenss %||% NA_real_,
+    # Read by the combined comparison table and the validation cards (F4).
+    ch_index = vm$calinski_harabasz %||% NA_real_,
+    db_index = vm$davies_bouldin %||% NA_real_
   )
 
   # Method-specific info

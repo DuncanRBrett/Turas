@@ -899,7 +899,7 @@ set_segmentation_seed <- function(config) {
     varsel_max_correlation = 0.8,
 
     # Validation
-    k_selection_metrics = c("silhouette", "elbow"),
+    k_selection_metrics = c("silhouette", "elbow", "calinski_harabasz", "davies_bouldin"),
 
     # Output
     output_folder = output_folder,
@@ -1666,7 +1666,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_field("id_variable",      sv("respondent_id"), "REQUIRED", "Column name for respondent unique identifier", "Column name in data"),
     add_field("clustering_vars",  sv("q1,q2,q3,q4,q5"), "REQUIRED", "Comma-separated list of numeric variables for clustering. Aim for 8-20 variables.", "Comma-separated column names"),
     add_field("profile_vars",     "",          "Optional", "Comma-separated variables for profiling (auto-detected from data if blank)", "Comma-separated column names"),
-    add_field("demographic_vars", "",          "Optional", "Comma-separated categorical variables for demographic profiling", "Comma-separated column names"),
+    add_field("demographic_vars", "",          "Optional", "Comma-separated variables profiled by segment. Categorical ones are cross-tabulated; a numeric one with more than ten distinct answers is summarised as means instead. Blanks are not counted as an answer, and a column of another type is named and skipped.", "Comma-separated column names"),
     # --- CLUSTERING METHOD ---
     add_section("CLUSTERING METHOD"),
     add_field("method",           "kmeans",    "REQUIRED", "Clustering algorithm. Use 'all' or comma-separated for multi-method comparison.", "kmeans, hclust, gmm, all"),
@@ -1677,7 +1677,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_field("k_fixed",          "",          "Optional", "Fixed number of segments. Leave blank for exploration mode (tests k_min to k_max).", "Integer >= 2"),
     add_field("k_min",            "3",         "Optional", "Minimum k to test in exploration mode", "2-10"),
     add_field("k_max",            "6",         "Optional", "Maximum k to test in exploration mode. Must be > k_min.", "2-15"),
-    add_field("k_selection_metrics", "silhouette,elbow", "Optional", "Metrics for choosing optimal k in exploration mode", "silhouette, elbow, calinski_harabasz, davies_bouldin, gap_statistic"),
+    add_field("k_selection_metrics", "silhouette,elbow,calinski_harabasz,davies_bouldin", "Optional", "Columns of the k-selection table. Silhouette (the recommendation basis) and elbow are always shown; name calinski_harabasz and davies_bouldin to add them.", "silhouette, elbow, calinski_harabasz, davies_bouldin"),
     add_field("nstart",           "50",        "Optional", "Number of random starts for k-means (higher = more stable, slower)", "1-200"),
     add_field("seed",             "123",       "Optional", "Random seed for reproducibility. Set to any integer.", "Any positive integer"),
     # --- DATA HANDLING ---
@@ -1747,7 +1747,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_section("STUDY IDENTIFICATION"),
     add_field("research_house",   "",          "Optional", "Research organisation name. Appears on the report header and footer and on the stats pack Declaration sheet.", "Text"),
     add_field("client_name",      "",          "Optional", "Client the report was prepared for. Appears on the report header and footer.", "Text"),
-    add_field("tabs_export",      "N",         "Optional", "Write the segment column back onto the survey file, plus a banner stub for tabs.", "Y, N"),
+    add_field("tabs_export",      "N",         "Optional", "Write the segment column back onto the survey file, plus a banner stub for tabs. Single-method final mode only.", "Y, N"),
     add_field("allow_partial_join", "N",       "Optional", "Allow the tabs export when some survey rows have no segment. They become 'Unassigned'.", "Y, N")
   )
 

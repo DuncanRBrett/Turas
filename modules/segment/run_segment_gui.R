@@ -282,9 +282,11 @@ run_segment_gui <- function() {
         h3(class = "turas-card-title", "Step 3: Run Analysis"),
         p("Click the button below to start the segmentation analysis. This may take a few moments."),
 
+        # Starts as the config's generate_stats_pack; a click overrides it
+        # for this run (F5).
         checkboxInput("generate_stats_pack",
                       "Generate stats pack (diagnostic workbook for advanced review)",
-                      value = FALSE),
+                      value = segment_gui_stats_pack_default(config_file())),
 
         actionButton("run_analysis_btn", "Run Segmentation Analysis",
                     class = "turas-btn-run",
@@ -372,8 +374,11 @@ run_segment_gui <- function() {
           # with the tick and the green toast (H1). Ask what came back.
           outcome <- segment_gui_outcome(result)
 
-          # Printed inside the sink, so it lands in the console pane the user
-          # is looking at as well as the terminal behind the app.
+          # Printed inside the sink, so it lands in the console pane the
+          # user is looking at. The sink is not split, so it does NOT also
+          # reach the terminal the app was launched from. Splitting it would
+          # double every line for anyone who launched from a terminal, which
+          # is worse than one place to read.
           segment_gui_console_block(outcome)
 
           list(success = outcome$success, result = result, outcome = outcome)
@@ -417,16 +422,36 @@ run_segment_gui <- function() {
           # Store successful result
           analysis_result(analysis_result_data$result)
 
-          # Append completion message to console
+          # A PARTIAL run is a success with warnings, and the warnings are the
+          # point: a degraded solution announced as a clean success is the
+          # silence this module set out to end (independent review
+          # 2026-09-21, F12).
+          outcome <- analysis_result_data$outcome
+          partial <- identical(outcome$status, "PARTIAL")
+
           console_output(paste0(
             console_output(),
-            sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80))
+            if (partial) {
+              sprintf("\n\n%s\nANALYSIS COMPLETE WITH %d WARNING(S)\n%s\n%s\n",
+                      strrep("=", 80), length(outcome$warnings), strrep("=", 80),
+                      paste0("- ", outcome$warnings, collapse = "\n"))
+            } else {
+              sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80))
+            }
           ))
 
           save_recent_project(config_file())
           progress$set(value = 1.0, detail = "Complete!")
-          showNotification("Segmentation analysis completed successfully!",
-                          type = "message", duration = 5)
+          if (partial) {
+            showNotification(
+              sprintf("Segmentation completed with %d warning(s): %s",
+                      length(outcome$warnings), outcome$warnings[1]),
+              type = "warning", duration = NULL
+            )
+          } else {
+            showNotification("Segmentation analysis completed successfully!",
+                             type = "message", duration = 5)
+          }
 
         } else {
           # Refusal or error. Store the classified outcome, not a bare string:
@@ -493,7 +518,7 @@ run_segment_gui <- function() {
             hr(style = "margin: 10px 0;"),
             p(strong("Note:"),
               if (refused) {
-                " Nothing was written. Fix the configuration or the data and run again."
+                " Nothing further was written. Files from earlier steps of this run, if any, are in the output folder. Fix the configuration or the data and run again."
               } else {
                 " Check the console output above. Output files may still have been generated."
               })
@@ -514,12 +539,21 @@ run_segment_gui <- function() {
           )
         )
       } else {
-        # Success
+        # Success, possibly with warnings (F12: a PARTIAL run names them here).
+        partial_outcome <- segment_gui_outcome(result)
+        is_partial <- identical(partial_outcome$status, "PARTIAL")
+
         div(class = "turas-card",
           h3(class = "turas-card-title", "Step 5: Results"),
 
-          div(class = "turas-status-success",
-            strong("✓ Analysis Complete!"), br(),
+          div(class = if (is_partial) "turas-status-warning" else "turas-status-success",
+            strong(if (is_partial) partial_outcome$title else "✓ Analysis Complete!"), br(),
+            if (is_partial) {
+              tagList(
+                tags$ul(lapply(partial_outcome$warnings, function(w) tags$li(w))),
+                p(em("Read the Run_Status sheet of the Excel report before using this solution."))
+              )
+            },
             hr(style = "margin: 10px 0;"),
 
             if (identical(result$mode, "exploration")) {

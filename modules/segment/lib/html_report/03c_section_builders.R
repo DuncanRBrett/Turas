@@ -313,6 +313,33 @@ build_seg_validation_section <- function(tables, charts, html_data) {
     )))
   }
 
+  # Calinski-Harabasz card. No fixed quality bands: the index scales with n
+  # and is read by comparing solutions, so the note says that.
+  if (!is.null(diag$ch_index) && !is.na(diag$ch_index)) {
+    fit_cards <- c(fit_cards, list(htmltools::tags$div(
+      class = "seg-fit-card",
+      htmltools::tags$div(class = "seg-fit-card-value", sprintf("%.1f", diag$ch_index)),
+      htmltools::tags$div(class = "seg-fit-card-label", "Calinski-Harabasz"),
+      htmltools::tags$div(class = "seg-fit-card-quality", "Higher is better"),
+      htmltools::tags$div(class = "seg-fit-card-note",
+                          "Ratio of between-segment to within-segment dispersion. It grows with sample size, so compare it across solutions of the same study rather than against a fixed scale.")
+    )))
+  }
+
+  # Davies-Bouldin card
+  if (!is.null(diag$db_index) && !is.na(diag$db_index)) {
+    db_val <- diag$db_index
+    db_label <- if (db_val < 1.0) "Well separated" else if (db_val < 1.5) "Moderate" else "Overlapping"
+    fit_cards <- c(fit_cards, list(htmltools::tags$div(
+      class = "seg-fit-card",
+      htmltools::tags$div(class = "seg-fit-card-value", sprintf("%.3f", db_val)),
+      htmltools::tags$div(class = "seg-fit-card-label", "Davies-Bouldin"),
+      htmltools::tags$div(class = "seg-fit-card-quality", db_label),
+      htmltools::tags$div(class = "seg-fit-card-note",
+                          "Average, over segments, of the worst ratio of within-segment spread to between-centre distance. Lower is better; under 1.0 is usually read as well separated.")
+    )))
+  }
+
   # Number of variables card
   if (!is.null(diag$n_variables) && !is.na(diag$n_variables)) {
     fit_cards <- c(fit_cards, list(htmltools::tags$div(
@@ -568,11 +595,13 @@ build_seg_importance_section <- function(tables, charts, html_data) {
     insight_area,
     htmltools::tags$p(
       class = "seg-section-intro",
-      htmltools::HTML(paste0(
-        "Variables ranked by their contribution to segment differentiation. ",
-        "The percentage shows each variable&rsquo;s share of the total discriminating power &mdash; ",
-        "a variable with 25% contributes one quarter of the total distinction between segments."
-      ))
+      paste(
+        "Variables ranked by how sharply they separate the segments.",
+        "The percentages rank the variables against each other and sum to 100",
+        "by construction. Read them as an order of strength rather than as a",
+        "share of the difference each variable explains. The note under the",
+        "table says what the percentages are calculated from."
+      )
     ),
     chart_el,
     table_el,
@@ -637,6 +666,162 @@ build_seg_profiles_section <- function(tables, charts, html_data) {
     ),
     chart_el,
     table_el
+  )
+}
+
+
+# ==============================================================================
+# DEMOGRAPHICS SECTION
+# ==============================================================================
+
+#' Build Demographic Profiles Section
+#'
+#' Shows how each demographic variable is distributed within each segment.
+#' The tables come from `profile_demographics()`, which the orchestrator calls
+#' when the config names any `demographic_vars`. Before September 2026 nothing
+#' called it and this section did not exist (independent review 2026-09-21,
+#' F2).
+#'
+#' @param tables Named list of table objects
+#' @param html_data Transformed HTML data
+#' @return htmltools tag, or NULL when there are no demographic profiles
+#' @keywords internal
+build_seg_demographics_section <- function(tables, html_data) {
+
+  demo <- html_data$enhanced$demographic_profiles %||% NULL
+  if (is.null(demo)) return(NULL)
+
+  cat_el <- tables$demographics
+  num_el <- tables$demographics_numeric
+  if (is.null(cat_el) && is.null(num_el)) return(NULL)
+
+  title_row <- build_seg_section_title_row("Demographics", "demographics")
+  insight_area <- build_seg_insight_area("demographics")
+
+  # The base. Demographics are profiled on the respondents who were
+  # clustered, which is not everyone in the data file when listwise deletion
+  # or outlier removal took rows out.
+  #
+  # This is the clustered n, not the answered n. table() drops NA, so a
+  # demographic with blanks is percentaged on fewer people than this line
+  # names (independent review 2026-09-22, D1). profile_demographics() now
+  # returns a bases frame, and build_seg_demo_base_line() states the answered
+  # n under each table. This line keeps the clustered n and the per-segment
+  # sizes, which is what the section as a whole is built on.
+  sizes <- html_data$segment_sizes
+  base_note <- if (!is.null(sizes) && nrow(sizes) > 0) {
+    sprintf("Base: %d respondents who were clustered (%s).",
+            sum(sizes$n),
+            paste(sprintf("%s n=%d", sizes$segment_name, sizes$n), collapse = ", "))
+  } else {
+    "Base: the respondents who were clustered."
+  }
+
+  # A variable with no answers at all among the clustered respondents
+  # profiles to an empty frame, which the table builders drop. Name it rather
+  # than letting it disappear between the config and the page.
+  all_frames <- c(demo$categorical_profiles %||% list(),
+                  demo$numeric_profiles %||% list())
+  empty_vars <- names(all_frames)[vapply(all_frames, function(f) {
+    is.null(f) || !is.data.frame(f) || nrow(f) == 0
+  }, logical(1))]
+
+  empty_note <- if (length(empty_vars) > 0) {
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      sprintf(
+        "Not shown, because no clustered respondent answered: %s.",
+        paste(empty_vars, collapse = ", "))
+    )
+  }
+
+  # A demographic that is also a clustering variable separates the segments by
+  # construction. Showing that separation without saying so reads as a finding
+  # about people (independent review 2026-09-22, D7).
+  circular <- demo$circular_vars %||% character(0)
+  circular_note <- if (length(circular) > 0) {
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      sprintf(
+        paste("The segments were built from %s, so %s separation below follows",
+              "from how the segments were made and is not a finding about the",
+              "people in them."),
+        paste(circular, collapse = ", "),
+        if (length(circular) == 1) "its" else "their")
+    )
+  }
+
+  numeric_heading <- if (!is.null(num_el)) {
+    htmltools::tags$h3(
+      class = "seg-subsection-title",
+      style = "margin:24px 0 10px; font-size:16px;",
+      "Numeric demographics"
+    )
+  }
+
+  numeric_note <- if (!is.null(num_el)) {
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:6px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      paste(
+        "A variable with more than ten distinct numeric answers is summarised",
+        "this way rather than cross-tabulated. Each table carries a one-way",
+        "ANOVA across the segments, which is descriptive for the same reason",
+        "the chi-square is: the segments were derived from this same sample,",
+        "so the test describes this data rather than a claim made before the",
+        "segmentation."
+      )
+    )
+  }
+
+  htmltools::tags$div(
+    class = "seg-section",
+    id = "seg-demographics",
+    `data-seg-section` = "demographics",
+    title_row,
+    insight_area,
+    htmltools::tags$p(
+      class = "seg-section-intro",
+      paste(
+        "How each demographic variable is spread within each segment.",
+        "Percentages are column percentages: they read down a segment and add",
+        "to 100 within it, give or take rounding, across the respondents who",
+        "answered that question. The Overall column is the same calculation",
+        "pooled across the segments. Each table states its own base under it,",
+        "because a demographic that some people left blank rests on fewer",
+        "respondents than the clustered n below."
+      )
+    ),
+    cat_el,
+    numeric_heading,
+    num_el,
+    numeric_note,
+    circular_note,
+    empty_note,
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      # The chi-square sentence only when there is a chi-square. An all-numeric
+      # set of demographics produces no tests and no Demographics_Tests sheet,
+      # and a footnote naming a sheet the workbook does not have is worse than
+      # no footnote.
+      if (!is.null(demo$chi_sq_tests) && nrow(demo$chi_sq_tests) > 0) {
+        paste(
+          base_note,
+          "The chi-square p-values in the workbook's Demographics_Tests sheet are",
+          "descriptive. The segments are a grouping derived from this same sample,",
+          "so a p-value here describes this data rather than testing a claim made",
+          "before the segmentation, and a table with expected counts under five is",
+          "flagged in that sheet as approximate. A variable that could not be",
+          "tested has no p-value and carries the reason in that sheet's Note",
+          "column."
+        )
+      } else {
+        base_note
+      }
+    )
   )
 }
 

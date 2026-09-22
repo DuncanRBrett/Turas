@@ -335,3 +335,105 @@ test_that("the gap statistic stays off unless it is asked for (M2)", {
 
   expect_false("gap_statistic" %in% names(metrics))
 })
+
+
+# ==============================================================================
+# F4 (independent review 2026-09-21): Calinski-Harabasz and Davies-Bouldin were
+# computed by a function with no caller while the template offered both as
+# k-selection choices and the setting was read by nothing.
+# ==============================================================================
+
+.f4_clusters <- function(seed = 7, k = 3, n_per = 40) {
+  set.seed(seed)
+  centres <- matrix(c(0, 0, 5, 5, -5, 5), nrow = k, byrow = TRUE)
+  d <- as.data.frame(do.call(rbind, lapply(seq_len(k), function(i) {
+    matrix(rnorm(n_per * 2, mean = rep(centres[i, ], each = n_per), sd = 0.5), ncol = 2)
+  })))
+  names(d) <- c("v1", "v2")
+  list(scaled = scale(d), km = kmeans(scale(d), centers = k, nstart = 10), k = k)
+}
+
+test_that("validation metrics carry CH and DB, and they agree with the standalone function (F4)", {
+  fx <- .f4_clusters()
+  capture.output(m <- calculate_validation_metrics(data = fx$scaled, model = fx$km,
+                                                   k = fx$k, clusters = fx$km$cluster))
+  expect_true(is.finite(m$calinski_harabasz))
+  expect_true(is.finite(m$davies_bouldin))
+  expect_gt(m$calinski_harabasz, 100)   # three well separated blobs
+  expect_lt(m$davies_bouldin, 1.0)
+
+  d <- as.data.frame(fx$scaled)
+  capture.output(sep <- calculate_separation_metrics(d, fx$km$cluster, c("v1", "v2")))
+  expect_equal(m$calinski_harabasz, sep$calinski_harabasz, tolerance = 1e-8)
+  expect_equal(m$davies_bouldin, sep$davies_bouldin, tolerance = 1e-8)
+})
+
+test_that("CH is a well separated solution's friend: it falls when the blobs merge (F4)", {
+  fx <- .f4_clusters()
+  worse <- kmeans(fx$scaled, centers = 6, nstart = 10)
+  capture.output(good <- calculate_validation_metrics(fx$scaled, fx$km, 3, fx$km$cluster))
+  capture.output(bad <- calculate_validation_metrics(fx$scaled, worse, 6, worse$cluster))
+  expect_gt(good$calinski_harabasz, bad$calinski_harabasz)
+})
+
+test_that("the k-selection metrics carry CH and DB only when the setting names them (F4)", {
+  fx <- .f4_clusters()
+  results <- lapply(2:4, function(k) {
+    km <- kmeans(fx$scaled, centers = k, nstart = 10)
+    list(clusters = km$cluster, model = km, k = k)
+  })
+  names(results) <- as.character(2:4)
+  expl <- list(results = results, data_list = list(scaled_data = fx$scaled))
+
+  capture.output(all4 <- calculate_exploration_metrics(expl))
+  expect_true(all(c("calinski_harabasz", "davies_bouldin") %in% names(all4$metrics_df)))
+  expect_true(all(is.finite(all4$metrics_df$calinski_harabasz)))
+
+  capture.output(two <- calculate_exploration_metrics(expl, metrics = c("silhouette", "elbow")))
+  expect_false("calinski_harabasz" %in% names(two$metrics_df))
+  expect_false("davies_bouldin" %in% names(two$metrics_df))
+  expect_true("avg_silhouette_width" %in% names(two$metrics_df))
+
+  capture.output(ch_only <- calculate_exploration_metrics(expl, metrics = c("silhouette", "calinski_harabasz")))
+  expect_true("calinski_harabasz" %in% names(ch_only$metrics_df))
+  expect_false("davies_bouldin" %in% names(ch_only$metrics_df))
+})
+
+test_that("k_selection_metrics refuses a metric the module does not compute (F4)", {
+  d <- data.frame(respondent_id = 1:60, q1 = rnorm(60), q2 = rnorm(60), q3 = rnorm(60))
+  path <- tempfile(fileext = ".xlsx"); openxlsx::write.xlsx(d, path)
+  base <- list(data_file = path, id_variable = "respondent_id",
+               clustering_vars = "q1,q2,q3", k_min = "2", k_max = "4", method = "kmeans")
+
+  err <- tryCatch(
+    capture.output(validate_segment_config(c(base, list(k_selection_metrics = "silhouette,gap_statistic")))),
+    turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_true(grepl("gap_statistic", conditionMessage(err), fixed = TRUE))
+
+  capture.output(ok <- validate_segment_config(c(base, list(k_selection_metrics = "Silhouette, Davies_Bouldin"))))
+  expect_equal(ok$k_selection_metrics, c("silhouette", "davies_bouldin"))
+
+  capture.output(dflt <- validate_segment_config(base))
+  expect_equal(dflt$k_selection_metrics, c("silhouette", "elbow", "calinski_harabasz", "davies_bouldin"))
+})
+
+test_that("the report transformer carries CH and DB to the diagnostics (F4)", {
+  skip_if_not(exists("transform_segment_for_html", mode = "function"), "report layer not loaded")
+  fx <- .f4_clusters()
+  capture.output(vm <- calculate_validation_metrics(fx$scaled, fx$km, 3, fx$km$cluster))
+  d <- as.data.frame(fx$scaled)
+  capture.output(pr <- create_full_segment_profile(d, fx$km$cluster, c("v1", "v2")))
+  results <- list(
+    mode = "final", method = "kmeans",
+    cluster_result = list(method = "kmeans", k = 3, clusters = fx$km$cluster,
+                          centers = fx$km$centers, model = fx$km, method_info = list()),
+    validation_metrics = vm, profile_result = pr,
+    segment_names = paste("Segment", 1:3),
+    data_list = list(original_data = d, scaled_data = fx$scaled, clustering_vars = c("v1", "v2")),
+    config = list(clustering_vars = c("v1", "v2"), method = "kmeans")
+  )
+  capture.output(hd <- transform_segment_for_html(results, results$config))
+  expect_equal(hd$diagnostics$ch_index, vm$calinski_harabasz)
+  expect_equal(hd$diagnostics$db_index, vm$davies_bouldin)
+})

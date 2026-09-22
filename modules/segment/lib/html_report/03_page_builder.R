@@ -97,6 +97,10 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     !is.null(html_data$variable_importance)
   show_profiles <- isTRUE(config$html_show_profiles %||% TRUE) &&
     !is.null(html_data$profile_data)
+  # The gate the template has offered since v11.0. It controlled nothing until
+  # the profiling was wired in (independent review 2026-09-21, F2).
+  show_demographics <- isTRUE(config$html_show_demographics %||% TRUE) &&
+    !is.null(html_data$enhanced$demographic_profiles)
   show_vulnerability <- !is.null(html_data$vulnerability)
   show_overlap <- !is.null(html_data$centers) && html_data$k > 1
   show_golden_questions <- !is.null(html_data$golden_questions) &&
@@ -112,6 +116,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     importance     = list(label = "Importance", show = show_importance),
     `golden-questions` = list(label = "Golden Questions", show = show_golden_questions),
     profiles       = list(label = "Profiles", show = show_profiles),
+    demographics   = list(label = "Demographics", show = show_demographics),
     rules          = list(label = "Rules", show = show_rules),
     cards          = list(label = "Segment Cards", show = show_cards),
     vulnerability  = list(label = "Vulnerability", show = show_vulnerability),
@@ -138,6 +143,9 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
   }
   profiles_section <- if (show_profiles) {
     build_seg_profiles_section(tables, charts, html_data)
+  }
+  demographics_section <- if (show_demographics) {
+    build_seg_demographics_section(tables, html_data)
   }
   rules_section <- if (show_rules) {
     build_seg_rules_section(tables, html_data)
@@ -323,6 +331,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
           importance_section,
           golden_questions_section,
           profiles_section,
+          demographics_section,
           rules_section,
           cards_section,
           vulnerability_section,

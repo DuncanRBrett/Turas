@@ -50,8 +50,12 @@ test_that("the joined file carries every survey row and the segment column", {
 
 test_that("the join keeps the survey's own row order", {
   # tabs matches rows by position in several places, so a reordered file is a
-  # silently different study.
-  fx <- .tabs_export_fixture()
+  # silently different study. The IDs are shuffled on purpose: with sorted IDs
+  # a merge() that reorders is indistinguishable from match() (independent
+  # review 2026-09-21, F13).
+  set.seed(57)
+  fx <- .tabs_export_fixture(ids = sample(sprintf("R%03d", 1:60)))
+  expect_false(identical(fx$survey$respondent_id, sort(fx$survey$respondent_id)))
   out <- tempfile(fileext = ".xlsx")
 
   capture.output(segment_export_for_tabs(
@@ -61,7 +65,9 @@ test_that("the join keeps the survey's own row order", {
   expect_equal(joined$respondent_id, fx$survey$respondent_id)
 })
 
-test_that("a partial join is refused unless it was allowed explicitly", {
+test_that("a row the segmentation never saw is refused unless allowed explicitly", {
+  # Rows the module itself removed are a different case (next test). These 20
+  # were never seen: no dropped_ids, so the assignments came from elsewhere.
   fx <- .tabs_export_fixture()
   short <- fx$assignments[1:40, ]
   out <- tempfile(fileext = ".xlsx")
@@ -75,6 +81,55 @@ test_that("a partial join is refused unless it was allowed explicitly", {
   expect_s3_class(err, "turas_refusal")
   expect_true(grepl("20", conditionMessage(err)))          # the unmatched count
   expect_true(grepl("allow_partial_join", conditionMessage(err), fixed = TRUE))
+})
+
+test_that("rows the module removed before clustering are Unassigned without a refusal (F1)", {
+  # Missing answers under listwise deletion and removed outliers are the
+  # module's own doing. Refusing on them made every ordinary study refuse
+  # (independent review 2026-09-21, F1); they are labelled and the result is
+  # PARTIAL so the run says so.
+  fx <- .tabs_export_fixture()
+  short <- fx$assignments[1:40, ]
+  dropped <- fx$assignments$respondent_id[41:60]
+  out <- tempfile(fileext = ".xlsx")
+
+  txt <- capture.output(res <- segment_export_for_tabs(
+    short, fx$survey_path, "Data", "respondent_id", out, dropped_ids = dropped))
+
+  expect_equal(res$status, "PARTIAL")
+  expect_equal(res$n_removed_by_module, 20)
+  expect_equal(res$n_never_seen, 0)
+  joined <- openxlsx::read.xlsx(out, sheet = 1, skipEmptyRows = FALSE)
+  expect_equal(sum(joined$segment_name == "Unassigned"), 20)
+  expect_true(any(grepl("removed before clustering", txt, fixed = TRUE)))
+
+  # Half dropped, half never seen: the never-seen half still refuses.
+  err <- tryCatch(
+    capture.output(segment_export_for_tabs(short, fx$survey_path, "Data",
+                                           "respondent_id", out, dropped_ids = dropped[1:10])),
+    turas_refusal = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_true(grepl("10 never seen", conditionMessage(err), fixed = TRUE))
+})
+
+test_that("a blank row in the survey sheet is dropped from the export, not written as a respondent (F1)", {
+  fx <- .tabs_export_fixture()
+  survey <- fx$survey
+  blank <- survey[1, ]; blank[] <- NA
+  survey <- rbind(survey[1:30, ], blank, survey[31:60, ])
+  sp <- tempfile(fileext = ".xlsx")
+  openxlsx::write.xlsx(survey, sp, sheetName = "Data")
+  out <- tempfile(fileext = ".xlsx")
+
+  txt <- capture.output(res <- segment_export_for_tabs(
+    fx$assignments, sp, "Data", "respondent_id", out))
+
+  expect_equal(res$status, "PASS")
+  expect_equal(res$n_blank_rows, 1)
+  joined <- openxlsx::read.xlsx(out, sheet = 1, skipEmptyRows = FALSE)
+  expect_equal(nrow(joined), 60)
+  expect_false(any(is.na(joined$respondent_id)))
+  expect_true(any(grepl("blank row", txt, fixed = TRUE)))
 })
 
 test_that("an allowed partial join marks the gap Unassigned and says how many", {
@@ -426,4 +481,131 @@ test_that("tabs gives a Total-only banner when the stub is not switched on", {
   )
 
   expect_equal(banner$columns, "Total")
+})
+
+
+test_that("a full run with missing answers exports every row, marks the run PARTIAL and writes every file (F1, F21)", {
+  # 400 rows: listwise deletion removes five, and 295 would be under the
+  # sample-size guard's floor for the default k_max.
+  cfg <- .tabs_export_config(n = 400, tabs_export = "Y")
+  # Five respondents with a missing clustering answer: listwise deletion
+  # removes them before clustering.
+  d <- openxlsx::read.xlsx(cfg$data_file, sheet = "Data", skipEmptyRows = FALSE)
+  d$q1[c(3, 50, 120, 200, 299)] <- NA
+  openxlsx::write.xlsx(d, cfg$data_file, sheetName = "Data")
+
+  out_dir <- file.path(tempdir(), paste0("tabsexp_na_", as.integer(runif(1) * 1e6)))
+  cfg$output_folder <- out_dir
+  cfg$create_dated_folder <- "FALSE"
+  cfg$html_report <- "FALSE"
+  cfg$generate_stats_pack <- "N"
+  cfg$output_prefix <- "seg_"
+
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook(); openxlsx::addWorksheet(wb, "Config")
+  openxlsx::writeData(wb, "Config", data.frame(
+    Setting = names(cfg), Value = unlist(lapply(cfg, as.character)), stringsAsFactors = FALSE))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+
+  capture.output(suppressMessages(res <- turas_segment_from_config(path, verbose = FALSE)))
+
+  expect_false(inherits(res, "turas_refusal_result"))
+  expect_equal(res$status, "PARTIAL")
+  files <- list.files(out_dir)
+  expect_true(all(c("seg_tabs_data.xlsx", "seg_tabs_banner_stub.xlsx",
+                    "seg_segment_assignments.xlsx", "seg_segmentation_report.xlsx") %in% files))
+
+  joined <- openxlsx::read.xlsx(file.path(out_dir, "seg_tabs_data.xlsx"), sheet = 1, skipEmptyRows = FALSE)
+  expect_equal(nrow(joined), 400)
+  expect_equal(sum(joined$segment_name == "Unassigned"), 5)
+
+  # The reason reaches the run state, which the Run_Status sheet reads from.
+  probs <- vapply(res$run_result$events, function(e) as.character(e$problem %||% ""), character(1))
+  expect_true(any(grepl("5 of 400 survey rows are Unassigned", probs, fixed = TRUE)))
+})
+
+
+# ------------------------------------------------------------------------------
+# F14: combined mode has no reader for tabs_export. The setting was silently
+# ignored there, which is the shape this programme exists to remove.
+# ------------------------------------------------------------------------------
+
+test_that("tabs_export in combined mode is refused by name (F14)", {
+  err <- tryCatch(
+    capture.output(validate_segment_config(
+      .tabs_export_config(method = "kmeans,hclust", tabs_export = "Y"))),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "CFG_TABS_EXPORT_COMBINED")
+  expect_true(grepl("combined", conditionMessage(err), ignore.case = TRUE))
+})
+
+test_that("combined mode without the export still validates", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(method = "kmeans,hclust", tabs_export = "N")))
+
+  expect_true(isTRUE(cfg$is_multi_method))
+  expect_equal(toupper(as.character(cfg$tabs_export)), "N")
+})
+
+test_that("a single-method config with the export still validates", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(method = "kmeans", tabs_export = "Y")))
+
+  expect_false(isTRUE(cfg$is_multi_method))
+  expect_equal(toupper(as.character(cfg$tabs_export)), "Y")
+})
+
+
+# ------------------------------------------------------------------------------
+# D10: exploration mode is the third path with no reader for tabs_export.
+# Combined mode was refused by Session D; exploration still accepted the
+# setting, wrote nothing and said nothing (independent review 2026-09-22).
+# ------------------------------------------------------------------------------
+
+test_that("tabs_export in exploration mode is refused by name (D10)", {
+  err <- tryCatch(
+    capture.output(validate_segment_config(
+      .tabs_export_config(k_fixed = NULL, k_min = "3", k_max = "4",
+                          tabs_export = "Y"))),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "CFG_TABS_EXPORT_EXPLORATION")
+  expect_true(grepl("exploration", conditionMessage(err), ignore.case = TRUE))
+})
+
+test_that("exploration mode without the export still validates", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(k_fixed = NULL, k_min = "3", k_max = "4",
+                        tabs_export = "N")))
+
+  expect_equal(cfg$mode, "exploration")
+  expect_equal(toupper(as.character(cfg$tabs_export)), "N")
+})
+
+test_that("a final single-method config with the export is untouched by D10", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(tabs_export = "Y")))
+
+  expect_equal(cfg$mode, "final")
+  expect_equal(toupper(as.character(cfg$tabs_export)), "Y")
+})
+
+test_that("a config that is both combined and exploration says so in one refusal", {
+  # Fixing the method alone would walk the user into a second refusal, so the
+  # combined message names k as well when both apply.
+  err <- tryCatch(
+    capture.output(validate_segment_config(
+      .tabs_export_config(method = "kmeans,hclust", k_fixed = NULL,
+                          k_min = "3", k_max = "4", tabs_export = "Y"))),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "CFG_TABS_EXPORT_COMBINED")
+  expect_true(any(grepl("k_fixed", err$how_to_fix, fixed = TRUE)))
 })

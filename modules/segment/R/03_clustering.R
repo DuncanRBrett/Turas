@@ -141,6 +141,30 @@ run_clustering_exploration <- function(data_list, config, guard) {
 
 #' K-means Dispatcher (Exploration + Final)
 #' @keywords internal
+#' Which Setting to Reach For After a Convergence Warning
+#'
+#' A convergence warning used to tell every user to raise `nstart`, including
+#' a mini-batch run, which takes no `nstart` and reports it as NA (independent
+#' review 2026-09-21, F9). The advice branches on the algorithm.
+#'
+#' Extracted from `run_kmeans_dispatch()` so the two branches can be tested.
+#' Reaching them through the dispatcher needs a genuine non-converging fit,
+#' which needs more than ten thousand rows and a non-zero `ifault`, so the
+#' wording was previously pinned by nothing and a revert went unnoticed
+#' (independent review 2026-09-22, D11).
+#'
+#' @param use_minibatch TRUE when the run used mini-batch k-means
+#' @return A single sentence naming the setting to change
+#' @keywords internal
+seg_convergence_lever <- function(use_minibatch) {
+  if (isTRUE(use_minibatch)) {
+    "Raise batch_size or try another seed; mini-batch takes no nstart."
+  } else {
+    "Consider increasing nstart."
+  }
+}
+
+
 run_kmeans_dispatch <- function(data_list, config, guard) {
   k <- config$k_fixed
 
@@ -183,9 +207,10 @@ run_kmeans_dispatch <- function(data_list, config, guard) {
   conv_warn <- NULL
   if (!is.null(model$ifault) && model$ifault != 0) {
     conv_warn <- sprintf("ifault=%d", model$ifault)
+    lever <- seg_convergence_lever(use_minibatch)
     cat(sprintf(
-      "[SEGMENT WARNING] K-means convergence issue for k=%d: %s. Results may be suboptimal. Consider increasing nstart.\n",
-      k, conv_warn
+      "[SEGMENT WARNING] K-means convergence issue for k=%d: %s. Results may be suboptimal. %s\n",
+      k, conv_warn, lever
     ))
   }
 

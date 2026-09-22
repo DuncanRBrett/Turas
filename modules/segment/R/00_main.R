@@ -356,6 +356,40 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     })
   }
 
+  # Demographic profiles
+  # Until September 2026 demographic_vars was parsed, carried through
+  # validation, offered by the template and consumed by nothing (independent
+  # review 2026-09-21, F2). This is the call that makes it real.
+  #
+  # Two things about the shape of this block. The data passed is
+  # data_list$data, which is the post-preparation data, so the demographics
+  # are profiled on the respondents who were clustered and not on the ones
+  # listwise deletion or outlier removal took out; the report section says so.
+  # And the tryCatch below also catches a TRS refusal, which inherits from
+  # error, so a refusal here would become a warning rather than stopping the
+  # run. That is acceptable only because load_segment_data() now refuses a
+  # demographic variable the data does not carry, which makes
+  # profile_demographics()'s own refusal unreachable from this path.
+  if (length(config$demographic_vars %||% character(0)) > 0) {
+    enhanced$demographic_profiles <- tryCatch({
+      cat("  Profiling demographics...\n")
+      keep <- !is.na(cluster_result$clusters)
+      profile_demographics(
+        data = data_list$data[keep, , drop = FALSE],
+        clusters = cluster_result$clusters[keep],
+        demo_vars = config$demographic_vars,
+        segment_names = segment_names,
+        # So the section can say when a demographic also built the segments
+        # (independent review 2026-09-22, D7).
+        clustering_vars = data_list$config$clustering_vars
+      )
+    }, error = function(e) {
+      guard <<- guard_warn(guard, paste("Demographic profiling failed:", e$message),
+                           "demographics")
+      NULL
+    })
+  }
+
   # Stability check
   if (config$run_stability_check) {
     enhanced$stability <- tryCatch({
@@ -515,13 +549,20 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     )
     names(assignments_df)[1] <- config$id_variable
 
+    # Respondents the module itself removed before clustering. They have no
+    # segment by the module's own doing and are labelled Unassigned; only a
+    # row the segmentation never saw is a join failure (F1).
+    dropped_ids <- setdiff(as.character(data_list$original_ids %||% character(0)),
+                           as.character(data_list$data[[config$id_variable]]))
+
     tabs_export_result <- segment_export_for_tabs(
       assignments = assignments_df,
       survey_file = config$data_file,
       survey_sheet = config$data_sheet %||% "Data",
       id_variable = config$id_variable,
       output_file = tabs_data_path,
-      allow_partial_join = isTRUE(config$allow_partial_join)
+      allow_partial_join = isTRUE(config$allow_partial_join),
+      dropped_ids = dropped_ids
     )
 
     segment_write_banner_stub(
@@ -529,6 +570,24 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
       column_name = tabs_export_result$segment_column,
       output_file = tabs_stub_path
     )
+
+    # An export with Unassigned rows makes the run PARTIAL, and says why, in
+    # the run state the Excel Run_Status sheet and the stats pack read from
+    # (F21). The status was decided above, before the export, so it is
+    # amended here rather than recomputed.
+    if ((tabs_export_result$n_unmatched %||% 0) > 0) {
+      reason <- sprintf(
+        "%d of %d survey rows are Unassigned in the tabs export (%d removed before clustering, %d never seen by the segmentation)",
+        tabs_export_result$n_unmatched, tabs_export_result$n_rows,
+        tabs_export_result$n_removed_by_module, tabs_export_result$n_never_seen)
+      run_status$run_status <- "PARTIAL"
+      run_status$degraded_reasons <- unique(c(run_status$degraded_reasons, reason))
+      if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(trs_state, code = "TABS_EXPORT_UNASSIGNED",
+                                title = "Unassigned rows in the tabs export", problem = reason)
+        run_result <- turas_run_state_result(trs_state)
+      }
+    }
   }
 
   # Export full report (Excel)
@@ -710,11 +769,27 @@ run_exploration_pipeline <- function(data_list, config, guard, trs_state, start_
   cat(sprintf("\n  Mode: EXPLORATION (k = %d to %d, method = %s)\n",
               config$k_min, config$k_max, toupper(config$method)))
 
+  # Exploration compares values of k and chooses none, so there is no one set
+  # of segments to cross-tabulate a demographic against. The shipped
+  # exploration example names three demographic variables, so say where they
+  # are profiled rather than dropping them without a word.
+  if (length(config$demographic_vars %||% character(0)) > 0) {
+    cat(sprintf(paste0(
+      "  [SEGMENT] Report section skipped: demographic profiles ",
+      "(%d variable(s) named; the Demographics section and its workbook ",
+      "sheets are written by the single-method final run made after you ",
+      "fix k)\n"), length(config$demographic_vars)))
+  }
+
   # Run clustering for multiple k values
   exploration_result <- run_clustering_exploration(data_list, config, guard)
 
   # Calculate metrics for each k
-  metrics_result <- calculate_exploration_metrics(exploration_result)
+  metrics_result <- calculate_exploration_metrics(
+    exploration_result,
+    metrics = config$k_selection_metrics %||% c("silhouette", "elbow",
+                                                 "calinski_harabasz", "davies_bouldin")
+  )
 
   # Recommend optimal k
   recommendation <- recommend_k(metrics_result$metrics_df, config$min_segment_size_pct)
@@ -807,6 +882,19 @@ run_multi_method_pipeline <- function(data_list, config, guard, trs_state, start
 
   methods <- config$methods
   cat(sprintf("\n  Multi-method mode: running %s\n", paste(toupper(methods), collapse = ", ")))
+
+  # Demographic profiling is a final-mode deliverable: the comparison report
+  # has its own page builder with no Demographics section, and the per-method
+  # workbooks would carry three different answers for the same question. Say
+  # so rather than letting the setting look as though it ran (independent
+  # review 2026-09-21, F2 and F14 are the same shape).
+  if (length(config$demographic_vars %||% character(0)) > 0) {
+    cat(sprintf(paste0(
+      "  [SEGMENT] Report section skipped: demographic profiles ",
+      "(%d variable(s) named; the Demographics section and its workbook ",
+      "sheets are written by the single-method final run made after you ",
+      "choose a method)\n"), length(config$demographic_vars)))
+  }
 
   method_results <- list()
 

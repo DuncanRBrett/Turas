@@ -121,7 +121,6 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | **Stability Check** | Fast multi-run consistency verification |
 | **Segment Assignments** | Excel output with ID, segment_id, segment_name (+ GMM probabilities) |
 | **Branded Excel Output** | Formatted Excel reports via openxlsx with consistent Turas styling |
-| **Latent Class Analysis** | Alternative method for categorical data |
 
 ---
 
@@ -312,8 +311,6 @@ install.packages("MASS")
 
 # Enhanced visualizations
 install.packages(c("ggplot2", "fmsb"))
-
-# Latent Class Analysis
 
 # Classification rules
 install.packages("rpart")

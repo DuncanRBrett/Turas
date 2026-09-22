@@ -80,7 +80,7 @@ Legacy/support library files. Most functionality has been consolidated into R/ f
 | `segment_data_prep.R` | Legacy | Superseded by `R/02_data_prep.R` |
 | `segment_export.R` | Legacy | Superseded by `R/09_output.R` |
 | `segment_kmeans.R` | Legacy | Superseded by `R/03a_kmeans.R` |
-| `segment_lca.R` | Legacy | Superseded by `R/11_lca.R` |
+| `segment_lca.R` | Legacy | Superseded by `R/11_lca.R`, itself removed in September 2026 (V2 lift, C2) |
 | `segment_outliers.R` | Legacy | Superseded by `R/02b_outliers.R` |
 | `segment_profile.R` | Legacy | Superseded by `R/05_profiling.R` |
 | `segment_profiling_enhanced.R` | Legacy | Superseded by `R/05a_profiling_stats.R` |

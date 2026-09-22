@@ -15,8 +15,11 @@ source("launch_turas.R"); launch_turas()
 Pick **Segment**, then browse to
 `examples/segment/Thornhill_Segment_Config.xlsx`. Outputs land in
 `examples/segment/Output/`, which is not committed, so the first run creates
-it. A run takes about four seconds and writes five files: the HTML report, the
-Excel report, the segment assignments, the saved model and the stats pack.
+it. A run takes about four seconds and writes seven files: the HTML report, the
+Excel report, the segment assignments, the saved model, the stats pack, and,
+because the config sets `tabs_export = Y`, the survey file with a
+`segment_name` column plus the tabs banner stub (see the module README,
+"Segment to Tabs").
 
 `Thornhill_Segment_Config_Explore.xlsx` is the same study in exploration mode,
 k = 2 to 6, if you want to see how it chooses k rather than being told.
@@ -38,9 +41,12 @@ and wrong if you launch from somewhere else.
 Six attitude statements scored 1 to 10 do the clustering. Five further
 variables are along for profiling only: `age_band`, `region` and
 `shops_online` as demographics, `household_size` and `monthly_spend` as
-profile variables. `region` is a character variable on purpose, because that
-is the path that used to be tested with Kruskal-Wallis as though its
-categories had an order.
+profile variables. The three demographics reach the report's Demographics
+section, one table each showing the split within every segment, and the Excel
+report's `Demographics_Tests` and `Demo_age_band`, `Demo_region` and
+`Demo_shops_online` sheets. `region` is a character variable on purpose,
+because that is the path that used to be tested with Kruskal-Wallis as though
+its categories had an order.
 
 The data file also carries `true_segment`, which the config does not mention
 and the module never sees. It is there so the answer can be checked.

@@ -264,6 +264,18 @@ build_seg_validation_table <- function(html_data) {
     ))
   }
 
+  # -- Calinski-Harabasz and Davies-Bouldin (F4) --
+  if (!is.null(diag$ch_index) && !is.na(diag$ch_index)) {
+    metric_rows <- c(metric_rows, list(
+      .build_seg_validation_row("Calinski-Harabasz", sprintf("%.1f", diag$ch_index), "Higher is better")
+    ))
+  }
+  if (!is.null(diag$db_index) && !is.na(diag$db_index)) {
+    metric_rows <- c(metric_rows, list(
+      .build_seg_validation_row("Davies-Bouldin", sprintf("%.3f", diag$db_index), "Lower is better")
+    ))
+  }
+
   # -- Method --
   method_val <- diag$method
   if (!is.null(method_val) && nzchar(method_val)) {
@@ -403,14 +415,26 @@ build_seg_demographics_table <- function(html_data) {
       )
     })
 
+    # One wrapper per variable, each holding exactly one table. The CSV
+    # export button reads the first table inside its own .seg-table-wrapper,
+    # so a single wrapper around all the variables would export the first one
+    # and call it the section.
     htmltools::tags$div(
       class = "seg-demo-block",
       htmltools::tags$h4(class = "seg-demo-var-title", var_name),
-      htmltools::tags$table(
-        class = "seg-table seg-demographics-table",
-        htmltools::tags$thead(header),
-        htmltools::tags$tbody(rows)
-      )
+      htmltools::tags$div(
+        class = "seg-table-wrapper",
+        build_seg_table_export_toolbar(paste0("demographics_", var_name)),
+        htmltools::tags$table(
+          class = "seg-table seg-demographics-table",
+          htmltools::tags$thead(header),
+          htmltools::tags$tbody(rows)
+        )
+      ),
+      build_seg_demo_base_line(
+        demo_data$bases, var_name,
+        blank_segments = seg_col_names[vapply(
+          seg_col_names, function(sn) all(is.na(prof_df[[sn]])), logical(1))])
     )
   })
 
@@ -420,6 +444,168 @@ build_seg_demographics_table <- function(html_data) {
   if (length(sub_tables) == 0) return(NULL)
 
   htmltools::tags$div(class = "seg-demographics-section", sub_tables)
+}
+
+
+#' Build the per-variable base line for a demographics table
+#'
+#' Percentages in the Demographics section are computed among the respondents
+#' who answered that variable, which is smaller than the clustered n whenever
+#' a demographic has blanks. The section used to state only the clustered n,
+#' so a table with blanks carried a base larger than the one it rested on
+#' (independent review 2026-09-22, D1). Each table now says its own.
+#'
+#' @param bases The `bases` frame from profile_demographics()
+#' @param var_name The variable this table shows
+#' @return htmltools tag, or NULL when there is no base to state
+#' @keywords internal
+build_seg_demo_base_line <- function(bases, var_name,
+                                     blank_segments = character(0),
+                                     test_line = NULL) {
+
+  parts <- character(0)
+
+  if (!is.null(bases) && is.data.frame(bases)) {
+    row <- bases[bases$Variable == var_name, , drop = FALSE]
+    if (nrow(row) == 1) {
+      parts <- sprintf("Base: %d answered, of %d clustered.",
+                       row$N_Answered[1], row$N_Clustered[1])
+      if (!is.na(row$N_Blank[1]) && row$N_Blank[1] > 0) {
+        parts <- paste(parts,
+                       sprintf("%d left it blank and are not in the percentages.",
+                               row$N_Blank[1]))
+      }
+    }
+  }
+
+  # A segment whose respondents all left this blank gets a column of dashes,
+  # because prop.table on an all-zero margin is NaN. The dash used to arrive
+  # with no explanation (independent review 2026-09-22, D4).
+  if (length(blank_segments) > 0) {
+    parts <- c(parts, sprintf(
+      "No one in %s answered it, so that column is blank.",
+      paste(blank_segments, collapse = ", ")))
+  }
+
+  if (!is.null(test_line) && nzchar(test_line)) parts <- c(parts, test_line)
+
+  if (length(parts) == 0) return(NULL)
+
+  htmltools::tags$p(
+    class = "seg-demo-base",
+    style = "margin:4px 0 0; font-size:11px; color:#64748b;",
+    paste(parts, collapse = " ")
+  )
+}
+
+
+#' One-line ANOVA statement for a numeric demographic
+#'
+#' `profile_demographics()` runs a one-way ANOVA per numeric demographic. It
+#' used to print the verdict and discard it, so the numeric tables reached the
+#' report with no test (independent review 2026-09-22, D8).
+#'
+#' @param numeric_tests The `numeric_tests` frame from profile_demographics()
+#' @param var_name The variable this table shows
+#' @return A single string, or NULL when there is no test to state
+#' @keywords internal
+build_seg_demo_anova_line <- function(numeric_tests, var_name) {
+
+  if (is.null(numeric_tests) || !is.data.frame(numeric_tests)) return(NULL)
+  row <- numeric_tests[numeric_tests$Variable == var_name, , drop = FALSE]
+  if (nrow(row) != 1) return(NULL)
+
+  if (is.na(row$F_Stat[1])) {
+    return(if (nzchar(row$Note[1] %||% "")) row$Note[1] else NULL)
+  }
+
+  sprintf("One-way ANOVA: F(%s, %s) = %s, p = %s, %s at the 5%% level.",
+          row$DF_Between[1], row$DF_Within[1], row$F_Stat[1], row$P_Value[1],
+          if (isTRUE(row$Significant[1])) "significant" else "not significant")
+}
+
+
+#' Build Numeric Demographics Table
+#'
+#' One table per numeric demographic variable: the mean, median, spread and
+#' range within each segment, plus an Overall row. `profile_demographics()`
+#' sends a numeric variable with more than ten distinct ANSWERS down this
+#' route, so an age in years lands here while an age band lands in the
+#' categorical tables. Blanks are not counted towards the ten, so a ten-point
+#' scale stays a cross-tab however many people skipped it (independent review
+#' 2026-09-22, D3).
+#'
+#' The stats frame itself carries no p-value, because the test is one per
+#' variable rather than one per row. `profile_demographics()` runs a one-way
+#' ANOVA per numeric variable and, since September 2026, returns it in
+#' `numeric_tests`; it used to print the verdict and discard it, so these
+#' tables reached the report with no test at all (independent review
+#' 2026-09-22, D8). `build_seg_demo_anova_line()` states it under each table.
+#'
+#' @param html_data Transformed data from transform_segment_for_html()
+#' @return htmltools tag list, or NULL if there are no numeric demographics
+#' @keywords internal
+build_seg_demographics_numeric_table <- function(html_data) {
+
+  enhanced <- html_data$enhanced %||% list()
+  demo_data <- enhanced$demographic_profiles %||% NULL
+  if (is.null(demo_data)) return(NULL)
+
+  num_profiles <- demo_data$numeric_profiles %||% NULL
+  if (is.null(num_profiles) || length(num_profiles) == 0) return(NULL)
+
+  cols <- c("Segment", "N", "Mean", "Median", "SD", "Min", "Max")
+
+  sub_tables <- lapply(names(num_profiles), function(var_name) {
+
+    stats_df <- num_profiles[[var_name]]
+    if (is.null(stats_df) || nrow(stats_df) == 0) return(NULL)
+
+    present <- intersect(cols, names(stats_df))
+    if (length(present) < 2) return(NULL)
+
+    header <- htmltools::tags$tr(lapply(seq_along(present), function(j) {
+      htmltools::tags$th(
+        present[j],
+        class = if (j == 1) "seg-th seg-th-label" else "seg-th seg-th-num")
+    }))
+
+    rows <- lapply(seq_len(nrow(stats_df)), function(i) {
+      is_overall <- identical(as.character(stats_df[[present[1]]][i]), "Overall")
+      htmltools::tags$tr(
+        class = if (is_overall) "seg-tr seg-tr-total" else "seg-tr",
+        lapply(seq_along(present), function(j) {
+          val <- stats_df[[present[j]]][i]
+          display <- if (length(val) == 0 || is.na(val)) "-" else as.character(val)
+          htmltools::tags$td(
+            display,
+            class = if (j == 1) "seg-td seg-td-label" else "seg-td seg-td-num")
+        })
+      )
+    })
+
+    htmltools::tags$div(
+      class = "seg-demo-block",
+      htmltools::tags$h4(class = "seg-demo-var-title", var_name),
+      htmltools::tags$div(
+        class = "seg-table-wrapper",
+        build_seg_table_export_toolbar(paste0("demographics_", var_name)),
+        htmltools::tags$table(
+          class = "seg-table seg-demographics-table",
+          htmltools::tags$thead(header),
+          htmltools::tags$tbody(rows)
+        )
+      ),
+      build_seg_demo_base_line(
+        demo_data$bases, var_name,
+        test_line = build_seg_demo_anova_line(demo_data$numeric_tests, var_name))
+    )
+  })
+
+  sub_tables <- Filter(Negate(is.null), sub_tables)
+  if (length(sub_tables) == 0) return(NULL)
+
+  htmltools::tags$div(class = "seg-demographics-numeric-section", sub_tables)
 }
 
 

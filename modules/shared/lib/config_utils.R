@@ -22,6 +22,30 @@ SUPPORTED_CONFIG_FORMATS <- c("xlsx", "xls")
 #' @examples
 #' config <- load_config_sheet("Config.xlsx", "Settings")
 #' sig_level <- get_config_value(config, "significance_level", 0.95)
+#' Clean a configuration key read from a workbook cell
+#'
+#' Removes the invisible characters Excel and copy-paste introduce, which make
+#' a key that reads correctly fail to match: the byte-order mark, zero-width
+#' space, zero-width non-joiner and joiner anywhere in the key, and ordinary
+#' or non-breaking whitespace at either end. `trimws()` alone does not remove
+#' a non-breaking space.
+#'
+#' A key is not altered otherwise. Case is left alone, because a key that
+#' differs in case is a real mistake the unused-settings warning should name.
+#'
+#' @param x Character vector of Setting names
+#' @return The cleaned character vector, same length
+#' @keywords internal
+.turas_clean_config_key <- function(x) {
+  x <- as.character(x)
+  # Zero-width and bidirectional marks, anywhere in the key.
+  x <- gsub("[\u200B-\u200F\uFEFF\u2060]", "", x, perl = TRUE)
+  # Whitespace at either end, including the non-breaking space.
+  x <- gsub("^[\\s\u00A0]+|[\\s\u00A0]+$", "", x, perl = TRUE)
+  x
+}
+
+
 load_config_sheet <- function(file_path, sheet_name = "Settings") {
   # Validate inputs
   validate_file_path(file_path, "config file", must_exist = TRUE,
@@ -86,6 +110,21 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
       warning(sprintf("Config sheet '%s' is empty", sheet_name))
       return(list())
     }
+
+    # Normalise the Setting names before anything reads them.
+    #
+    # Keys were taken from the cell exactly as typed. A cell carrying a
+    # zero-width space or a non-breaking space looks identical to a correct
+    # one in Excel and in every message printed about it, but it does not
+    # match, so get_config_value() falls through to the default and the
+    # setting silently does nothing. Duncan hit this on a segment config
+    # whose tabs_export carried an invisible character: the export did not
+    # run, and the unused-settings warning named a key that looked perfectly
+    # spelled (independent review 2026-09-22, D12).
+    #
+    # trimws() does not remove a non-breaking space, so it is named here
+    # along with the zero-width characters and the byte-order mark.
+    config_df$Setting <- .turas_clean_config_key(config_df$Setting)
 
     # Check for duplicate Setting names
     setting_names <- as.character(config_df$Setting)

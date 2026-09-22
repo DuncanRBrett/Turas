@@ -290,6 +290,61 @@ perform_discriminant_analysis <- function(data, clusters, clustering_vars) {
 #' @param clustering_vars Character vector of clustering variable names
 #' @return List with separation metrics
 #' @export
+#' Calinski-Harabasz and Davies-Bouldin on a scaled matrix
+#'
+#' The maths of calculate_separation_metrics() without its banner, so the
+#' validation metrics and the k-selection metrics can carry both indices on
+#' every run. Until September 2026 the only function computing them had no
+#' caller, while the template offered both as k-selection choices
+#' (independent review 2026-09-21, F4).
+#'
+#' @param data Numeric matrix or data frame, already scaled
+#' @param clusters Integer vector of segment assignments, 1..k
+#' @return list(calinski_harabasz, davies_bouldin); NA where undefined
+#' @keywords internal
+.segment_ch_db <- function(data, clusters) {
+  data <- as.matrix(data)
+  k <- length(unique(clusters))
+  n <- nrow(data)
+  if (k < 2 || n <= k) {
+    return(list(calinski_harabasz = NA_real_, davies_bouldin = NA_real_))
+  }
+  seg_ids <- sort(unique(clusters))
+  grand_mean <- colMeans(data)
+  centers <- t(vapply(seg_ids, function(s) colMeans(data[clusters == s, , drop = FALSE]),
+                      numeric(ncol(data))))
+  centers <- matrix(centers, nrow = k)
+  sizes <- vapply(seg_ids, function(s) sum(clusters == s), numeric(1))
+
+  bgss <- sum(sizes * rowSums(sweep(centers, 2, grand_mean)^2))
+  wgss <- 0
+  avg_within <- numeric(k)
+  for (i in seq_len(k)) {
+    seg_data <- data[clusters == seg_ids[i], , drop = FALSE]
+    dev <- sweep(seg_data, 2, centers[i, ])
+    wgss <- wgss + sum(dev^2)
+    avg_within[i] <- mean(sqrt(rowSums(dev^2)))
+  }
+  ch_index <- if (wgss > 0) (bgss / (k - 1)) / (wgss / (n - k)) else NA_real_
+
+  db_scores <- numeric(k)
+  degenerate <- FALSE
+  for (i in seq_len(k)) {
+    max_ratio <- 0
+    for (j in seq_len(k)) {
+      if (i == j) next
+      between <- sqrt(sum((centers[i, ] - centers[j, ])^2))
+      if (between < 1e-10) { degenerate <- TRUE; next }
+      max_ratio <- max(max_ratio, (avg_within[i] + avg_within[j]) / between)
+    }
+    db_scores[i] <- max_ratio
+  }
+  db_index <- if (degenerate) NA_real_ else mean(db_scores)
+
+  list(calinski_harabasz = ch_index, davies_bouldin = db_index)
+}
+
+
 calculate_separation_metrics <- function(data, clusters, clustering_vars) {
 
   cat("\n")
@@ -407,7 +462,10 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
 #' @param exploration_result Result from run_kmeans_exploration()
 #' @return List with metrics_df and exploration_result
 #' @export
-calculate_exploration_metrics <- function(exploration_result) {
+calculate_exploration_metrics <- function(exploration_result,
+                                          metrics = c("silhouette", "elbow",
+                                                      "calinski_harabasz",
+                                                      "davies_bouldin")) {
   if (!requireNamespace("cluster", quietly = TRUE)) {
     segment_refuse(
       code = "PKG_CLUSTER_MISSING",
@@ -472,7 +530,7 @@ calculate_exploration_metrics <- function(exploration_result) {
 
     betweenss_totss <- if (totss > 0) betweenss / totss else 0
 
-    metrics_list[[k_str]] <- data.frame(
+    row <- data.frame(
       k = k,
       tot.withinss = tot_withinss,
       betweenss = betweenss,
@@ -481,6 +539,19 @@ calculate_exploration_metrics <- function(exploration_result) {
       avg_silhouette_width = avg_sil,
       min_segment_pct = min_size_pct
     )
+
+    # The two separation indices, when the study asked for them
+    # (k_selection_metrics). Silhouette is always computed because the
+    # recommendation is made on it.
+    want_ch <- "calinski_harabasz" %in% tolower(metrics)
+    want_db <- "davies_bouldin" %in% tolower(metrics)
+    if (want_ch || want_db) {
+      sep <- .segment_ch_db(data, cluster_assignments)
+      if (want_ch) row$calinski_harabasz <- sep$calinski_harabasz
+      if (want_db) row$davies_bouldin <- sep$davies_bouldin
+    }
+
+    metrics_list[[k_str]] <- row
   }
 
   metrics_df <- do.call(rbind, metrics_list)
@@ -589,12 +660,22 @@ calculate_validation_metrics <- function(data, model, k, clusters = NULL,
 
   betweenss_totss <- if (totss > 0) betweenss / totss else 0
 
+  # Calinski-Harabasz and Davies-Bouldin on every run. Cheap, and the
+  # reports and the combined comparison table read them (F4).
+  sep <- .segment_ch_db(data, cluster_assignments)
+  cat(sprintf("  Calinski-Harabasz: %s (higher is better)\n",
+              if (is.na(sep$calinski_harabasz)) "NA" else sprintf("%.1f", sep$calinski_harabasz)))
+  cat(sprintf("  Davies-Bouldin: %s (lower is better)\n",
+              if (is.na(sep$davies_bouldin)) "NA" else sprintf("%.3f", sep$davies_bouldin)))
+
   metrics <- list(
     avg_silhouette = avg_sil,
     betweenss_totss = betweenss_totss,
     tot_withinss = tot_withinss,
     betweenss = betweenss,
-    totss = totss
+    totss = totss,
+    calinski_harabasz = sep$calinski_harabasz,
+    davies_bouldin = sep$davies_bouldin
   )
 
   # Optionally calculate gap statistic (Tibshirani et al. 2001)
