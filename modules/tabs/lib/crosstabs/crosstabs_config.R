@@ -326,6 +326,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
         if (is.na(n) || n < 1) NULL else floor(n)
       }
     },
+    # Word document holding the report's Background and Executive summary, one
+    # screen per Heading 1 (narrative_reader.R). Path relative to the config
+    # file. Blank -> the Comments sheet's _BACKGROUND / _EXECUTIVE_SUMMARY cells,
+    # exactly as before the setting existed.
+    narrative_file = get_config_value(config, "narrative_file", ""),
     # Folder holding prior waves' *_wave.json tracking contributions (emitted by
     # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
     waves_source = get_config_value(config, "waves_source", ""),
@@ -1906,7 +1911,7 @@ TABS_KNOWN_SETTINGS <- c(
   # HTML report (html_report itself is retired, see TABS_RETIRED_SETTINGS)
   "html_report_v2", "html_report_v2_tracking",
   "html_report_v2_microdata", "html_report_v2_cover",
-  "html_report_v2_cover_findings",
+  "html_report_v2_cover_findings", "narrative_file",
   "html_report_v2_interactivity", "html_report_v2_filter_vars",
   "html_report_v2_cube_order",
   "waves_source", "question_mapping", "wave_order", "sampling_method",
@@ -2002,6 +2007,11 @@ load_crosstabs_config <- function(config_file) {
     config_obj$executive_summary <- attr(config_obj$comments, "executive_summary")
     config_obj$report_construction <- attr(config_obj$comments, "report_construction")
   }
+
+  # Report narrative screens (narrative_reader.R): the Word document named by
+  # narrative_file, or the Comments summary cells above in the same shape.
+  # A missing or unreadable Word file refuses here, before any analysis runs.
+  config_obj$narrative <- load_narrative(config_obj, config_file)
 
   # Load optional AddedSlides sheet (V10.8.0, renamed from Qualitative)
   config_obj$qualitative_slides <- load_qualitative_sheet(config_file)

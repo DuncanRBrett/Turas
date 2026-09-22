@@ -195,6 +195,7 @@ source(file.path(script_dir, "summary_builder.R"))
 
 tabs_source("crosstabs", "checkpoint.R")
 tabs_source("crosstabs", "crosstabs_config.R")
+tabs_source("crosstabs", "narrative_reader.R")
 tabs_source("crosstabs", "data_setup.R")
 tabs_source("crosstabs", "analysis_runner.R")
 tabs_source("crosstabs", "workbook_builder.R")

@@ -48,6 +48,7 @@ source(file.path(turas_root, "modules/tabs/lib/data_loader.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
 source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))
+source(file.path(turas_root, "modules/tabs/lib/crosstabs/narrative_reader.R"))
 
 # ==============================================================================
 # FIXTURES. Real image files, written by base R's own devices
