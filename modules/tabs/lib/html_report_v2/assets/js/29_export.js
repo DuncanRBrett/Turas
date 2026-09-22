@@ -243,21 +243,24 @@
 
   function inch(v) { return Math.round(v * EMU); }
 
+  /** One text run. o = {size, italic, alpha}: alpha (percent) is how the
+   *  divider ordinal is 20%-alpha white. Shared by para and narrativePara. */
+  function runXml(t, colour, bold, o) {
+    var fill = o.alpha
+      ? '<a:srgbClr val="' + colour + '"><a:alpha val="' +
+        Math.round(o.alpha * 1000) + '"/></a:srgbClr>'
+      : '<a:srgbClr val="' + colour + '"/>';
+    return '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
+      (bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
+      '<a:solidFill>' + fill + '</a:solidFill>' +
+      // explicit latin face: text boxes match the charts (and the theme)
+      '<a:latin typeface="' + STYLE.FONT + '"/>' +
+      "</a:rPr><a:t>" + esc(t) + "</a:t></a:r>";
+  }
+
   function para(text, o) {
     if (!text && !o.delta) return "<a:p/>";
-    var run = function (t, colour, bold) {
-      // optional alpha (percent): the divider ordinal is 20%-alpha white
-      var fill = o.alpha
-        ? '<a:srgbClr val="' + colour + '"><a:alpha val="' +
-          Math.round(o.alpha * 1000) + '"/></a:srgbClr>'
-        : '<a:srgbClr val="' + colour + '"/>';
-      return '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
-        (bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
-        '<a:solidFill>' + fill + '</a:solidFill>' +
-        // explicit latin face: text boxes match the charts (and the theme)
-        '<a:latin typeface="' + STYLE.FONT + '"/>' +
-        "</a:rPr><a:t>" + esc(t) + "</a:t></a:r>";
-    };
+    var run = function (t, colour, bold) { return runXml(t, colour, bold, o); };
     var runs = text ? run(text, o.colour || INK, o.bold) : "";
     // optional wave-change chip as a second coloured run (▼0.1)
     if (o.delta) runs += run("  " + o.delta.text, o.delta.up ? STYLE.GOOD : STYLE.BAD, true);
@@ -1366,6 +1369,275 @@
         h: Math.min(STYLE.BODY.h, (matrix.body.length + 1) * 0.32) }, matrix, brand,
         matrix.head.length > 8 ? SIZE.tableSmall : SIZE.table) +
       footer(next, opts.footer || {}));
+  };
+
+  /* ---------------- narrative screens (the Word executive summary) -------- */
+
+  // Rough text metrics for laying words out before PowerPoint does: an Arial
+  // character averages about half an em, a line is 1.25 em, a paragraph adds
+  // 6pt after. Estimates only. Every box also carries normAutofit, so an
+  // under-estimate shrinks the text rather than spilling it off the slide.
+  var NAR_GAP = 6 / 72;
+  function narLineH(size) { return size * 1.25 / 72; }
+  function narLines(text, width, size) {
+    var perLine = Math.max(1, Math.floor(width * 72 / (size * 0.5)));
+    return Math.max(1, Math.ceil(String(text || "").length / perLine));
+  }
+  function narRunsText(runs) {
+    return (runs || []).map(function (r) { return r && r.text != null ? String(r.text) : ""; })
+      .join("");
+  }
+
+  /** A paragraph of Word runs, each keeping its own bold and italic, with an
+   *  optional bullet (o.bullet "char" | "num") at nesting level o.level. */
+  function narrativePara(runs, o) {
+    var level = Math.max(0, Math.min(o.level || 0, 8));
+    var marL = o.bullet ? 0.28 + level * 0.3 : 0;
+    var bullet = o.bullet === "num" ? '<a:buFont typeface="' + STYLE.FONT +
+        '"/><a:buAutoNum type="arabicPeriod"/>'
+      : o.bullet ? '<a:buFont typeface="' + STYLE.FONT + '"/><a:buChar char="•"/>'
+      : "<a:buNone/>";
+    var body = (runs || []).map(function (r) {
+      var t = r && r.text != null ? String(r.text) : "";
+      if (!t) return "";
+      return runXml(t, o.colour || INK, !!(o.bold || (r && r.bold)),
+        { size: o.size, italic: !!(r && r.italic) });
+    }).join("");
+    return '<a:p><a:pPr marL="' + inch(marL) + '" indent="' +
+      (o.bullet ? -inch(0.22) : 0) + '"' + (level ? ' lvl="' + level + '"' : "") +
+      '><a:spcAft><a:spcPts val="600"/></a:spcAft>' + bullet + "</a:pPr>" +
+      (body || '<a:endParaRPr lang="en-US" dirty="0"/>') + "</a:p>";
+  }
+
+  /** One screen's blocks as layout elements, in document order. A text
+   *  element is one paragraph (grouped into a text box at layout time so it can
+   *  break across slides between paragraphs); quotes, tables and long lists
+   *  are placed whole. Pictures are pulled out to the side column. */
+  function narrativeElements(blocks, textW, twoCols) {
+    var els = [], lead = true;
+    var text = function (runs, o, chars) {
+      var size = o.size;
+      els.push({ kind: "text", xml: narrativePara(runs, o),
+        h: narLines(chars, textW - (o.bullet ? 0.3 + (o.level || 0) * 0.3 : 0), size) *
+          narLineH(size) + NAR_GAP });
+    };
+    var listParas = function (items, width) {
+      return (items || []).map(function (it) {
+        var lvl = Math.max(0, parseInt(it && it.level, 10) || 0);
+        var t = narRunsText(it && it.runs);
+        return { xml: narrativePara(it && it.runs, { size: SIZE.body, level: lvl,
+            bullet: it && it.ordered ? "num" : "char" }),
+          h: narLines(t, width - 0.3 - lvl * 0.3, SIZE.body) * narLineH(SIZE.body) + NAR_GAP };
+      });
+    };
+    (blocks || []).forEach(function (b) {
+      if (!b || typeof b !== "object") return;
+      if (b.type === "paragraph") {
+        var size = lead ? SIZE.lead : SIZE.body;
+        text(b.runs, { size: size }, narRunsText(b.runs));
+        lead = false;
+        return;
+      }
+      lead = false;
+      if (b.type === "subheading") {
+        text([{ text: b.text || "", bold: true }],
+          { size: SIZE.lead, colour: TR.charts.brandOf().replace("#", "").toUpperCase() },
+          b.text || "");
+      } else if (b.type === "list") {
+        var items = b.items || [];
+        // a long list reads in two columns, as it does in Present. Split at a
+        // top-level item so no sub-list is cut from its parent
+        if (twoCols && items.length > 6) {
+          var half = Math.ceil(items.length / 2);
+          while (half < items.length && (parseInt(items[half].level, 10) || 0) > 0) half++;
+          var colW = (textW - 0.4) / 2;
+          var left = listParas(items.slice(0, half), colW);
+          var right = listParas(items.slice(half), colW);
+          var sum = function (ps) { return ps.reduce(function (a, p) { return a + p.h; }, 0); };
+          els.push({ kind: "cols", left: left, right: right,
+            h: Math.max(sum(left), sum(right)), items: items });
+        } else {
+          listParas(items, textW).forEach(function (p) {
+            els.push({ kind: "text", xml: p.xml, h: p.h });
+          });
+        }
+      } else if (b.type === "quote") {
+        var qt = narRunsText(b.runs);
+        els.push({ kind: "band", runs: b.runs,
+          h: narLines(qt, textW - 0.5, SIZE.lead) * narLineH(SIZE.lead) + 0.3 });
+      } else if (b.type === "table") {
+        var rows = (b.rows || []).map(function (r) {
+          return (Array.isArray(r) ? r : [r]).map(function (c) { return c == null ? "" : String(c); });
+        }).filter(function (r) { return r.length; });
+        if (rows.length) els.push({ kind: "table", rows: rows });
+      }
+    });
+    return els;
+  }
+
+  /**
+   * A narrative screen as deck slides: the Present layout in PowerPoint. The
+   * screen title leads in the shared header, the first paragraph is the lead,
+   * sub-headings are brand-coloured, bullets keep their nesting and numbering,
+   * a list longer than 6 reads in two columns, the Quote style is a gold band,
+   * simple tables are native tables, and pictures sit in a column beside the
+   * words. The pin's commentary is the gold insight band on the first slide.
+   *
+   * Nothing is dropped. Words that do not fit carry on to a "(continued)"
+   * slide at a paragraph, list item or table-row boundary; a table that
+   * breaks repeats its first row, which is styled as the header row (Word
+   * tables almost always open with one). Every picture goes on the first
+   * slide, sharing the column's height.
+   *
+   * @param {Object} screen - {id, title, blocks} from project.narrative
+   * @param {Object} [opts] - {kicker, note}
+   * @returns {Array} one or more rich slides {xml, charts, images}
+   */
+  exporter.narrativeSlides = function (screen, opts) {
+    opts = opts || {};
+    var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
+    var blocks = Array.isArray(screen && screen.blocks) ? screen.blocks : [];
+    var pics = blocks.filter(function (b) { return b && b.type === "image"; })
+      .map(function (b) {
+        return exporter.slidePicture({ image: b.src, w: b.width, h: b.height });
+      }).filter(Boolean);
+    var BODY = STYLE.BODY;
+    var textW = pics.length ? BODY.w * 0.58 : BODY.w;
+    // beside a picture the text column is too narrow to split again
+    var els = narrativeElements(blocks, textW, !pics.length);
+    var note = String(opts.note || "").trim();
+    var noteLines = note ? wrapText(note, 150) : [];
+    var noteH = note ? 0.45 + noteLines.length * 0.24 : 0;
+    var title = String((screen && screen.title) || "");
+    var slides = [];
+    var page = null;
+
+    var openPage = function () {
+      var id = 1;
+      var first = !slides.length;
+      page = { next: function () { return ++id; }, y: BODY.y, pending: [], textY: null,
+        bottom: BODY.y + BODY.h - (first && note ? noteH + 0.12 : 0), images: [],
+        empty: true };
+      page.xml = header(page.next, { kicker: opts.kicker || "",
+        title: first ? title : title + " (continued)" });
+      if (first && pics.length) placePictures();
+      if (first && note) page.xml += callout(page.next, noteLines, noteH);
+      slides.push(page);
+    };
+    var flushText = function () {
+      if (!page.pending.length) return;
+      var h = page.y - page.textY;
+      page.xml += textBox(page.next(), { x: BODY.x, y: page.textY, w: textW, h: h },
+        page.pending);
+      page.pending = [];
+      page.textY = null;
+    };
+    var closePage = function () {
+      flushText();
+      page.xml += footer(page.next, {});
+    };
+    var fits = function (h) { return page.empty || page.y + h <= page.bottom; };
+    var newPageIfNeeded = function (h) {
+      if (fits(h)) return;
+      closePage();
+      openPage();
+    };
+    function placePictures() {
+      var colX = BODY.x + textW + 0.35, colW = BODY.w - textW - 0.35;
+      var gap = 0.15, share = (page.bottom - BODY.y - gap * (pics.length - 1)) / pics.length;
+      var y = BODY.y;
+      pics.forEach(function (pic, k) {
+        var ar = (pic.w && pic.h) ? pic.w / pic.h : colW / share;
+        var w = colW, h = colW / ar;
+        if (h > share) { h = share; w = share * ar; }
+        page.xml += '<p:pic><p:nvPicPr><p:cNvPr id="' + page.next() + '" name="Picture"/>' +
+          '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>' +
+          '<p:blipFill><a:blip r:embed="rId' + (2 + k) + '"/><a:stretch><a:fillRect/>' +
+          "</a:stretch></p:blipFill><p:spPr>" +
+          '<a:xfrm><a:off x="' + inch(colX) + '" y="' + inch(y) + '"/>' +
+          '<a:ext cx="' + inch(w) + '" cy="' + inch(h) + '"/></a:xfrm>' +
+          '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+        page.images.push({ bytes: pic.bytes, ext: pic.ext });
+        y += h + gap;
+      });
+    }
+    var placeTable = function (rows) {
+      // every row padded to the widest, so a ragged row never loses a cell
+      var width = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+      var pad = function (r) {
+        var cells = r.slice();
+        while (cells.length < width) cells.push("");
+        return cells;
+      };
+      var rowH = 0.32, head = pad(rows[0]), body = rows.slice(1).map(pad);
+      var matrixOf = function (chunk) {
+        return { head: head, body: chunk.map(function (cells) {
+          return { kind: "row", cells: cells };
+        }) };
+      };
+      var i = 0;
+      do {
+        newPageIfNeeded(rowH * 2);
+        flushText();
+        var room = Math.max(1, Math.floor((page.bottom - page.y) / rowH) - 1);
+        var chunk = body.slice(i, i + room);
+        var h = rowH * (chunk.length + 1);
+        page.xml += tableFrame(page.next(), { x: BODY.x, y: page.y, w: textW, h: h },
+          matrixOf(chunk), brand, SIZE.tableSmall);
+        page.y += h + 0.18;
+        page.empty = false;
+        i += chunk.length;
+        if (i < body.length) { closePage(); openPage(); }
+      } while (i < body.length);
+    };
+
+    openPage();
+    els.forEach(function (el) {
+      if (el.kind === "cols" && el.h > page.bottom - BODY.y) {
+        // taller than a whole slide in two columns: one column that breaks
+        el = { kind: "split", parts: el.left.concat(el.right) };
+      }
+      if (el.kind === "split") {
+        el.parts.forEach(function (p) {
+          newPageIfNeeded(p.h);
+          if (page.textY === null) page.textY = page.y;
+          page.pending.push(p.xml);
+          page.y += p.h;
+          page.empty = false;
+        });
+        return;
+      }
+      if (el.kind === "text") {
+        if (!fits(el.h)) { closePage(); openPage(); }
+        if (page.textY === null) page.textY = page.y;
+        page.pending.push(el.xml);
+        page.y += el.h;
+        page.empty = false;
+        return;
+      }
+      if (el.kind === "table") { placeTable(el.rows); return; }
+      newPageIfNeeded(el.h);
+      flushText();
+      if (el.kind === "cols") {
+        var colW = (textW - 0.4) / 2;
+        page.xml += textBox(page.next(), { x: BODY.x, y: page.y, w: colW, h: el.h },
+          el.left.map(function (p) { return p.xml; }));
+        page.xml += textBox(page.next(), { x: BODY.x + colW + 0.4, y: page.y, w: colW,
+          h: el.h }, el.right.map(function (p) { return p.xml; }));
+      } else if (el.kind === "band") {
+        page.xml += rectShape(page.next(), { x: BODY.x, y: page.y, w: textW, h: el.h - 0.1 },
+          STYLE.CALLOUT_BG) +
+          rectShape(page.next(), { x: BODY.x, y: page.y, w: 0.05, h: el.h - 0.1 }, STYLE.GOLD) +
+          textBox(page.next(), { x: BODY.x + 0.2, y: page.y + 0.06, w: textW - 0.35,
+            h: el.h - 0.2 }, [narrativePara(el.runs, { size: SIZE.lead, bold: true })]);
+      }
+      page.y += el.h + 0.08;
+      page.empty = false;
+    });
+    closePage();
+    return slides.map(function (pg) {
+      return { xml: wrapSlide(pg.xml), charts: [], images: pg.images };
+    });
   };
 
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July",

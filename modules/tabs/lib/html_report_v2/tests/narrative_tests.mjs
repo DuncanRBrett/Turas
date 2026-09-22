@@ -48,6 +48,7 @@ function at(hay, needle, msg) {
   return i;
 }
 const clone = (o) => JSON.parse(JSON.stringify(o));
+const xmlOf = (s) => (typeof s === "string" ? s : s.xml);
 const run1 = (text, bold, italic) => ({ text, bold: !!bold, italic: !!italic });
 const item = (level, ordered, text) => ({ level, ordered, runs: [run1(text)] });
 
@@ -299,6 +300,7 @@ run("N2: the shell hands a narrative pin to story2.pinNarrative before any snaps
 
 run("N3: pinNarrative stores the id and heading, never the words", () => {
   const TR = sandbox({}).TR;
+  TR.story2.items().length = 0;   // past the screens-first seed
   TR.story2.pinNarrative("executive-summary", "Executive summary");
   const it = TR.story2.items()[0];
   eq(it, { kind: "narrative", screen: "executive-summary",
@@ -353,6 +355,17 @@ run("N3: Present lays the pinned screen out as a slide, with its commentary", ()
   at(pres, '<div class="pr-note">Say this &lt;first&gt;</div>', "the commentary, escaped");
 });
 
+run("N3: a fresh story opens with the screens, which are never cover findings", () => {
+  const sb = sandbox({});
+  load(sb, "24a_reader.js");
+  eq(sb.TR.story2.items().map((it) => it.kind + ":" + it.screen),
+    ["narrative:background-method", "narrative:executive-summary",
+      "narrative:executive-summary-2"], "one pin per screen, in document order");
+  eq(sb.TR.story2.items()[0].heading, "Background & method", "the heading rides along");
+  eq(sb.TR.reader.coverEvidence().length, 0, "the seeded screens are not findings");
+  eq(sandbox({ narrative: undefined }).TR.story2.items().length, 0, "no screens, no seed");
+});
+
 run("N3: a narrative pin is not a leading finding on the cover", () => {
   const sb = sandbox({});
   load(sb, "24a_reader.js");
@@ -367,21 +380,160 @@ run("N3: a narrative pin is not a leading finding on the cover", () => {
 
 /* ---------------- N4: the deck ---------------------------------------------- */
 
-run("N4: every narrative pin gets a slide in both decks, gone or not", () => {
+run("N4: every narrative pin gets its slides in both decks, gone or not", () => {
   const sb = sandbox({});
   const TR = sb.TR;
+  TR.story2.items().length = 0;   // past the screens-first seed
   TR.story2.pinNarrative("background-method", "Background & method");
   TR.story2.pinNarrative("deleted-section", "Old section");
   const slides = TR.story2._slidesFor(TR.story2.items());
-  eq(slides.length, 3, "cover + one slide per pin");
-  at(slides[1], "Background &amp; method", "the live title");
-  at(slides[1], "Staff | 136 | 58% of invites", "the screen's words, table included");
-  at(slides[2], "Old section", "a gone screen still gets its slide");
-  const gone = TXT("story.narrative_gone").replace(/<[^>]*>/g, "");
-  at(slides[2], gone.slice(0, 30).replace(/&/g, "&amp;"), "carrying the note");
+  const xmls = slides.map(xmlOf);
+  const mine = xmls.slice(1, -1).join("");
+  at(mine, "Background &amp; method", "the live title");
+  at(mine, "<a:t>Staff</a:t>", "the screen's words, table included");
+  const gone = xmls[xmls.length - 1];
+  at(gone, "Old section", "a gone screen still gets its slide");
+  const note = TXT("story.narrative_gone").replace(/<[^>]*>/g, "");
+  at(gone, note.slice(0, 30).replace(/&/g, "&amp;"), "carrying the note");
   const cards = TR.story2._imageCards(TR.story2.items());
   eq(cards.length, 2, "the image deck has a card per pin");
   assert(cards.every((c) => typeof c === "string" && c.length > 0), "both cards render");
+});
+
+/* ---------------- N5: the narrative deck slide ------------------------------ */
+
+const slidesOf = (sb, screen, opts) => sb.TR.exporter.narrativeSlides(screen, opts || {});
+const allText = (slides) => slides.map(xmlOf).join("")
+  .match(/<a:t>[^<]*<\/a:t>/g).map((t) => t.slice(5, -6));
+const runWith = (xml, text) => {
+  const m = new RegExp('<a:r><a:rPr ([^>]*)>(?:(?!</a:r>).)*<a:t>' + text + "</a:t></a:r>")
+    .exec(xml);
+  if (!m) throw new Error("no run for " + text);
+  return m[1];
+};
+
+run("N5: runs keep their own bold and italic; the first paragraph leads", () => {
+  const sb = sandbox({});
+  const [s] = slidesOf(sb, sb.TR.narrative.byId("background-method"));
+  const x = xmlOf(s);
+  assert(/ b="1"/.test(runWith(x, "136")), "the bold run is bold");
+  assert(/ i="1"/.test(runWith(x, "two")), "the italic run is italic");
+  assert(!/ b="1"/.test(runWith(x, "This study has ")), "its neighbours are not");
+  const lead = sb.TR.pptx.STYLE.SIZE.lead * 100, body = sb.TR.pptx.STYLE.SIZE.body * 100;
+  assert(runWith(x, "136").indexOf('sz="' + lead + '"') >= 0, "the lead paragraph at lead size");
+  assert(runWith(x, "See the Turas site for more.").indexOf('sz="' + body + '"') >= 0,
+    "later paragraphs at body size");
+  at(x, "Background &amp; method", "the screen title leads the slide");
+});
+
+run("N5: bullets keep their nesting and numbering; sub-headings are brand", () => {
+  const sb = sandbox({});
+  sb.TR.AGG.project.brand_colour = "#123ABC";
+  const x = xmlOf(slidesOf(sb, sb.TR.narrative.byId("background-method"))[0]);
+  const paraOf = (text) => {
+    const i = at(x, "<a:t>" + text + "</a:t>", text);
+    return x.slice(x.lastIndexOf("<a:p>", i), i);
+  };
+  at(paraOf("Online survey"), '<a:buChar char="•"/>', "a bullet");
+  assert(paraOf("Online survey").indexOf("lvl=") === -1, "top level");
+  at(paraOf("Invites by email"), 'lvl="1"', "the sub-bullet is nested");
+  at(paraOf("First step"), '<a:buAutoNum type="arabicPeriod"/>', "a numbered list numbers");
+  at(paraOf("A paragraph between lists."), "<a:buNone/>", "a paragraph has no bullet");
+  const sub = runWith(x, "How we asked");
+  assert(/ b="1"/.test(sub), "the sub-heading is bold");
+});
+
+run("N5: the Quote style is a gold band; a table is a native table", () => {
+  const sb = sandbox({});
+  const S = sb.TR.pptx.STYLE;
+  const ex = xmlOf(slidesOf(sb, sb.TR.narrative.byId("executive-summary"))[0]);
+  at(ex, 'val="' + S.CALLOUT_BG + '"', "the band fill");
+  assert(/ b="1"/.test(runWith(ex, "&quot;Culture varies by campus.&quot;")),
+    "the quote reads bold in the band");
+  const bg = xmlOf(slidesOf(sb, sb.TR.narrative.byId("background-method"))[0]);
+  const tbl = bg.slice(at(bg, "<a:tbl>", "a native table"), bg.indexOf("</a:tbl>"));
+  ["Group", "n", "%", "Staff", "136", "58% of invites"].forEach((t) =>
+    at(tbl, "<a:t>" + t + "</a:t>", "cell " + t));
+});
+
+run("N5: pictures go in the side column as real pictures, one rel each", () => {
+  const sb = sandbox({});
+  const slides = slidesOf(sb, sb.TR.narrative.byId("executive-summary"));
+  eq(slides[0].images.length, 2, "both pictures on the first slide");
+  at(slides[0].xml, 'r:embed="rId2"', "first picture");
+  at(slides[0].xml, 'r:embed="rId3"', "second picture, its own rel");
+  eq(slides[0].images[0].ext, "png", "the original format");
+  assert(slides[0].images[0].bytes.length > 0, "the original bytes");
+  const pkg = sb.TR.pptx.package(slides, { project: sb.TR.AGG.project });
+  const txt = Buffer.from(pkg).toString("latin1");
+  at(txt, "ppt/media/image1.png", "media part one");
+  at(txt, "ppt/media/image2.png", "media part two");
+  const none = slidesOf(sb, sb.TR.narrative.byId("background-method"));
+  eq(none[0].images.length, 0, "no pictures, no media");
+});
+
+run("N5: the pin's commentary is the insight band, on the first slide only", () => {
+  const sb = sandbox({});
+  const slides = slidesOf(sb, longScreen(40), { note: "Say this <first>" });
+  at(xmlOf(slides[0]), "Say this &lt;first&gt;", "the note, escaped");
+  assert(slides.slice(1).every((s) => xmlOf(s).indexOf("Say this") === -1),
+    "not repeated on continuation slides");
+});
+
+function longScreen(n) {
+  const words = "a considered sentence about the findings that runs long enough to wrap ";
+  return { id: "long", title: "Long", blocks: Array.from({ length: n }, (_, i) =>
+    ({ type: "paragraph", runs: [run1("P" + i + " " + words.repeat(3))] })) };
+}
+
+run("N5: a long screen carries on over continuation slides and loses no words", () => {
+  const sb = sandbox({});
+  const slides = slidesOf(sb, longScreen(40));
+  assert(slides.length > 1, "more than one slide, got " + slides.length);
+  at(xmlOf(slides[1]), "Long (continued)", "a continuation slide says so");
+  const texts = allText(slides);
+  for (let i = 0; i < 40; i++) {
+    eq(texts.filter((t) => t.indexOf("P" + i + " ") === 0).length, 1, "paragraph " + i + " once");
+  }
+  assert(slides.every((s) => xmlOf(s).indexOf(sb.TR.pptx.PAGE_TOKEN) >= 0),
+    "every slide carries the footer page token");
+});
+
+run("N5: a long table breaks across slides, repeating its header row", () => {
+  const sb = sandbox({});
+  const rows = [["Group", "n"]].concat(Array.from({ length: 40 }, (_, i) => ["G" + i, String(i)]));
+  const slides = slidesOf(sb, { id: "t", title: "T", blocks: [{ type: "table", rows }] });
+  assert(slides.length > 1, "the table needed more than one slide");
+  slides.forEach((s) => at(xmlOf(s), "<a:t>Group</a:t>", "the header row on every part"));
+  const texts = allText(slides);
+  for (let i = 0; i < 40; i++) eq(texts.filter((t) => t === "G" + i).length, 1, "row " + i + " once");
+  const ragged = slidesOf(sb, { id: "r", title: "R", blocks: [{ type: "table",
+    rows: [["a"], ["b", "c", "d"]] }] });
+  at(xmlOf(ragged[0]), "<a:t>d</a:t>", "a ragged row keeps every cell");
+});
+
+run("N5: a long list reads in two columns, split at a top-level item", () => {
+  const sb = sandbox({});
+  const items = [item(0, false, "i1"), item(0, false, "i2"), item(0, false, "i3"),
+    item(0, false, "i4"), item(1, false, "i4a"), item(1, false, "i4b"), item(0, false, "i5"),
+    item(0, false, "i6")];
+  const x = xmlOf(slidesOf(sb, { id: "l", title: "L", blocks: [{ type: "list", items }] })[0]);
+  const boxes = x.split("<p:txBody>").slice(1).filter((b) => b.indexOf("<a:t>i") >= 0);
+  eq(boxes.length, 2, "two column boxes");
+  assert(boxes[0].indexOf("<a:t>i4b</a:t>") >= 0 && boxes[1].indexOf("<a:t>i5</a:t>") >= 0,
+    "the sub-list stays with its parent in the first column");
+  const withPic = sandbox({});
+  const px = xmlOf(slidesOf(withPic, { id: "l", title: "L", blocks: [
+    { type: "list", items }, FIX.word[1].blocks.find((b) => b.type === "image")] })[0]);
+  eq(px.split("<p:txBody>").filter((b) => b.indexOf("<a:t>i") >= 0).length, 1,
+    "beside a picture the list stays one column");
+});
+
+run("N5: every run on a narrative slide is Arial", () => {
+  const sb = sandbox({});
+  const x = sb.TR.narrative.screens().map((sc) => slidesOf(sb, sc).map(xmlOf).join("")).join("");
+  const faces = [...x.matchAll(/<a:latin typeface="([^"]*)"/g)].map((m) => m[1]);
+  assert(faces.length && faces.every((f) => f === "Arial"), "Arial throughout");
 });
 
 run("N4: the deck cover quotes the first screen through the same blocks", () => {

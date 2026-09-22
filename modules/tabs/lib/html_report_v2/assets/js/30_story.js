@@ -41,7 +41,24 @@
       items = JSON.parse(JSON.stringify(TR.userState.story));
     }
     if (Array.isArray(own) && own.length) items = own;   // legacy un-owning state
+    if (!items.length) seedScreens();
     return items;
+  }
+
+  /** Screens first: a story that is empty and not owned opens with one pin per
+   *  narrative screen, in document order. After that they are ordinary pins.
+   *  Not a reader change, so it never takes ownership: the next passive
+   *  persist stores the seeded list un-owned, a later load finds a non-empty
+   *  story and seeds nothing, and a section added to Word afterwards is pinned
+   *  by hand. A load before any persist seeds the same list again. Clear takes
+   *  ownership, so a cleared story stays empty. */
+  function seedScreens() {
+    var screens = TR.narrative ? TR.narrative.screens() : [];
+    screens.forEach(function (sc) {
+      if (!sc || !sc.id) return;
+      items.push({ kind: "narrative", screen: String(sc.id),
+        heading: String(sc.title || ""), note: "" });
+    });
   }
 
   function persist() {
@@ -784,7 +801,9 @@
     // its own text, and a finding line reading "Background & method" is a
     // heading, not a finding. Each such pin still gets its own slide below.
     var findings = list.filter(function (it) {
-      return it.kind !== "divider" &&
+      // "narrative" named here as well as by the reader's test, so a deck built
+      // without the reader module still never lists a screen as a finding
+      return it.kind !== "divider" && it.kind !== "narrative" &&
         !(TR.reader && TR.reader.isCoverSectionPin && TR.reader.isCoverSectionPin(it));
     }).slice(0, 5).map(function (it) { return story2.pinTitle(it); });
     var lead = TR.narrative ? TR.narrative.coverScreen() : null;
@@ -866,10 +885,17 @@
         return;
       }
       if (item.kind === "narrative") {
-        // A bridge until the deck has a text-and-bullets slide (brief stage 3):
-        // the screen's words on a plain slide, so the pin is never dropped.
-        slides.push(TR.exporter.dividerSlide(story2.pinTitle(item),
-          narrativeText(item) || item.note || ""));
+        // The screen laid out as it is in Present, over as many slides as its
+        // words need (exporter.narrativeSlides). A screen the report no longer
+        // carries still gets a slide, saying so, so the pin is never dropped.
+        var screen = narrativeOf(item);
+        if (screen && TR.exporter.narrativeSlides) {
+          TR.exporter.narrativeSlides(screen, { kicker: apx ? "Appendix" : "Summary",
+            note: item.note || "" }).forEach(function (sl) { slides.push(sl); });
+        } else {
+          slides.push(TR.exporter.dividerSlide(story2.pinTitle(item),
+            narrativeText(item) || item.note || ""));
+        }
         return;
       }
       if (item.kind === "heatmap") {
@@ -960,6 +986,9 @@
       return TR.exporter.cardSvgRaw(item.title || "Section", item.note || "", null, null);
     }
     if (item.kind === "narrative") {
+      // The image deck keeps a text card: the screen's words as plain lines.
+      // A faithful render of the HTML screen would need its own SVG layout
+      // engine; the editable deck carries the laid-out slide.
       return TR.exporter.cardSvgRaw(story2.pinTitle(item),
         narrativeText(item) || item.note || "", null, null);
     }
