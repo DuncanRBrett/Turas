@@ -46,7 +46,7 @@ Suite on the branch before my fixes: FAIL 0, WARN 0, SKIP 0, PASS 1345, from my 
 | Combined mode + `tabs_export = N`, branch | same config, export off | PASS, and the console carries "Report section skipped: demographic profiles" and "single-method final run". |
 | Single method + `tabs_export = Y`, branch | `method = kmeans` | PASS, and `p_tabs_banner_stub.xlsx` and `p_tabs_data.xlsx` are written. The refusal is scoped to combined mode only. |
 | Template workbook | `generate_segment_config_template()` to a scratch path | Config sheet carries `demographic_vars` (row 7), `html_show_demographics` (row 56, default TRUE) and `tabs_export` (row 78) whose description now ends "Single-method final mode only." |
-| Mutation tests | ten reverts, one at a time, suite run with `filter='demographics|tabs_export'`, file restored and `git status --short` confirmed clean between each | Nine caught, one stayed green. Table in section 2a. |
+| Mutation tests | nine reverts of Session D's behavioural changes, one at a time, suite run with `filter='demographics|tabs_export'`, file restored and `git status --short` confirmed clean between each | Eight caught, one stayed green (M7). Table in section 2a. Three further mutations, MR1 to MR3, tested my own fixes and F17. |
 | Em dashes | `git diff db2c66dc..HEAD | grep "^+", then a grep for the em dash character and for the `&mdash;` entity` | Two hits, neither an em dash in Session D's own prose: one is a note discussing the `&mdash;` entity it removed, the other is the pre-existing `V2_LIFT_PROGRAM.md` segment row, whose em dashes date from the July review and which Session D only appended to. |
 
 ## 2. Findings
@@ -84,6 +84,15 @@ Each revert was a one-line edit on the branch, the suite was run filtered to `de
 | M9 | the multi-method skip note, `R/00_main.R:888` | FAIL 2, PASS 78. Caught. |
 
 A first attempt at M7 targeted `R/09_output.R:817`, which broke the file's brace balance and produced no suite summary at all; it is reported here as an invalid mutation and was retried at the correct line, 812.
+
+Three further mutations tested this review's own work and the one fix that had no test:
+
+| # | Reverted | Result |
+|---|---|---|
+| MR1 | my D1 wording fix | FAIL 1. My test catches it. |
+| MR2 | the collision guard again, after my D5 test | FAIL 3. The M7 gap is closed. |
+| MR3 | the F17 intro sentence, back to the false claim | FAIL 0, PASS 1355 on the FULL suite. Finding D11. |
+
 
 ## 3. Claims in the brief, one by one
 
@@ -191,6 +200,6 @@ The HTML renders the same figures at whole-percentage resolution, which is where
 
 8. **Deviation 6, the CSS fix.** The notes verified the header alignment by rendering the section headless twice. This review did no browser rendering at all, so that fix is unverified here and I am not claiming otherwise. The CSS itself reads as the notes describe.
 
-9. **The notes' mutation test of the recompute is the strongest thing in them, and it agrees with this review.** The relative-tolerance trap was real, the `+ 1` mutation genuinely passed on every cell of 10 or more, and the absolute comparison that replaced it is what makes the recompute test worth having. My independent recompute from the assignments file is a second and separate check on the same numbers, and it matches to 0.0000 on every cell of all three demographics. Where the notes claim the numbers are right, they are right.
+9. **The notes' mutation test of the recompute is the strongest thing in them, and it agrees with this review.** The relative-tolerance trap was real, and the notes report that their `+ 1` mutation passed on every cell of 10 or more, which I did not rerun. The absolute comparison that replaced it is what makes the recompute test worth having, and that part I did verify: the committed test compares with `expect_lt(abs(...), 0.051)`. My independent recompute from the assignments file is a second and separate check on the same numbers, and it matches to 0.0000 on every cell of all three demographics. Where the notes claim the numbers are right, they are right.
 
 Where the notes were right and the handover undersold them: the `<<-` repair in the chi-square handler, the export toolbar per variable rather than per section, and the conditional chi-square sentence are all real defects found by the session itself and not asked for by the work order. My mutation run confirms the first is pinned by a test that fails on a revert (M6), as are both console skip notes (M8, M9).
