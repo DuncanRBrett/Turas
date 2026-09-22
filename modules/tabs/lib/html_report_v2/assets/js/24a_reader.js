@@ -312,7 +312,7 @@
    *  applied on top of this.
    *
    *  Two kinds are skipped. Dividers are structure, not findings. And a pin of a
-   *  narrative screen is skipped: the cover opens with the first screen, and a
+   *  narrative screen is skipped: the cover opens with a screen already, and a
    *  finding titled "Background & method" is a heading, not a finding. That is
    *  every "narrative" item, plus the frozen "report" snapshots the section
    *  cards made before screens pinned by reference, which a regenerated report
@@ -362,7 +362,7 @@
     if (!(TR.AGG && TR.AGG.project && TR.AGG.project.cover)) return false;
     if (!TR.userState) return false;
     if (reader.coverFindings().length) return true;
-    return !!(TR.narrative && TR.narrative.first());
+    return !!(TR.narrative && TR.narrative.coverScreen());
   };
 
   /** Where "Explore the dashboard →" lands: the first READ tab (dashboard
@@ -372,7 +372,8 @@
   };
 
   /**
-   * The cover page: report title/client/wave, the first narrative screen (read
+   * The cover page: report title/client/wave, the cover's narrative screen
+   * (TR.narrative.coverScreen: the executive summary when there is one, read
    * from the island, never from a pin, and rendered by the same
    * TR.narrative.blocksHtml as the Report tab), then the leading findings.
    * Each story pin as its insight sentence (pin title)
@@ -392,10 +393,10 @@
       '<div class="cover-kicker">Report cover</div>' +
       "<h1>" + fmt.escapeHtml(p.name || "") + "</h1>" +
       (sub ? '<div class="cover-sub">' + sub + "</div>" : "") + explore + "</div>");
-    var first = TR.narrative ? TR.narrative.first() : null;
-    if (first) {
-      html.push('<div class="card cover-sec"><h3>' + fmt.escapeHtml(first.title || "") +
-        '</h3><div class="nar-body">' + TR.narrative.blocksHtml(first.blocks) +
+    var lead = TR.narrative ? TR.narrative.coverScreen() : null;
+    if (lead) {
+      html.push('<div class="card cover-sec"><h3>' + fmt.escapeHtml(lead.title || "") +
+        '</h3><div class="nar-body">' + TR.narrative.blocksHtml(lead.blocks) +
         "</div></div>");
     }
     var findings = reader.coverFindings();

@@ -37,9 +37,35 @@
     return null;
   };
 
-  /** The screen the cover shows: the first one, whatever it is called. */
-  narrative.first = function () {
-    return narrative.screens()[0] || null;
+  /** A title reduced to lower-case words: "Executive summary : In a
+   *  nutshell" -> "executive summary in a nutshell". */
+  function titleWords(title) {
+    return String(title == null ? "" : title).toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  /**
+   * The screen the cover opens with, read from the island, never from a pin:
+   * the first screen whose title starts with "Executive summary" (case,
+   * spacing and punctuation ignored), else the first screen.
+   *
+   * Why not simply the first screen: a narrative written the natural way opens
+   * with its background and method, so the cover would lead with how the
+   * study was run rather than what it found. That is true of the Comments
+   * fallback (Background, then Executive summary) and of real Word files
+   * (SACS 2026 opens "Background and method", then "Executive summary : In a
+   * nutshell"). The deck cover has only ever carried the executive summary.
+   *
+   * @returns {object|null} the screen, or null when there are none
+   */
+  narrative.coverScreen = function () {
+    var list = narrative.screens();
+    for (var i = 0; i < list.length; i++) {
+      if (/^executive summary( |$)/.test(titleWords(list[i] && list[i].title))) {
+        return list[i];
+      }
+    }
+    return list[0] || null;
   };
 
   function runsOf(block) {

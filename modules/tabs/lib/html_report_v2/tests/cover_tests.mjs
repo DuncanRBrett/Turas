@@ -503,20 +503,24 @@ run("I20: a copy with NO qual island treats qualitative pins as stale", () => {
 const manyPins = (n) => ({ userState: { story:
   Array.from({ length: n }, (_, i) => snap("F" + (i + 1))) } });
 
-run("the cover shows the FIRST screen, whatever it is called", () => {
-  // Brief decision: the first screen is the cover text. With the Comments
-  // fallback that is Background & method, so the executive summary is on the
-  // Report tab and not on the cover (it used to show both).
+run("the cover leads with the executive summary screen, else the first", () => {
+  // Decided with Duncan, 22 Sep 2026: the cover opens on the first screen
+  // titled "Executive summary..." (TR.narrative.coverScreen), else the first
+  // screen. A Comments-sheet project shows its executive summary and not its
+  // background (it used to show both; the background stays on the Report tab).
   const sb = coverSandbox({ userState: { story: [] },
     project: { name: "P", narrative: nar("How it was done.", "What we found.") } });
   const html = sb.TR.reader.coverHtml();
-  at(html, "<h3>Background &amp; method</h3>", "the first screen's title");
-  at(html, "<p>How it was done.</p>", "and its words");
-  assert(html.indexOf("What we found.") === -1, "the second screen is not on the cover");
-  // Word order decides: reorder the sections and the cover follows
+  at(html, "<h3>Executive summary</h3>", "the executive summary's title");
+  at(html, "<p>What we found.</p>", "and its words");
+  assert(html.indexOf("How it was done.") === -1, "the background is not on the cover");
+  // a narrative with no executive summary heading opens on its first screen
   const word = coverSandbox({ userState: { story: [] }, project: { name: "P",
-    narrative: nar("How it was done.", "What we found.").reverse() } });
-  at(word.TR.reader.coverHtml(), "<p>What we found.</p>", "the new first screen");
+    narrative: [{ id: "overview", title: "Overview", blocks: [para("In short.")] },
+      { id: "detail", title: "Detail", blocks: [para("More.")] }] } });
+  const wh = word.TR.reader.coverHtml();
+  at(wh, "<p>In short.</p>", "the first screen");
+  assert(wh.indexOf("More.") === -1, "and only that screen");
   assert(READER_SRC.indexOf("coverParas") === -1, "no cover paragraph splitter of its own");
 });
 
@@ -649,9 +653,9 @@ run("a pinned section is NOT repeated as a leading finding", () => {
   eq(sb.TR.reader.coverEvidence().map((f) => f.title), ["A real finding"],
     "section pins, old and new, are not evidence for the cover");
   const html = sb.TR.reader.coverHtml();
-  // the first screen's words appear exactly once, as the section
-  eq(count(html, "How it was done."), 1, "the first screen rendered once");
-  eq(count(html, "What we found."), 0, "the pinned second screen is not a finding");
+  // the cover screen's words appear exactly once, as the section
+  eq(count(html, "What we found."), 1, "the cover screen rendered once");
+  eq(count(html, "How it was done."), 0, "the pinned background is not a finding");
   eq(count(html, 'class="cf-title"'), 1, "one finding, not four");
   assert(html.indexOf("the authored words") === -1,
     "the pin's captured html must not render as a finding thumbnail");

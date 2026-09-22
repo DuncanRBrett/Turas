@@ -15,7 +15,7 @@
  *    shows the authored "unavailable" note everywhere, never a crash.
  * N4 The deck never drops a narrative pin (a plain bridge slide until stage 3
  *    adds a text-and-bullets slide), and the deck cover's summary text comes
- *    from the first screen through the same blocks.
+ *    from the cover screen (coverScreen) through the same blocks.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/narrative_tests.mjs
  */
@@ -125,7 +125,8 @@ run("N1: the fixture screens resolve by id, in document order", () => {
   const TR = sandbox({}).TR;
   eq(TR.narrative.screens().map((s) => s.id),
     ["background-method", "executive-summary", "executive-summary-2"], "ids");
-  eq(TR.narrative.first().id, "background-method", "the first screen");
+  eq(TR.narrative.coverScreen().id, "executive-summary",
+    "the cover screen is the executive summary, not the first screen");
   eq(TR.narrative.byId("executive-summary-2").blocks.length, 1, "a repeat heading");
   eq(TR.narrative.byId("gone"), null, "an unknown id");
 });
@@ -133,7 +134,27 @@ run("N1: the fixture screens resolve by id, in document order", () => {
 run("N1: no narrative on the island (or not an array) is no screens", () => {
   eq(sandbox({ narrative: undefined }).TR.narrative.screens(), [], "absent");
   eq(sandbox({ narrative: "x" }).TR.narrative.screens(), [], "malformed");
-  eq(sandbox({ narrative: undefined }).TR.narrative.first(), null, "no first");
+  eq(sandbox({ narrative: undefined }).TR.narrative.coverScreen(), null, "no cover screen");
+});
+
+run("N1: the cover screen is the first titled Executive summary, else the first", () => {
+  const sc = (title) => ({ id: title, title, blocks: [] });
+  const pick = (titles) => {
+    const TR = sandbox({ narrative: titles.map(sc) }).TR;
+    return TR.narrative.coverScreen().title;
+  };
+  // the SACS 2026 Word file's Heading 1 titles, in order
+  eq(pick(["Background and method", "Executive summary : In a nutshell",
+    "Executive summary", "Executive summary: the ratings", "Participation"]),
+    "Executive summary : In a nutshell", "the first of several, whatever follows the words");
+  eq(pick(["Background & method", "Executive summary"]), "Executive summary",
+    "the Comments fallback leads with its executive summary");
+  eq(pick(["background", "EXECUTIVE  SUMMARY."]), "EXECUTIVE  SUMMARY.",
+    "case, spacing and punctuation are ignored");
+  eq(pick(["Background", "Key findings"]), "Background",
+    "no executive summary: the first screen, as the brief says");
+  eq(pick(["Why an executive summary matters", "Executive summaryish"]),
+    "Why an executive summary matters", "the words must lead the title, as whole words");
 });
 
 run("N1: paragraphs keep their bold and italic runs", () => {
@@ -369,10 +390,10 @@ run("N4: the deck cover quotes the first screen through the same blocks", () => 
   const real = sb.TR.exporter.coverSlide;
   sb.TR.exporter.coverSlide = (s) => { spec = s; return real(s); };
   sb.TR.story2._slidesFor([]);
-  eq(spec.exec, sb.TR.narrative.blocksText(sb.TR.narrative.first().blocks),
-    "the cover text is blocksText of screen one");
-  eq(spec.exec.split("\n")[0], "This study has 136 responses and two sections.",
-    "its first line is the first paragraph, runs joined");
+  eq(spec.exec, sb.TR.narrative.blocksText(sb.TR.narrative.byId("executive-summary").blocks),
+    "the cover text is blocksText of the cover screen");
+  eq(spec.exec.split("\n")[0], "Ratings are stable.",
+    "the executive summary, not the background");
   const none = sandbox({ narrative: undefined });
   let spec2 = null;
   none.TR.exporter.coverSlide = (s) => { spec2 = s; return ""; };

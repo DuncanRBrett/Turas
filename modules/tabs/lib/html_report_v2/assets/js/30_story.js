@@ -3,7 +3,8 @@
  * (with chart/table/insight flags), section dividers, pinned dashboard
  * heatmaps, composites (all index metrics of a section in one exhibit), and
  * the by-reference pins: study slides and narrative screens. Present
- * full-screen or export a native, editable PowerPoint. Persists locally and inside saved report copies.
+ * full-screen or export a native, editable PowerPoint. Persists locally and
+ * inside saved report copies.
  *
  * SIZE-EXCEPTION: one narrative workspace; splitting item kinds across
  * files would obscure the story contract.
@@ -768,8 +769,8 @@
   }
 
   /** WP3 cover: the same content as the HTML cover. Project head, the
-   *  first narrative screen as plain lines (TR.narrative.blocksText, the same
-   *  blocks the HTML cover renders) and the leading findings as
+   *  cover's narrative screen as plain lines (TR.narrative.coverScreen and
+   *  blocksText, the same screen the HTML cover renders) and the findings as
    *  pin-title insight lines (story2.pinTitle, the reader chain). Falls back
    *  to the plain title slide when the exporter has no cover (node stubs). */
   function coverSlideFor(list) {
@@ -779,15 +780,15 @@
     // long list would compress into something unreadable. The config setting
     // governs the HTML cover only, and says so in the template and the docs.
     // Same two exclusions as the HTML cover: dividers, and pins of the Report
-    // tab's narrative screens. This slide already carries the first screen as
+    // tab's narrative screens. This slide already carries the cover screen as
     // its own text, and a finding line reading "Background & method" is a
     // heading, not a finding. Each such pin still gets its own slide below.
     var findings = list.filter(function (it) {
       return it.kind !== "divider" &&
         !(TR.reader && TR.reader.isCoverSectionPin && TR.reader.isCoverSectionPin(it));
     }).slice(0, 5).map(function (it) { return story2.pinTitle(it); });
-    var first = TR.narrative ? TR.narrative.first() : null;
-    var exec = first ? TR.narrative.blocksText(first.blocks).trim() : "";
+    var lead = TR.narrative ? TR.narrative.coverScreen() : null;
+    var exec = lead ? TR.narrative.blocksText(lead.blocks).trim() : "";
     return TR.exporter.coverSlide({ exec: exec, findings: findings });
   }
 
