@@ -80,8 +80,9 @@ cover findings (`reader.isCoverSectionPin`).
 
 Replace the stage 2 BRIDGE. Today a narrative pin exports as
 `exporter.dividerSlide(title, blocksText(...))` in `30_story.js slidesFor`,
-and as `exporter.cardSvgRaw(...)` in `itemCardSvg` for the image deck. Both
-are marked with a comment naming stage 3.
+and as `exporter.cardSvgRaw(...)` in `itemCardSvg` for the image deck. The
+`slidesFor` branch carries a comment naming stage 3; the `itemCardSvg` one
+does not.
 
 Add `exporter.narrativeSlide(screen, opts)` to `29_export.js`, built from the
 same blocks, laid out like Present: brand title, the first paragraph as the
@@ -129,8 +130,9 @@ Traps:
 - Do not call `touch()`. Seeding is not a reader change and must not set the
   `_owns` marker. The passive persist in `renderTab` then stores the seeded
   list as un-owned state, and the next load finds a non-empty story and does
-  not seed again. That is the behaviour the brief wants: a section added to
-  Word later is pinned by hand.
+  not seed again (a load before any persist seeds the same list, so it is
+  harmless). That is the behaviour the brief wants: a section added to Word
+  later is pinned by hand.
 - Clear sets ownership, so a cleared story stays empty. Test that.
 - A saved copy's `TR.userState.story` that is `[]` and un-owned seeds; one
   with items does not. Test both, plus the legacy array form of stored state
