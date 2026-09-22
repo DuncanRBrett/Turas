@@ -418,9 +418,10 @@ run("an unauthored report shows the config hints instead of an editor", () => {
 });
 
 run("report_meta alone no longer makes a card. The narrative is the only source", () => {
-  // Deliberate change (stage 2): the Report tab reads project.narrative only.
-  // The old "Fieldwork: <dates>." stand-in for a blank _BACKGROUND lived in this
-  // file; narrative_from_comments (R, stage 1) does not carry it.
+  // The Report tab reads project.narrative only. The "Fieldwork: <dates>."
+  // stand-in for a blank _BACKGROUND used to be built here; the R fallback
+  // (narrative_from_comments) builds it now, so it arrives as an ordinary
+  // screen and renders like any other (test_narrative_reader.R holds it).
   const h = boot(undefined, { fieldwork: "May 2026", exec_summary: "Old path." })
     .report.sectionsHtml();
   assert(h.indexOf("Fieldwork: May 2026.") < 0, "no fieldwork stand-in");

@@ -321,6 +321,23 @@ test_that("a blank Comments cell gives no screen, and both blank give none", {
     one)
 })
 
+test_that("fieldwork dates stand in for a blank _BACKGROUND, as the Report tab always did", {
+  para <- function(text) list(type = "paragraph",
+                              runs = list(list(text = text, bold = FALSE, italic = FALSE)))
+  bg <- narrative_from_comments(NULL, NULL, "May 2026")
+  expect_length(bg, 1)
+  expect_identical(bg[[1]]$id, "background-method")
+  expect_identical(bg[[1]]$blocks, list(para("Fieldwork: May 2026.")))
+  # the loader passes the setting through on the blank-key path
+  both <- load_narrative(list(narrative_file = "", fieldwork_dates = "May 2026",
+                              executive_summary = "Only this."), "cfg.xlsx")
+  expect_identical(vapply(both, `[[`, "", "id"), c("background-method", "executive-summary"))
+  # authored background text wins, and blank dates add nothing
+  expect_identical(narrative_from_comments("Why.", NULL, "May 2026")[[1]]$blocks,
+                   list(para("Why.")))
+  expect_null(narrative_from_comments(NULL, NULL, "  "))
+})
+
 # ==============================================================================
 # THE SETTING, THE LOADER AND THE ISLAND
 # ==============================================================================

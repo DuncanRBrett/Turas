@@ -97,7 +97,8 @@ load_narrative <- function(config_obj, config_file) {
   raw <- config_obj$narrative_file
   if (is_blank_setting(raw)) {
     return(narrative_from_comments(config_obj$background_text,
-                                   config_obj$executive_summary))
+                                   config_obj$executive_summary,
+                                   config_obj$fieldwork_dates))
   }
   path <- resolve_narrative_file(raw, config_file)
   screens <- read_narrative_docx(path)
@@ -805,11 +806,19 @@ read_narrative_docx <- function(path) {
 #' split text (report.slideBodyHtml): a blank line separates blocks, a line
 #' starting "- " or "* " is a bullet, any other line is a paragraph.
 #'
+#' A blank _BACKGROUND with fieldwork_dates set becomes the one-line
+#' "Fieldwork: <dates>." background the Report tab has always shown in that
+#' case, so a project that never sets narrative_file keeps its Background card.
+#'
 #' @param background _BACKGROUND text, or NULL
 #' @param exec_summary _EXECUTIVE_SUMMARY text, or NULL
-#' @return A list of up to two screens, or NULL when both are blank
+#' @param fieldwork The fieldwork_dates setting, or NULL
+#' @return A list of up to two screens, or NULL when all are blank
 #' @keywords internal
-narrative_from_comments <- function(background, exec_summary) {
+narrative_from_comments <- function(background, exec_summary, fieldwork = NULL) {
+  if (is_blank_setting(background) && !is_blank_setting(fieldwork)) {
+    background <- sprintf("Fieldwork: %s.", trimws(as.character(fieldwork)[1]))
+  }
   sources <- list(background = background, exec = exec_summary)
   keep <- Filter(function(k) !is_blank_setting(sources[[k]]), names(sources))
   if (length(keep) == 0) return(NULL)
