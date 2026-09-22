@@ -552,7 +552,41 @@ profile_demographics <- function(data, clusters, demo_vars,
 
     categorical_profiles[[var]] <- profile_df
 
-    # Chi-squared test
+    # Chi-squared test.
+    #
+    # A one-row table has to be skipped rather than tested. chisq.test() on a
+    # one-row table does not test association, because with one category
+    # there is nothing to associate; it silently runs a goodness-of-fit test
+    # against equal expected counts instead, which asks whether the SEGMENTS
+    # are the same size. Segments almost never are, so a demographic every
+    # respondent answered identically came back significant: with segments of
+    # 532, 263 and 405 it returned p = 2.18e-20 and wrote Significant = TRUE,
+    # next to a profile frame reading 100 in every column (independent review
+    # 2026-09-22, D9).
+    # A table with no rows at all is the variable nobody answered, which
+    # reaches the same skip by a different road and must not be told it has
+    # one category.
+    if (nrow(cross_tab) < 2) {
+      skip_note <- if (nrow(cross_tab) == 0) {
+        "Not tested: no clustered respondent answered this question."
+      } else {
+        paste("Not tested: only one category, so there is nothing to",
+              "compare between segments.")
+      }
+      cat(sprintf("    %s\n", skip_note))
+      chi_sq_tests[[var]] <- data.frame(
+        Variable = var,
+        Chi_Sq = NA_real_,
+        DF = NA_real_,
+        P_Value = NA_character_,
+        Significant = NA,
+        Low_Expected = NA,
+        Note = skip_note,
+        stringsAsFactors = FALSE
+      )
+      next
+    }
+
     tryCatch({
       chi_result <- suppressWarnings(chisq.test(cross_tab))
       # Check expected frequency assumption (cells < 5 invalidate chi-sq approximation)
@@ -564,6 +598,7 @@ profile_demographics <- function(data, clusters, demo_vars,
         P_Value = format(chi_result$p.value, scientific = TRUE, digits = 3),
         Significant = chi_result$p.value < 0.05,
         Low_Expected = low_expected,
+        Note = "",
         stringsAsFactors = FALSE
       )
 
@@ -591,6 +626,7 @@ profile_demographics <- function(data, clusters, demo_vars,
         P_Value = NA_character_,
         Significant = NA,
         Low_Expected = NA,
+        Note = paste("Not tested:", conditionMessage(e)),
         stringsAsFactors = FALSE
       )
     })
@@ -675,13 +711,24 @@ profile_demographics <- function(data, clusters, demo_vars,
   cat(rep("=", 80), "\n", sep = "")
   cat("\n")
 
+  # The denominator is the variables that were actually tested, not every
+  # categorical one. A constant demographic and one nobody answered are both
+  # counted as untested and named, rather than quietly widening the
+  # denominator or, worse, being announced as significant (independent review
+  # 2026-09-22, D9).
   n_sig <- sum(chi_sq_combined$Significant, na.rm = TRUE)
-  cat(sprintf("Categorical variables with significant segment differences: %d/%d\n",
-              n_sig, length(categorical_vars)))
+  n_tested <- sum(!is.na(chi_sq_combined$Significant))
+  cat(sprintf("Categorical variables with significant segment differences: %d/%d tested\n",
+              n_sig, n_tested))
 
   if (n_sig > 0) {
-    sig_vars <- chi_sq_combined$Variable[chi_sq_combined$Significant == TRUE]
+    sig_vars <- chi_sq_combined$Variable[which(chi_sq_combined$Significant)]
     cat(sprintf("  Significant: %s\n", paste(sig_vars, collapse = ", ")))
+  }
+
+  untested <- chi_sq_combined$Variable[is.na(chi_sq_combined$Significant)]
+  if (length(untested) > 0) {
+    cat(sprintf("  Not tested: %s\n", paste(untested, collapse = ", ")))
   }
 
   cat("\n")

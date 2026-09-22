@@ -794,7 +794,9 @@ build_seg_demographics_section <- function(tables, html_data) {
           "descriptive. The segments are a grouping derived from this same sample,",
           "so a p-value here describes this data rather than testing a claim made",
           "before the segmentation, and a table with expected counts under five is",
-          "flagged in that sheet as approximate."
+          "flagged in that sheet as approximate. A variable that could not be",
+          "tested has no p-value and carries the reason in that sheet's Note",
+          "column."
         )
       } else {
         base_note

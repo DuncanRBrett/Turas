@@ -349,7 +349,11 @@ test_that("an empty demographic is named in the section and in the tests sheet",
   tests <- res$enhanced$demographic_profiles$chi_sq_tests
   expect_true("empty_var" %in% tests$Variable)
   expect_true(is.na(tests$Chi_Sq[tests$Variable == "empty_var"]))
-  expect_equal(ncol(tests), 6L)
+  # Seven since the reviewer's D9 fix: the frame carries a Note saying why a
+  # variable was not tested, rather than an all-NA row with no reason.
+  expect_equal(ncol(tests), 7L)
+  expect_true(grepl("nobody answered|no clustered respondent answered",
+                    tests$Note[tests$Variable == "empty_var"]))
 
   html <- paste(readLines(file.path(run$out_dir, "seg_segmentation_report.html"),
                           warn = FALSE), collapse = "\n")
@@ -473,4 +477,84 @@ test_that("two demographics whose sheet names collide get a sheet each", {
   })
   expect_true(any(vapply(cats, function(c) identical(c, sort(unique(d$region))), logical(1))))
   expect_true(any(vapply(cats, function(c) identical(c, sort(unique(d$gender))), logical(1))))
+})
+
+
+# ------------------------------------------------------------------------------
+# 11. D9: a demographic that cannot vary must not be reported as significant.
+#
+# chisq.test() on a one-row table is a goodness-of-fit test against equal
+# expected counts, so it tests whether the segments are the same size rather
+# than whether the demographic differs. With equal segments it returns p = 1
+# and looks harmless; with real segment sizes it returns a tiny p and the
+# module wrote Significant = TRUE for a variable every respondent answered
+# the same way (independent review 2026-09-22).
+# ------------------------------------------------------------------------------
+
+test_that("a constant demographic is not tested, whatever the segment sizes are", {
+  for (sizes in list(c(40, 40, 40), c(532, 263, 405))) {
+    clusters <- rep(seq_along(sizes), times = sizes)
+    d <- data.frame(only = rep("Yes", sum(sizes)), stringsAsFactors = FALSE)
+
+    capture.output(prof <- profile_demographics(d, clusters, "only"))
+    row <- prof$chi_sq_tests[prof$chi_sq_tests$Variable == "only", ]
+
+    expect_equal(nrow(row), 1L)
+    # The point of the test: never TRUE, and never a p-value at all.
+    expect_false(isTRUE(row$Significant))
+    expect_true(is.na(row$Significant))
+    expect_true(is.na(row$Chi_Sq))
+    expect_true(is.na(row$P_Value))
+    expect_true(grepl("one category", row$Note, fixed = TRUE))
+  }
+})
+
+test_that("the 532/263/405 case does not produce the old tiny p-value", {
+  # The exact shape that made this a finding: Thornhill's own segment sizes.
+  clusters <- rep(1:3, times = c(532, 263, 405))
+  d <- data.frame(only = rep("Yes", 1200), stringsAsFactors = FALSE)
+  capture.output(prof <- profile_demographics(d, clusters, "only"))
+
+  p <- suppressWarnings(as.numeric(prof$chi_sq_tests$P_Value[1]))
+  expect_true(is.na(p))
+  # The profile frame still shows the variable, reading 100 in every column.
+  frame <- prof$categorical_profiles$only
+  expect_equal(nrow(frame), 1L)
+  expect_true(all(as.numeric(frame[1, -1]) == 100))
+})
+
+test_that("a demographic that can vary is still tested normally", {
+  clusters <- rep(1:3, times = c(532, 263, 405))
+  d <- data.frame(region = c("North", "South", "East")[clusters],
+                  stringsAsFactors = FALSE)
+  capture.output(prof <- profile_demographics(d, clusters, "region"))
+  row <- prof$chi_sq_tests[1, ]
+
+  expect_false(is.na(row$Chi_Sq))
+  expect_true(isTRUE(row$Significant))
+  expect_equal(row$Note, "")
+})
+
+test_that("the tests frame carries a Note column on every branch", {
+  d <- .demographics_fixture()
+  d$empty_var <- NA_character_
+  d$constant_var <- "Yes"
+  run <- .demographics_run(data = d, html_report = "TRUE",
+                           demographic_vars = "region,empty_var,constant_var")
+  tests <- run$res$enhanced$demographic_profiles$chi_sq_tests
+
+  expect_true("Note" %in% names(tests))
+  expect_equal(ncol(tests), 7L)
+  expect_setequal(tests$Variable, c("region", "empty_var", "constant_var"))
+  expect_equal(tests$Note[tests$Variable == "region"], "")
+  expect_true(nzchar(tests$Note[tests$Variable == "empty_var"]))
+  expect_true(grepl("one category", tests$Note[tests$Variable == "constant_var"],
+                    fixed = TRUE))
+  expect_false(isTRUE(tests$Significant[tests$Variable == "constant_var"]))
+
+  # The sheet the user opens carries the reason too.
+  sheet <- openxlsx::read.xlsx(
+    file.path(run$out_dir, "seg_segmentation_report.xlsx"),
+    sheet = "Demographics_Tests", skipEmptyRows = FALSE)
+  expect_true("Note" %in% names(sheet))
 })
