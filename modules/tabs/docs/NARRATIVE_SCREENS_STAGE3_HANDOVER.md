@@ -1,5 +1,19 @@
 # Narrative screens: stage 3 handover
 
+> **Stage 3 is BUILT** (22 Sep 2026): aefd0c05 (the deck slide, the seed) and
+> b0f82755 (the template, the docs), on `feature/narrative-screens-reader`,
+> not merged, not pushed. The list below is kept as the record of what was
+> asked. What is owed now is Duncan's SACS 2026 eyeball and an independent
+> review in a fresh session. Known limits a reviewer should not re-report:
+> the image deck still shows a narrative pin as a text card (its words in the
+> card's subtitle line), not a laid-out slide; the deck slide's height
+> estimate is conservative (about 0.5 em per character plus a 6pt gap), so a
+> table or last paragraph can start a "(continued)" slide when it would have
+> fitted, but no words are ever dropped; the "Summary" kicker and the
+> "(continued)" suffix are hard-coded, like the deck's other kickers; the
+> template regeneration also brought in about ten generator rows the shipped
+> binary had fallen behind on (see b0f82755).
+
 Written 22 September 2026 at the end of the stage 2 session. Read this with
 `NARRATIVE_SCREENS_BRIEF.md` (the settled design) before touching code. This
 note says what exists, what was decided after the brief, and exactly what
