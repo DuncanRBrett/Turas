@@ -415,6 +415,9 @@ test_that("the island JSON keeps screens, blocks, items and table rows as arrays
     back <- jsonlite::fromJSON(json, simplifyVector = FALSE)$project$narrative
     expect_length(back, length(screens))
     expect_true(is.list(back[[1]]$blocks))
+    # the reader's ignored counts ride config_obj as an attribute, for the
+    # console and these tests; they must never reach the client's file
+    expect_false(grepl('"ignored"', json, fixed = TRUE))
   }
   json <- as.character(serialize_data_layer(list(project = build_dl_project(
     list(narrative = one_cell)))))
