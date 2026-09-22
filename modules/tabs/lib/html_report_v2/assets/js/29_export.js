@@ -1376,7 +1376,7 @@
    * REPORT kicker, project name, client · wave · date, the authored exec
    * summary (first two paragraphs) and the leading findings as numbered
    * insight lines with gold chips. The same content as the HTML cover
-   * (reader.coverFindings / report.sectionText), passed in by the deck
+   * (reader.coverFindings / narrative.blocksText), passed in by the deck
    * assembler so this stays data-source-agnostic. Degrades to a clean title
    * cover when spec carries no exec text / findings.
    * spec = {exec, findings: [title, …]}. Replaces titleSlide in the editable

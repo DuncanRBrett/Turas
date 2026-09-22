@@ -494,6 +494,13 @@
           pin.getAttribute("data-snap-title") || "");
         return;
       }
+      // A narrative screen pins by its id for the same reason, and so that a
+      // regenerated report shows the current wording, never the pinned-day copy.
+      var screenId = pin.getAttribute("data-snap-narrative");
+      if (screenId !== null && TR.story2.pinNarrative) {
+        TR.story2.pinNarrative(screenId, pin.getAttribute("data-snap-title") || "");
+        return;
+      }
       TR.story2.pinSnapshot({
         source: pin.getAttribute("data-snap-source") || "card",
         title: pin.getAttribute("data-snap-title") || "Pinned card",

@@ -1,9 +1,9 @@
 /**
- * v2 story builder. An ordered, annotated narrative of four item kinds:
- * pinned questions (with chart/table/insight flags), section dividers,
- * pinned dashboard heatmaps, and composites (all index metrics of a
- * section in one exhibit). Present full-screen or export a native,
- * editable PowerPoint. Persists locally and inside saved report copies.
+ * v2 story builder. An ordered, annotated narrative of pinned questions
+ * (with chart/table/insight flags), section dividers, pinned dashboard
+ * heatmaps, composites (all index metrics of a section in one exhibit), and
+ * the by-reference pins: study slides and narrative screens. Present
+ * full-screen or export a native, editable PowerPoint. Persists locally and inside saved report copies.
  *
  * SIZE-EXCEPTION: one narrative workspace; splitting item kinds across
  * files would obscure the story contract.
@@ -260,6 +260,44 @@
 
   var SLIDE_GONE_NOTE = "This slide is no longer in the project configuration.";
 
+  /** A narrative screen, pinned by its id into project.narrative. The id is the
+   *  heading's slug, so reordering sections in Word keeps the pin on its
+   *  section, and a regenerated report shows the current wording. The heading
+   *  at pin time is kept only to name the pin once its screen is gone. */
+  story2.pinNarrative = function (id, heading) {
+    if (!id) return;
+    load().push({ kind: "narrative", screen: String(id),
+      heading: heading || "", note: "" });
+    touch();
+    TR.shell.toast("Pinned to story (" + load().length + "): see the Story tab");
+  };
+
+  /** The screen a "narrative" item points at, or null when the island no
+   *  longer carries it (section renamed or deleted in Word). */
+  function narrativeOf(item) {
+    if (!item || item.kind !== "narrative" || !TR.narrative) return null;
+    return TR.narrative.byId(item.screen);
+  }
+  story2._narrativeOf = narrativeOf;   // exposed for the node gate
+
+  /** The screen's words, or the authored "no longer in the report" note. */
+  function narrativeBodyHtml(item) {
+    var sc = narrativeOf(item);
+    if (!sc) {
+      return '<div class="snap-body">' +
+        TR.txt.block("story.narrative_gone", null, { cls: "si-ctx" }) + "</div>";
+    }
+    return '<div class="snap-body nar-body">' + TR.narrative.blocksHtml(sc.blocks) +
+      "</div>";
+  }
+
+  /** The screen as plain lines for the deck; the gone note when it is gone. */
+  function narrativeText(item) {
+    var sc = narrativeOf(item);
+    if (sc) return TR.narrative.blocksText(sc.blocks);
+    return String(TR.txt("story.narrative_gone") || "").replace(/<[^>]*>/g, "");
+  }
+
   story2.addDivider = function () {
     var title = prompt("Section title for the divider:");
     if (!title) return;
@@ -396,6 +434,10 @@
       var sl = slideOf(item);
       return (sl && sl.title) || "Study slide";
     }
+    if (item.kind === "narrative") {
+      var sc = narrativeOf(item);
+      return (sc && sc.title) || item.heading || "Summary";
+    }
     if (item.kind === "heatmap") return "Index heatmap";
     if (item.kind === "composite") return "Composite: " + item.category;
     return item.kind === "divider" ? (item.title || "Section") : "Pinned card";
@@ -442,6 +484,7 @@
   story2.itemBodyHtml = function (item) {
     if (item.kind === "divider") return "";
     if (item.kind === "slide") return slideBodyHtml(item);
+    if (item.kind === "narrative") return narrativeBodyHtml(item);
     if (item.kind === "exhibit") return TR.exhibit.panelsHtml(item);
     if (item.kind === "snapshot") {
       if (qualPinStale(item)) {
@@ -592,6 +635,15 @@
         '<textarea class="si-note" placeholder="Commentary for this slide…">' +
         fmt.escapeHtml(item.note || "") + "</textarea></div>";
     }
+    if (item.kind === "narrative") {
+      return '<div class="card story-item story-snapshot story-narrative" data-i="' + i + '">' +
+        '<div class="si-head"><span class="qcode">' + (i + 1) + ". SUMMARY</span>" +
+        "<strong>" + fmt.escapeHtml(story2.pinTitle(item)) +
+        "</strong>" + buttons + "</div>" +
+        narrativeBodyHtml(item) +
+        '<textarea class="si-note" placeholder="Commentary for this slide…">' +
+        fmt.escapeHtml(item.note || "") + "</textarea></div>";
+    }
     if (item.kind === "snapshot") {
       // pinned "as it looks". The card's own HTML, re-shown verbatim (unless a
       // rebuild withheld any of its quotes, in which case the frozen payload
@@ -716,7 +768,8 @@
   }
 
   /** WP3 cover: the same content as the HTML cover. Project head, the
-   *  authored exec summary (report.sectionText) and the leading findings as
+   *  first narrative screen as plain lines (TR.narrative.blocksText, the same
+   *  blocks the HTML cover renders) and the leading findings as
    *  pin-title insight lines (story2.pinTitle, the reader chain). Falls back
    *  to the plain title slide when the exporter has no cover (node stubs). */
   function coverSlideFor(list) {
@@ -726,15 +779,15 @@
     // long list would compress into something unreadable. The config setting
     // governs the HTML cover only, and says so in the template and the docs.
     // Same two exclusions as the HTML cover: dividers, and pins of the Report
-    // tab's narrative sections. This slide already carries the exec summary as
+    // tab's narrative screens. This slide already carries the first screen as
     // its own text, and a finding line reading "Background & method" is a
     // heading, not a finding. Each such pin still gets its own slide below.
     var findings = list.filter(function (it) {
       return it.kind !== "divider" &&
         !(TR.reader && TR.reader.isCoverSectionPin && TR.reader.isCoverSectionPin(it));
     }).slice(0, 5).map(function (it) { return story2.pinTitle(it); });
-    var exec = (TR.report && TR.report.sectionText)
-      ? String(TR.report.sectionText("exec") || "").trim() : "";
+    var first = TR.narrative ? TR.narrative.first() : null;
+    var exec = first ? TR.narrative.blocksText(first.blocks).trim() : "";
     return TR.exporter.coverSlide({ exec: exec, findings: findings });
   }
 
@@ -809,6 +862,13 @@
           slides.push(TR.exporter.dividerSlide(story2.pinTitle(item),
             (sl ? (sl.text || "") : SLIDE_GONE_NOTE) || item.note || ""));
         }
+        return;
+      }
+      if (item.kind === "narrative") {
+        // A bridge until the deck has a text-and-bullets slide (brief stage 3):
+        // the screen's words on a plain slide, so the pin is never dropped.
+        slides.push(TR.exporter.dividerSlide(story2.pinTitle(item),
+          narrativeText(item) || item.note || ""));
         return;
       }
       if (item.kind === "heatmap") {
@@ -897,6 +957,10 @@
     }
     if (item.kind === "divider") {
       return TR.exporter.cardSvgRaw(item.title || "Section", item.note || "", null, null);
+    }
+    if (item.kind === "narrative") {
+      return TR.exporter.cardSvgRaw(story2.pinTitle(item),
+        narrativeText(item) || item.note || "", null, null);
     }
     if (item.kind === "heatmap") {
       return TR.exporter.cardSvgRaw("Index heatmap",
@@ -1052,6 +1116,13 @@
       body = "<h1>" + fmt.escapeHtml(story2.pinTitle(item)) + "</h1>" +
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
         '<div class="pr-table">' + slideBodyHtml(item) + "</div>";
+    } else if (item.kind === "narrative") {
+      var screen = narrativeOf(item);
+      body = screen
+        ? TR.narrative.presentHtml(screen) +
+          (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "")
+        : '<div class="pr-divider"><h1>' + fmt.escapeHtml(story2.pinTitle(item)) + "</h1>" +
+          TR.txt.block("story.narrative_gone", null, { cls: "pr-ctx" }) + "</div>";
     } else if (item.kind === "snapshot") {
       var presentBody = qualPinStale(item)
         ? '<p class="pr-ctx">' + fmt.escapeHtml(QUAL_STALE_NOTE) + "</p>"

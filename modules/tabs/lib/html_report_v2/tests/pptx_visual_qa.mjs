@@ -41,7 +41,7 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "13_zip.js",
   "14_pptx_parts.js", "23_render.js", "23z_charts.js", "23za_trend.js",
-  "23y_xlsx.js", "29_export.js", "30_story.js", "30x_exhibit.js"]) {
+  "23y_xlsx.js", "29_export.js", "24b_narrative.js", "30_story.js", "30x_exhibit.js"]) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
 }
 const TR = sandbox.TR;
@@ -57,10 +57,18 @@ function eq(a, b, msg) { if (a !== b) throw new Error(msg + ": expected " + JSON
 
 /* ================= fixture deck. Every archetype, weighted ================= */
 
+const para = (text) => ({ type: "paragraph", runs: [{ text, bold: false, italic: false }] });
+
 function setupFixture() {
   TR.AGG = {
     project: { name: "Turas visual QA fixture", client: "CCS", wave: "Wave 12",
-      brand_colour: "#123ABC", accent_colour: "#CC9900", weighted: true },
+      brand_colour: "#123ABC", accent_colour: "#CC9900", weighted: true,
+      // the first narrative screen is the cover's summary text
+      narrative: [{ id: "executive-summary", title: "Executive summary", blocks: [
+        para("Overall service holds up this wave: satisfaction is stable and the " +
+          "branch channel keeps gaining share at the call centre's expense."),
+        para("The risk sits with recent graduates. Their verbatims say support is " +
+          "too slow, and their KPI recovery is the most fragile.")] }] },
     questions: [], banner_groups: []
   };
   TR.d2 = { storeKey: (b) => b, bannerDescription: () => "All respondents",
@@ -68,12 +76,6 @@ function setupFixture() {
     questionByCode: () => null, state: { filters: [] } };
   TR.insights = { get: () => "" };
   TR.shell = { toast: () => {} };
-  TR.report = { sectionText: (s) => s === "exec"
-    ? "Overall service holds up this wave: satisfaction is stable and the " +
-      "branch channel keeps gaining share at the call centre's expense.\n" +
-      "The risk sits with recent graduates. Their verbatims say support is " +
-      "too slow, and their KPI recovery is the most fragile."
-    : "" };
   TR.conf = { methodNote: () => "Wilson 95%", modelIntervalKind: () => "props" };
   // I20 gate: qualitative pins render only while their quotes are published.
   TR.qual = { textPublished: () => true };

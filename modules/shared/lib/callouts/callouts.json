@@ -749,6 +749,12 @@
       "context": "Report tab, Added slides card",
       "page": "Report"
     },
+    "story.narrative_gone": {
+      "title": "Story: a pinned summary screen that is gone",
+      "text": "This summary screen is no longer in the report. Its heading may have been renamed, or the section removed, in the Word document. Remove this pin, or pin the renamed section again from the Report tab.",
+      "context": "Story tab, Present and the deck, in place of a pinned narrative screen",
+      "page": "Story"
+    },
     "filter.weighting.summary": {
       "title": "Weighted data: summary line",
       "text": "⚖ Weighted data. Figures represent the population, not the raw sample. How the three bases work ▸",

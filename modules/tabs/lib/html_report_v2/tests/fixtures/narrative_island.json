@@ -1,0 +1,357 @@
+{
+  "_about": "project.narrative exactly as the R build emits it (jsonlite::toJSON, auto_unbox = TRUE). 'word' is read_narrative_docx() on modules/tabs/tests/fixtures/narrative/narrative_fixture.docx; 'comments' is narrative_from_comments('Why we ran it.\\n\\n- one\\n- two', 'First.\\nSecond.'). Regenerate both from the R reader if the block schema changes; never edit by hand.",
+  "word": [
+    {
+      "id": "background-method",
+      "title": "Background & method",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "This study has ",
+              "bold": false,
+              "italic": false
+            },
+            {
+              "text": "136",
+              "bold": true,
+              "italic": false
+            },
+            {
+              "text": " responses and ",
+              "bold": false,
+              "italic": false
+            },
+            {
+              "text": "two",
+              "bold": false,
+              "italic": true
+            },
+            {
+              "text": " sections.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "See the Turas site for more.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Line one line two",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "subheading",
+          "text": "How we asked"
+        },
+        {
+          "type": "list",
+          "items": [
+            {
+              "level": 0,
+              "ordered": false,
+              "runs": [
+                {
+                  "text": "Online survey",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "ordered": false,
+              "runs": [
+                {
+                  "text": "Invites by email",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            },
+            {
+              "level": 0,
+              "ordered": false,
+              "runs": [
+                {
+                  "text": "Two reminders",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "A paragraph between lists.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "items": [
+            {
+              "level": 0,
+              "ordered": true,
+              "runs": [
+                {
+                  "text": "First step",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            },
+            {
+              "level": 0,
+              "ordered": true,
+              "runs": [
+                {
+                  "text": "Second step",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Group",
+              "n",
+              "%"
+            ],
+            [
+              "Staff",
+              "136",
+              "58% of invites"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Response rate fell to 58%.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "executive-summary",
+      "title": "Executive summary",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Ratings are stable.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "quote",
+          "runs": [
+            {
+              "text": "\"Culture varies by campus.\"",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAYAAAD/Rn+7AAAEDmlDQ1BrQ0dDb2xvclNwYWNlR2VuZXJpY1JHQgAAOI2NVV1oHFUUPpu5syskzoPUpqaSDv41lLRsUtGE2uj+ZbNt3CyTbLRBkMns3Z1pJjPj/KRpKT4UQRDBqOCT4P9bwSchaqvtiy2itFCiBIMo+ND6R6HSFwnruTOzu5O4a73L3PnmnO9+595z7t4LkLgsW5beJQIsGq4t5dPis8fmxMQ6dMF90A190C0rjpUqlSYBG+PCv9rt7yDG3tf2t/f/Z+uuUEcBiN2F2Kw4yiLiZQD+FcWyXYAEQfvICddi+AnEO2ycIOISw7UAVxieD/Cyz5mRMohfRSwoqoz+xNuIB+cj9loEB3Pw2448NaitKSLLRck2q5pOI9O9g/t/tkXda8Tbg0+PszB9FN8DuPaXKnKW4YcQn1Xk3HSIry5ps8UQ/2W5aQnxIwBdu7yFcgrxPsRjVXu8HOh0qao30cArp9SZZxDfg3h1wTzKxu5E/LUxX5wKdX5SnAzmDx4A4OIqLbB69yMesE1pKojLjVdoNsfyiPi45hZmAn3uLWdpOtfQOaVmikEs7ovj8hFWpz7EV6mel0L9Xy23FMYlPYZenAx0yDB1/PX6dledmQjikjkXCxqMJS9WtfFCyH9XtSekEF+2dH+P4tzITduTygGfv58a5VCTH5PtXD7EFZiNyUDBhHnsFTBgE0SQIA9pfFtgo6cKGuhooeilaKH41eDs38Ip+f4At1Rq/sjr6NEwQqb/I/DQqsLvaFUjvAx+eWirddAJZnAj1DFJL0mSg/gcIpPkMBkhoyCSJ8lTZIxk0TpKDjXHliJzZPO50dR5ASNSnzeLvIvod0HG/mdkmOC0z8VKnzcQ2M/Yz2vKldduXjp9bleLu0ZWn7vWc+l0JGcaai10yNrUnXLP/8Jf59ewX+c3Wgz+B34Df+vbVrc16zTMVgp9um9bxEfzPU5kPqUtVWxhs6OiWTVW+gIfywB9uXi7CGcGW/zk98k/kmvJ95IfJn/j3uQ+4c5zn3Kfcd+AyF3gLnJfcl9xH3OfR2rUee80a+6vo7EK5mmXUdyfQlrYLTwoZIU9wsPCZEtP6BWGhAlhL3p2N6sTjRdduwbHsG9kq32sgBepc+xurLPW4T9URpYGJ3ym4+8zA05u44QjST8ZIoVtu3qE7fWmdn5LPdqvgcZz8Ww8BWJ8X3w0PhQ/wnCDGd+LvlHs8dRy6bLLDuKMaZ20tZrqisPJ5ONiCq8yKhYM5cCgKOu66Lsc0aYOtZdo5QCwezI4wm9J/v0X23mlZXOfBjj8Jzv3WrY5D+CsA9D7aMs2gGfjve8ArD6mePZSeCfEYt8CONWDw8FXTxrPqx/r9Vt4biXeANh8vV7/+/16ffMD1N8AuKD/A/8leAvFY9bLAAAAOGVYSWZNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAACoAIABAAAAAEAAAAooAMABAAAAAEAAAAUAAAAAD3/EREAAAA/SURBVEgN7dKxCQAACANBdf+dVVzhG4u3D4Qz2Xvx+Opxt6tmQfohBRWkAjTvBhWkAjTvBhWkAjTvBhWkAjQ/HtsEJFwmM6gAAAAASUVORK5CYII=",
+          "alt": "Response chart",
+          "width": 40,
+          "height": 20
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Text before.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAYAAAD/Rn+7AAAEDmlDQ1BrQ0dDb2xvclNwYWNlR2VuZXJpY1JHQgAAOI2NVV1oHFUUPpu5syskzoPUpqaSDv41lLRsUtGE2uj+ZbNt3CyTbLRBkMns3Z1pJjPj/KRpKT4UQRDBqOCT4P9bwSchaqvtiy2itFCiBIMo+ND6R6HSFwnruTOzu5O4a73L3PnmnO9+595z7t4LkLgsW5beJQIsGq4t5dPis8fmxMQ6dMF90A190C0rjpUqlSYBG+PCv9rt7yDG3tf2t/f/Z+uuUEcBiN2F2Kw4yiLiZQD+FcWyXYAEQfvICddi+AnEO2ycIOISw7UAVxieD/Cyz5mRMohfRSwoqoz+xNuIB+cj9loEB3Pw2448NaitKSLLRck2q5pOI9O9g/t/tkXda8Tbg0+PszB9FN8DuPaXKnKW4YcQn1Xk3HSIry5ps8UQ/2W5aQnxIwBdu7yFcgrxPsRjVXu8HOh0qao30cArp9SZZxDfg3h1wTzKxu5E/LUxX5wKdX5SnAzmDx4A4OIqLbB69yMesE1pKojLjVdoNsfyiPi45hZmAn3uLWdpOtfQOaVmikEs7ovj8hFWpz7EV6mel0L9Xy23FMYlPYZenAx0yDB1/PX6dledmQjikjkXCxqMJS9WtfFCyH9XtSekEF+2dH+P4tzITduTygGfv58a5VCTH5PtXD7EFZiNyUDBhHnsFTBgE0SQIA9pfFtgo6cKGuhooeilaKH41eDs38Ip+f4At1Rq/sjr6NEwQqb/I/DQqsLvaFUjvAx+eWirddAJZnAj1DFJL0mSg/gcIpPkMBkhoyCSJ8lTZIxk0TpKDjXHliJzZPO50dR5ASNSnzeLvIvod0HG/mdkmOC0z8VKnzcQ2M/Yz2vKldduXjp9bleLu0ZWn7vWc+l0JGcaai10yNrUnXLP/8Jf59ewX+c3Wgz+B34Df+vbVrc16zTMVgp9um9bxEfzPU5kPqUtVWxhs6OiWTVW+gIfywB9uXi7CGcGW/zk98k/kmvJ95IfJn/j3uQ+4c5zn3Kfcd+AyF3gLnJfcl9xH3OfR2rUee80a+6vo7EK5mmXUdyfQlrYLTwoZIU9wsPCZEtP6BWGhAlhL3p2N6sTjRdduwbHsG9kq32sgBepc+xurLPW4T9URpYGJ3ym4+8zA05u44QjST8ZIoVtu3qE7fWmdn5LPdqvgcZz8Ww8BWJ8X3w0PhQ/wnCDGd+LvlHs8dRy6bLLDuKMaZ20tZrqisPJ5ONiCq8yKhYM5cCgKOu66Lsc0aYOtZdo5QCwezI4wm9J/v0X23mlZXOfBjj8Jzv3WrY5D+CsA9D7aMs2gGfjve8ArD6mePZSeCfEYt8CONWDw8FXTxrPqx/r9Vt4biXeANh8vV7/+/16ffMD1N8AuKD/A/8leAvFY9bLAAAAOGVYSWZNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAACoAIABAAAAAEAAAAooAMABAAAAAEAAAAUAAAAAD3/EREAAAA/SURBVEgN7dKxCQAACANBdf+dVVzhG4u3D4Qz2Xvx+Opxt6tmQfohBRWkAjTvBhWkAjTvBhWkAjTvBhWkAjQ/HtsEJFwmM6gAAAAASUVORK5CYII=",
+          "width": 40,
+          "height": 20
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Text after.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Visible text.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Equation follows.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Minor heading",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "items": [
+            {
+              "level": 0,
+              "ordered": false,
+              "runs": [
+                {
+                  "text": "Styled bullet",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "executive-summary-2",
+      "title": "Executive summary",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Second occurrence.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "comments": [
+    {
+      "id": "background-method",
+      "title": "Background & method",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Why we ran it.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "items": [
+            {
+              "level": 0,
+              "ordered": false,
+              "runs": [
+                {
+                  "text": "one",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            },
+            {
+              "level": 0,
+              "ordered": false,
+              "runs": [
+                {
+                  "text": "two",
+                  "bold": false,
+                  "italic": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "executive-summary",
+      "title": "Executive summary",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "First.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "Second.",
+              "bold": false,
+              "italic": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
