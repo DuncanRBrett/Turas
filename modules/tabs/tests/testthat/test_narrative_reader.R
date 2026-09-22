@@ -134,7 +134,7 @@ test_that("the fixture reads to exactly the expected screens and blocks", {
       para(run("Text after.")),
       para(run("Visible text.")),
       para(run("Equation follows.")),
-      para(run("Minor heading")),
+      list(type = "subheading", text = "Minor heading", level = 3L),
       list(type = "list", items = list(item("Styled bullet")))
     )),
     list(id = "executive-summary-2", title = "Executive summary", blocks = list(
@@ -150,7 +150,7 @@ test_that("every ignored feature in the fixture is counted exactly once", {
   ignored <- attr(screens, "ignored")
 
   expected <- c(
-    preamble = 1L, minor_headings = 1L, hyperlinks = 1L, tracked_changes = 2L,
+    preamble = 1L, minor_headings = 0L, hyperlinks = 1L, tracked_changes = 2L,
     comments = 1L, footnotes = 1L, text_boxes = 1L, shapes = 1L, smartart = 1L,
     charts = 1L, picture_formats = 1L, linked_pictures = 1L, table_drawings = 1L,
     merged_tables = 1L, nested_tables = 0L, embedded_objects = 1L,
@@ -175,7 +175,8 @@ test_that("the console names every skipped kind and how many", {
 
   expect_true(grepl("narrative_fixture.docx: 3 screens, 20 blocks, 2 pictures", joined, fixed = TRUE))
   for (key in names(.NARRATIVE_IGNORED)) {
-    if (key == "nested_tables") next  # none in the fixture, so no line
+    # none in the fixture, so no line (its one Heading 3 is now a sub-heading)
+    if (key %in% c("nested_tables", "minor_headings")) next
     expect_true(grepl(.NARRATIVE_IGNORED[[key]][1], joined, fixed = TRUE), info = key)
   }
   expect_true(grepl("2 tracked change(s)", joined, fixed = TRUE))
@@ -335,6 +336,106 @@ test_that("a heading style built on Heading 1 starts a screen; TOC Heading does 
     list(type = "subheading", text = "What moved"),
     list(type = "quote", runs = list(run("Said it all.")))))
   expect_false(any(grepl("no Heading 1 was found", attr(screens, "console"), fixed = TRUE)))
+})
+
+# ==============================================================================
+# COLOUR, HIGHLIGHTER, HEADING 3 AND 4, LIST FORMATS, WIDE PICTURES
+# ==============================================================================
+
+# A run with raw run properties, for the marks fx_run does not write
+fx_run_props <- function(text, props) {
+  sprintf('<w:r><w:rPr>%s</w:rPr><w:t xml:space="preserve">%s</w:t></w:r>', props, fx_esc(text))
+}
+
+test_that("a font colour with a hue, and the highlighter, mark a run; black and greys do not", {
+  p <- tempfile(fileext = ".docx")
+  on.exit(unlink(p), add = TRUE)
+  write_narrative_docx(p, paste0(
+    fx_par(fx_run("Findings"), style = "berschrift1"),
+    fx_par(fx_run("Plain, "),
+           fx_run_props("red", '<w:color w:val="C00000"/>'),
+           fx_run_props(" and theme blue", '<w:b/><w:color w:val="4472C4" w:themeColor="accent1"/>'),
+           fx_run_props(" black", '<w:color w:val="000000" w:themeColor="text1"/>'),
+           fx_run_props(" grey", '<w:color w:val="7F7F7F"/>'),
+           fx_run_props(" auto", '<w:color w:val="auto"/>'),
+           fx_run_props(" marked", '<w:highlight w:val="yellow"/>'),
+           fx_run_props(" unmarked", '<w:highlight w:val="none"/>'))))
+  runs <- read_quietly(p)[[1]]$blocks[[1]]$runs
+  expect_identical(runs, list(
+    run("Plain, "),
+    list(text = "red", bold = FALSE, italic = FALSE, colour = TRUE),
+    list(text = " and theme blue", bold = TRUE, italic = FALSE, colour = TRUE),
+    run(" black grey auto"),
+    list(text = " marked", bold = FALSE, italic = FALSE, highlight = TRUE),
+    run(" unmarked")))
+})
+
+test_that("Heading 3 is a small sub-heading; Heading 4 is a paragraph and is named", {
+  styles <- sub("</w:styles>", paste0(
+    '<w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/>',
+    '<w:basedOn w:val="Normal"/></w:style></w:styles>'), narrative_fixture_styles(), fixed = TRUE)
+  p <- tempfile(fileext = ".docx")
+  on.exit(unlink(p), add = TRUE)
+  write_narrative_docx(p, paste0(
+    fx_par(fx_run("Findings"), style = "berschrift1"),
+    fx_par(fx_run("Big point"), style = "Kop2"),
+    fx_par(fx_run("Smaller point"), style = "Heading3"),
+    fx_par(fx_run("Smallest"), style = "Heading4")), styles_xml = styles)
+  screens <- read_quietly(p)
+  expect_identical(screens[[1]]$blocks, list(
+    list(type = "subheading", text = "Big point"),
+    list(type = "subheading", text = "Smaller point", level = 3L),
+    para(run("Smallest"))))
+  expect_identical(attr(screens, "ignored")[["minor_headings"]], 1L)
+  expect_true(any(grepl("1 Heading 4 or lower", attr(screens, "console"), fixed = TRUE)))
+})
+
+test_that("letter and roman list numbering is kept; plain numbers carry no format", {
+  numbering <- sub("</w:numbering>", paste0(
+    '<w:abstractNum w:abstractNumId="5"><w:lvl w:ilvl="0"><w:start w:val="1"/>',
+    '<w:numFmt w:val="upperRoman"/></w:lvl></w:abstractNum>',
+    '<w:num w:numId="6"><w:abstractNumId w:val="5"/></w:num></w:numbering>'),
+    narrative_fixture_numbering(), fixed = TRUE)
+  p <- tempfile(fileext = ".docx")
+  on.exit(unlink(p), add = TRUE)
+  write_narrative_docx(p, paste0(
+    fx_par(fx_run("Plan"), style = "berschrift1"),
+    fx_par(fx_run("one"), num = c(2, 0)), fx_par(fx_run("one.a"), num = c(2, 1)),
+    fx_par(fx_run("I"), num = c(6, 0)), fx_par(fx_run("II"), num = c(6, 0))),
+    numbering_xml = numbering)
+  items <- read_quietly(p)[[1]]$blocks[[1]]$items
+  formats <- vapply(items, function(it) it$format %||% "(none)", character(1))
+  expect_identical(formats, c("(none)", "lowerLetter", "upperRoman", "upperRoman"))
+  expect_identical(vapply(items, function(it) it$number, integer(1)), c(1L, 1L, 1L, 2L))
+})
+
+test_that("a picture Word shows across the text width is wide; a small one is not", {
+  wide_pic <- sub('cx="914400"', 'cx="5486400"', fx_picture("rIdPng", id = 2), fixed = TRUE)
+  png_rel <- '<Relationship Id="rIdPng" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/p.png"/>'
+  pictures_of <- function(sect) {
+    p <- tempfile(fileext = ".docx")
+    on.exit(unlink(p), add = TRUE)
+    write_narrative_docx(p, paste0(
+      fx_par(fx_run("Findings"), style = "berschrift1"),
+      fx_par(fx_picture("rIdPng", id = 1)), fx_par(wide_pic), sect),
+      doc_rels = png_rel, media = list("p.png" = narrative_fixture_png()))
+    Filter(function(b) identical(b$type, "image"), read_quietly(p)[[1]]$blocks)
+  }
+  # A4 (11906 twips) less 1in margins each side = 9026 twips of text; the
+  # wide one is 6in = 8640 twips (96%), the small one 1in = 1440 twips (16%)
+  a4 <- '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:left="1440" w:right="1440"/></w:sectPr>'
+  pics <- pictures_of(a4)
+  expect_null(pics[[1]]$wide)
+  expect_true(isTRUE(pics[[2]]$wide))
+  # margins not stated: Word's 1in default, so the same answer
+  pics <- pictures_of('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>')
+  expect_true(isTRUE(pics[[2]]$wide))
+  # 3in side margins leave 3386 twips of text: a 1in picture (43%) is still not wide
+  pics <- pictures_of('<w:sectPr><w:pgSz w:w="11906"/><w:pgMar w:left="4320" w:right="4200"/></w:sectPr>')
+  expect_null(pics[[1]]$wide)
+  # no page size at all: nothing is called wide
+  pics <- pictures_of("")
+  expect_null(pics[[2]]$wide)
 })
 
 test_that("the JS suites' island fixture is the reader's current output", {

@@ -241,14 +241,9 @@
           ]
         },
         {
-          "type": "paragraph",
-          "runs": [
-            {
-              "text": "Minor heading",
-              "bold": false,
-              "italic": false
-            }
-          ]
+          "type": "subheading",
+          "text": "Minor heading",
+          "level": 3
         },
         {
           "type": "list",

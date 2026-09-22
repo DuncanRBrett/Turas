@@ -14,14 +14,17 @@
 # (data_layer_writer.R). Build brief: modules/tabs/docs/NARRATIVE_SCREENS_BRIEF.md.
 #
 # BLOCK KINDS (the fixed scope list; nothing else is half-read):
-#   subheading  list(type, text)                        Heading 2
+#   subheading  list(type, text, level?)                Heading 2 (level 3: Heading 3)
 #   paragraph   list(type, runs)                        Normal text
 #   quote       list(type, runs)                        Quote style
-#   list        list(type, items = list(list(level, ordered, runs, number?)))
+#   list        list(type, items = list(list(level, ordered, runs, number?, format?)))
 #               number: the number Word shows, on ordered items only
-#   image       list(type, src, alt?, width?, height?)  embedded picture
+#               format: lowerLetter / upperLetter / lowerRoman / upperRoman
+#   image       list(type, src, alt?, width?, height?, wide?)  embedded picture
+#               wide: TRUE when Word shows it across the page's text width
 #   table       list(type, rows = list(list("cell", ...))) text cells only
-# A run is list(text, bold, italic).
+# A run is list(text, bold, italic), plus colour = TRUE (a font colour with a
+# hue) and highlight = TRUE (Word's highlighter) only when set.
 #
 # Everything outside that list is counted and named in the console, never
 # silently dropped and never partly rendered. The counts ride on the result as
@@ -57,7 +60,7 @@
 # What is skipped, in console order: the noun, and what happened plus the fix.
 .NARRATIVE_IGNORED <- list(
   preamble         = c("paragraph(s) before the first Heading 1", "Not read. Put them under a Heading 1."),
-  minor_headings   = c("Heading 3 or lower", "Read as ordinary paragraphs."),
+  minor_headings   = c("Heading 4 or lower", "Read as ordinary paragraphs."),
   hyperlinks       = c("hyperlink(s)", "The words are kept and the link is dropped."),
   tracked_changes  = c("tracked change(s)", "Read as if accepted. Accept or reject them in Word to be sure."),
   comments         = c("comment(s)", "Review comments never reach the report."),
@@ -281,12 +284,51 @@ read_narrative_docx <- function(path) {
     body = body,
     rels = rels,
     part_path = part_path,
+    text_width = .narrative_text_width(body),
     styles = .narrative_styles(read_part("styles")),
     numbering = read_part("numbering"),
     header_footer = lapply(
       rels$target[rels$type %in% c("header", "footer") & !rels$external],
       function(t) { p <- part_path(t); if (file.exists(p)) xml2::read_xml(p) else NULL })
   )
+}
+
+# A picture is "wide" when Word shows it at least this share of the page's
+# text width: the author stretched it across the page, so the report gives it
+# the full width too instead of the side column (24b_narrative.js, the deck).
+.NARRATIVE_WIDE_PICTURE_SHARE <- 0.8
+# Word's own default page margin, in twentieths of a point, used when a
+# section states a page width but no margins.
+.NARRATIVE_DEFAULT_MARGIN_TWIPS <- 1440
+.NARRATIVE_EMU_PER_TWIP <- 635
+
+#' The width between the margins of the document's last section, in twips
+#'
+#' The body's own w:sectPr is the section that closes the document. A
+#' document with sections of different widths is measured by that last one.
+#' @return A positive number, or NA when the page width is not stated
+#' @keywords internal
+.narrative_text_width <- function(body) {
+  ns <- .NARRATIVE_NS
+  sect <- xml2::xml_find_first(body, "w:sectPr", ns)
+  if (inherits(sect, "xml_missing")) return(NA_real_)
+  twips <- function(xpath, attr, default) {
+    v <- suppressWarnings(as.numeric(xml2::xml_attr(xml2::xml_find_first(sect, xpath, ns), attr, ns)))
+    if (is.na(v)) default else v
+  }
+  page <- twips("w:pgSz", "w:w", NA_real_)
+  width <- page - twips("w:pgMar", "w:left", .NARRATIVE_DEFAULT_MARGIN_TWIPS) -
+    twips("w:pgMar", "w:right", .NARRATIVE_DEFAULT_MARGIN_TWIPS)
+  if (is.na(width) || width <= 0) NA_real_ else width
+}
+
+#' Is this drawing shown at least .NARRATIVE_WIDE_PICTURE_SHARE of the text width?
+#' @keywords internal
+.narrative_is_wide <- function(d, text_width) {
+  if (is.na(text_width)) return(FALSE)
+  cx <- suppressWarnings(as.numeric(xml2::xml_attr(
+    xml2::xml_find_first(d, ".//wp:extent", .NARRATIVE_NS), "cx")))
+  !is.na(cx) && cx / .NARRATIVE_EMU_PER_TWIP >= .NARRATIVE_WIDE_PICTURE_SHARE * text_width
 }
 
 #' Paragraph styles: id -> lower-case name, basedOn, and any list numbering
@@ -330,13 +372,14 @@ read_narrative_docx <- function(path) {
   )
 }
 
-#' Is a list level ordered (numbers, letters) rather than bulleted?
+#' A list level's number format (w:numFmt: "decimal", "lowerLetter",
+#' "bullet", ...), or NA when the numbering does not say
 #' @keywords internal
-.narrative_ordered <- function(numbering, num_id, ilvl) {
-  if (is.null(numbering)) return(FALSE)
+.narrative_num_format <- function(numbering, num_id, ilvl) {
+  if (is.null(numbering)) return(NA_character_)
   ns <- .NARRATIVE_NS
   num <- xml2::xml_find_first(numbering, sprintf("//w:num[@w:numId='%s']", num_id), ns)
-  if (inherits(num, "xml_missing")) return(FALSE)
+  if (inherits(num, "xml_missing")) return(NA_character_)
   lvl_q <- sprintf("w:lvl[@w:ilvl='%d']/w:numFmt", ilvl)
   fmt <- xml2::xml_attr(xml2::xml_find_first(
     num, sprintf("w:lvlOverride[@w:ilvl='%d']/%s", ilvl, lvl_q), ns), "w:val", ns)
@@ -345,7 +388,27 @@ read_narrative_docx <- function(path) {
     abs <- xml2::xml_find_first(numbering, sprintf("//w:abstractNum[@w:abstractNumId='%s']", abs_id), ns)
     fmt <- xml2::xml_attr(xml2::xml_find_first(abs, lvl_q, ns), "w:val", ns)
   }
-  !is.na(fmt) && !(fmt %in% c("bullet", "none"))
+  fmt
+}
+
+# Word number formats the report shows as they are. Any other ordered format
+# (decimalZero, ordinal, a word like "First") is shown as 1, 2, 3.
+.NARRATIVE_LETTER_FORMATS <- c("lowerLetter", "upperLetter", "lowerRoman", "upperRoman")
+
+#' A list item from a list paragraph: ordered or not, and for an ordered item
+#' its number and, when it is not plain 1, 2, 3, its format
+#' @keywords internal
+.narrative_list_item <- function(ctx, num, level, runs) {
+  fmt <- .narrative_num_format(ctx$parts$numbering, num$num_id, level)
+  item <- list(level = level, ordered = !is.na(fmt) && !(fmt %in% c("bullet", "none")),
+               runs = runs)
+  # counted only for an item that is shown, so the report never skips a number
+  number <- .narrative_list_number(ctx, num$num_id, level)
+  if (item$ordered) {
+    item$number <- number
+    if (fmt %in% .NARRATIVE_LETTER_FORMATS) item$format <- fmt
+  }
+  item
 }
 
 #' The number a list level starts counting from (w:start), 1 when unset
@@ -533,8 +596,11 @@ read_narrative_docx <- function(path) {
     if (!nzchar(plain)) return(list(kind = "blocks", blocks = images))
     return(list(kind = "h1", title = gsub("\\s+", " ", plain), blocks = images))
   }
-  if (identical(heading_level, 2L)) {
-    blocks <- if (nzchar(plain)) list(list(type = "subheading", text = gsub("\\s+", " ", plain))) else list()
+  if (heading_level %in% c(2L, 3L)) {
+    # Heading 2 is a sub-heading; Heading 3 a smaller one, marked level 3
+    sub <- list(type = "subheading", text = gsub("\\s+", " ", plain))
+    if (identical(heading_level, 3L)) sub$level <- 3L
+    blocks <- if (nzchar(plain)) list(sub) else list()
     return(list(kind = "blocks", blocks = c(blocks, images)))
   }
   if (!is.na(heading_level)) {
@@ -551,13 +617,7 @@ read_narrative_docx <- function(path) {
     level <- if (is.na(num$ilvl)) 0L else num$ilvl
     blocks <- list()
     if (length(runs) > 0) {
-      item <- list(level = level,
-                   ordered = .narrative_ordered(ctx$parts$numbering, num$num_id, level),
-                   runs = runs)
-      # counted only for an item that is shown, so the report never skips a number
-      number <- .narrative_list_number(ctx, num$num_id, level)
-      if (item$ordered) item$number <- number
-      blocks <- list(list(type = "list", items = list(item)))
+      blocks <- list(list(type = "list", items = list(.narrative_list_item(ctx, num, level, runs))))
     }
     return(list(kind = "blocks", blocks = c(blocks, images)))
   }
@@ -660,6 +720,7 @@ read_narrative_docx <- function(path) {
     rpr <- xml2::xml_find_first(r, "w:rPr", ns)
     bold <- .narrative_toggle(rpr, "w:b")
     italic <- .narrative_toggle(rpr, "w:i")
+    marks <- .narrative_run_marks(rpr)
     for (child in xml2::xml_children(r)) {
       nm <- xml2::xml_name(child, ns)
       text <- NULL
@@ -680,7 +741,8 @@ read_narrative_docx <- function(path) {
         for (d in xml2::xml_find_all(child, "mc:Choice/w:drawing", ns)) read_drawing(d)
       }
       if (!is.null(text)) {
-        out[[length(out) + 1L]] <<- list(type = "run", text = text, bold = bold, italic = italic)
+        out[[length(out) + 1L]] <<- list(type = "run", text = text, bold = bold, italic = italic,
+                                         colour = marks$colour, highlight = marks$highlight)
       }
     }
   }
@@ -704,16 +766,54 @@ read_narrative_docx <- function(path) {
   is.na(val) || !(tolower(val) %in% c("0", "false", "off"))
 }
 
+# A font colour counts as emphasis only when it has a hue: the spread between
+# its strongest and weakest channel (0-255) must exceed this. Black, white and
+# every grey fall under it, and grey text in Word is a quieter voice, not a
+# louder one.
+.NARRATIVE_MIN_COLOUR_SPREAD <- 40
+
+#' The two marks a run can carry beyond bold and italic
+#'
+#' colour: a font colour applied to the words themselves (w:color in the run's
+#' own properties), with a hue. Colour a style gives (heading blue, link blue)
+#' is never on the run, so it never counts. highlight: Word's highlighter pen,
+#' any colour. The report shows both in its own colours, never Word's.
+#'
+#' @return list(colour = TRUE/FALSE, highlight = TRUE/FALSE)
+#' @keywords internal
+.narrative_run_marks <- function(rpr) {
+  none <- list(colour = FALSE, highlight = FALSE)
+  if (inherits(rpr, "xml_missing")) return(none)
+  ns <- .NARRATIVE_NS
+  hex <- xml2::xml_attr(xml2::xml_find_first(rpr, "w:color", ns), "w:val", ns)
+  rgb <- if (!is.na(hex) && grepl("^[0-9A-Fa-f]{6}$", hex)) {
+    strtoi(substring(hex, c(1, 3, 5), c(2, 4, 6)), 16L)
+  } else NULL
+  mark <- xml2::xml_attr(xml2::xml_find_first(rpr, "w:highlight", ns), "w:val", ns)
+  list(colour = !is.null(rgb) && (max(rgb) - min(rgb)) > .NARRATIVE_MIN_COLOUR_SPREAD,
+       highlight = !is.na(mark) && !identical(tolower(mark), "none"))
+}
+
 #' Merge adjacent runs of the same formatting and trim the ends
+#'
+#' A run is list(text, bold, italic), plus colour = TRUE and highlight = TRUE
+#' only when set, so an ordinary document's runs keep their three fields.
 #' @keywords internal
 .narrative_runs <- function(segments) {
+  same <- function(a, b) {
+    a$bold == b$bold && a$italic == b$italic &&
+      isTRUE(a$colour) == isTRUE(b$colour) && isTRUE(a$highlight) == isTRUE(b$highlight)
+  }
   runs <- list()
   for (s in segments) {
     n <- length(runs)
-    if (n > 0 && runs[[n]]$bold == s$bold && runs[[n]]$italic == s$italic) {
+    if (n > 0 && same(runs[[n]], s)) {
       runs[[n]]$text <- paste0(runs[[n]]$text, s$text)
     } else {
-      runs[[n + 1L]] <- list(text = s$text, bold = s$bold, italic = s$italic)
+      run <- list(text = s$text, bold = s$bold, italic = s$italic)
+      if (isTRUE(s$colour)) run$colour <- TRUE
+      if (isTRUE(s$highlight)) run$highlight <- TRUE
+      runs[[n + 1L]] <- run
     }
   }
   if (length(runs) == 0) return(list())
@@ -780,6 +880,7 @@ read_narrative_docx <- function(path) {
     block$width <- as.integer(px$w)
     block$height <- as.integer(px$h)
   }
+  if (.narrative_is_wide(d, ctx$parts$text_width)) block$wide <- TRUE
   block
 }
 
