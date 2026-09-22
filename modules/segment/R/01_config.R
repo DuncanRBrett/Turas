@@ -679,13 +679,26 @@ segment_warn_unused_settings <- function(raw_config, validated_config) {
     "segment_names"          # handled with the naming style
   )
 
-  unused <- setdiff(raw_keys, c(names(validated_config), consumed_elsewhere))
+  known <- c(names(validated_config), consumed_elsewhere)
+  unused <- setdiff(raw_keys, known)
   if (length(unused) == 0) return(invisible(character(0)))
+
+  # A key that differs from a real one only in case is the commonest cause,
+  # and naming it alone sends the user looking for a setting that does not
+  # exist. Say which one it nearly is (independent review 2026-09-22, D12).
+  near <- vapply(unused, function(k) {
+    hit <- known[tolower(known) == tolower(k)]
+    if (length(hit) > 0) hit[1] else NA_character_
+  }, character(1))
 
   cat("\n")
   cat("+--- SEGMENT: settings that did not survive validation ---+\n")
   for (k in unused) {
     cat(sprintf("| %-55s |\n", k))
+    if (!is.na(near[[k]])) {
+      cat(sprintf("| %-55s |\n",
+                  sprintf("  did you mean '%s'? Case must match.", near[[k]])))
+    }
   }
   cat("| These were read from the Config sheet and are not used by  |\n")
   cat("| the run. Check the spelling against the template, or       |\n")
@@ -696,10 +709,14 @@ segment_warn_unused_settings <- function(raw_config, validated_config) {
   cat("+------------------------------------------------------------+\n\n")
 
   if (exists("showNotification", mode = "function")) {
-    try(showNotification(
-      paste("Segment: unused config settings:", paste(unused, collapse = ", ")),
-      type = "warning", duration = NULL
-    ), silent = TRUE)
+    msg <- paste("Segment: unused config settings:", paste(unused, collapse = ", "))
+    if (any(!is.na(near))) {
+      msg <- paste0(msg, ". Close to: ",
+                    paste(sprintf("%s -> %s", names(near)[!is.na(near)],
+                                  near[!is.na(near)]), collapse = ", "),
+                    " (case must match)")
+    }
+    try(showNotification(msg, type = "warning", duration = NULL), silent = TRUE)
   }
 
   invisible(unused)
