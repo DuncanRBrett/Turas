@@ -440,3 +440,37 @@ test_that("the section does not call the clustered sample the base of its percen
   expect_true(grepl("column percentages", html, fixed = TRUE))
   expect_true(grepl("respondents who were clustered", html, fixed = TRUE))
 })
+
+
+test_that("two demographics whose sheet names collide get a sheet each", {
+  # D5. substr(paste0("Demo_", var), 1, 31) truncates, so two names sharing
+  # their first 26 characters map to one sheet and the second would overwrite
+  # the first without a word. The guard in export_final_report() renames it;
+  # nothing noticed when the guard was reverted.
+  v1 <- "household_income_bracket_detailed_a"
+  v2 <- "household_income_bracket_detailed_b"
+  expect_equal(substr(paste0("Demo_", v1), 1, 31),
+               substr(paste0("Demo_", v2), 1, 31))
+
+  d <- .demographics_fixture()
+  d[[v1]] <- d$region
+  d[[v2]] <- d$gender
+  run <- .demographics_run(data = d, html_report = "FALSE",
+                           demographic_vars = paste(v1, v2, sep = ","))
+  expect_false(inherits(run$res, "turas_refusal_result"))
+
+  sheets <- openxlsx::getSheetNames(
+    file.path(run$out_dir, "seg_segmentation_report.xlsx"))
+  demo_sheets <- grep("^Demo_household", sheets, value = TRUE)
+  expect_length(demo_sheets, 2L)
+  expect_equal(length(unique(demo_sheets)), 2L)
+
+  # Both frames survive: one carries the region categories, one the gender ones.
+  cats <- lapply(demo_sheets, function(s) {
+    sort(openxlsx::read.xlsx(
+      file.path(run$out_dir, "seg_segmentation_report.xlsx"),
+      sheet = s, skipEmptyRows = FALSE)$Category)
+  })
+  expect_true(any(vapply(cats, function(c) identical(c, sort(unique(d$region))), logical(1))))
+  expect_true(any(vapply(cats, function(c) identical(c, sort(unique(d$gender))), logical(1))))
+})
