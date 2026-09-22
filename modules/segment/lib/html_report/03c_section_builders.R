@@ -701,6 +701,14 @@ build_seg_demographics_section <- function(tables, html_data) {
   # The base. Demographics are profiled on the respondents who were
   # clustered, which is not everyone in the data file when listwise deletion
   # or outlier removal took rows out.
+  #
+  # This is the clustered n, not the answered n. table() drops NA, so a
+  # demographic with blanks is percentaged on fewer people than this line
+  # names, and the profile frames carry percentages only, so the answered n
+  # per variable is not available here without changing what
+  # profile_demographics() returns (independent review 2026-09-22, D1). The
+  # intro above says the base shrinks; saying which number it shrinks to
+  # needs that change and is Duncan's ruling.
   sizes <- html_data$segment_sizes
   base_note <- if (!is.null(sizes) && nrow(sizes) > 0) {
     sprintf("Base: %d respondents who were clustered (%s).",
@@ -761,8 +769,10 @@ build_seg_demographics_section <- function(tables, html_data) {
         "How each demographic variable is spread within each segment.",
         "Percentages are column percentages: they read down a segment and add",
         "to 100 within it, give or take rounding, across the respondents who",
-        "answered that question. The Overall column is the same calculation on",
-        "the whole clustered sample."
+        "answered that question. The Overall column is the same calculation",
+        "pooled across the segments. Each table's own base is therefore the",
+        "people who answered that variable, which is smaller than the clustered",
+        "n below wherever a demographic was left blank."
       )
     ),
     cat_el,

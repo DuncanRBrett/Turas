@@ -418,3 +418,25 @@ test_that("an all-numeric set of demographics does not name a sheet that is abse
   expect_false(grepl("Demographics_Tests", html, fixed = TRUE))
   expect_true(grepl("respondents who were clustered", html, fixed = TRUE))
 })
+
+
+# ------------------------------------------------------------------------------
+# 10. Reviewer's tests (independent review 2026-09-22).
+# ------------------------------------------------------------------------------
+
+test_that("the section does not call the clustered sample the base of its percentages", {
+  # D1. Percentages are computed among the respondents who answered the
+  # demographic, which is smaller than the clustered n whenever a demographic
+  # has blanks. The section used to say the Overall column was "the same
+  # calculation on the whole clustered sample", which is false in that case.
+  hd <- .demographics_html_data()
+  tables <- list(demographics = build_seg_demographics_table(hd),
+                 demographics_numeric = build_seg_demographics_numeric_table(hd))
+  html <- as.character(build_seg_demographics_section(tables, hd))
+
+  expect_false(grepl("the whole clustered sample", html, fixed = TRUE))
+  expect_true(grepl("smaller than the clustered", html, fixed = TRUE))
+  # The two claims the rest of the suite relies on are still made.
+  expect_true(grepl("column percentages", html, fixed = TRUE))
+  expect_true(grepl("respondents who were clustered", html, fixed = TRUE))
+})
