@@ -88,6 +88,34 @@
   }
 
   /**
+   * The number each list item shows: null for a bullet, else the number Word
+   * shows (item.number, from the R reader, which keeps counting across a
+   * paragraph that interrupts the list). An item without one, e.g. from an
+   * older island, is counted here the way the nested HTML list would count it:
+   * per level, restarting a level under each new parent and when the list type
+   * changes. Shared by the HTML list, the plain-text lines and the deck slide,
+   * so every surface shows the same numbers.
+   *
+   * @param {Array} items - a list block's items
+   * @returns {Array} one number (or null) per item
+   */
+  narrative.listNumbers = function (items) {
+    var count = [], kind = [];
+    return (items || []).map(function (it) {
+      var level = Math.max(0, parseInt(it && it.level, 10) || 0);
+      var ordered = !!(it && it.ordered);
+      count.length = kind.length = Math.min(count.length, level + 1);
+      var n = kind[level] === ordered && count[level] ? count[level] + 1 : 1;
+      count[level] = n;
+      kind[level] = ordered;
+      if (!ordered) return null;
+      var given = parseInt(it.number, 10);
+      if (isFinite(given)) count[level] = given;
+      return isFinite(given) ? given : n;
+    });
+  };
+
+  /**
    * Word list items arrive flat, each with a level and an ordered flag. They
    * nest here: a deeper item opens a list inside the open item, a shallower one
    * closes back out, and a change of type at the same level closes the one list
@@ -95,9 +123,9 @@
    * item for the level in between to hang the list on.
    */
   function listHtml(items) {
-    var out = [], stack = [];
+    var out = [], stack = [], numbers = narrative.listNumbers(items);
     var open = function (tag) { out.push("<" + tag + ">"); stack.push(tag); };
-    (items || []).forEach(function (it) {
+    (items || []).forEach(function (it, i) {
       var level = Math.max(0, parseInt(it && it.level, 10) || 0);
       var tag = it && it.ordered ? "ol" : "ul";
       if (!stack.length) {
@@ -115,7 +143,9 @@
           }
         }
       }
-      out.push("<li>" + runsHtml(runsOf(it)));
+      // an explicit value, so a list Word kept counting shows 3, not 1
+      out.push((numbers[i] === null ? "<li>" : '<li value="' + numbers[i] + '">') +
+        runsHtml(runsOf(it)));
     });
     while (stack.length) out.push("</li></" + stack.pop() + ">");
     return out.join("");
@@ -178,10 +208,15 @@
     }).join("");
   };
 
+  /** A list item as one plain line: "• text", or "3. text" when numbered. */
+  function itemLine(it, number) {
+    return (number === null ? "• " : number + ". ") + runsText(runsOf(it));
+  }
+
   /**
    * The same blocks as plain lines, for the deck. A paragraph, quote or
-   * sub-heading is one line, a list item is a bullet line, and a table row is
-   * its cells joined. Pictures carry no words and are left out.
+   * sub-heading is one line, a list item is a bullet (or numbered) line, and a
+   * table row is its cells joined. Pictures carry no words and are left out.
    *
    * @param {Array} blocks - the screen's blocks
    * @returns {string} lines joined with "\n"
@@ -193,7 +228,8 @@
       if (b.type === "subheading") lines.push(String(b.text || ""));
       if (b.type === "paragraph" || b.type === "quote") lines.push(runsText(runsOf(b)));
       if (b.type === "list") {
-        (b.items || []).forEach(function (it) { lines.push("• " + runsText(runsOf(it))); });
+        var numbers = narrative.listNumbers(b.items);
+        (b.items || []).forEach(function (it, i) { lines.push(itemLine(it, numbers[i])); });
       }
       if (b.type === "table") {
         (b.rows || []).forEach(function (row) {
@@ -202,6 +238,30 @@
       }
     });
     return lines.filter(function (l) { return l.trim(); }).join("\n");
+  };
+
+  /**
+   * The opening lines of a screen for the deck cover, which has room for a
+   * couple of lines only: paragraphs, quotes and list items in document order,
+   * as plain text. Sub-headings, tables and pictures are passed over, so a
+   * screen that opens with a heading or a table still puts its first words on
+   * the cover rather than the heading or a row of cells.
+   *
+   * @param {Array} blocks - the screen's blocks
+   * @param {number} max - how many lines at most
+   * @returns {Array} up to max non-empty lines
+   */
+  narrative.coverLines = function (blocks, max) {
+    var lines = [];
+    (Array.isArray(blocks) ? blocks : []).forEach(function (b) {
+      if (!b || typeof b !== "object") return;
+      if (b.type === "paragraph" || b.type === "quote") lines.push(runsText(runsOf(b)));
+      if (b.type === "list") {
+        var numbers = narrative.listNumbers(b.items);
+        (b.items || []).forEach(function (it, i) { lines.push(itemLine(it, numbers[i])); });
+      }
+    });
+    return lines.filter(function (l) { return l.trim(); }).slice(0, max);
   };
 
   /**

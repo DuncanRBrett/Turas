@@ -1383,18 +1383,48 @@
     var perLine = Math.max(1, Math.floor(width * 72 / (size * 0.5)));
     return Math.max(1, Math.ceil(String(text || "").length / perLine));
   }
+  // A narrative table row is never shorter than this, and adds this much to its
+  // lines for the cell margins (tableFrame: 0.01in top and bottom, 0.03in each
+  // side). A row grows with its words in PowerPoint, so the layout has to size
+  // it the same way or a table of sentences runs off the bottom of the slide.
+  var NAR_ROW_MIN = 0.32, NAR_ROW_PAD = 0.08, NAR_CELL_MARGIN = 0.06;
+
+  /** Estimated height of each table row, from its longest cell at the column
+   *  widths tableFrame gives (a first column of 28% up to 3.4in, the rest
+   *  equal). The same half-em estimate as the text, so it errs tall. */
+  function narTableRowHeights(rows, w, size) {
+    var nCols = rows.length ? rows[0].length : 1;
+    var labelW = Math.min(w * 0.28, 3.4);
+    var colW = (w - labelW) / Math.max(nCols - 1, 1);
+    return rows.map(function (cells) {
+      var lines = cells.reduce(function (m, c, i) {
+        return Math.max(m, narLines(c, (i === 0 ? labelW : colW) - NAR_CELL_MARGIN, size));
+      }, 1);
+      return Math.max(NAR_ROW_MIN, lines * narLineH(size) + NAR_ROW_PAD);
+    });
+  }
+  exporter._narTableRowHeights = narTableRowHeights;   // exposed for the node gate
+
   function narRunsText(runs) {
     return (runs || []).map(function (r) { return r && r.text != null ? String(r.text) : ""; })
       .join("");
   }
 
   /** A paragraph of Word runs, each keeping its own bold and italic, with an
-   *  optional bullet (o.bullet "char" | "num") at nesting level o.level. */
+   *  optional bullet (o.bullet "char" | "num") at nesting level o.level. A
+   *  numbered paragraph states its own number (o.number, startAt), because
+   *  PowerPoint counts from 1 in every text box: without it the second column
+   *  of a list, and every "(continued)" slide, would start again at 1. */
   function narrativePara(runs, o) {
     var level = Math.max(0, Math.min(o.level || 0, 8));
-    var marL = o.bullet ? 0.28 + level * 0.3 : 0;
+    // bullets and numbers share one text edge; a number hangs further out than
+    // a bullet, or "10." runs into its text
+    var hang = o.bullet === "num" ? 0.28 : 0.22;
+    var marL = o.bullet ? 0.34 + level * 0.3 : 0;
+    var number = parseInt(o.number, 10);
     var bullet = o.bullet === "num" ? '<a:buFont typeface="' + STYLE.FONT +
-        '"/><a:buAutoNum type="arabicPeriod"/>'
+        '"/><a:buAutoNum type="arabicPeriod"' +
+        (number > 0 ? ' startAt="' + number + '"' : "") + "/>"
       : o.bullet ? '<a:buFont typeface="' + STYLE.FONT + '"/><a:buChar char="•"/>'
       : "<a:buNone/>";
     var body = (runs || []).map(function (r) {
@@ -1404,7 +1434,7 @@
         { size: o.size, italic: !!(r && r.italic) });
     }).join("");
     return '<a:p><a:pPr marL="' + inch(marL) + '" indent="' +
-      (o.bullet ? -inch(0.22) : 0) + '"' + (level ? ' lvl="' + level + '"' : "") +
+      (o.bullet ? -inch(hang) : 0) + '"' + (level ? ' lvl="' + level + '"' : "") +
       '><a:spcAft><a:spcPts val="600"/></a:spcAft>' + bullet + "</a:pPr>" +
       (body || '<a:endParaRPr lang="en-US" dirty="0"/>') + "</a:p>";
   }
@@ -1421,12 +1451,14 @@
         h: narLines(chars, textW - (o.bullet ? 0.3 + (o.level || 0) * 0.3 : 0), size) *
           narLineH(size) + NAR_GAP });
     };
-    var listParas = function (items, width) {
-      return (items || []).map(function (it) {
+    // numbers are worked out over the WHOLE list before it is split into
+    // columns or slides, so each part carries on from the last
+    var listParas = function (items, width, numbers) {
+      return (items || []).map(function (it, i) {
         var lvl = Math.max(0, parseInt(it && it.level, 10) || 0);
         var t = narRunsText(it && it.runs);
         return { xml: narrativePara(it && it.runs, { size: SIZE.body, level: lvl,
-            bullet: it && it.ordered ? "num" : "char" }),
+            bullet: it && it.ordered ? "num" : "char", number: numbers[i] }),
           h: narLines(t, width - 0.3 - lvl * 0.3, SIZE.body) * narLineH(SIZE.body) + NAR_GAP };
       });
     };
@@ -1445,19 +1477,20 @@
           b.text || "");
       } else if (b.type === "list") {
         var items = b.items || [];
+        var numbers = TR.narrative.listNumbers(items);
         // a long list reads in two columns, as it does in Present. Split at a
         // top-level item so no sub-list is cut from its parent
         if (twoCols && items.length > 6) {
           var half = Math.ceil(items.length / 2);
           while (half < items.length && (parseInt(items[half].level, 10) || 0) > 0) half++;
           var colW = (textW - 0.4) / 2;
-          var left = listParas(items.slice(0, half), colW);
-          var right = listParas(items.slice(half), colW);
+          var left = listParas(items.slice(0, half), colW, numbers.slice(0, half));
+          var right = listParas(items.slice(half), colW, numbers.slice(half));
           var sum = function (ps) { return ps.reduce(function (a, p) { return a + p.h; }, 0); };
           els.push({ kind: "cols", left: left, right: right,
             h: Math.max(sum(left), sum(right)), items: items });
         } else {
-          listParas(items, textW).forEach(function (p) {
+          listParas(items, textW, numbers).forEach(function (p) {
             els.push({ kind: "text", xml: p.xml, h: p.h });
           });
         }
@@ -1569,7 +1602,9 @@
         while (cells.length < width) cells.push("");
         return cells;
       };
-      var rowH = 0.32, head = pad(rows[0]), body = rows.slice(1).map(pad);
+      var head = pad(rows[0]), body = rows.slice(1).map(pad);
+      var heights = narTableRowHeights([head].concat(body), textW, SIZE.tableSmall);
+      var headH = heights[0], bodyH = heights.slice(1);
       var matrixOf = function (chunk) {
         return { head: head, body: chunk.map(function (cells) {
           return { kind: "row", cells: cells };
@@ -1577,16 +1612,21 @@
       };
       var i = 0;
       do {
-        newPageIfNeeded(rowH * 2);
+        newPageIfNeeded(headH + (bodyH[i] || 0));
         flushText();
-        var room = Math.max(1, Math.floor((page.bottom - page.y) / rowH) - 1);
-        var chunk = body.slice(i, i + room);
-        var h = rowH * (chunk.length + 1);
+        // as many rows as fit under the repeated header, and always at least
+        // one, so a row taller than a slide still gets a slide of its own
+        var h = headH, end = i;
+        while (end < body.length && (end === i || page.y + h + bodyH[end] <= page.bottom)) {
+          h += bodyH[end];
+          end++;
+        }
+        var chunk = body.slice(i, end);
         page.xml += tableFrame(page.next(), { x: BODY.x, y: page.y, w: textW, h: h },
           matrixOf(chunk), brand, SIZE.tableSmall);
         page.y += h + 0.18;
         page.empty = false;
-        i += chunk.length;
+        i = end;
         if (i < body.length) { closePage(); openPage(); }
       } while (i < body.length);
     };

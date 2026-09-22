@@ -173,7 +173,8 @@ run("N1: every block kind from the Word fixture renders", () => {
   at(bg, '<h4 class="nar-sub">How we asked</h4>', "Heading 2 is a sub-heading");
   at(bg, "<ul><li>Online survey<ul><li>Invites by email</li></ul></li>" +
     "<li>Two reminders</li></ul>", "a level-1 item nests inside its parent");
-  at(bg, "<ol><li>First step</li><li>Second step</li></ol>", "a numbered list");
+  at(bg, '<ol><li value="1">First step</li><li value="2">Second step</li></ol>',
+    "a numbered list, each item with the number Word shows");
   at(bg, '<table class="nar-table"><tbody><tr><td>Group</td><td>n</td><td>%</td></tr>' +
     "<tr><td>Staff</td><td>136</td><td>58% of invites</td></tr></tbody></table>",
     "a simple table, text cells by row");
@@ -196,16 +197,39 @@ run("N1: list nesting survives level jumps and a change of list type", () => {
     "a jump of two levels reads as one");
   eq(TR.narrative.blocksHtml([{ type: "list", items: [
     item(0, false, "a"), item(1, true, "b"), item(1, true, "c"), item(0, false, "d")] }]),
-    "<ul><li>a<ol><li>b</li><li>c</li></ol></li><li>d</li></ul>",
+    '<ul><li>a<ol><li value="1">b</li><li value="2">c</li></ol></li><li>d</li></ul>',
     "a numbered list inside a bulleted one");
   eq(TR.narrative.blocksHtml([{ type: "list", items: [
     item(0, false, "a"), item(0, true, "b")] }]),
-    "<ul><li>a</li></ul><ol><li>b</li></ol>",
+    '<ul><li>a</li></ul><ol><li value="1">b</li></ol>',
     "a change of type at the same level closes one list and opens the other");
   eq(TR.narrative.blocksHtml([{ type: "list", items: [
     item(0, false, "a"), item(1, false, "b"), item(2, false, "c"), item(0, false, "d")] }]),
     "<ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li><li>d</li></ul>",
     "closing two levels at once");
+});
+
+run("N1: a numbered list keeps Word's numbers across an interrupting paragraph", () => {
+  const TR = sandbox({}).TR;
+  const num = (text, n) => Object.assign(item(0, true, text), { number: n });
+  const html = TR.narrative.blocksHtml([
+    { type: "list", items: [num("One", 1), num("Two", 2)] },
+    { type: "paragraph", runs: [run1("An aside.")] },
+    { type: "list", items: [num("Three", 3)] }]);
+  at(html, '<ol><li value="3">Three</li></ol>', "the third item still reads 3");
+  eq(TR.narrative.blocksText([{ type: "list", items: [num("Three", 3)] }]), "3. Three",
+    "and so does its plain line");
+});
+
+run("N1: without Word's numbers, items are counted as the nested list reads", () => {
+  const TR = sandbox({}).TR;
+  // known answer: a(1) b(1, a new level) c(2) d(2, back to the outer list)
+  // e (a bullet) f(1, the numbered list restarts after the change of type)
+  eq(TR.narrative.listNumbers([item(0, true, "a"), item(1, true, "b"), item(1, true, "c"),
+    item(0, true, "d"), item(0, false, "e"), item(0, true, "f")]),
+    [1, 1, 2, 2, null, 1], "counted per level, restarting under a new parent");
+  eq(TR.narrative.listNumbers([Object.assign(item(0, true, "x"), { number: 7 }),
+    item(0, true, "y")]), [7, 8], "a given number is carried on from");
 });
 
 run("N1: every authored value is escaped and no markup is honoured", () => {
@@ -243,6 +267,7 @@ run("N1: blocksText is the same blocks as plain lines", () => {
   eq(t[0], "This study has 136 responses and two sections.", "runs joined, no markup");
   assert(t.indexOf("How we asked") > 0, "the sub-heading is a line");
   assert(t.indexOf("• Invites by email") > 0, "a list item is a bullet line");
+  assert(t.indexOf("2. Second step") > 0, "a numbered item keeps its number");
   assert(t.indexOf("Staff | 136 | 58% of invites") > 0, "a table row is its cells");
   assert(TR.narrative.blocksText(FIX.word[1].blocks).indexOf("data:image") === -1,
     "pictures carry no words");
@@ -437,7 +462,9 @@ run("N5: bullets keep their nesting and numbering; sub-headings are brand", () =
   at(paraOf("Online survey"), '<a:buChar char="•"/>', "a bullet");
   assert(paraOf("Online survey").indexOf("lvl=") === -1, "top level");
   at(paraOf("Invites by email"), 'lvl="1"', "the sub-bullet is nested");
-  at(paraOf("First step"), '<a:buAutoNum type="arabicPeriod"/>', "a numbered list numbers");
+  at(paraOf("First step"), '<a:buAutoNum type="arabicPeriod" startAt="1"/>',
+    "a numbered list numbers, stating each item's number");
+  at(paraOf("Second step"), 'startAt="2"', "the second item is 2");
   at(paraOf("A paragraph between lists."), "<a:buNone/>", "a paragraph has no bullet");
   const sub = runWith(x, "How we asked");
   assert(/ b="1"/.test(sub), "the sub-heading is bold");
@@ -529,6 +556,79 @@ run("N5: a long list reads in two columns, split at a top-level item", () => {
     "beside a picture the list stays one column");
 });
 
+/** Every numbered paragraph's startAt on a slide, in order. */
+const startsOf = (x) => [...x.matchAll(/<a:buAutoNum type="arabicPeriod" startAt="(\d+)"\/>/g)]
+  .map((m) => Number(m[1]));
+
+run("N5: a numbered list's second column carries on from the first", () => {
+  const sb = sandbox({});
+  const items = Array.from({ length: 10 }, (_, i) => item(0, true, "Rec " + (i + 1)));
+  const x = xmlOf(slidesOf(sb, { id: "n", title: "N", blocks: [{ type: "list", items }] })[0]);
+  const boxes = x.split("<p:txBody>").slice(1).filter((b) => b.indexOf("<a:t>Rec") >= 0);
+  eq(boxes.length, 2, "two columns");
+  eq(startsOf(boxes[0]), [1, 2, 3, 4, 5], "left column");
+  eq(startsOf(boxes[1]), [6, 7, 8, 9, 10], "right column starts at 6, not 1");
+});
+
+run("N5: a numbered list carried onto a continued slide keeps its numbers", () => {
+  const sb = sandbox({});
+  const long = "A recommendation long enough to take a couple of lines on the slide, " +
+    "so that forty of them cannot fit on one.";
+  const items = Array.from({ length: 40 }, (_, i) =>
+    Object.assign(item(0, true, "R" + (i + 1) + " " + long), { number: i + 1 }));
+  const slides = slidesOf(sb, { id: "n", title: "N", blocks: [{ type: "list", items }] });
+  assert(slides.length > 1, "the list needed more than one slide");
+  eq(slides.map(xmlOf).flatMap(startsOf), Array.from({ length: 40 }, (_, i) => i + 1),
+    "1 to 40 across the slides, never restarting");
+  const second = xmlOf(slides[1]);
+  const first = Number(/<a:t>R(\d+) /.exec(second)[1]);
+  eq(startsOf(second)[0], first, "the continued slide opens on its own item's number");
+});
+
+run("N5: table rows are sized by their words (known answer)", () => {
+  const rh = sandbox({}).TR.exporter._narTableRowHeights;
+  // a short row is the 0.32in minimum
+  eq(rh([["a", "b"]], 10, 9.5), [0.32], "a short row");
+  // 200 characters in the second column: 10in wide, first column 2.8in, so the
+  // column is 7.2in less 0.06in of margins = 7.14in = 514pt; at half of 9.5pt a
+  // character that is 108 characters a line, so 2 lines of 9.5 * 1.25 / 72 in
+  // plus 0.08in of padding
+  const h = rh([["a", "x".repeat(200)]], 10, 9.5)[0];
+  assert(Math.abs(h - (2 * 9.5 * 1.25 / 72 + 0.08)) < 1e-9, "two lines, got " + h);
+});
+
+run("N5: a table of sentences breaks before the bottom of the slide", () => {
+  const sb = sandbox({});
+  const BODY = sb.TR.pptx.STYLE.BODY, EMU = 914400;
+  const sentence = "Satisfaction among recent graduates fell for the third wave running, " +
+    "driven by slow support and repeated document rejections in the app. ";
+  const rows = [["Theme", "What they said", "What to do"]].concat(Array.from({ length: 13 },
+    (_, i) => ["Theme " + (i + 1), sentence + sentence, sentence + sentence]));
+  const slides = slidesOf(sb, { id: "t", title: "T", blocks: [{ type: "table", rows }] });
+  assert(slides.length >= 3, "13 rows of sentences need several slides, got " + slides.length);
+  slides.map(xmlOf).forEach((x, k) => {
+    const m = /<p:graphicFrame>[\s\S]*?<a:off x="\d+" y="(\d+)"\/><a:ext cx="\d+" cy="(\d+)"\/>/.exec(x);
+    assert(m, "slide " + k + " has its table part");
+    assert((Number(m[1]) + Number(m[2])) / EMU <= BODY.y + BODY.h + 1e-6,
+      "slide " + k + ": the table ends inside the body");
+  });
+  const texts = allText(slides);
+  for (let i = 1; i <= 13; i++) {
+    eq(texts.filter((t) => t === "Theme " + i).length, 1, "row " + i + " once");
+  }
+});
+
+run("N4: the deck cover quotes a screen's first words, not a heading or a table", () => {
+  const TR = sandbox({}).TR;
+  const lines = TR.narrative.coverLines([
+    { type: "subheading", text: "In a nutshell" },
+    { type: "table", rows: [["a", "b"]] },
+    { type: "list", items: [item(0, false, "Stable ratings"),
+      Object.assign(item(0, true, "Fix support"), { number: 1 }), item(0, false, "Third")] }], 2);
+  eq(lines, ["• Stable ratings", "1. Fix support"], "the first two list lines");
+  eq(TR.narrative.coverLines([], 2), [], "an empty screen gives nothing");
+});
+
 run("N5: every run on a narrative slide is Arial", () => {
   const sb = sandbox({});
   const x = sb.TR.narrative.screens().map((sc) => slidesOf(sb, sc).map(xmlOf).join("")).join("");
@@ -542,8 +642,10 @@ run("N4: the deck cover quotes the first screen through the same blocks", () => 
   const real = sb.TR.exporter.coverSlide;
   sb.TR.exporter.coverSlide = (s) => { spec = s; return real(s); };
   sb.TR.story2._slidesFor([]);
-  eq(spec.exec, sb.TR.narrative.blocksText(sb.TR.narrative.byId("executive-summary").blocks),
-    "the cover text is blocksText of the cover screen");
+  eq(spec.exec, sb.TR.narrative.coverLines(
+    sb.TR.narrative.byId("executive-summary").blocks, 2).join("\n"),
+    "the cover text is the cover screen's first two lines");
+  eq(spec.exec, 'Ratings are stable.\n"Culture varies by campus."', "the first two lines");
   eq(spec.exec.split("\n")[0], "Ratings are stable.",
     "the executive summary, not the background");
   const none = sandbox({ narrative: undefined });

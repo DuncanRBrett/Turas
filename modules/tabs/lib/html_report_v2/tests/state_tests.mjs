@@ -324,6 +324,26 @@ run("seed: legacy un-owned local state with pins is left alone", () => {
   eq(a.TR.story2.items()[0].title, "Mine", "the reader's pin stands");
 });
 
+run("seed: importing a story does not show a seeded screen twice", () => {
+  const a = bootScreens(null);
+  eq(a.TR.story2.items().length, 2, "the fresh story is seeded");
+  a.TR.story2.merge([
+    { kind: "narrative", screen: "executive-summary", heading: "Executive summary",
+      note: "Lead with this." },
+    { kind: "narrative", screen: "background", heading: "Background", note: "" },
+    { kind: "divider", title: "Findings", note: "" }]);
+  const items = a.TR.story2.items();
+  eq(screensOf(items.filter((it) => it.kind === "narrative")),
+    "narrative:background,narrative:executive-summary", "each screen once, in its place");
+  eq(items[1].note, "Lead with this.", "the imported commentary replaced the bare pin");
+  eq(items.length, 3, "and the divider was added");
+  // a screen pinned twice on purpose, each with its own commentary, stays twice
+  a.TR.story2.merge([{ kind: "narrative", screen: "executive-summary",
+    heading: "Executive summary", note: "A second take." }]);
+  eq(a.TR.story2.items().filter((it) => it.screen === "executive-summary").length, 2,
+    "an annotated pin is never overwritten");
+});
+
 run("seed: no narrative on the island, no seed", () => {
   eq(bootScreens(null, null, []).TR.story2.items().length, 0, "nothing to seed");
   eq(boot(["30_story.js"], null).TR.story2.items().length, 0,

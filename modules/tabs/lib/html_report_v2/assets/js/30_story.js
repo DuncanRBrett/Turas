@@ -79,14 +79,35 @@
 
   story2.items = function () { return load(); };
 
+  /** Import pins (an insights sidecar), never deleting any. An identical pin
+   *  is not added twice. An imported narrative pin whose screen is already
+   *  pinned without commentary takes that pin's place, commentary and all, so
+   *  a fresh report (whose story opens seeded with bare screens) does not end
+   *  up showing each screen twice. */
   story2.merge = function (incoming) {
     var have = {};
     load().forEach(function (item) { have[JSON.stringify(item)] = true; });
     (incoming || []).forEach(function (item) {
-      if (!have[JSON.stringify(item)]) load().push(item);
+      if (have[JSON.stringify(item)]) return;
+      var bare = item && item.kind === "narrative" ? bareScreenPin(item.screen) : -1;
+      if (bare >= 0) load()[bare] = item;
+      else load().push(item);
+      have[JSON.stringify(item)] = true;
     });
     touch();
   };
+
+  /** Index of a narrative pin to this screen with no commentary, or -1. */
+  function bareScreenPin(screen) {
+    var list = load();
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (it && it.kind === "narrative" && it.screen === screen && !String(it.note || "").trim()) {
+        return i;
+      }
+    }
+    return -1;
+  }
 
   /* ---------------- pin creators ---------------- */
 
@@ -806,8 +827,10 @@
       return it.kind !== "divider" && it.kind !== "narrative" &&
         !(TR.reader && TR.reader.isCoverSectionPin && TR.reader.isCoverSectionPin(it));
     }).slice(0, 5).map(function (it) { return story2.pinTitle(it); });
+    // the cover has room for two lines: the screen's first words, never a
+    // sub-heading or a row of table cells (TR.narrative.coverLines)
     var lead = TR.narrative ? TR.narrative.coverScreen() : null;
-    var exec = lead ? TR.narrative.blocksText(lead.blocks).trim() : "";
+    var exec = lead ? TR.narrative.coverLines(lead.blocks, 2).join("\n") : "";
     return TR.exporter.coverSlide({ exec: exec, findings: findings });
   }
 
