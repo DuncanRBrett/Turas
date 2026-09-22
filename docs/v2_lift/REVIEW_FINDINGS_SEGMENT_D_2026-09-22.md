@@ -94,6 +94,8 @@ Three further mutations tested this review's own work and the one fix that had n
 | MR1 | my D1 wording fix | FAIL 1. My test catches it. |
 | MR2 | the collision guard again, after my D5 test | FAIL 3. The M7 gap is closed. |
 | MR3 | the F17 intro sentence, back to the false claim | FAIL 0, PASS 1355 on the FULL suite. Finding D11. |
+| MR4 | the D9 skip, after Duncan's ruling | FAIL 13. Caught. |
+| MR5 | the D10 exploration refusal, after Duncan's ruling | FAIL 2. Caught. |
 
 
 ## 3. Claims in the brief, one by one
