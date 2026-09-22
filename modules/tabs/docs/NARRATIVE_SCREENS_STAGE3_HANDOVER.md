@@ -14,6 +14,18 @@
 > template regeneration also brought in about ten generator rows the shipped
 > binary had fallen behind on (see b0f82755).
 
+> **Independent review fixes** (22 Sep 2026, uncommitted at the time of
+> writing): numbered lists keep their numbers in the deck's second column and
+> on "(continued)" slides, and across an interrupting paragraph everywhere (the
+> reader now emits each ordered item's `number`); deck table rows are sized by
+> their words, so a table of sentences no longer runs off the slide; heading
+> and quote styles are found through `basedOn`; screen ids for headings with no
+> ASCII letters, or that differ only in punctuation, come from the heading's
+> own wording, not its position; a document with no Heading 1 says so in the
+> console; the deck cover quotes the cover screen's first lines, never a
+> sub-heading or table row; importing a story does not duplicate a seeded
+> screen; the shipped template is gated against the generator.
+
 Written 22 September 2026 at the end of the stage 2 session. Read this with
 `NARRATIVE_SCREENS_BRIEF.md` (the settled design) before touching code. This
 note says what exists, what was decided after the brief, and exactly what
