@@ -510,6 +510,47 @@ Any tab can be switched off per-report from Settings
 - **Export as PNG**. Click the camera icon to download a table as an image
 - **Chart palette**. Set `chart_palette_preset` in your config to change the ordinal chart colours across the entire report
 
+### The executive summary from a Word document
+
+Write the report's Background, Executive summary and any other summary
+screens in Word, save the file in the project folder, and name it in the
+Settings sheet's `narrative_file` (a path relative to the config file). Leave
+the setting blank and the Comments sheet's `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
+rows are used exactly as before.
+
+**How the document is read.** Each Heading 1 starts a screen, and its text is
+the screen's title. Inside a screen Turas keeps:
+
+- Heading 2, as a sub-heading
+- ordinary paragraphs, with bold and italic
+- bulleted and numbered lists, with their nesting
+- the Quote style, as a highlighted band
+- pictures (PNG, JPEG or GIF, up to 1.5 MB each), where they sit in the text
+- simple tables: words only, no merged cells
+
+Everything else is skipped, and the console names what was skipped and how
+many: text boxes, shapes, SmartArt, native Word charts, footnotes, comments,
+headers and footers, and embedded objects. Tracked changes are read as if
+accepted, a hyperlink keeps its words, Heading 3 and below read as ordinary
+paragraphs, and anything before the first Heading 1 is not read. A document
+with no headings at all is one screen titled "Executive summary". Charts and
+result tables belong in Turas, not in Word: pin the Turas chart after the
+screen it supports.
+
+**Where the screens appear.** Each screen is a card on the **Report** tab with
+a 📌 pin. A pin is a reference to the screen, not a copy, so when you edit the
+Word file and regenerate, every pin shows the new wording. A section that is
+renamed or deleted in Word leaves its pin saying the screen is no longer in the
+report. A new story starts with every screen pinned, in document order; after
+that they are ordinary pins, so a section added to Word later is pinned by
+hand. In Present each screen is laid out as a slide, and the PowerPoint export
+gives it a text slide of its own (with "continued" slides when the words need
+more room, and its pictures and tables).
+
+**The cover.** A saved copy's cover (`html_report_v2_cover`) opens with the
+first screen whose heading starts "Executive summary", or with the first
+screen when no heading does. The exported deck's cover quotes the same screen.
+
 ### Added Slides
 
 On the **Report** tab, the "Added slides" card lets you bring in material
@@ -519,10 +560,10 @@ Picture*), or short text blocks with a caption. Use **+ Import image** or
 **+ Text block**, then edit the caption inline. Added slides persist in
 the browser and travel inside any saved copy of the report.
 
-For narrative that should come from the config instead of being typed in
-the browser, background & method, executive summary, use the
-**Comments** sheet's reserved `_BACKGROUND` / `_EXECUTIVE_SUMMARY` rows;
-see [Template Reference](06_TEMPLATE_REFERENCE.md). A third reserved row,
+For narrative that should come from the project instead of being typed in
+the browser, background & method and executive summary, use a Word document
+(above) or the **Comments** sheet's reserved `_BACKGROUND` /
+`_EXECUTIVE_SUMMARY` rows; see [Template Reference](06_TEMPLATE_REFERENCE.md). A third reserved row,
 `_REPORT_CONSTRUCTION`, states how the study's numbers were actually built when
 other stages sit around Turas. A derived engine ahead of it, a preparation
 layer, pages that compute in the browser. It replaces the whole *Report

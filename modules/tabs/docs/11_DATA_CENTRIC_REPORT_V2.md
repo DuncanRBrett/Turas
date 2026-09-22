@@ -150,9 +150,15 @@ is hand-retyped:
   `AGG.comments[code] = [{banner, text}]` and pre-fills that question's *Analyst
   insight* box (`TR.insights.get` falls back to the config comment, banner-
   specific first then general). The analyst's own edit overrides it.
-- **Background & method** and **Executive summary**: the reserved `_BACKGROUND`
-  and `_EXECUTIVE_SUMMARY` rows ride in `project.report_meta.background` /
-  `.exec_summary` and pre-fill those (editable) Report-tab sections.
+- **Background & method**, **Executive summary** and any other summary
+  screens ride in `project.narrative`, a list of screens `{id, title, blocks}`.
+  They come from the Word document named by `narrative_file`, read by
+  `narrative_reader.R`, or, when that setting is blank, from the reserved
+  `_BACKGROUND` and `_EXECUTIVE_SUMMARY` rows converted to the same shape.
+  `TR.narrative` (`24b_narrative.js`) renders them once for the read-only
+  Report-tab cards, the cover, the story card and Present; the deck slide is
+  `exporter.narrativeSlides`. A pin is `{kind: "narrative", screen}`, a
+  reference. The rows are still carried in `project.report_meta` too.
 - **About this report** is **read-only**. Analyst, contact and disclaimers come
   straight from the config (`report_meta`) and are displayed, not edited.
 

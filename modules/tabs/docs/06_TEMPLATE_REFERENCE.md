@@ -879,7 +879,8 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | `sampling_method` | Sample design. Drives honest CI vocabulary. Probability designs (Random / Stratified / Cluster / Census) → CI/MOE; everything else → stability/PE | Not_Specified / Random / Stratified / Cluster / Census / Quota / Online_Panel / Convenience | Not_Specified |
 | `wave` | Wave label (v2 header + tracking trend label) | Text, e.g. `Wave 25 - May 2026` | (none) |
 | `html_report_v2_tracking` | Add a Tracking tab built from per-wave microdata. Needs `html_report_v2=TRUE` + a `waves_source` | TRUE / FALSE | FALSE |
-| `html_report_v2_cover` | Open **saved copies** on a cover page: report title, the Comments sheet's background and executive summary, and your Story pins as leading findings. Affects only copies made with *Save copy*, and only when there is story content to show. Your own generated report always lands on the dashboard | TRUE / FALSE | FALSE |
+| `html_report_v2_cover` | Open **saved copies** on a cover page: report title, the executive summary (the first narrative screen whose heading starts "Executive summary", otherwise the first screen), and your Story pins as leading findings. Affects only copies made with *Save copy*, and only when there is story content to show. Your own generated report always lands on the dashboard | TRUE / FALSE | FALSE |
+| `narrative_file` | Word document (.docx) holding the report's Background, Executive summary and any other summary screens. Each Heading 1 starts a screen on the Report tab. The path is relative to this config file. A file that is named but missing refuses the run. See [User Manual](04_USER_MANUAL.md), "The executive summary from a Word document" | Path to a `.docx`, or blank | *(blank: the Comments sheet's `_BACKGROUND` / `_EXECUTIVE_SUMMARY` rows)* |
 | `html_report_v2_cover_findings` | How many Story pins the cover lists. `ALL` lists every pin. When the cover does stop short it says so on the page ("Showing 5 of 12 pinned findings"). The exported PowerPoint cover is one slide and always shows the first 5 | Whole number ≥ 1, or `ALL` | 5 |
 | `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |
 | `wave_order` | Numeric x-axis order key (e.g. `2025.5` for twice-yearly) | Number | *(year parsed from `wave`)* |
@@ -2274,12 +2275,13 @@ question card:
 
 | QuestionCode | Fills |
 |--------------|-------|
-| `_BACKGROUND` | The Report tab's *Background & method* card |
-| `_EXECUTIVE_SUMMARY` | The Report tab's *Executive summary* card |
+| `_BACKGROUND` | The Report tab's *Background & method* card, when `narrative_file` is blank. Blank here with `fieldwork_dates` set gives a one-line "Fieldwork: ..." background |
+| `_EXECUTIVE_SUMMARY` | The Report tab's *Executive summary* card, when `narrative_file` is blank |
 | `_REPORT_CONSTRUCTION` | The whole *Report construction* section of the About card |
 
 The first two are read-only in the report (edit the config to change them) and
-each is pinnable (📌) to the Story. See
+each is pinnable (📌) to the Story. When the Settings sheet names a
+`narrative_file`, the Word document replaces both rows. See
 [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) ("Narrative
 pulled from the config" section).
 
