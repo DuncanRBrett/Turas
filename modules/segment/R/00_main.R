@@ -378,7 +378,10 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
         data = data_list$data[keep, , drop = FALSE],
         clusters = cluster_result$clusters[keep],
         demo_vars = config$demographic_vars,
-        segment_names = segment_names
+        segment_names = segment_names,
+        # So the section can say when a demographic also built the segments
+        # (independent review 2026-09-22, D7).
+        clustering_vars = data_list$config$clustering_vars
       )
     }, error = function(e) {
       guard <<- guard_warn(guard, paste("Demographic profiling failed:", e$message),

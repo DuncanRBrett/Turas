@@ -242,7 +242,12 @@ test_that("a numeric demographic renders its own table", {
   html <- as.character(build_seg_demographics_section(tables, hd))
   expect_true(grepl("age_years", html, fixed = TRUE))
   expect_true(grepl("51.2", html, fixed = TRUE))
-  expect_true(grepl("carry no test", html, fixed = TRUE))
+  # The numeric tables used to say they carried no test, because the ANOVA was
+  # computed and discarded. Since the D8 fix they carry one, with the same
+  # in-sample caveat the chi-square gets.
+  expect_false(grepl("carry no test", html, fixed = TRUE))
+  expect_true(grepl("one-way", html, ignore.case = TRUE))
+  expect_true(grepl("derived from this same sample", html, fixed = TRUE))
 })
 
 
@@ -657,4 +662,94 @@ test_that("D1: each table in the report carries its own answered base", {
     sheet = "Demographics_Bases", skipEmptyRows = FALSE)
   expect_setequal(bs$Variable, c("region", "gender"))
   expect_equal(bs$N_Answered[bs$Variable == "region"], n_reg)
+})
+
+
+# ------------------------------------------------------------------------------
+# 13. D4, D7, D8: the blank segment column, the circular variable, the ANOVA
+#     that was computed and thrown away.
+# ------------------------------------------------------------------------------
+
+test_that("D4: a segment that answered nothing is named, not left as a dash", {
+  # One whole segment blank on a demographic gives that column NaN, which
+  # renders as a dash. The dash used to arrive with no explanation.
+  clusters <- rep(1:3, times = c(120, 100, 80))
+  car <- c("Yes", "No")[1 + (seq_along(clusters) %% 2)]
+  car[clusters == 2] <- NA
+  hd <- list(
+    k = 3, segment_names = c("A", "B", "C"),
+    segment_sizes = data.frame(segment_id = 1:3, segment_name = c("A", "B", "C"),
+                               n = c(120L, 100L, 80L), pct = c(40, 33, 27),
+                               stringsAsFactors = FALSE),
+    enhanced = list(demographic_profiles = NULL))
+  capture.output(prof <- profile_demographics(
+    data.frame(has_car = car, stringsAsFactors = FALSE), clusters, "has_car",
+    segment_names = c("A", "B", "C")))
+  hd$enhanced$demographic_profiles <- prof
+
+  tables <- list(demographics = build_seg_demographics_table(hd),
+                 demographics_numeric = build_seg_demographics_numeric_table(hd))
+  html <- as.character(build_seg_demographics_section(tables, hd))
+
+  expect_true(grepl("No one in B answered", html, fixed = TRUE))
+})
+
+test_that("D7: a demographic that is also a clustering variable is flagged as circular", {
+  clusters <- rep(1:3, length.out = 300)
+  d <- data.frame(region = c("N", "S", "E")[clusters],
+                  q1 = rnorm(300, clusters), stringsAsFactors = FALSE)
+
+  capture.output(prof <- profile_demographics(
+    d, clusters, c("region", "q1"), clustering_vars = c("q1", "q2", "q3")))
+
+  expect_true("circular_vars" %in% names(prof))
+  expect_equal(prof$circular_vars, "q1")
+})
+
+test_that("D7: the section says so when a demographic built the segments", {
+  hd <- .demographics_html_data()
+  hd$enhanced$demographic_profiles$circular_vars <- "q1"
+  tables <- list(demographics = build_seg_demographics_table(hd),
+                 demographics_numeric = build_seg_demographics_numeric_table(hd))
+  html <- as.character(build_seg_demographics_section(tables, hd))
+
+  expect_true(grepl("were built from", html, fixed = TRUE))
+  expect_true(grepl("q1", html, fixed = TRUE))
+})
+
+test_that("D8: the numeric ANOVA is returned rather than printed and dropped", {
+  set.seed(4)
+  clusters <- rep(1:3, length.out = 300)
+  d <- data.frame(age_years = rnorm(300, mean = 30 + clusters * 8, sd = 5))
+
+  capture.output(prof <- profile_demographics(d, clusters, "age_years"))
+
+  expect_true("numeric_tests" %in% names(prof))
+  row <- prof$numeric_tests
+  expect_equal(nrow(row), 1L)
+  expect_equal(row$Variable, "age_years")
+  expect_false(is.na(row$F_Stat))
+  expect_true(isTRUE(row$Significant))
+  # A variable with no real difference is not significant.
+  set.seed(5)
+  d2 <- data.frame(age_years = rnorm(300, mean = 40, sd = 5))
+  capture.output(p2 <- profile_demographics(d2, clusters, "age_years"))
+  expect_false(isTRUE(p2$numeric_tests$Significant))
+})
+
+test_that("D8: the report shows the ANOVA and no longer says the tables carry no test", {
+  set.seed(6)
+  d <- .demographics_fixture()
+  d$age_years <- round(rnorm(nrow(d), 45, 12))
+  run <- .demographics_run(data = d, html_report = "TRUE",
+                           demographic_vars = "region,age_years")
+  html <- paste(readLines(file.path(run$out_dir, "seg_segmentation_report.html"),
+                          warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("carry no test", html, fixed = TRUE))
+  expect_true(grepl("One-way ANOVA", html, fixed = TRUE))
+
+  sheets <- openxlsx::getSheetNames(
+    file.path(run$out_dir, "seg_segmentation_report.xlsx"))
+  expect_true("Demographics_Numeric_Tests" %in% sheets)
 })

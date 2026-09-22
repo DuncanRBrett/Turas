@@ -736,6 +736,23 @@ build_seg_demographics_section <- function(tables, html_data) {
     )
   }
 
+  # A demographic that is also a clustering variable separates the segments by
+  # construction. Showing that separation without saying so reads as a finding
+  # about people (independent review 2026-09-22, D7).
+  circular <- demo$circular_vars %||% character(0)
+  circular_note <- if (length(circular) > 0) {
+    htmltools::tags$p(
+      class = "seg-footnote",
+      style = "margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
+      sprintf(
+        paste("The segments were built from %s, so %s separation below follows",
+              "from how the segments were made and is not a finding about the",
+              "people in them."),
+        paste(circular, collapse = ", "),
+        if (length(circular) == 1) "its" else "their")
+    )
+  }
+
   numeric_heading <- if (!is.null(num_el)) {
     htmltools::tags$h3(
       class = "seg-subsection-title",
@@ -749,9 +766,12 @@ build_seg_demographics_section <- function(tables, html_data) {
       class = "seg-footnote",
       style = "margin:6px 0 0; font-size:11px; color:#64748b; line-height:1.5;",
       paste(
-        "The numeric tables are descriptive: they carry no test.",
-        "A variable with more than ten distinct numeric values is summarised",
-        "this way rather than cross-tabulated."
+        "A variable with more than ten distinct numeric answers is summarised",
+        "this way rather than cross-tabulated. Each table carries a one-way",
+        "ANOVA across the segments, which is descriptive for the same reason",
+        "the chi-square is: the segments were derived from this same sample,",
+        "so the test describes this data rather than a claim made before the",
+        "segmentation."
       )
     )
   }
@@ -778,6 +798,7 @@ build_seg_demographics_section <- function(tables, html_data) {
     numeric_heading,
     num_el,
     numeric_note,
+    circular_note,
     empty_note,
     htmltools::tags$p(
       class = "seg-footnote",

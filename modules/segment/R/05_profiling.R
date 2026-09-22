@@ -465,7 +465,8 @@ make_names_unique <- function(names) {
 #'   demo_vars = c("gender", "age_group", "region", "income_bracket")
 #' )
 profile_demographics <- function(data, clusters, demo_vars,
-                                  segment_names = NULL) {
+                                  segment_names = NULL,
+                                  clustering_vars = NULL) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -531,6 +532,18 @@ profile_demographics <- function(data, clusters, demo_vars,
     } else {
       unsupported_vars <- c(unsupported_vars, var)
     }
+  }
+
+  # A demographic that is also a clustering variable separates the segments by
+  # construction, because the segments were built from it. That is the user's
+  # choice to make, but the report should not present the separation as a
+  # finding about people (independent review 2026-09-22, D7).
+  circular_vars <- intersect(available_vars, clustering_vars %||% character(0))
+  if (length(circular_vars) > 0) {
+    cat(sprintf(
+      "  Note: %s also built the segments, so any separation shown is circular: %s\n",
+      if (length(circular_vars) == 1) "this demographic" else "these demographics",
+      paste(circular_vars, collapse = ", ")))
   }
 
   if (length(unsupported_vars) > 0) {
@@ -678,6 +691,7 @@ profile_demographics <- function(data, clusters, demo_vars,
   # ===========================================================================
 
   numeric_profiles <- list()
+  numeric_tests <- list()
 
   if (length(numeric_vars) > 0) {
     for (var in numeric_vars) {
@@ -731,11 +745,27 @@ profile_demographics <- function(data, clusters, demo_vars,
         stringsAsFactors = FALSE
       )
 
-      # ANOVA test
+      # ANOVA test.
+      #
+      # Until September 2026 this was computed, printed and thrown away, so
+      # the numeric tables reached the report with no test at all and the
+      # section had to say they carried none (independent review 2026-09-22,
+      # D8). The result is returned now.
       tryCatch({
         anova_result <- aov(data[[var]] ~ as.factor(clusters))
-        anova_summary <- summary(anova_result)
-        p_value <- anova_summary[[1]]$`Pr(>F)`[1]
+        anova_summary <- summary(anova_result)[[1]]
+        p_value <- anova_summary$`Pr(>F)`[1]
+
+        numeric_tests[[var]] <- data.frame(
+          Variable = var,
+          F_Stat = round(anova_summary$`F value`[1], 2),
+          DF_Between = anova_summary$Df[1],
+          DF_Within = anova_summary$Df[2],
+          P_Value = format(p_value, scientific = TRUE, digits = 3),
+          Significant = p_value < 0.05,
+          Note = "",
+          stringsAsFactors = FALSE
+        )
 
         if (p_value < 0.05) {
           cat(sprintf("  ✓ Significant difference (p < 0.05)\n"))
@@ -743,7 +773,17 @@ profile_demographics <- function(data, clusters, demo_vars,
           cat(sprintf("    Not significant (p = %.3f)\n", p_value))
         }
       }, error = function(e) {
-        cat(sprintf("  Warning: ANOVA test failed\n"))
+        cat(sprintf("  Warning: ANOVA test failed: %s\n", conditionMessage(e)))
+        numeric_tests[[var]] <<- data.frame(
+          Variable = var,
+          F_Stat = NA_real_,
+          DF_Between = NA_real_,
+          DF_Within = NA_real_,
+          P_Value = NA_character_,
+          Significant = NA,
+          Note = paste("Not tested:", conditionMessage(e)),
+          stringsAsFactors = FALSE
+        )
       })
     }
   }
@@ -806,7 +846,9 @@ profile_demographics <- function(data, clusters, demo_vars,
     categorical_profiles = categorical_profiles,
     numeric_profiles = numeric_profiles,
     chi_sq_tests = chi_sq_combined,
+    numeric_tests = do.call(rbind, numeric_tests),
     bases = do.call(rbind, bases),
+    circular_vars = circular_vars,
     segment_names = segment_names
   ))
 }

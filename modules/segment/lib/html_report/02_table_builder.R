@@ -431,7 +431,10 @@ build_seg_demographics_table <- function(html_data) {
           htmltools::tags$tbody(rows)
         )
       ),
-      build_seg_demo_base_line(demo_data$bases, var_name)
+      build_seg_demo_base_line(
+        demo_data$bases, var_name,
+        blank_segments = seg_col_names[vapply(
+          seg_col_names, function(sn) all(is.na(prof_df[[sn]])), logical(1))])
     )
   })
 
@@ -456,24 +459,69 @@ build_seg_demographics_table <- function(html_data) {
 #' @param var_name The variable this table shows
 #' @return htmltools tag, or NULL when there is no base to state
 #' @keywords internal
-build_seg_demo_base_line <- function(bases, var_name) {
+build_seg_demo_base_line <- function(bases, var_name,
+                                     blank_segments = character(0),
+                                     test_line = NULL) {
 
-  if (is.null(bases) || !is.data.frame(bases)) return(NULL)
-  row <- bases[bases$Variable == var_name, , drop = FALSE]
-  if (nrow(row) != 1) return(NULL)
+  parts <- character(0)
 
-  text <- sprintf("Base: %d answered, of %d clustered.",
-                  row$N_Answered[1], row$N_Clustered[1])
-  if (!is.na(row$N_Blank[1]) && row$N_Blank[1] > 0) {
-    text <- paste(text, sprintf("%d left it blank and are not in the percentages.",
-                                row$N_Blank[1]))
+  if (!is.null(bases) && is.data.frame(bases)) {
+    row <- bases[bases$Variable == var_name, , drop = FALSE]
+    if (nrow(row) == 1) {
+      parts <- sprintf("Base: %d answered, of %d clustered.",
+                       row$N_Answered[1], row$N_Clustered[1])
+      if (!is.na(row$N_Blank[1]) && row$N_Blank[1] > 0) {
+        parts <- paste(parts,
+                       sprintf("%d left it blank and are not in the percentages.",
+                               row$N_Blank[1]))
+      }
+    }
   }
+
+  # A segment whose respondents all left this blank gets a column of dashes,
+  # because prop.table on an all-zero margin is NaN. The dash used to arrive
+  # with no explanation (independent review 2026-09-22, D4).
+  if (length(blank_segments) > 0) {
+    parts <- c(parts, sprintf(
+      "No one in %s answered it, so that column is blank.",
+      paste(blank_segments, collapse = ", ")))
+  }
+
+  if (!is.null(test_line) && nzchar(test_line)) parts <- c(parts, test_line)
+
+  if (length(parts) == 0) return(NULL)
 
   htmltools::tags$p(
     class = "seg-demo-base",
     style = "margin:4px 0 0; font-size:11px; color:#64748b;",
-    text
+    paste(parts, collapse = " ")
   )
+}
+
+
+#' One-line ANOVA statement for a numeric demographic
+#'
+#' `profile_demographics()` runs a one-way ANOVA per numeric demographic. It
+#' used to print the verdict and discard it, so the numeric tables reached the
+#' report with no test (independent review 2026-09-22, D8).
+#'
+#' @param numeric_tests The `numeric_tests` frame from profile_demographics()
+#' @param var_name The variable this table shows
+#' @return A single string, or NULL when there is no test to state
+#' @keywords internal
+build_seg_demo_anova_line <- function(numeric_tests, var_name) {
+
+  if (is.null(numeric_tests) || !is.data.frame(numeric_tests)) return(NULL)
+  row <- numeric_tests[numeric_tests$Variable == var_name, , drop = FALSE]
+  if (nrow(row) != 1) return(NULL)
+
+  if (is.na(row$F_Stat[1])) {
+    return(if (nzchar(row$Note[1] %||% "")) row$Note[1] else NULL)
+  }
+
+  sprintf("One-way ANOVA: F(%s, %s) = %s, p = %s, %s at the 5%% level.",
+          row$DF_Between[1], row$DF_Within[1], row$F_Stat[1], row$P_Value[1],
+          if (isTRUE(row$Significant[1])) "significant" else "not significant")
 }
 
 
@@ -487,10 +535,12 @@ build_seg_demo_base_line <- function(bases, var_name) {
 #' scale stays a cross-tab however many people skipped it (independent review
 #' 2026-09-22, D3).
 #'
-#' The frames carry no p-value. `profile_demographics()` runs a one-way ANOVA
-#' per numeric variable and prints the result to the console without returning
-#' it, so there is no test statistic to render without changing that
-#' function's return. The section says these tables are descriptive.
+#' The stats frame itself carries no p-value, because the test is one per
+#' variable rather than one per row. `profile_demographics()` runs a one-way
+#' ANOVA per numeric variable and, since September 2026, returns it in
+#' `numeric_tests`; it used to print the verdict and discard it, so these
+#' tables reached the report with no test at all (independent review
+#' 2026-09-22, D8). `build_seg_demo_anova_line()` states it under each table.
 #'
 #' @param html_data Transformed data from transform_segment_for_html()
 #' @return htmltools tag list, or NULL if there are no numeric demographics
@@ -546,7 +596,9 @@ build_seg_demographics_numeric_table <- function(html_data) {
           htmltools::tags$tbody(rows)
         )
       ),
-      build_seg_demo_base_line(demo_data$bases, var_name)
+      build_seg_demo_base_line(
+        demo_data$bases, var_name,
+        test_line = build_seg_demo_anova_line(demo_data$numeric_tests, var_name))
     )
   })
 

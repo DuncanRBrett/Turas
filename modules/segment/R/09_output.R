@@ -809,6 +809,13 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       sheets[["Demographics_Bases"]] <- bases_df
     }
 
+    # The one-way ANOVA per numeric demographic, which used to be printed to
+    # the console and discarded (independent review 2026-09-22, D8).
+    num_tests <- demo$numeric_tests
+    if (!is.null(num_tests) && is.data.frame(num_tests) && nrow(num_tests) > 0) {
+      sheets[["Demographics_Numeric_Tests"]] <- num_tests
+    }
+
     demo_frames <- c(demo$categorical_profiles %||% list(),
                      demo$numeric_profiles %||% list())
     for (var in names(demo_frames)) {
