@@ -328,6 +328,39 @@ build_narrative_fixture <- function(path) {
   write_narrative_docx(path, body, doc_rels = rels, media = media, extra_parts = extra)
 }
 
+# ---- the JS suites' island fixture ------------------------------------------
+
+#' The content of html_report_v2/tests/fixtures/narrative_island.json
+#'
+#' project.narrative exactly as the island carries it, for the reader's output
+#' on the committed fixture ("word") and for a small Comments fallback
+#' ("comments"). Each goes through the real island serializer and back, so the
+#' node suites see what a browser sees. test_narrative_reader.R compares the
+#' committed file with this and, with TURAS_REGEN_NARRATIVE_ISLAND=1 set,
+#' rewrites it. Needs the reader and data_layer_writer.R loaded.
+#'
+#' @param word_screens read_narrative_docx() on narrative_fixture.docx
+#' @return A list(_about, word, comments), as the JSON file holds it
+narrative_island_fixture <- function(word_screens) {
+  as_island <- function(screens) {
+    json <- as.character(serialize_data_layer(list(project = build_dl_project(
+      list(narrative = screens)))))
+    jsonlite::fromJSON(json, simplifyVector = FALSE)$project$narrative
+  }
+  attr(word_screens, "ignored") <- NULL
+  list(
+    `_about` = paste(
+      "project.narrative exactly as the R build emits it (the island serializer).",
+      "'word' is read_narrative_docx() on",
+      "modules/tabs/tests/fixtures/narrative/narrative_fixture.docx; 'comments' is",
+      "narrative_from_comments('Why we ran it.\\n\\n- one\\n- two', 'First.\\nSecond.').",
+      "Never edit by hand: rerun test_narrative_reader.R with",
+      "TURAS_ROOT set and TURAS_REGEN_NARRATIVE_ISLAND=1."),
+    word = as_island(word_screens),
+    comments = as_island(narrative_from_comments("Why we ran it.\n\n- one\n- two",
+                                                 "First.\nSecond.")))
+}
+
 if (sys.nframe() == 0) {
   here <- file.path("modules", "tabs", "tests", "fixtures", "narrative")
   if (!dir.exists(here)) {

@@ -1,5 +1,5 @@
 {
-  "_about": "project.narrative exactly as the R build emits it (jsonlite::toJSON, auto_unbox = TRUE). 'word' is read_narrative_docx() on modules/tabs/tests/fixtures/narrative/narrative_fixture.docx; 'comments' is narrative_from_comments('Why we ran it.\\n\\n- one\\n- two', 'First.\\nSecond.'). Regenerate both from the R reader if the block schema changes; never edit by hand.",
+  "_about": "project.narrative exactly as the R build emits it (the island serializer). 'word' is read_narrative_docx() on modules/tabs/tests/fixtures/narrative/narrative_fixture.docx; 'comments' is narrative_from_comments('Why we ran it.\\n\\n- one\\n- two', 'First.\\nSecond.'). Never edit by hand: rerun test_narrative_reader.R with TURAS_ROOT set and TURAS_REGEN_NARRATIVE_ISLAND=1.",
   "word": [
     {
       "id": "background-method",
@@ -119,7 +119,8 @@
                   "bold": false,
                   "italic": false
                 }
-              ]
+              ],
+              "number": 1
             },
             {
               "level": 0,
@@ -130,7 +131,8 @@
                   "bold": false,
                   "italic": false
                 }
-              ]
+              ],
+              "number": 2
             }
           ]
         },

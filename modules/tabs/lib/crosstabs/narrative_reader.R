@@ -17,7 +17,8 @@
 #   subheading  list(type, text)                        Heading 2
 #   paragraph   list(type, runs)                        Normal text
 #   quote       list(type, runs)                        Quote style
-#   list        list(type, items = list(list(level, ordered, runs)))
+#   list        list(type, items = list(list(level, ordered, runs, number?)))
+#               number: the number Word shows, on ordered items only
 #   image       list(type, src, alt?, width?, height?)  embedded picture
 #   table       list(type, rows = list(list("cell", ...))) text cells only
 # A run is list(text, bold, italic).
@@ -214,6 +215,7 @@ read_narrative_docx <- function(path) {
   ctx <- new.env(parent = emptyenv())
   ctx$parts <- parts
   ctx$counts <- counts
+  ctx$list_counters <- list()   # numId -> the count at each list level
 
   screens <- tryCatch({
     out <- .narrative_assemble(ctx)
@@ -307,7 +309,10 @@ read_narrative_docx <- function(path) {
     by_id[[id]] <- list(
       name = if (is.na(name)) "" else tolower(trimws(name)),
       based_on = xml2::xml_attr(xml2::xml_find_first(s, "w:basedOn", ns), "w:val", ns),
-      num = if (inherits(num_node, "xml_missing")) NULL else .narrative_numpr(num_node)
+      num = if (inherits(num_node, "xml_missing")) NULL else .narrative_numpr(num_node),
+      # Word's outline level, 0 = level 1. NA when the style does not set one.
+      outline = suppressWarnings(as.integer(xml2::xml_attr(
+        xml2::xml_find_first(s, "w:pPr/w:outlineLvl", ns), "w:val", ns)))
     )
     if (identical(xml2::xml_attr(s, "w:default", ns), "1")) default <- id
   }
@@ -343,6 +348,51 @@ read_narrative_docx <- function(path) {
   !is.na(fmt) && !(fmt %in% c("bullet", "none"))
 }
 
+#' The number a list level starts counting from (w:start), 1 when unset
+#'
+#' A startOverride on the list instance wins, then a level redefined on the
+#' instance, then the abstract definition's level.
+#' @keywords internal
+.narrative_level_start <- function(numbering, num_id, ilvl) {
+  if (is.null(numbering)) return(1L)
+  ns <- .NARRATIVE_NS
+  num <- xml2::xml_find_first(numbering, sprintf("//w:num[@w:numId='%s']", num_id), ns)
+  if (inherits(num, "xml_missing")) return(1L)
+  over <- sprintf("w:lvlOverride[@w:ilvl='%d']", ilvl)
+  val <- xml2::xml_attr(xml2::xml_find_first(num, paste0(over, "/w:startOverride"), ns), "w:val", ns)
+  if (is.na(val)) {
+    val <- xml2::xml_attr(xml2::xml_find_first(
+      num, sprintf("%s/w:lvl[@w:ilvl='%d']/w:start", over, ilvl), ns), "w:val", ns)
+  }
+  if (is.na(val)) {
+    abs_id <- xml2::xml_attr(xml2::xml_find_first(num, "w:abstractNumId", ns), "w:val", ns)
+    abs <- xml2::xml_find_first(numbering, sprintf("//w:abstractNum[@w:abstractNumId='%s']", abs_id), ns)
+    val <- xml2::xml_attr(xml2::xml_find_first(
+      abs, sprintf("w:lvl[@w:ilvl='%d']/w:start", ilvl), ns), "w:val", ns)
+  }
+  n <- suppressWarnings(as.integer(val))
+  if (is.na(n)) 1L else n
+}
+
+#' The number Word shows on a list paragraph, advancing the list's counter
+#'
+#' Word counts per list instance (numId) and per level, in document order: a
+#' paragraph between two items of the same list does not restart it, so an
+#' "aside" between items 2 and 3 still leaves the next item numbered 3. An item
+#' at a shallower level restarts every deeper level. Counters live on ctx, so
+#' they carry across screens exactly as they do across Word's own pages.
+#' @keywords internal
+.narrative_list_number <- function(ctx, num_id, level) {
+  counters <- ctx$list_counters[[num_id]] %||% rep(NA_integer_, 9L)
+  idx <- min(max(level, 0L), 8L) + 1L
+  if (idx < 9L) counters[(idx + 1L):9L] <- NA_integer_
+  counters[idx] <- if (is.na(counters[idx])) {
+    .narrative_level_start(ctx$parts$numbering, num_id, idx - 1L)
+  } else counters[idx] + 1L
+  ctx$list_counters[[num_id]] <- counters
+  counters[idx]
+}
+
 # ==============================================================================
 # BODY WALK
 # ==============================================================================
@@ -369,6 +419,7 @@ read_narrative_docx <- function(path) {
   }
 
   has_h1 <- any(vapply(items, function(it) identical(it$kind, "h1"), logical(1)))
+  ctx$has_h1 <- has_h1
   screens <- list()
   current <- if (has_h1) NULL else list(title = .NARRATIVE_UNTITLED, blocks = list())
 
@@ -414,21 +465,49 @@ read_narrative_docx <- function(path) {
   })
 }
 
-#' Screen ids: the title as a lower-case ASCII slug, "-2", "-3" on repeats
+#' Screen ids: each title's own, so a pin follows its section when reordered
+#'
+#' The id is the title as a lower-case ASCII slug. Two DIFFERENT titles that
+#' slug alike ("Q1: Results", "Q1 results") each add a code computed from their
+#' exact wording, and a title with no ASCII letter or digit at all ("★ 要点") is
+#' "screen-" plus that code, so neither case falls back to document position.
+#' Only a genuinely repeated title takes "-2", "-3" in order, as the brief says.
+#'
+#' @param titles Screen titles in document order
+#' @return Character vector of unique ids, one per title
 #' @keywords internal
 .narrative_screen_ids <- function(titles) {
-  slug <- gsub("[^a-z0-9]+", "-", tolower(titles))
-  slug <- gsub("^-+|-+$", "", slug)
-  slug[!nzchar(slug)] <- "screen"
-  out <- slug
+  titles <- gsub("\\s+", " ", trimws(titles))
+  base <- gsub("^-+|-+$", "", gsub("[^a-z0-9]+", "-", tolower(titles)))
+  codes <- vapply(titles, .narrative_title_code, character(1), USE.NAMES = FALSE)
+  base[!nzchar(base)] <- paste0("screen-", codes[!nzchar(base)])
+  for (b in unique(base)) {
+    same <- base == b
+    if (length(unique(titles[same])) > 1L) base[same] <- paste0(b, "-", codes[same])
+  }
+  out <- base
   seen <- list()
-  for (i in seq_along(slug)) {
-    k <- slug[i]
-    n <- (seen[[k]] %||% 0L) + 1L
-    seen[[k]] <- n
-    if (n > 1L) out[i] <- paste0(k, "-", n)
+  for (i in seq_along(base)) {
+    n <- (seen[[base[i]]] %||% 0L) + 1L
+    seen[[base[i]]] <- n
+    if (n > 1L) out[i] <- paste0(base[i], "-", n)
   }
   out
+}
+
+# Modulus of the title code: a prime under 2^26, so every step of the
+# polynomial below stays an exact integer in a double (31 * 2^26 < 2^53).
+.NARRATIVE_CODE_MOD <- 67108859
+
+#' A short code computed from a title's exact characters (7 hex digits)
+#'
+#' Base R only and the same on every platform: a polynomial over the Unicode
+#' code points, not a locale-dependent transliteration.
+#' @keywords internal
+.narrative_title_code <- function(title) {
+  h <- 0
+  for (cp in utf8ToInt(enc2utf8(title))) h <- (h * 31 + cp) %% .NARRATIVE_CODE_MOD
+  sprintf("%07x", as.integer(h))
 }
 
 #' Classify one body paragraph and read its content
@@ -441,11 +520,8 @@ read_narrative_docx <- function(path) {
   styles <- ctx$parts$styles
   style_id <- xml2::xml_attr(xml2::xml_find_first(p, "w:pPr/w:pStyle", ns), "w:val", ns)
   if (is.na(style_id)) style_id <- styles$default
-  style <- if (!is.na(style_id)) styles$by_id[[style_id]] else NULL
-  style_name <- style$name %||% ""
-
-  heading <- regmatches(style_name, regexec("^heading ([1-9])$", style_name))[[1]]
-  heading_level <- if (length(heading) == 2) as.integer(heading[2]) else NA_integer_
+  role <- .narrative_style_role(style_id, styles)
+  heading_level <- role$heading
 
   segments <- .narrative_segments(p, ctx)
   runs <- .narrative_runs(Filter(function(s) s$type == "run", segments))
@@ -473,17 +549,21 @@ read_narrative_docx <- function(path) {
 
   if (is.na(heading_level) && !is.null(num) && !is.na(num$num_id) && num$num_id != "0") {
     level <- if (is.na(num$ilvl)) 0L else num$ilvl
-    blocks <- if (length(runs) > 0) {
-      list(list(type = "list", items = list(list(
-        level = level,
-        ordered = .narrative_ordered(ctx$parts$numbering, num$num_id, level),
-        runs = runs))))
-    } else list()
+    blocks <- list()
+    if (length(runs) > 0) {
+      item <- list(level = level,
+                   ordered = .narrative_ordered(ctx$parts$numbering, num$num_id, level),
+                   runs = runs)
+      # counted only for an item that is shown, so the report never skips a number
+      number <- .narrative_list_number(ctx, num$num_id, level)
+      if (item$ordered) item$number <- number
+      blocks <- list(list(type = "list", items = list(item)))
+    }
     return(list(kind = "blocks", blocks = c(blocks, images)))
   }
 
   # A paragraph or quote keeps each picture where it sits in the text
-  type <- if (identical(style_name, "quote") && is.na(heading_level)) "quote" else "paragraph"
+  type <- if (identical(role$kind, "quote")) "quote" else "paragraph"
   blocks <- list()
   pending <- list()
   flush <- function() {
@@ -501,6 +581,39 @@ read_narrative_docx <- function(path) {
   }
   flush()
   list(kind = "blocks", blocks = blocks)
+}
+
+#' What a paragraph style makes a paragraph: a heading (and its level), a
+#' quote, or plain text
+#'
+#' Follows basedOn, the way list numbering does, so a house style built on
+#' Heading 1 ("TRL Heading", say) starts a screen just as Heading 1 does. At
+#' each step: a built-in heading name decides it; else an outline level set on
+#' the style decides it (Word's own "TOC Heading" is based on Heading 1 but
+#' sets body-text level 9, so it is not a heading); else a style named Quote
+#' makes a quote; else the style it is based on is asked.
+#'
+#' @return list(kind = "heading" | "quote" | "text", heading = level or NA)
+#' @keywords internal
+.narrative_style_role <- function(style_id, styles) {
+  text <- list(kind = "text", heading = NA_integer_)
+  seen <- character(0)
+  while (!is.na(style_id) && !(style_id %in% seen)) {
+    seen <- c(seen, style_id)
+    s <- styles$by_id[[style_id]]
+    if (is.null(s)) return(text)
+    named <- regmatches(s$name, regexec("^heading ([1-9])$", s$name))[[1]]
+    if (length(named) == 2) return(list(kind = "heading", heading = as.integer(named[2])))
+    if (!is.null(s$outline) && !is.na(s$outline)) {
+      if (s$outline >= 0L && s$outline <= 8L) {
+        return(list(kind = "heading", heading = s$outline + 1L))
+      }
+      return(text)
+    }
+    if (identical(s$name, "quote")) return(list(kind = "quote", heading = NA_integer_))
+    style_id <- s$based_on
+  }
+  text
 }
 
 #' A style's list numbering, following basedOn
@@ -779,6 +892,11 @@ read_narrative_docx <- function(path) {
               length(screens), if (length(screens) == 1) "" else "s",
               n_blocks, if (n_blocks == 1) "" else "s",
               n_pictures, if (n_pictures == 1) "" else "s"))
+  if (length(screens) > 0 && !isTRUE(ctx$has_h1)) {
+    cat(sprintf("  [INFO] Narrative file: no Heading 1 was found, so the whole document is one screen titled \"%s\".\n",
+                .NARRATIVE_UNTITLED))
+    cat("         To split it into screens, give each section title Word's Heading 1 style.\n")
+  }
   if (length(screens) == 0) {
     cat("  [WARNING] Narrative file: the document holds no text the report can show.\n")
     cat("            The report will have no Background or Executive summary screens.\n")

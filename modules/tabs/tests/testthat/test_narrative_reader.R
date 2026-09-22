@@ -71,8 +71,10 @@ read_quietly <- function(path) {
 
 run <- function(text, bold = FALSE, italic = FALSE) list(text = text, bold = bold, italic = italic)
 para <- function(...) list(type = "paragraph", runs = list(...))
-item <- function(text, level = 0L, ordered = FALSE) {
-  list(level = level, ordered = ordered, runs = list(run(text)))
+item <- function(text, level = 0L, ordered = FALSE, number = NULL) {
+  out <- list(level = level, ordered = ordered, runs = list(run(text)))
+  if (!is.null(number)) out$number <- number
+  out
 }
 
 # The fixture's own picture bytes, straight out of the package
@@ -117,7 +119,8 @@ test_that("the fixture reads to exactly the expected screens and blocks", {
         item("Online survey"), item("Invites by email", level = 1L), item("Two reminders"))),
       para(run("A paragraph between lists.")),
       list(type = "list", items = list(
-        item("First step", ordered = TRUE), item("Second step", ordered = TRUE))),
+        item("First step", ordered = TRUE, number = 1L),
+        item("Second step", ordered = TRUE, number = 2L))),
       list(type = "table", rows = list(
         list("Group", "n", "%"), list("Staff", "136", "58% of invites"))),
       para(run("Response rate fell to 58%."))
@@ -199,6 +202,8 @@ test_that("a document with no Heading 1 is one screen titled Executive summary",
   expect_identical(screens[[1]]$blocks, list(
     para(run("First.")), list(type = "subheading", text = "Sub"), para(run("Second."))))
   expect_identical(attr(screens, "ignored")[["preamble"]], 0L)
+  # said in the console, so a document whose headings were missed is noticed
+  expect_true(any(grepl("no Heading 1 was found", attr(screens, "console"), fixed = TRUE)))
 })
 
 test_that("a document with no text is no screens, loudly, and no narrative", {
@@ -228,12 +233,122 @@ test_that("an oversized picture is refused loudly and its screen keeps its text"
   expect_true(any(grepl("NARRATIVE PICTURE TOO LARGE", attr(screens, "console"), fixed = TRUE)))
 })
 
-test_that("screen ids are heading slugs, suffixed on repeats", {
+test_that("screen ids are heading slugs; only a repeated title is suffixed by order", {
   expect_identical(
-    .narrative_screen_ids(c("Executive summary", "Executive  Summary!", "", "The 2026 view",
-                            "Executive summary")),
-    c("executive-summary", "executive-summary-2", "screen", "the-2026-view",
-      "executive-summary-3"))
+    .narrative_screen_ids(c("Executive summary", "The 2026 view", "Executive  summary")),
+    c("executive-summary", "the-2026-view", "executive-summary-2"))
+})
+
+test_that("the title code is a fixed polynomial over code points", {
+  # known answer: ("a" = 97) * 31 + ("b" = 98) = 3105 = 0xc21
+  expect_identical(.narrative_title_code("ab"), "0000c21")
+  expect_identical(.narrative_title_code("\u2605"), sprintf("%07x", 0x2605L))
+})
+
+test_that("titles that slug alike, or have no ASCII at all, keep their ids when reordered", {
+  titles <- c("Q1: Results", "Q1 results", "\u2605 \u8981\u70b9", "\u2605\u2605")
+  ids <- .narrative_screen_ids(titles)
+  expect_identical(ids, c(
+    paste0("q1-results-", .narrative_title_code("Q1: Results")),
+    paste0("q1-results-", .narrative_title_code("Q1 results")),
+    paste0("screen-", .narrative_title_code("\u2605 \u8981\u70b9")),
+    paste0("screen-", .narrative_title_code("\u2605\u2605"))))
+  expect_length(unique(ids), 4)
+  # the property the pins rely on: an id belongs to its title, not its position
+  expect_identical(.narrative_screen_ids(rev(titles)), rev(ids))
+})
+
+# ==============================================================================
+# LIST NUMBERS AND STYLE ROLES
+# ==============================================================================
+
+# The list items of a document's one screen, as "text=number" (or "text" for a
+# bullet), in document order
+numbers_of <- function(screens) {
+  items <- unlist(lapply(screens[[1]]$blocks, function(b) {
+    if (identical(b$type, "list")) b$items else NULL
+  }), recursive = FALSE)
+  vapply(items, function(it) {
+    if (is.null(it$number)) it$runs[[1]]$text else paste0(it$runs[[1]]$text, "=", it$number)
+  }, character(1))
+}
+
+test_that("a numbered list interrupted by a paragraph keeps counting, as Word does", {
+  p <- tempfile(fileext = ".docx")
+  on.exit(unlink(p), add = TRUE)
+  write_narrative_docx(p, paste0(
+    fx_par(fx_run("Recommendations"), style = "berschrift1"),
+    fx_par(fx_run("One"), num = c(2, 0)), fx_par(fx_run("Two"), num = c(2, 0)),
+    fx_par(fx_run("An aside between them.")),
+    fx_par(fx_run("Three"), num = c(2, 0))))
+  screens <- read_quietly(p)
+  expect_identical(vapply(screens[[1]]$blocks, function(b) b$type, character(1)),
+                   c("list", "paragraph", "list"))
+  expect_identical(numbers_of(screens), c("One=1", "Two=2", "Three=3"))
+})
+
+test_that("list numbers honour start values, restarts and nested levels", {
+  # num 4 is the decimal list again, restarted at 5 (Word's "Set numbering value")
+  numbering <- sub("</w:numbering>", paste0(
+    '<w:num w:numId="4"><w:abstractNumId w:val="1"/>',
+    '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="5"/></w:lvlOverride></w:num>',
+    "</w:numbering>"), narrative_fixture_numbering(), fixed = TRUE)
+  p <- tempfile(fileext = ".docx")
+  on.exit(unlink(p), add = TRUE)
+  write_narrative_docx(p, paste0(
+    fx_par(fx_run("Plan"), style = "berschrift1"),
+    fx_par(fx_run("a"), num = c(2, 0)), fx_par(fx_run("a.1"), num = c(2, 1)),
+    fx_par(fx_run("a.2"), num = c(2, 1)), fx_par(fx_run("b"), num = c(2, 0)),
+    fx_par(fx_run("b.1"), num = c(2, 1)), fx_par(fx_run("bullet"), num = c(1, 0)),
+    fx_par(fx_run("x"), num = c(4, 0)), fx_par(fx_run("y"), num = c(4, 0))),
+    numbering_xml = numbering)
+  # a deeper level restarts under each new parent; a bullet has no number; the
+  # restarted list instance counts from its own start value
+  expect_identical(numbers_of(read_quietly(p)), c(
+    "a=1", "a.1=1", "a.2=2", "b=2", "b.1=1", "bullet", "x=5", "y=6"))
+})
+
+test_that("a heading style built on Heading 1 starts a screen; TOC Heading does not", {
+  styles <- sub("</w:styles>", paste0(
+    '<w:style w:type="paragraph" w:styleId="TRLHeading"><w:name w:val="TRL Heading"/>',
+    '<w:basedOn w:val="berschrift1"/></w:style>',
+    '<w:style w:type="paragraph" w:styleId="TOCHeading"><w:name w:val="TOC Heading"/>',
+    '<w:basedOn w:val="berschrift1"/><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style>',
+    '<w:style w:type="paragraph" w:styleId="Sub"><w:name w:val="Section sub"/>',
+    '<w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="1"/></w:pPr></w:style>',
+    '<w:style w:type="paragraph" w:styleId="PullQuote"><w:name w:val="Pull quote"/>',
+    '<w:basedOn w:val="Quote"/></w:style>',
+    "</w:styles>"), narrative_fixture_styles(), fixed = TRUE)
+  p <- tempfile(fileext = ".docx")
+  on.exit(unlink(p), add = TRUE)
+  write_narrative_docx(p, paste0(
+    fx_par(fx_run("Background"), style = "TRLHeading"), fx_par(fx_run("Why.")),
+    fx_par(fx_run("Findings"), style = "TRLHeading"),
+    fx_par(fx_run("Contents"), style = "TOCHeading"),
+    fx_par(fx_run("What moved"), style = "Sub"),
+    fx_par(fx_run("Said it all."), style = "PullQuote")), styles_xml = styles)
+  screens <- read_quietly(p)
+  expect_identical(vapply(screens, function(s) s$title, character(1)),
+                   c("Background", "Findings"))
+  expect_identical(screens[[2]]$blocks, list(
+    para(run("Contents")),
+    list(type = "subheading", text = "What moved"),
+    list(type = "quote", runs = list(run("Said it all.")))))
+  expect_false(any(grepl("no Heading 1 was found", attr(screens, "console"), fixed = TRUE)))
+})
+
+test_that("the JS suites' island fixture is the reader's current output", {
+  skip_if_not(file.exists(FIXTURE), "narrative fixture not present")
+  island_path <- file.path(turas_root,
+    "modules/tabs/lib/html_report_v2/tests/fixtures/narrative_island.json")
+  capture.output(word <- read_narrative_docx(FIXTURE))
+  fresh <- narrative_island_fixture(word)
+  if (identical(Sys.getenv("TURAS_REGEN_NARRATIVE_ISLAND"), "1")) {
+    jsonlite::write_json(fresh, island_path, auto_unbox = TRUE, pretty = TRUE, digits = NA)
+  }
+  committed <- jsonlite::fromJSON(island_path, simplifyVector = FALSE)
+  expect_identical(committed$word, fresh$word)
+  expect_identical(committed$comments, fresh$comments)
 })
 
 # ==============================================================================

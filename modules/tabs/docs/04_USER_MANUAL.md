@@ -519,11 +519,13 @@ the setting blank and the Comments sheet's `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
 rows are used exactly as before.
 
 **How the document is read.** Each Heading 1 starts a screen, and its text is
-the screen's title. Inside a screen Turas keeps:
+the screen's title. A house heading style built on Heading 1 counts as Heading 1.
+Inside a screen Turas keeps:
 
 - Heading 2, as a sub-heading
 - ordinary paragraphs, with bold and italic
-- bulleted and numbered lists, with their nesting
+- bulleted and numbered lists, with their nesting and the numbers Word shows
+  (a list interrupted by a paragraph carries on counting, as it does in Word)
 - the Quote style, as a highlighted band
 - pictures (PNG, JPEG or GIF, up to 1.5 MB each), where they sit in the text
 - simple tables: words only, no merged cells
