@@ -522,22 +522,37 @@ rows are used exactly as before.
 the screen's title. A house heading style built on Heading 1 counts as Heading 1.
 Inside a screen Turas keeps:
 
-- Heading 2, as a sub-heading
+- Heading 2 as a sub-heading, and Heading 3 as a smaller one
 - ordinary paragraphs, with bold and italic
+- coloured words: any font colour you pick in Word (other than black or a grey)
+  shows in the report's brand colour, so colour means "stress this" and the
+  report keeps its own look
+- highlighted words: Word's highlighter pen, in any colour, shows as a soft
+  tint of the report's accent colour
 - bulleted and numbered lists, with their nesting and the numbers Word shows
-  (a list interrupted by a paragraph carries on counting, as it does in Word)
+  (a list interrupted by a paragraph carries on counting, as it does in Word;
+  "a, b, c" and "i, ii, iii" lists keep their letters and numerals)
 - the Quote style, as a highlighted band
 - pictures (PNG, JPEG or GIF, up to 1.5 MB each), where they sit in the text
-- simple tables: words only, no merged cells
+- simple tables: words only, no merged cells; the first row is the header row
 
 Everything else is skipped, and the console names what was skipped and how
 many: text boxes, shapes, SmartArt, native Word charts, footnotes, comments,
 headers and footers, and embedded objects. Tracked changes are read as if
-accepted, a hyperlink keeps its words, Heading 3 and below read as ordinary
+accepted, a hyperlink keeps its words, Heading 4 and below read as ordinary
 paragraphs, and anything before the first Heading 1 is not read. A document
 with no headings at all is one screen titled "Executive summary". Charts and
 result tables belong in Turas, not in Word: pin the Turas chart after the
 screen it supports.
+
+**How pictures are laid out.** Size the picture in Word. A picture you
+stretch across the page (at least 80% of the width between the margins) is a
+wide picture: in Present and the PowerPoint export it spans the width of the
+words, where it sits in the text, and if too little of the slide is left it
+moves to the next slide, which it fills, like a chart. A smaller picture (a
+photo, a logo) sits in a column beside the words. The Report tab card shows
+every picture in the text. For a real chart, a pinned Turas chart after the
+screen is still better: it stays live and editable.
 
 **Where the screens appear.** Each screen is a card on the **Report** tab with
 a 📌 pin. A pin is a reference to the screen, not a copy, so when you edit the

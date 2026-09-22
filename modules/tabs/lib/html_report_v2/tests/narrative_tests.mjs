@@ -175,9 +175,9 @@ run("N1: every block kind from the Word fixture renders", () => {
     "<li>Two reminders</li></ul>", "a level-1 item nests inside its parent");
   at(bg, '<ol><li value="1">First step</li><li value="2">Second step</li></ol>',
     "a numbered list, each item with the number Word shows");
-  at(bg, '<table class="nar-table"><tbody><tr><td>Group</td><td>n</td><td>%</td></tr>' +
-    "<tr><td>Staff</td><td>136</td><td>58% of invites</td></tr></tbody></table>",
-    "a simple table, text cells by row");
+  at(bg, '<table class="nar-table"><thead><tr><th>Group</th><th>n</th><th>%</th></tr></thead>' +
+    "<tbody><tr><td>Staff</td><td>136</td><td>58% of invites</td></tr></tbody></table>",
+    "a simple table, text cells by row, its first row the header row as on the deck");
   const ex = TR.narrative.blocksHtml(FIX.word[1].blocks);
   at(ex, '<blockquote class="nar-callout">&quot;Culture varies by campus.&quot;</blockquote>',
     "the Quote style is a callout band");
@@ -271,6 +271,52 @@ run("N1: blocksText is the same blocks as plain lines", () => {
   assert(t.indexOf("Staff | 136 | 58% of invites") > 0, "a table row is its cells");
   assert(TR.narrative.blocksText(FIX.word[1].blocks).indexOf("data:image") === -1,
     "pictures carry no words");
+});
+
+run("N6: coloured words take the brand colour and highlighted words the accent tint", () => {
+  const TR = sandbox({}).TR;
+  const html = TR.narrative.blocksHtml([{ type: "paragraph", runs: [
+    run1("Plain "), Object.assign(run1("<red>", true), { colour: true }),
+    Object.assign(run1(" marked"), { highlight: true })] }]);
+  eq(html, '<p>Plain <span class="nar-em"><strong>&lt;red&gt;</strong></span>' +
+    '<mark class="nar-hl"> marked</mark></p>', "classes, never Word's colours, and escaped");
+});
+
+run("N6: Heading 3 is a smaller sub-heading", () => {
+  const TR = sandbox({}).TR;
+  eq(TR.narrative.blocksHtml([{ type: "subheading", text: "Big" },
+    { type: "subheading", text: "Small", level: 3 }]),
+    '<h4 class="nar-sub">Big</h4><h5 class="nar-sub nar-sub3">Small</h5>', "h4, then h5");
+});
+
+run("N6: letter and roman numbering (known answers)", () => {
+  const TR = sandbox({}).TR;
+  const lab = TR.narrative.numberLabel;
+  eq([lab(1, "lowerLetter"), lab(26, "lowerLetter"), lab(27, "lowerLetter"),
+    lab(28, "upperLetter")], ["a", "z", "aa", "AB"], "letters run a..z, aa, ab");
+  eq([lab(4, "lowerRoman"), lab(9, "upperRoman"), lab(1994, "upperRoman"), lab(3, undefined)],
+    ["iv", "IX", "MCMXCIV", "3"], "roman numerals, and digits with no format");
+  const items = [Object.assign(item(0, true, "one"), { number: 1 }),
+    Object.assign(item(1, true, "sub"), { number: 2, format: "lowerLetter" })];
+  at(TR.narrative.blocksHtml([{ type: "list", items }]),
+    '<ol type="a"><li value="2">sub</li></ol>', "the HTML list keeps Word's letters");
+  eq(TR.narrative.blocksText([{ type: "list", items }]), "1. one\nb. sub", "and its lines");
+});
+
+run("N6: a wide picture stays in the words in Present; a small one goes beside", () => {
+  const TR = sandbox({}).TR;
+  const pic = FIX.word[1].blocks.find((b) => b.type === "image");
+  const wide = Object.assign({}, pic, { wide: true });
+  const html = TR.narrative.presentHtml({ id: "w", title: "W", blocks: [
+    { type: "paragraph", runs: [run1("Before.")] }, wide,
+    { type: "paragraph", runs: [run1("After.")] }] });
+  at(html, '<div class="pr-narrative">', "no side column for a wide picture alone");
+  assert(html.indexOf("Before.") < html.indexOf("nar-fig-wide") &&
+    html.indexOf("nar-fig-wide") < html.indexOf("After."), "it sits where it sits in the text");
+  const mixed = TR.narrative.presentHtml({ id: "m", title: "M", blocks: [wide, pic] });
+  at(mixed, '<div class="pr-narrative has-pic">', "a small picture still gets the side column");
+  eq((mixed.split('<div class="nar-pics">')[1].match(/<figure/g) || []).length, 1,
+    "and only the small one is in it");
 });
 
 run("N1: Present lays a screen out as a slide", () => {
@@ -627,6 +673,101 @@ run("N4: the deck cover quotes a screen's first words, not a heading or a table"
       Object.assign(item(0, true, "Fix support"), { number: 1 }), item(0, false, "Third")] }], 2);
   eq(lines, ["• Stable ratings", "1. Fix support"], "the first two list lines");
   eq(TR.narrative.coverLines([], 2), [], "an empty screen gives nothing");
+});
+
+/** The whole <a:r> run on a slide that carries this text. */
+const runXmlOf = (xml, text) => {
+  const i = at(xml, "<a:t>" + text + "</a:t>", text);
+  return xml.slice(xml.lastIndexOf("<a:r>", i), xml.indexOf("</a:r>", i) + 6);
+};
+
+run("N6: on the slide, coloured words are brand and highlighted words sit on the accent tint", () => {
+  const sb = sandbox({});
+  sb.TR.AGG.project.brand_colour = "#123ABC";
+  sb.TR.AGG.project.accent_colour = "#CC9900";
+  // known answer: 30% of the way from white to CC9900 is F0 E0 B3
+  eq(sb.TR.exporter._narTint("#CC9900", 0.3), "F0E0B3", "the tint");
+  const x = xmlOf(slidesOf(sb, { id: "c", title: "C", blocks: [{ type: "paragraph", runs: [
+    run1("plain"), Object.assign(run1("brand"), { colour: true }),
+    Object.assign(run1("marked"), { highlight: true })] }] })[0]);
+  at(runXmlOf(x, "brand"), '<a:srgbClr val="123ABC"/>', "the coloured run is brand");
+  assert(runXmlOf(x, "plain").indexOf("123ABC") === -1, "a plain run is not");
+  at(runXmlOf(x, "marked"), '</a:solidFill><a:highlight><a:srgbClr val="F0E0B3"/></a:highlight><a:latin',
+    "the highlight sits between the fill and the font, as the schema orders them");
+});
+
+run("N6: on the slide, Heading 3 is body size and letters are PowerPoint letters", () => {
+  const sb = sandbox({});
+  const x = xmlOf(slidesOf(sb, { id: "h", title: "H", blocks: [
+    { type: "subheading", text: "Big" }, { type: "subheading", text: "Small", level: 3 },
+    { type: "list", items: [Object.assign(item(0, true, "Alpha"), { number: 1, format: "upperLetter" }),
+      Object.assign(item(0, true, "Beta"), { number: 2, format: "upperLetter" })] }] })[0]);
+  at(runWith(x, "Big"), 'sz="' + sb.TR.pptx.STYLE.SIZE.lead * 100 + '"', "Heading 2 at the lead size");
+  at(runWith(x, "Small"), 'sz="' + sb.TR.pptx.STYLE.SIZE.body * 100 + '"', "Heading 3 at body size");
+  at(x, '<a:buAutoNum type="alphaUcPeriod" startAt="2"/>', "B., not 2.");
+});
+
+// a picture that "fills" a slide takes at least this share of the body height
+const NAR_MIN_FILL = 0.6;
+/** Every picture on a slide: its rId and box, in inches. */
+const picsOf = (x) => [...x.matchAll(/<a:blip r:embed="(rId\d+)"\/>[\s\S]*?<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)]
+  .map((m) => ({ rid: m[1], x: m[2] / 914400, y: m[3] / 914400, w: m[4] / 914400, h: m[5] / 914400 }));
+
+run("N6: on the slide, a wide picture spans the words where it sits", () => {
+  const sb = sandbox({});
+  const BODY = sb.TR.pptx.STYLE.BODY;
+  const pic = FIX.word[1].blocks.find((b) => b.type === "image");
+  const line = { type: "paragraph", runs: [run1("One short line.")] };
+  // a 4:1 banner: at the body's full width (12.13in) it is 3.03in tall, which
+  // fits under one line of words in the 4.62in body
+  const banner = Object.assign({}, pic, { wide: true, width: 1600, height: 400 });
+  const slides = slidesOf(sb, { id: "w", title: "W", blocks: [line, banner] });
+  eq(slides.length, 1, "room for it under one line of words");
+  const p = picsOf(xmlOf(slides[0]));
+  eq(p.length, 1, "one picture");
+  eq(p[0].rid, "rId2", "the slide's first picture rel");
+  assert(Math.abs(p[0].w - BODY.w) < 0.01, "full body width, got " + p[0].w);
+  assert(Math.abs(p[0].h - BODY.w / 4) < 0.01, "shape kept, got " + p[0].h);
+  assert(p[0].y > BODY.y, "below the words");
+  eq(slides[0].images.length, 1, "its bytes ride on the slide");
+  // a 2:1 picture at full width (6.07in) is taller than the room left, so it
+  // takes all of that room, keeps its shape and is centred in the column
+  const q = picsOf(xmlOf(slidesOf(sb, { id: "w", title: "W", blocks: [line,
+    Object.assign({}, pic, { wide: true })] })[0]))[0];
+  assert(Math.abs(q.y + q.h - (BODY.y + BODY.h)) < 0.01, "down to the body's foot");
+  assert(Math.abs(q.w - 2 * q.h) < 0.01, "2:1 kept, got " + q.w + " x " + q.h);
+  assert(Math.abs(q.x + q.w / 2 - (BODY.x + BODY.w / 2)) < 0.01, "centred");
+});
+
+run("N6: a wide picture after a full slide of words fills the next slide", () => {
+  const sb = sandbox({});
+  const BODY = sb.TR.pptx.STYLE.BODY;
+  const pic = Object.assign({}, FIX.word[1].blocks.find((b) => b.type === "image"),
+    { wide: true, width: 1600, height: 900 });
+  const words = Array.from({ length: 11 }, (_, i) =>
+    ({ type: "paragraph", runs: [run1("P" + i + " " + "word ".repeat(30))] }));
+  const slides = slidesOf(sb, { id: "w", title: "W", blocks: words.concat([pic]) });
+  const last = xmlOf(slides[slides.length - 1]);
+  const p = picsOf(last);
+  eq(p.length, 1, "the picture is on the last slide");
+  assert(last.indexOf("<a:t>P") === -1, "on its own");
+  assert(Math.abs(p[0].y - BODY.y) < 0.01, "from the top of the body");
+  assert(p[0].h > NAR_MIN_FILL * BODY.h, "filling the body, got " + p[0].h);
+  assert(p[0].y + p[0].h <= BODY.y + BODY.h + 1e-6, "and inside it");
+  assert(slides.slice(0, -1).every((s) => picsOf(xmlOf(s)).length === 0),
+    "no picture on the slides of words");
+});
+
+run("N6: a small and a wide picture each get their own rel, and the deck packages", () => {
+  const sb = sandbox({});
+  const pic = FIX.word[1].blocks.find((b) => b.type === "image");
+  const slides = slidesOf(sb, { id: "m", title: "M", blocks: [
+    { type: "paragraph", runs: [run1("Words.")] }, pic, Object.assign({}, pic, { wide: true })] });
+  const p = picsOf(xmlOf(slides[0]));
+  eq(p.map((q) => q.rid), ["rId2", "rId3"], "side picture first, then the wide one");
+  eq(slides[0].images.length, 2, "both pictures' bytes");
+  const bytes = sb.TR.pptx.package(slides, { project: sb.TR.AGG.project });
+  assert(bytes && bytes.length > 0, "the deck packages");
 });
 
 run("N5: every run on a narrative slide is Arial", () => {

@@ -26,6 +26,14 @@
 > sub-heading or table row; importing a story does not duplicate a seeded
 > screen; the shipped template is gated against the generator.
 
+> **Formatting batch** (22 Sep 2026, Duncan's decisions): coloured words show
+> in the brand colour (a colour with a hue; black and greys are plain), the
+> highlighter as an accent tint, Heading 3 as a smaller sub-heading, letter and
+> roman list numbering kept, a table's first row styled as its header on every
+> surface, and a picture sized to at least 80% of the text width in Word laid
+> out wide (in the flow, full word-column width, on to a filled slide when
+> there is no room) instead of in the side column.
+
 Written 22 September 2026 at the end of the stage 2 session. Read this with
 `NARRATIVE_SCREENS_BRIEF.md` (the settled design) before touching code. This
 note says what exists, what was decided after the brief, and exactly what
