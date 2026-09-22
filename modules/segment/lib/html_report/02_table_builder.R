@@ -430,7 +430,8 @@ build_seg_demographics_table <- function(html_data) {
           htmltools::tags$thead(header),
           htmltools::tags$tbody(rows)
         )
-      )
+      ),
+      build_seg_demo_base_line(demo_data$bases, var_name)
     )
   })
 
@@ -443,13 +444,48 @@ build_seg_demographics_table <- function(html_data) {
 }
 
 
+#' Build the per-variable base line for a demographics table
+#'
+#' Percentages in the Demographics section are computed among the respondents
+#' who answered that variable, which is smaller than the clustered n whenever
+#' a demographic has blanks. The section used to state only the clustered n,
+#' so a table with blanks carried a base larger than the one it rested on
+#' (independent review 2026-09-22, D1). Each table now says its own.
+#'
+#' @param bases The `bases` frame from profile_demographics()
+#' @param var_name The variable this table shows
+#' @return htmltools tag, or NULL when there is no base to state
+#' @keywords internal
+build_seg_demo_base_line <- function(bases, var_name) {
+
+  if (is.null(bases) || !is.data.frame(bases)) return(NULL)
+  row <- bases[bases$Variable == var_name, , drop = FALSE]
+  if (nrow(row) != 1) return(NULL)
+
+  text <- sprintf("Base: %d answered, of %d clustered.",
+                  row$N_Answered[1], row$N_Clustered[1])
+  if (!is.na(row$N_Blank[1]) && row$N_Blank[1] > 0) {
+    text <- paste(text, sprintf("%d left it blank and are not in the percentages.",
+                                row$N_Blank[1]))
+  }
+
+  htmltools::tags$p(
+    class = "seg-demo-base",
+    style = "margin:4px 0 0; font-size:11px; color:#64748b;",
+    text
+  )
+}
+
+
 #' Build Numeric Demographics Table
 #'
 #' One table per numeric demographic variable: the mean, median, spread and
 #' range within each segment, plus an Overall row. `profile_demographics()`
-#' sends a numeric variable with more than ten distinct values down this
+#' sends a numeric variable with more than ten distinct ANSWERS down this
 #' route, so an age in years lands here while an age band lands in the
-#' categorical tables.
+#' categorical tables. Blanks are not counted towards the ten, so a ten-point
+#' scale stays a cross-tab however many people skipped it (independent review
+#' 2026-09-22, D3).
 #'
 #' The frames carry no p-value. `profile_demographics()` runs a one-way ANOVA
 #' per numeric variable and prints the result to the console without returning
@@ -509,7 +545,8 @@ build_seg_demographics_numeric_table <- function(html_data) {
           htmltools::tags$thead(header),
           htmltools::tags$tbody(rows)
         )
-      )
+      ),
+      build_seg_demo_base_line(demo_data$bases, var_name)
     )
   })
 

@@ -1666,7 +1666,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
     add_field("id_variable",      sv("respondent_id"), "REQUIRED", "Column name for respondent unique identifier", "Column name in data"),
     add_field("clustering_vars",  sv("q1,q2,q3,q4,q5"), "REQUIRED", "Comma-separated list of numeric variables for clustering. Aim for 8-20 variables.", "Comma-separated column names"),
     add_field("profile_vars",     "",          "Optional", "Comma-separated variables for profiling (auto-detected from data if blank)", "Comma-separated column names"),
-    add_field("demographic_vars", "",          "Optional", "Comma-separated variables profiled by segment. Categorical ones are cross-tabulated; a numeric one with more than ten distinct values, counting a blank as one of them, is summarised as means instead.", "Comma-separated column names"),
+    add_field("demographic_vars", "",          "Optional", "Comma-separated variables profiled by segment. Categorical ones are cross-tabulated; a numeric one with more than ten distinct answers is summarised as means instead. Blanks are not counted as an answer, and a column of another type is named and skipped.", "Comma-separated column names"),
     # --- CLUSTERING METHOD ---
     add_section("CLUSTERING METHOD"),
     add_field("method",           "kmeans",    "REQUIRED", "Clustering algorithm. Use 'all' or comma-separated for multi-method comparison.", "kmeans, hclust, gmm, all"),

@@ -501,17 +501,45 @@ profile_demographics <- function(data, clusters, demo_vars,
     )
   }
 
-  # Separate categorical and numeric variables
+  # Separate categorical and numeric variables.
+  #
+  # Two corrections here, both from the independent review of 2026-09-22.
+  #
+  # The distinct-value count is taken over the ANSWERS. It used to be
+  # length(unique(x)), and unique() counts NA as a value, so a ten-point coded
+  # demographic was cross-tabulated while the same variable with one blank had
+  # eleven "distinct values" and was summarised as means instead. A blank is
+  # not an eleventh answer (D3).
+  #
+  # And a variable that is neither factor, character nor numeric, with more
+  # than ten distinct answers, used to match no branch at all: it entered
+  # neither list, got no table, no sheet and no chi-square row, and the
+  # section's "nobody answered" note could not name it because it never
+  # reached the frames. A date column, which readxl::read_excel produces for a
+  # date-formatted cell, is the live case. It is collected here and named
+  # below instead of vanishing (D2).
   categorical_vars <- character(0)
   numeric_vars <- character(0)
+  unsupported_vars <- character(0)
 
   for (var in available_vars) {
-    if (is.factor(data[[var]]) || is.character(data[[var]]) ||
-        length(unique(data[[var]])) <= 10) {
+    n_distinct <- length(unique(data[[var]][!is.na(data[[var]])]))
+    if (is.factor(data[[var]]) || is.character(data[[var]]) || n_distinct <= 10) {
       categorical_vars <- c(categorical_vars, var)
     } else if (is.numeric(data[[var]])) {
       numeric_vars <- c(numeric_vars, var)
+    } else {
+      unsupported_vars <- c(unsupported_vars, var)
     }
+  }
+
+  if (length(unsupported_vars) > 0) {
+    cat(sprintf(
+      "  Not profiled, because the column is a %s with more than ten distinct answers: %s\n",
+      paste(unique(vapply(unsupported_vars,
+                          function(v) class(data[[v]])[1], character(1))),
+            collapse = "/"),
+      paste(unsupported_vars, collapse = ", ")))
   }
 
   cat(sprintf("Profiling %d categorical and %d numeric demographics...\n\n",
@@ -523,6 +551,7 @@ profile_demographics <- function(data, clusters, demo_vars,
 
   categorical_profiles <- list()
   chi_sq_tests <- list()
+  bases <- list()
 
   for (var in categorical_vars) {
     cat(sprintf("Analyzing: %s\n", var))
@@ -551,6 +580,18 @@ profile_demographics <- function(data, clusters, demo_vars,
     }
 
     categorical_profiles[[var]] <- profile_df
+
+    # The base these percentages rest on. sum(cross_tab) is exactly the
+    # respondents counted, because table() drops a blank in either margin, so
+    # it is the answered n and not the clustered n (independent review
+    # 2026-09-22, D1).
+    bases[[var]] <- data.frame(
+      Variable = var,
+      N_Clustered = length(clusters),
+      N_Answered = as.integer(sum(cross_tab)),
+      N_Blank = as.integer(length(clusters) - sum(cross_tab)),
+      stringsAsFactors = FALSE
+    )
 
     # Chi-squared test.
     #
@@ -682,6 +723,14 @@ profile_demographics <- function(data, clusters, demo_vars,
 
       numeric_profiles[[var]] <- stats_df
 
+      bases[[var]] <- data.frame(
+        Variable = var,
+        N_Clustered = length(clusters),
+        N_Answered = length(all_data),
+        N_Blank = as.integer(length(clusters) - length(all_data)),
+        stringsAsFactors = FALSE
+      )
+
       # ANOVA test
       tryCatch({
         anova_result <- aov(data[[var]] ~ as.factor(clusters))
@@ -702,6 +751,26 @@ profile_demographics <- function(data, clusters, demo_vars,
   # ===========================================================================
   # COMBINE CHI-SQUARED TESTS
   # ===========================================================================
+
+  # A variable of an unhandled class is named in the same frame the user reads
+  # for "what happened to each demographic", rather than being absent from
+  # every output the run produces (independent review 2026-09-22, D2).
+  for (var in unsupported_vars) {
+    chi_sq_tests[[var]] <- data.frame(
+      Variable = var,
+      Chi_Sq = NA_real_,
+      DF = NA_real_,
+      P_Value = NA_character_,
+      Significant = NA,
+      Low_Expected = NA,
+      Note = sprintf(
+        paste("Not profiled: the column is a %s with more than ten distinct",
+              "answers, which is neither a category to cross-tabulate nor a",
+              "number to average."),
+        class(data[[var]])[1]),
+      stringsAsFactors = FALSE
+    )
+  }
 
   chi_sq_combined <- do.call(rbind, chi_sq_tests)
 
@@ -737,6 +806,7 @@ profile_demographics <- function(data, clusters, demo_vars,
     categorical_profiles = categorical_profiles,
     numeric_profiles = numeric_profiles,
     chi_sq_tests = chi_sq_combined,
+    bases = do.call(rbind, bases),
     segment_names = segment_names
   ))
 }

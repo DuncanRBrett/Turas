@@ -800,6 +800,15 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       sheets[["Demographics_Tests"]] <- tests_df
     }
 
+    # The base each variable's percentages rest on. Percentages are computed
+    # among the respondents who answered, so a demographic with blanks has a
+    # smaller base than the clustered n, and the workbook has to say which
+    # (independent review 2026-09-22, D1).
+    bases_df <- demo$bases
+    if (!is.null(bases_df) && is.data.frame(bases_df) && nrow(bases_df) > 0) {
+      sheets[["Demographics_Bases"]] <- bases_df
+    }
+
     demo_frames <- c(demo$categorical_profiles %||% list(),
                      demo$numeric_profiles %||% list())
     for (var in names(demo_frames)) {

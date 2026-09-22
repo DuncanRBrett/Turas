@@ -439,7 +439,10 @@ test_that("the section does not call the clustered sample the base of its percen
   html <- as.character(build_seg_demographics_section(tables, hd))
 
   expect_false(grepl("the whole clustered sample", html, fixed = TRUE))
-  expect_true(grepl("smaller than the clustered", html, fixed = TRUE))
+  # Since the D1 base fix, the intro points at the per-table base rather than
+  # describing the shrinkage in the abstract.
+  expect_true(grepl("Each table states its own base", html, fixed = TRUE))
+  expect_true(grepl("fewer respondents than the clustered n", html, fixed = TRUE))
   # The two claims the rest of the suite relies on are still made.
   expect_true(grepl("column percentages", html, fixed = TRUE))
   expect_true(grepl("respondents who were clustered", html, fixed = TRUE))
@@ -557,4 +560,101 @@ test_that("the tests frame carries a Note column on every branch", {
     file.path(run$out_dir, "seg_segmentation_report.xlsx"),
     sheet = "Demographics_Tests", skipEmptyRows = FALSE)
   expect_true("Note" %in% names(sheet))
+})
+
+
+# ------------------------------------------------------------------------------
+# 12. D1, D2, D3: the base, the unhandled class and the blank in the threshold.
+# ------------------------------------------------------------------------------
+
+test_that("D3: a blank does not push a ten-value demographic into the means table", {
+  # length(unique(x)) counted NA as one of the ten, so a ten-point coded
+  # demographic changed form the moment one respondent left it blank.
+  clusters <- rep(1:3, length.out = 300)
+
+  ten_clean <- data.frame(x = rep(1:10, length.out = 300))
+  capture.output(a <- profile_demographics(ten_clean, clusters, "x"))
+  expect_equal(names(a$categorical_profiles), "x")
+  expect_length(a$numeric_profiles, 0L)
+
+  ten_blanks <- ten_clean
+  ten_blanks$x[1:5] <- NA
+  capture.output(b <- profile_demographics(ten_blanks, clusters, "x"))
+  expect_equal(names(b$categorical_profiles), "x")
+  expect_length(b$numeric_profiles, 0L)
+
+  # Eleven real values is still numeric, blanks or not.
+  eleven <- data.frame(x = rep(1:11, length.out = 300))
+  eleven$x[1:5] <- NA
+  capture.output(cc <- profile_demographics(eleven, clusters, "x"))
+  expect_equal(names(cc$numeric_profiles), "x")
+  expect_length(cc$categorical_profiles, 0L)
+})
+
+test_that("D2: a demographic of an unhandled class is named, not dropped", {
+  clusters <- rep(1:3, length.out = 300)
+  d <- data.frame(region = c("N", "S", "E")[clusters], stringsAsFactors = FALSE)
+  d$interview_date <- as.POSIXct("2026-01-01", tz = "UTC") +
+    rep(1:50, length.out = 300) * 86400
+
+  capture.output(prof <- profile_demographics(d, clusters, c("region", "interview_date")))
+
+  # It reaches neither profile list, which is the old behaviour and is fine.
+  expect_equal(names(prof$categorical_profiles), "region")
+  expect_length(prof$numeric_profiles, 0L)
+  # What is new: it is named, with a reason, instead of vanishing.
+  row <- prof$chi_sq_tests[prof$chi_sq_tests$Variable == "interview_date", ]
+  expect_equal(nrow(row), 1L)
+  expect_true(is.na(row$Significant))
+  expect_true(grepl("POSIXct", row$Note, fixed = TRUE))
+})
+
+test_that("D2: a date with few values is still cross-tabulated", {
+  clusters <- rep(1:3, length.out = 300)
+  d <- data.frame(wave = as.Date("2026-01-01") + rep(1:4, length.out = 300))
+  capture.output(prof <- profile_demographics(d, clusters, "wave"))
+  expect_equal(names(prof$categorical_profiles), "wave")
+})
+
+test_that("D1: the answered base is returned per variable and differs from the clustered n", {
+  set.seed(5)
+  clusters <- rep(1:3, length.out = 400)
+  reg <- c("N", "S", "E")[clusters]
+  reg[sample(400, 80)] <- NA
+  d <- data.frame(region = reg, stringsAsFactors = FALSE)
+
+  capture.output(prof <- profile_demographics(d, clusters, "region"))
+
+  expect_true("bases" %in% names(prof))
+  b <- prof$bases[prof$bases$Variable == "region", ]
+  expect_equal(b$N_Clustered, 400L)
+  expect_equal(b$N_Answered, 320L)
+  expect_equal(b$N_Blank, 80L)
+})
+
+test_that("D1: each table in the report carries its own answered base", {
+  d <- .demographics_fixture()
+  d$region[1:60] <- NA
+  run <- .demographics_run(data = d, html_report = "TRUE")
+  html <- paste(readLines(file.path(run$out_dir, "seg_segmentation_report.html"),
+                          warn = FALSE), collapse = "\n")
+
+  prof <- run$res$enhanced$demographic_profiles
+  n_reg <- prof$bases$N_Answered[prof$bases$Variable == "region"]
+  n_gen <- prof$bases$N_Answered[prof$bases$Variable == "gender"]
+  expect_lt(n_reg, n_gen)
+
+  # The smaller base is stated on the face of the table it belongs to.
+  expect_true(grepl(sprintf("Base: %d answered", n_reg), html, fixed = TRUE))
+  expect_true(grepl(sprintf("Base: %d answered", n_gen), html, fixed = TRUE))
+
+  # And the workbook carries the bases too.
+  sheets <- openxlsx::getSheetNames(
+    file.path(run$out_dir, "seg_segmentation_report.xlsx"))
+  expect_true("Demographics_Bases" %in% sheets)
+  bs <- openxlsx::read.xlsx(
+    file.path(run$out_dir, "seg_segmentation_report.xlsx"),
+    sheet = "Demographics_Bases", skipEmptyRows = FALSE)
+  expect_setequal(bs$Variable, c("region", "gender"))
+  expect_equal(bs$N_Answered[bs$Variable == "region"], n_reg)
 })
