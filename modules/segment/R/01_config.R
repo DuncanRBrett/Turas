@@ -722,13 +722,21 @@ validate_segment_config <- function(config) {
   # Step 3: HTML report + enhanced features
   features <- parse_segment_feature_params(config, req$clustering_vars)
 
-  # Step 3a: the tabs export belongs to the single-method final run. The
-  # multi-method output block has no reader for tabs_export, so a combined run
-  # with the setting on wrote no files and said nothing (independent review
-  # 2026-09-21, F14). Refuse it here, before a run starts, rather than at the
-  # end of one.
-  if (isTRUE(req$is_multi_method) &&
-      identical(toupper(as.character(features$tabs_export %||% "N")), "Y")) {
+  # Step 3a: the tabs export belongs to the single-method final run, and to no
+  # other path. Only that path has a reader for tabs_export, so combined mode
+  # ran with the setting on and wrote nothing (independent review 2026-09-21,
+  # F14), and so did exploration mode, which the fix for F14 did not cover
+  # (independent review 2026-09-22, D10). Refuse both here, before a run
+  # starts, rather than at the end of one.
+  #
+  # The two are checked separately because the reasons differ: combined mode
+  # has no one method to export from, exploration mode has no one k. A config
+  # that is both is refused once, by the combined branch, whose fix text then
+  # names k as well so the user is not walked into a second refusal.
+  tabs_export_on <- identical(toupper(as.character(features$tabs_export %||% "N")), "Y")
+  is_exploration <- is.null(analysis$k_fixed)
+
+  if (tabs_export_on && isTRUE(req$is_multi_method)) {
     cat("\n[SEGMENT] Config asks for the tabs export while comparing methods, where nothing writes it.\n")
     segment_refuse(
       code = "CFG_TABS_EXPORT_COMBINED",
@@ -745,10 +753,39 @@ validate_segment_config <- function(config) {
       ),
       how_to_fix = c(
         "Set tabs_export to N for this comparison run.",
-        "Then set method to the one method you chose, keep tabs_export = Y, and run again."
+        if (is_exploration) {
+          "Then set method to the one method you chose and k_fixed to the k you chose, keep tabs_export = Y, and run again."
+        } else {
+          "Then set method to the one method you chose, keep tabs_export = Y, and run again."
+        }
       ),
       expected = "tabs_export = N while method names more than one method",
       observed = sprintf("method = %s, tabs_export = Y", paste(req$methods, collapse = ", "))
+    )
+  }
+
+  if (tabs_export_on && is_exploration) {
+    cat("\n[SEGMENT] Config asks for the tabs export while exploring values of k, where nothing writes it.\n")
+    segment_refuse(
+      code = "CFG_TABS_EXPORT_EXPLORATION",
+      title = "The Tabs Export Is Not Written in Exploration Mode",
+      problem = sprintf(
+        "This config explores k from %s to %s and sets tabs_export = Y.",
+        as.character(analysis$k_min), as.character(analysis$k_max)),
+      why_it_matters = paste(
+        "Exploration compares values of k and chooses none, so there is no one",
+        "segment column to write back onto the survey file. The export belongs",
+        "to the final run you make after you fix k. Until now the setting was",
+        "read on the final path only and ignored in silence here, which looked",
+        "like an export that had happened."
+      ),
+      how_to_fix = c(
+        "Set tabs_export to N for this exploration run.",
+        "Then set k_fixed to the k you chose, keep tabs_export = Y, and run again."
+      ),
+      expected = "tabs_export = N while k_fixed is empty",
+      observed = sprintf("k_min = %s, k_max = %s, tabs_export = Y",
+                         as.character(analysis$k_min), as.character(analysis$k_max))
     )
   }
 

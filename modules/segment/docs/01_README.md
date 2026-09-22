@@ -304,11 +304,15 @@ assignments came from another file or another ID column and an "Unassigned"
 label would hide it. If you really want those rows labelled Unassigned, set
 `allow_partial_join = Y`.
 
-The export is written by a single-method final run only. A config that
-compares methods (`method = kmeans,hclust,gmm`) with `tabs_export = Y` is
-refused at validation, because a comparison chooses no method and so has no
-one segment column to write back. Compare first, then run the method you chose
-with the export on.
+The export is written by a single-method final run only, and the other two
+modes refuse it at validation rather than ignoring it. A config that compares
+methods (`method = kmeans,hclust,gmm`) with `tabs_export = Y` is refused
+`CFG_TABS_EXPORT_COMBINED`, because a comparison chooses no method and so has
+no one segment column to write back. A config that explores k (no `k_fixed`,
+just `k_min` and `k_max`) with `tabs_export = Y` is refused
+`CFG_TABS_EXPORT_EXPLORATION`, for the same reason one step along: exploration
+chooses no k. Compare or explore first, then run the method and the k you
+chose with the export on.
 
 Three things travel deliberately and three do not. The segment name travels.
 The numeric segment id, the outlier flag and the GMM membership probabilities

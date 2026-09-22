@@ -557,3 +557,55 @@ test_that("a single-method config with the export still validates", {
   expect_false(isTRUE(cfg$is_multi_method))
   expect_equal(toupper(as.character(cfg$tabs_export)), "Y")
 })
+
+
+# ------------------------------------------------------------------------------
+# D10: exploration mode is the third path with no reader for tabs_export.
+# Combined mode was refused by Session D; exploration still accepted the
+# setting, wrote nothing and said nothing (independent review 2026-09-22).
+# ------------------------------------------------------------------------------
+
+test_that("tabs_export in exploration mode is refused by name (D10)", {
+  err <- tryCatch(
+    capture.output(validate_segment_config(
+      .tabs_export_config(k_fixed = NULL, k_min = "3", k_max = "4",
+                          tabs_export = "Y"))),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "CFG_TABS_EXPORT_EXPLORATION")
+  expect_true(grepl("exploration", conditionMessage(err), ignore.case = TRUE))
+})
+
+test_that("exploration mode without the export still validates", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(k_fixed = NULL, k_min = "3", k_max = "4",
+                        tabs_export = "N")))
+
+  expect_equal(cfg$mode, "exploration")
+  expect_equal(toupper(as.character(cfg$tabs_export)), "N")
+})
+
+test_that("a final single-method config with the export is untouched by D10", {
+  capture.output(cfg <- validate_segment_config(
+    .tabs_export_config(tabs_export = "Y")))
+
+  expect_equal(cfg$mode, "final")
+  expect_equal(toupper(as.character(cfg$tabs_export)), "Y")
+})
+
+test_that("a config that is both combined and exploration says so in one refusal", {
+  # Fixing the method alone would walk the user into a second refusal, so the
+  # combined message names k as well when both apply.
+  err <- tryCatch(
+    capture.output(validate_segment_config(
+      .tabs_export_config(method = "kmeans,hclust", k_fixed = NULL,
+                          k_min = "3", k_max = "4", tabs_export = "Y"))),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "CFG_TABS_EXPORT_COMBINED")
+  expect_true(any(grepl("k_fixed", err$how_to_fix, fixed = TRUE)))
+})
