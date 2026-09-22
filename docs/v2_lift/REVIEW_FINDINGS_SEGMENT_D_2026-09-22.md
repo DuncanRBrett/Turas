@@ -1,0 +1,158 @@
+# Independent pre-merge review: segment Session D
+
+**Date:** 2026-09-22.
+**Reviewer:** Opus 5 session, independent of the session that built Session D, with the `fable-method` skill loaded. The brief (`REVIEW_BRIEF_SEGMENT_D.md`) and the work order (`HANDOVER_SEGMENT_D_FOR_OPUS.md`) were read as claims. `SESSION_D_NOTES_SEGMENT.md` was not read until sections 0 to 7 below were on disk; section 8 records where it and this review disagree. Disclosure: two lines of the notes appeared incidentally in `git diff` output before the findings were written, both about an `&mdash;` entity, and neither shaped a finding.
+**Reviewed:** `feature/segment-demographics` at `906428dc`. Session D is the six commits `e19b45d2..906428dc`.
+**Findings under test:** `REVIEW_FINDINGS_SEGMENT_2026-09-21.md`, rows F2 and F14, plus F8, F9 and F17.
+
+**Which base.** `git merge-base main feature/segment-demographics` is `6063bb5c`, but that predates the September review's own fixes and the rulings commit, so a suite count taken there would not be comparable to the handover's stated baseline of 1258 and a both-ways check there would conflate Session D with the review's work. Every base-side run below used `db2c66dc`, Session D's immediate parent, in a detached worktree in the session scratchpad with `RENV_CONFIG_AUTOLOADER_ENABLED=FALSE` and `R_LIBS_USER` pointed at this checkout's renv library. `db2c66dc` is docs only against `324a642f`, so it carries the same code as the handover's baseline commit.
+
+**Method:** verdict by execution. Both-ways runs of the Thornhill example and of a combined-mode config; an independent recomputation of every demographic percentage from the assignments file; ten mutation tests, each reverting one behavioural change and running the suite; and seven corner-case probes on `profile_demographics()`, four of them driven through the whole pipeline. Probe scripts and logs are under the session scratchpad, which is session-local and not in the repo.
+
+## 0. Verdict
+
+**MERGE AFTER FIXES.** Both work items are real, and both fail at the base and pass on the branch by execution. F2 is genuinely commissioned: `profile_demographics()` had no caller at `db2c66dc` and the Thornhill example's report there carries no Demographics section, no `Demo_*` sheet and not one occurrence of the string "Demographic"; on the branch the same config renders all three demographics and writes all four sheets. F14 likewise: at the base a combined run with `tabs_export = Y` reaches PASS with no mention of `tabs` anywhere in its log and no tabs file on disk, and on the branch it refuses `CFG_TABS_EXPORT_COMBINED` before clustering starts. F8, F9 and F17 are each correctly fixed, and F17's new claim that the percentages "sum to 100 by construction" is true of the code that builds them.
+
+The numbers are right, which was the thing most worth checking. Recomputed independently from `thornhill_segment_assignments.xlsx` joined to `Thornhill_Segment_Data.xlsx`, all three demographics match the `Demo_*` sheets to a maximum absolute difference of 0.0000 on every segment cell and on every Overall cell, every segment column sums to 100, and the base note's per-segment n of 532, 263 and 405 summing to 1200 matches the join exactly. The HTML table carries the same figures rounded to whole percentages. The tests that pin this are honest ones: the recompute test compares absolutely rather than with testthat's relative tolerance, which the branch's own last commit fixed.
+
+The tests hold up under mutation. Nine of the ten behavioural changes I reverted were caught, including the `<<-` repair in the chi-square handler and both console skip notes. One was not, and it is the smallest of them.
+
+What needs fixing before this is relied on is one honesty defect, and it is in the new text rather than the new numbers. Percentages in the Demographics section are computed among the respondents who answered that demographic, which is correct, but the section states its base as the clustered sample and says in as many words that the Overall column is "the same calculation on the whole clustered sample". For any demographic with blanks that sentence is false and the stated base is larger than the real one. I reproduced it through the pipeline: a demographic unanswered by one whole segment produced an Overall column computed on 285 respondents under a note reading "Base: 400 respondents who were clustered". The three Thornhill demographics have no blanks at all, so the shipped example never shows this and the building session had no way to see it from that example.
+
+Two further gaps are pre-existing in `profile_demographics()` and become reachable for the first time because Session D wired it in, so they are not its regression but they are now its exposure. A demographic whose class is neither factor, character nor numeric with more than ten distinct values falls into neither branch of the type split and disappears with no table, no sheet, no chi-square row and no note, and the section's new "nobody answered" note cannot name it because it never enters the frame list. And the split counts NA as a distinct value, so a ten-value numeric demographic is cross-tabulated while the same variable with one blank is summarised as means.
+
+Suite on the branch: FAIL 0, WARN 0, SKIP 0, PASS 1345, from my own run. At `db2c66dc`: FAIL 0, WARN 0, SKIP 0, PASS 1258, which matches the handover's stated baseline exactly.
+
+## 1. Gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Segment suite, base `db2c66dc` | detached worktree, `RENV_CONFIG_AUTOLOADER_ENABLED=FALSE R_LIBS_USER=<main renv library> Rscript -e 'testthat::test_dir("modules/segment/tests/testthat")'` from the worktree root | FAIL 0, WARN 0, SKIP 0, PASS 1258 (13.0 s). Matches the handover's baseline. |
+| Segment suite, branch `906428dc` | same call from the repo root | FAIL 0, WARN 0, SKIP 0, PASS 1345 (20.8 s). Matches the handover's claim. |
+| Tabs suite | not run | Not needed. Session D's delta (`git diff --stat db2c66dc..HEAD`) is 21 files: `modules/segment/**`, `docs/v2_lift/**` and `examples/segment/README.md`. Nothing outside `modules/segment` carries code, and `modules/shared` is untouched, so the three tabs tests that source every file in `modules/shared/lib` cannot be affected. |
+| Scope | `git diff --stat db2c66dc..HEAD` | 21 files, 1190 insertions, 22 deletions. No module other than segment. |
+| Thornhill final mode, base | `turas_segment_from_config()` on a scratch copy of `Thornhill_Segment_Config.xlsx` with an absolute scratch `output_folder` | PASS. Report sheets: `Summary, Segment_Profiles, Validation, Executive_Summary, Classification_Rules, Run_Status`. No `Demographics_Tests`, no `Demo_*`. `grep -o "Demographic[a-z]*"` on the HTML returns nothing. |
+| Thornhill final mode, branch | same config | PASS, 1200 respondents, silhouette 0.510. Sheets gain `Demographics_Tests, Demo_age_band, Demo_region, Demo_shops_online`. HTML carries `id="seg-demographics"`, `seg-demographics-section` and a titled block for each of `age_band`, `region`, `shops_online`. |
+| Numbers, independent recompute | join `thornhill_segment_assignments.xlsx` to `Thornhill_Segment_Data.xlsx` on `respondent_id`, drop unassigned, `prop.table(table(var, segment_name), margin = 2) * 100` and `prop.table(table(var)) * 100`, both rounded to 1dp | 1200 clustered rows joined. `region`, `age_band`, `shops_online`: max segment-cell difference 0.0000, max Overall difference 0.0000. Every segment column sums to 100 within 0.25. |
+| Base note | same join | Per-segment n 532, 263, 405; total 1200. The rendered note reads "Base: 1200 respondents who were clustered (Moderate n=532, Moderate 2 n=263, Satisfied n=405)." Exact match. |
+| Combined mode + `tabs_export = Y`, base | `method = kmeans,hclust` on the same data | PASS. `grep -in tabs` on the run log returns nothing. Files written: the two per-method assignment files and two models, no tabs file. F14 reproduced as described. |
+| Combined mode + `tabs_export = Y`, branch | same config | REFUSED `CFG_TABS_EXPORT_COMBINED`, with the console line before it. `grep -c` for any clustering progress line returns 0, so it refuses before clustering. No output folder created. |
+| Combined mode + `tabs_export = N`, branch | same config, export off | PASS, and the console carries "Report section skipped: demographic profiles" and "single-method final run". |
+| Single method + `tabs_export = Y`, branch | `method = kmeans` | PASS, and `p_tabs_banner_stub.xlsx` and `p_tabs_data.xlsx` are written. The refusal is scoped to combined mode only. |
+| Template workbook | `generate_segment_config_template()` to a scratch path | Config sheet carries `demographic_vars` (row 7), `html_show_demographics` (row 56, default TRUE) and `tabs_export` (row 78) whose description now ends "Single-method final mode only." |
+| Mutation tests | ten reverts, one at a time, suite run with `filter='demographics|tabs_export'`, file restored and `git status --short` confirmed clean between each | Nine caught, one stayed green. Table in section 2a. |
+| Em dashes | `git diff db2c66dc..HEAD | grep "^+", then a grep for the em dash character and for the `&mdash;` entity` | Two hits, neither an em dash in Session D's own prose: one is a note discussing the `&mdash;` entity it removed, the other is the pre-existing `V2_LIFT_PROGRAM.md` segment row, whose em dashes date from the July review and which Session D only appended to. |
+
+## 2. Findings
+
+Severity: CRITICAL blocks merge; HIGH should be fixed before the work is relied on; MEDIUM after; LOW is polish; OBS is context. Line numbers are on the branch at `906428dc`.
+
+| ID | Sev | File:line | Finding | How verified | Status |
+|---|---|---|---|---|---|
+| D1 | HIGH | `lib/html_report/03c_section_builders.R:706`; `:763-765` | The section's stated base is the clustered sample, but every percentage in it is computed among the respondents who answered that demographic. The base note reads "Base: N respondents who were clustered (per-segment n)", taken from `html_data$segment_sizes`, and the intro then says "The Overall column is the same calculation on the whole clustered sample". Both are false for any demographic with blanks, and nothing in the section gives the answered n per variable. `table()` drops NA in `profile_demographics()` (`R/05_profiling.R:534,537`), which is the right arithmetic; it is the label that is wrong. The intro's earlier clause, "across the respondents who answered that question", is correct and contradicts the later sentence. | Reproduced through the pipeline. A 400-row run whose `has_car` was unanswered by exactly one discovered segment (n=115) rendered Overall 50.9 / 49.1, computed on 285 respondents, under "Base: 400 respondents who were clustered (Low n=115, ...)". At the function level, a `region` with 80 blanks gave answered n per segment of 102, 111, 107 against clustered n of 134, 133, 133, and the Overall column was built on 320 of 400. | Open. Fix is wording plus a per-variable answered n. |
+| D2 | MEDIUM (pre-existing, newly reachable) | `R/05_profiling.R:509-515` | The type split sends factors, characters and anything with ten or fewer distinct values to the categorical branch and numerics to the numeric branch. A variable that is neither, with more than ten distinct values, matches no branch: it enters neither profile list, gets no chi-square row, no sheet and no table, and the run still reports PASS. The section's new "Not shown, because no clustered respondent answered" note (`03c:722-726`) cannot name it either, because that note is built from the frame lists and the variable never reaches them. Reachable because the shared loader reads xlsx with `readxl::read_excel` (`modules/shared/lib/data_utils.R:66`), which returns POSIXct for date-formatted cells. | Reproduced end to end. A config naming `demographic_vars = region,interview_date` with `interview_date` a POSIXct of 50 distinct days: run PASS, `categorical_profiles` holds only `region`, `numeric_profiles` is empty, `chi_sq_tests$Variable` is `region` alone, sheets are `Demographics_Tests, Demo_region`, and `grepl("interview_date", html)` is FALSE. The variable is named in the config and appears nowhere. | Open. Duncan's ruling: refuse the class at load, or route it to the categorical branch, or name it in the skipped note. |
+| D3 | MEDIUM (pre-existing, newly reachable) | `R/05_profiling.R:510`; docstring `lib/html_report/02_table_builder.R:450` | The split uses `length(unique(data[[var]])) <= 10`, and `unique()` counts NA as a value. A numeric demographic with exactly ten distinct values is cross-tabulated; the same variable with a single blank has eleven unique values and is summarised as means instead. A ten-point coded demographic with any missing data therefore silently changes form. The new docstring states the rule as "a numeric variable with more than ten distinct values", which is inaccurate in exactly that case. | Reproduced at the function level. Ten distinct values, no NA: `categorical: x`, `numeric:` empty. The same vector with five NAs: `categorical:` empty, `numeric: x`. Eleven distinct values, no NA: numeric, as documented. | Open. |
+| D4 | LOW | `lib/html_report/03c_section_builders.R:722-726`; `R/05_profiling.R:536` | A demographic answered by nobody in one segment produces `NaN` for that column from `prop.table` on an all-zero margin. It renders as "-" in the HTML (`02_table_builder.R:404` treats NaN as NA) and as `NA` in the `Demo_*` sheet, which is a fair rendering, but no note says why the column is blank, and the chi-square row for that variable comes back all-NA because `chisq.test()` refuses the table, with nothing in the report saying the test did not run. The "nobody answered" note does not fire, because the frame is not empty. | Reproduced through the pipeline in the same run as D1: the `Low` column rendered "-" for both categories, `Demo_has_car` carried NA, the chi row was `NA, NA, <NA>, NA, NA`, and `grepl("no clustered respondent answered", html)` was FALSE. | Open. |
+| D5 | LOW | `R/09_output.R:812-818` | The sheet-name collision guard, which de-duplicates two demographic names that truncate to the same 31-character sheet, has no test: mutation M7 disabled it and the suite stayed at FAIL 0, PASS 173. The guard itself works. A second point on the same lines: the de-duplicated name drops the characters that distinguish the variable, so neither sheet identifies which variable it holds. | Mutation M7 (green with the guard disabled). Then a probe with `household_income_bracket_detailed_a` and `..._b`, which both truncate to `Demo_household_income_bracket_d`: the run passed and wrote `Demo_household_income_bracket_d` and `Demo_household_income_bracket_2`, with the right frames in each and no way to tell from the names which is which. | Open. Test owed; the guard is correct. |
+| D6 | LOW | `R/10_utilities.R:1669` | The template describes `demographic_vars` as "Comma-separated categorical variables for demographic profiling". Session D added rendering and a workbook sheet for numeric demographics, so the description now understates what the setting takes. The generated template workbook carries the same wording. | Read, plus the generated template workbook (row 7 of its Config sheet). Numeric support confirmed by execution: a run with `demographic_vars = region,age_years` writes `Demo_age_years` and a `seg-demographics-numeric-section` block. | Open. |
+| D7 | OBS | `lib/html_report/03c_section_builders.R:757-766` | A clustering variable named as a demographic is profiled without a word about circularity. Its separation between segments is guaranteed by construction, because the segments were built from it. The section's intro does not say so, and the numeric note says only that the tables carry no test. | Reproduced. `demographic_vars = region,q1` with `q1` a clustering variable: `Demo_q1` written, a numeric block rendered, and `grepl("clustering variable", html)` FALSE. | Recorded. |
+| D8 | OBS | `R/05_profiling.R:648-661`; `lib/html_report/02_table_builder.R:453-457` | Numeric demographics carry no test statistic. `profile_demographics()` runs a one-way ANOVA per numeric variable, prints the verdict and discards the p-value (`:653`), so there is nothing to render. The handover asked for a p-value column or a stated deferral; Session D rendered the table without one and documented why in the builder's docstring and in the section's own note ("The numeric tables are descriptive: they carry no test"). An honest deviation, recorded rather than charged. | Read, and confirmed in the rendered HTML, which carries "carry no test". | Recorded. |
+
+### 2a. Mutation tests
+
+Each revert was a one-line edit on the branch, the suite was run filtered to `demographics|tabs_export`, the file was restored with `git checkout --` and `git status --short` was confirmed clean before the next.
+
+| # | Reverted | Result |
+|---|---|---|
+| M1 | the `profile_demographics()` call in `R/00_main.R:373` | FAIL 16, PASS 44. Caught. |
+| M2 | `demographics_section` from the page body, `03_page_builder.R:334` | FAIL 7, PASS 73. Caught. |
+| M3 | the Excel demographic sheets, `R/09_output.R:795` | FAIL 6, PASS 74. Caught. |
+| M4 | the F14 refusal, `R/01_config.R:730` | FAIL 2, PASS 170. Caught. |
+| M5 | the missing-demographic refusal, `R/02_data_prep.R:89` | FAIL 4, PASS 76. Caught. |
+| M6 | the `<<-` in the chi-square error handler, `R/05_profiling.R:587` | FAIL 2, PASS 78. Caught. |
+| M7 | the sheet-name collision guard, `R/09_output.R:812` | FAIL 0, PASS 173. **Stayed green.** Finding D5. |
+| M8 | the exploration skip note, `R/00_main.R:773` | FAIL 2, PASS 78. Caught. |
+| M9 | the multi-method skip note, `R/00_main.R:888` | FAIL 2, PASS 78. Caught. |
+
+A first attempt at M7 targeted `R/09_output.R:817`, which broke the file's brace balance and produced no suite summary at all; it is reported here as an invalid mutation and was retried at the correct line, 812.
+
+## 3. Claims in the brief, one by one
+
+### Both ways
+
+| Claim | Base `db2c66dc` | Branch `906428dc` |
+|---|---|---|
+| `profile_demographics()` has no caller | `grep -rn "profile_demographics("` over `R/` and `lib/` returns two roxygen lines and no call | a call at `R/00_main.R:377` |
+| the Thornhill HTML has no Demographics section | `grep -o "Demographic[a-z]*"` returns nothing; 0 section markers | `id="seg-demographics"`, `seg-demographics-section`, three titled blocks |
+| no demographic workbook sheets | six sheets, none of them demographic | four added: `Demographics_Tests`, `Demo_age_band`, `Demo_region`, `Demo_shops_online` |
+| `build_seg_demographics_section` does not exist | no occurrence anywhere in `modules/segment` | defined at `03c_section_builders.R:685` and called at `03_page_builder.R:148` |
+| a combined config with `tabs_export = Y` runs silently | PASS, no `tabs` string in the log, no tabs file | REFUSED `CFG_TABS_EXPORT_COMBINED` before clustering |
+
+### Numbers
+
+Recomputed independently, not read back. Every figure below is from my own join of the assignments file to the source data, and the comparison is absolute.
+
+| Variable | Max segment-cell difference | Max Overall difference | Columns sum to 100 |
+|---|---|---|---|
+| `region` | 0.0000 | 0.0000 | yes, within 0.25 |
+| `age_band` | 0.0000 | 0.0000 | yes, within 0.25 |
+| `shops_online` | 0.0000 | 0.0000 | yes, within 0.25 |
+
+The HTML renders the same figures at whole-percentage resolution, which is where "give or take rounding" in the intro earns its place: `region` in the Moderate column reads 29, 23, 26, 23 and sums to 101. A numeric demographic was checked separately, since Thornhill has none: a run with `age_years` added wrote `Demo_age_years` and rendered a numeric block with the mean, median, SD, min and max per segment and an Overall row.
+
+### The honesty text
+
+| Check | Result |
+|---|---|
+| the base note | Correct as a statement of who was clustered, wrong as the base for the percentages above it whenever the demographic has blanks. Finding D1. |
+| the chi-square caveat | Accurate, and correctly conditional. It fires only when `chi_sq_tests` has rows (`03c:770-782`), so an all-numeric set of demographics does not point at a `Demographics_Tests` sheet the workbook does not have. It names the in-sample problem plainly and it names the low-expected-count flag, which the tests sheet does carry (`Low_Expected`, `R/05_profiling.R:592`). |
+| percentages are within segment among respondents with an answer | True of the arithmetic. `table()` drops NA in both margins, so each column is over answerers. The note does not say the base shrinks, and one sentence says the opposite. Finding D1. |
+| blanks in a demographic | Handled correctly and described incorrectly. Thornhill has zero NA and zero empty strings in all three demographics, so the shipped example exercises none of this; I injected blanks to test it. |
+| a variable nobody answered | Named in the section by the new note, and its chi-square row survives with six columns rather than vanishing. Both verified, and the `<<-` that makes it work is pinned by a test (M6). A variable nobody answered *in one segment only* is not named. Finding D4. |
+
+### Places the brief said to look
+
+| Item | Result |
+|---|---|
+| `html_show_demographics` in the template and the generated workbook | Present in both, default TRUE, and it is now parsed to a logical by `get_logical_config()` (`R/01_config.R:448`) so the `isTRUE(... %||% TRUE)` gate at `03_page_builder.R:101` behaves. Verified by execution in both directions: the section is absent with FALSE and the sheets remain, which the suite also pins. |
+| combined mode | Gets a console skip note rather than the section, which is the handover's logged choice. Verified: the note prints with `tabs_export = N`, and with `Y` the run refuses first. Exploration mode gets its own note. Both notes are pinned by tests (M8, M9). |
+| a demographic that is also a clustering or profile variable | Profiled, with no circularity note. Finding D7. |
+| a demographic with a single category | Handled without error: the profile frame reads 100 in every column and the chi-square row is computed. Worth knowing that `chisq.test()` on a one-row table runs a goodness-of-fit test against equal segment sizes rather than a test of association, so the row reports DF 2 and p 0.998 for a variable that cannot differ. It is non-significant, and the 100s make the constancy obvious, so I am recording it rather than raising it. |
+| a numeric demographic with exactly ten distinct values | Treated as categorical, as the handover said. But NA counts towards the ten. Finding D3. |
+
+### F8, F9, F17
+
+| Finding | Claim | Result |
+|---|---|---|
+| F8 | the comment said the console block also reaches the terminal | Fixed at `run_segment_gui.R:377-381`. The comment now says the sink is not split, that it does not reach the launching terminal, and why splitting would be worse. No `split = TRUE` was added, as instructed. Read-level evidence; the Shiny server was not executed in this review. |
+| F9 | mini-batch was told to raise `nstart`, which it ignores | Fixed at `R/03_clustering.R:186-195`. The lever now branches on `use_minibatch` and names `batch_size` or the seed for mini-batch. Read-level evidence; I did not run a 12,000-row non-converging fit to see the branch print. |
+| F17 | the intro promised a share of the total distinction the F basis does not deliver | Fixed at `03c_section_builders.R:596-605`. The `&mdash;` went with it. The new claim that the percentages "sum to 100 by construction" is true: `01_data_transformer.R:224-228` builds them as `f_statistic / sum(f_statistic) * 100`. Confirmed in the rendered Thornhill report, where the six percentages read 22, 21, 20, 18, 10, 9 and sum to 100. |
+
+## 4. Definition of done, against the handover
+
+| Requirement | Result |
+|---|---|
+| suite green, zero skips, new tests in it | FAIL 0, WARN 0, SKIP 0, PASS 1345, my run. |
+| Thornhill to a scratch folder shows `age_band`, `region`, `shops_online` by segment | Yes, and the figures are independently correct. |
+| Excel report with the four new sheets | Yes. |
+| a combined config with `tabs_export = Y` refuses by name before clustering | Yes. |
+| nothing committed under `examples/segment/Output/` | Confirmed: `git status --short` clean, and the delta contains no path under `Output/`. |
+
+## 5. What was not run, or not verified
+
+- The Shiny GUI was not executed. F8 rests on reading the comment against the `sink()` call, not on driving the server. The September review executed that path; nothing in Session D changes it.
+- F9's new branch was not made to print. Reaching it needs a non-converging mini-batch fit, which needs over 10,000 rows and an `ifault`; I read the branch instead.
+- No browser rendering. Every HTML check is on the file text, including the extraction of the section's prose.
+- The pipeline was never run against a real project folder and nothing was written into any OneDrive path. All runs went to the session scratchpad.
+- D4's `NaN` column was reproduced, but only by first discovering the clusters and then blanking the demographic for exactly one of them. I did not establish how a real study would arrive there; correlated routing would do it, which is why it is LOW rather than OBS.
+- The tabs suite was not run, for the reason given in the gates table.
+- The merge base against `main`, `6063bb5c`, was not used for any run, for the reason given at the head of this document.
+- Scratch artefacts for every check are under the session scratchpad, which is session-local and not in the repo.
+
+## 6. What Duncan must rule on or re-eyeball
+
+1. **D1, the base statement.** The fix is wording plus an answered n per variable. Worth doing before the section reaches a client report, because a stated base that is larger than the real one is the one error this module cannot afford.
+2. **D2, a demographic of an unhandled class.** Refuse it at load, route it to the categorical branch, or name it in the skipped note. Refusing at load is the most consistent with what Session D built for the missing-name case.
+3. **D3, NA in the ten-value threshold.** Deciding this changes what a ten-point coded demographic with blanks looks like in the report, so it is a judgement about what a reader should see, not a bug fix.
+4. **launch_turas() eyeball.** Still owed on this branch, per the handover's ground rules. Nothing in this review substitutes for it.
+
