@@ -99,6 +99,7 @@ function coverSandbox(opts) {
   TR.exhibit = { titleFor: () => "EXTITLE", models: () => [], panelsHtml: () => "<div>EXPANELS</div>" };
   TR.cards2 = { chartState: () => ({ type: "bar", kind: "auto", cols: [0] }) };
   load(sb, "24a_reader.js");
+  load(sb, "24b_narrative.js");
   load(sb, "28_insights.js");
   load(sb, "30_story.js");
   load(sb, "32_report.js");
@@ -107,6 +108,16 @@ function coverSandbox(opts) {
 
 const snap = (title) => ({ kind: "snapshot", source: "hub", title: title,
   context: "", html: "<div class='hx'>EVIDENCE</div>", lines: [], note: "" });
+
+// project.narrative as narrative_from_comments (R) builds it from the Comments
+// sheet: a screen per non-blank cell, background first, a paragraph per line.
+const para = (text) => ({ type: "paragraph", runs: [{ text, bold: false, italic: false }] });
+const nar = (background, exec) => [
+  background ? { id: "background-method", title: "Background & method",
+    blocks: background.split("\n").map(para) } : null,
+  exec ? { id: "executive-summary", title: "Executive summary",
+    blocks: exec.split("\n").map(para) } : null
+].filter(Boolean);
 
 console.log("Exec-summary cover (bundle D): suite:");
 
@@ -119,7 +130,7 @@ run("gate: without html_report_v2_cover there is no cover, whatever else is true
   // project.cover, so every report built before this existed behaves as it did.
   const off = coverSandbox({ cover: false,
     userState: { story: [snap("A finding")] },
-    project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
+    project: { name: "P", narrative: nar(null, "The findings that matter.") } });
   eq(off.TR.reader.coverAvailable(), false, "opted out -> never a cover");
   // and the landing / header link follow the same gate
   eq(shellSandbox(false).TR.shell.landingTab("", "takeout"), "takeout",
@@ -127,7 +138,7 @@ run("gate: without html_report_v2_cover there is no cover, whatever else is true
   // the same sandbox with the study opted in DOES open a cover, so the test
   // above is failing on the gate, not on missing content
   const on = coverSandbox({ userState: { story: [snap("A finding")] },
-    project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
+    project: { name: "P", narrative: nar(null, "The findings that matter.") } });
   eq(on.TR.reader.coverAvailable(), true, "opted in + saved + content -> cover");
 });
 
@@ -148,19 +159,23 @@ run("D1: cover opens only when userState AND content. All four combinations", ()
     true, "saved copy + story pins");
 });
 
-run("D1: a config-authored exec summary or background alone is cover content", () => {
-  // Sections are authored in the config (report_meta from the Comments sheet)
-  // and read-only in the app. The cover reads the SAME value the Report tab
-  // shows, so config sections alone (on a saved copy) are content…
+run("D1: a narrative screen alone is cover content", () => {
+  // Screens are authored in Word or the config's Comments sheet and read-only
+  // in the app. The cover reads the SAME island the Report tab shows, so a
+  // screen alone (on a saved copy) is content…
   const exec = coverSandbox({ userState: {},
-    project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
-  eq(exec.TR.reader.coverAvailable(), true, "config exec summary alone");
+    project: { name: "P", narrative: nar(null, "The findings that matter.") } });
+  eq(exec.TR.reader.coverAvailable(), true, "an exec summary screen alone");
   const bg = coverSandbox({ userState: {},
-    project: { name: "P", report_meta: { background: "Fieldwork in May." } } });
-  eq(bg.TR.reader.coverAvailable(), true, "config background alone");
-  const blank = coverSandbox({ userState: {},
-    project: { name: "P", report_meta: { exec_summary: "   " } } });
-  eq(blank.TR.reader.coverAvailable(), false, "whitespace-only section is not content");
+    project: { name: "P", narrative: nar("Fieldwork in May.", null) } });
+  eq(bg.TR.reader.coverAvailable(), true, "a background screen alone");
+  // a blank Comments cell never becomes a screen (narrative_from_comments), so
+  // "nothing authored" reaches the island as no narrative at all
+  const blank = coverSandbox({ userState: {}, project: { name: "P" } });
+  eq(blank.TR.reader.coverAvailable(), false, "no screens is not content");
+  const oldPath = coverSandbox({ userState: {},
+    project: { name: "P", report_meta: { exec_summary: "Old path." } } });
+  eq(oldPath.TR.reader.coverAvailable(), false, "report_meta text is no longer read");
   // …and legacy locally-typed sections in stored state no longer count
   const legacy = coverSandbox({ userState: { report: {
     sections: { exec: "Old locally-typed summary." }, about: {}, slides: [] } } });
@@ -241,7 +256,7 @@ const COVER_OPTS = {
     report: { sections: { exec: "STALE LOCAL EDIT" }, about: {}, slides: [] }
   },
   project: { name: "CCS 2026", client: "CCS", wave: "Wave 2",
-    report_meta: { exec_summary: "Line one.\nLine two." } },
+    narrative: nar(null, "Line one.\nLine two.") },
   questions: [{ code: "Q8", title: "How was registration?",
     headline: "Registration is the pain point" }],
   models: { Q8: { code: "Q8", title: "How was registration?", rows: [], columns: [] } }
@@ -252,13 +267,12 @@ run("D1: cover = title/client/wave + authored sections + explore action", () => 
   const name = at(html, "<h1>CCS 2026</h1>", "report title");
   const sub = at(html, '<div class="cover-sub">CCS · Wave 2</div>', "client · wave");
   assert(name < sub, "title above the client/wave line");
-  at(html, "<h3>Executive summary</h3><p>Line one.</p><p>Line two.</p>",
-    "authored exec summary as paragraphs");
+  at(html, '<h3>Executive summary</h3><div class="nar-body"><p>Line one.</p>' +
+    "<p>Line two.</p></div>", "the first screen, through the shared renderer");
   assert(html.indexOf("STALE LOCAL EDIT") === -1,
     "a legacy locally-typed section never reaches the cover");
-  // NB the section headings are inserted raw, so the literal is "&", not "&amp;".
-  // This assertion used to name the escaped form and so could never fail.
-  assert(html.indexOf("Background & method") === -1,
+  // screen titles are authored and escaped, so the literal is "&amp;"
+  assert(html.indexOf("Background &amp; method") === -1,
     "unauthored section omitted, never an empty card");
   assert(count(html, "data-cover-explore") >= 1, "Explore the dashboard action present");
 });
@@ -489,18 +503,25 @@ run("I20: a copy with NO qual island treats qualitative pins as stale", () => {
 const manyPins = (n) => ({ userState: { story:
   Array.from({ length: n }, (_, i) => snap("F" + (i + 1))) } });
 
-run("sections read background BEFORE executive summary (as the Report tab does)", () => {
-  // Duncan's order. The Report tab's own SECTIONS list has always been
-  // [background, exec]; the cover was the one surface disagreeing with it.
+run("the cover leads with the executive summary screen, else the first", () => {
+  // Decided with Duncan, 22 Sep 2026: the cover opens on the first screen
+  // titled "Executive summary..." (TR.narrative.coverScreen), else the first
+  // screen. A Comments-sheet project shows its executive summary and not its
+  // background (it used to show both; the background stays on the Report tab).
   const sb = coverSandbox({ userState: { story: [] },
-    project: { name: "P", report_meta: {
-      background: "How it was done.", exec_summary: "What we found." } } });
+    project: { name: "P", narrative: nar("How it was done.", "What we found.") } });
   const html = sb.TR.reader.coverHtml();
-  const bg = at(html, "Background & method", "background section");
-  const ex = at(html, "Executive summary", "exec section");
-  assert(bg < ex, "background must render above the executive summary");
-  at(READER_SRC, '[["background", "Background & method"], ["exec", "Executive summary"]]',
-    "the order is the literal in coverHtml, not an accident of the data");
+  at(html, "<h3>Executive summary</h3>", "the executive summary's title");
+  at(html, "<p>What we found.</p>", "and its words");
+  assert(html.indexOf("How it was done.") === -1, "the background is not on the cover");
+  // a narrative with no executive summary heading opens on its first screen
+  const word = coverSandbox({ userState: { story: [] }, project: { name: "P",
+    narrative: [{ id: "overview", title: "Overview", blocks: [para("In short.")] },
+      { id: "detail", title: "Detail", blocks: [para("More.")] }] } });
+  const wh = word.TR.reader.coverHtml();
+  at(wh, "<p>In short.</p>", "the first screen");
+  assert(wh.indexOf("More.") === -1, "and only that screen");
+  assert(READER_SRC.indexOf("coverParas") === -1, "no cover paragraph splitter of its own");
 });
 
 run("limit: absent cover_findings keeps the default of 5", () => {
@@ -613,27 +634,29 @@ run("scrollToTop is safe where there is no window scrolling at all", () => {
 
 /* -------- a pinned narrative section must not appear twice on the cover ----- */
 
-// what pinning the Report tab's "Executive summary" card actually stores:
-// snap-source="report", the heading as the title (32_report.js sectionsHtml)
+// what pinning the Report tab's "Executive summary" card USED to store, and a
+// reader's saved story can still hold: snap-source="report", the heading as the
+// title. Today the card pins by reference (screenPin below).
 const sectionPin = (heading) => ({ kind: "snapshot", source: "report",
   title: heading, context: "", html: "<div>the authored words</div>",
   lines: [], note: "" });
+const screenPin = (id) => ({ kind: "narrative", screen: id, heading: "", note: "" });
 
 run("a pinned section is NOT repeated as a leading finding", () => {
-  // The cover renders background + exec from the authored text already. Duncan
-  // pinned them as well and got each one twice.
+  // The cover renders the first screen from the island already. Duncan pinned
+  // the sections as well and got each one twice.
   const sb = coverSandbox({
     userState: { story: [sectionPin("Executive summary"),
-      sectionPin("Background & method"), snap("A real finding")] },
-    project: { name: "P", report_meta: {
-      background: "How it was done.", exec_summary: "What we found." } } });
+      screenPin("background-method"), screenPin("executive-summary"),
+      snap("A real finding")] },
+    project: { name: "P", narrative: nar("How it was done.", "What we found.") } });
   eq(sb.TR.reader.coverEvidence().map((f) => f.title), ["A real finding"],
-    "the two section pins are not evidence for the cover");
+    "section pins, old and new, are not evidence for the cover");
   const html = sb.TR.reader.coverHtml();
-  // each section's words appear exactly once, as the section, not again below
-  eq(count(html, "What we found."), 1, "exec summary rendered once");
-  eq(count(html, "How it was done."), 1, "background rendered once");
-  eq(count(html, 'class="cf-title"'), 1, "one finding, not three");
+  // the cover screen's words appear exactly once, as the section
+  eq(count(html, "What we found."), 1, "the cover screen rendered once");
+  eq(count(html, "How it was done."), 0, "the pinned background is not a finding");
+  eq(count(html, 'class="cf-title"'), 1, "one finding, not four");
   assert(html.indexOf("the authored words") === -1,
     "the pin's captured html must not render as a finding thumbnail");
 });
@@ -656,6 +679,7 @@ run("only the narrative sections are dropped. Every other pin source stays", () 
   eq(sb.TR.reader.coverEvidence().length, other.length,
     "no other snapshot source is treated as a section");
   eq(sb.TR.reader.isCoverSectionPin(sectionPin("Executive summary")), true, "report source");
+  eq(sb.TR.reader.isCoverSectionPin(screenPin("executive-summary")), true, "a narrative pin");
   eq(sb.TR.reader.isCoverSectionPin(snap("x")), false, "hub snapshot is a finding");
   // a slide pin is kind "slide", not a snapshot at all
   eq(sb.TR.reader.isCoverSectionPin({ kind: "slide", slide: 0 }), false, "slide pin kept");
@@ -665,16 +689,16 @@ run("the cover still opens when the ONLY pins are narrative sections", () => {
   // findings are now empty, so coverAvailable has to fall through to the
   // authored-section check or the cover would vanish for this analyst.
   const sb = coverSandbox({
-    userState: { story: [sectionPin("Executive summary")] },
-    project: { name: "P", report_meta: { exec_summary: "What we found." } } });
+    userState: { story: [sectionPin("Executive summary"), screenPin("executive-summary")] },
+    project: { name: "P", narrative: nar(null, "What we found.") } });
   eq(sb.TR.reader.coverFindings().length, 0, "no findings");
-  eq(sb.TR.reader.coverAvailable(), true, "but the authored section keeps the cover");
+  eq(sb.TR.reader.coverAvailable(), true, "but the authored screen keeps the cover");
 });
 
 run("the PPTX cover drops section pins too, and keeps them as their own slides", () => {
   at(STORY_SRC, "isCoverSectionPin", "the deck cover reuses the reader's test");
   const sb = coverSandbox({});
-  const list = [sectionPin("Executive summary"), snap("F1")];
+  const list = [sectionPin("Executive summary"), screenPin("executive-summary"), snap("F1")];
   // the deck's own filter, exercised through the shared predicate
   const kept = list.filter((it) => !sb.TR.reader.isCoverSectionPin(it));
   eq(kept.map((f) => f.title), ["F1"], "only the real finding reaches the cover slide");

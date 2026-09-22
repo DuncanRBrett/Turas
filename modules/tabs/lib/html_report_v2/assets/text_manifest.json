@@ -616,6 +616,11 @@
     "context": "Report tab. What the reader's own Added slides are for and how to make one.",
     "tokens": []
   },
+  "story.narrative_gone": {
+    "page": "Story",
+    "context": "Story tab, Present and the deck. Shown in place of a pinned summary screen the report no longer carries, because its heading was renamed or the section deleted in the Word document.",
+    "tokens": []
+  },
   "filter.weighting.summary": {
     "page": "Crosstabs",
     "context": "Filter bar. The collapsed weighted-data summary line.",

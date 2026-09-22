@@ -115,6 +115,29 @@ test_that("crosstab config template Population sheet round-trips through the loa
   expect_true(all(frame$population > 1))
 })
 
+test_that("the shipped crosstab template is what the generator writes today", {
+  # The generator gained narrative_file and nine other Settings rows while the
+  # shipped binary stayed behind, so an operator copying the template never saw
+  # them. Every sheet's cells must match a fresh generation. When this fails,
+  # regenerate: generate_crosstab_config_template(
+  #   "modules/tabs/templates/Crosstab_Config_Template.xlsx")
+  shipped <- file.path(tabs_root, "templates", "Crosstab_Config_Template.xlsx")
+  skip_if_not(file.exists(shipped), "shipped template not present")
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+  generate_crosstab_config_template(tmp)
+
+  expect_identical(openxlsx::getSheetNames(shipped), openxlsx::getSheetNames(tmp))
+  for (sheet in openxlsx::getSheetNames(tmp)) {
+    read <- function(path) openxlsx::read.xlsx(path, sheet = sheet, colNames = FALSE,
+                                               skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+    expect_identical(read(shipped), read(tmp), info = paste("sheet", sheet))
+  }
+  settings <- openxlsx::read.xlsx(shipped, sheet = "Settings", colNames = FALSE,
+                                  skipEmptyRows = FALSE)
+  expect_true("narrative_file" %in% settings[[1]])
+})
+
 test_that("crosstab config Settings sheet has expected structure", {
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)

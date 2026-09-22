@@ -243,21 +243,26 @@
 
   function inch(v) { return Math.round(v * EMU); }
 
+  /** One text run. o = {size, italic, alpha, highlight}: alpha (percent) is
+   *  how the divider ordinal is 20%-alpha white; highlight (hex) is a marker
+   *  behind the words (narrative runs only). Shared by para and narrativePara. */
+  function runXml(t, colour, bold, o) {
+    var fill = o.alpha
+      ? '<a:srgbClr val="' + colour + '"><a:alpha val="' +
+        Math.round(o.alpha * 1000) + '"/></a:srgbClr>'
+      : '<a:srgbClr val="' + colour + '"/>';
+    return '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
+      (bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
+      '<a:solidFill>' + fill + '</a:solidFill>' +
+      (o.highlight ? '<a:highlight><a:srgbClr val="' + o.highlight + '"/></a:highlight>' : "") +
+      // explicit latin face: text boxes match the charts (and the theme)
+      '<a:latin typeface="' + STYLE.FONT + '"/>' +
+      "</a:rPr><a:t>" + esc(t) + "</a:t></a:r>";
+  }
+
   function para(text, o) {
     if (!text && !o.delta) return "<a:p/>";
-    var run = function (t, colour, bold) {
-      // optional alpha (percent): the divider ordinal is 20%-alpha white
-      var fill = o.alpha
-        ? '<a:srgbClr val="' + colour + '"><a:alpha val="' +
-          Math.round(o.alpha * 1000) + '"/></a:srgbClr>'
-        : '<a:srgbClr val="' + colour + '"/>';
-      return '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
-        (bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
-        '<a:solidFill>' + fill + '</a:solidFill>' +
-        // explicit latin face: text boxes match the charts (and the theme)
-        '<a:latin typeface="' + STYLE.FONT + '"/>' +
-        "</a:rPr><a:t>" + esc(t) + "</a:t></a:r>";
-    };
+    var run = function (t, colour, bold) { return runXml(t, colour, bold, o); };
     var runs = text ? run(text, o.colour || INK, o.bold) : "";
     // optional wave-change chip as a second coloured run (▼0.1)
     if (o.delta) runs += run("  " + o.delta.text, o.delta.up ? STYLE.GOOD : STYLE.BAD, true);
@@ -1368,6 +1373,375 @@
       footer(next, opts.footer || {}));
   };
 
+  /* ---------------- narrative screens (the Word executive summary) -------- */
+
+  // Rough text metrics for laying words out before PowerPoint does: an Arial
+  // character averages about half an em, a line is 1.25 em, a paragraph adds
+  // 6pt after. Estimates only. Every box also carries normAutofit, so an
+  // under-estimate shrinks the text rather than spilling it off the slide.
+  var NAR_GAP = 6 / 72;
+  function narLineH(size) { return size * 1.25 / 72; }
+  function narLines(text, width, size) {
+    var perLine = Math.max(1, Math.floor(width * 72 / (size * 0.5)));
+    return Math.max(1, Math.ceil(String(text || "").length / perLine));
+  }
+  // A narrative table row is never shorter than this, and adds this much to its
+  // lines for the cell margins (tableFrame: 0.01in top and bottom, 0.03in each
+  // side). A row grows with its words in PowerPoint, so the layout has to size
+  // it the same way or a table of sentences runs off the bottom of the slide.
+  var NAR_ROW_MIN = 0.32, NAR_ROW_PAD = 0.08, NAR_CELL_MARGIN = 0.06;
+
+  /** Estimated height of each table row, from its longest cell at the column
+   *  widths tableFrame gives (a first column of 28% up to 3.4in, the rest
+   *  equal). The same half-em estimate as the text, so it errs tall. */
+  function narTableRowHeights(rows, w, size) {
+    var nCols = rows.length ? rows[0].length : 1;
+    var labelW = Math.min(w * 0.28, 3.4);
+    var colW = (w - labelW) / Math.max(nCols - 1, 1);
+    return rows.map(function (cells) {
+      var lines = cells.reduce(function (m, c, i) {
+        return Math.max(m, narLines(c, (i === 0 ? labelW : colW) - NAR_CELL_MARGIN, size));
+      }, 1);
+      return Math.max(NAR_ROW_MIN, lines * narLineH(size) + NAR_ROW_PAD);
+    });
+  }
+  exporter._narTableRowHeights = narTableRowHeights;   // exposed for the node gate
+
+  // The highlighter's colour on a slide: the report's accent, this share of the
+  // way from white, so black words stay readable on it (the HTML's nar-hl tint).
+  var NAR_HIGHLIGHT_SHARE = 0.3;
+  /** A hex colour mixed with white: share 0 is white, 1 the colour itself. */
+  function narTint(hex, share) {
+    var h = String(hex || "").replace("#", "");
+    if (!/^[0-9a-f]{6}$/i.test(h)) return STYLE.CALLOUT_BG;
+    return [0, 2, 4].map(function (i) {
+      var c = parseInt(h.substr(i, 2), 16);
+      var v = Math.round(255 - (255 - c) * share).toString(16).toUpperCase();
+      return v.length < 2 ? "0" + v : v;
+    }).join("");
+  }
+  exporter._narTint = narTint;   // exposed for the node gate
+
+  // Word's list formats as PowerPoint numbering schemes; anything else is 1. 2. 3.
+  var NAR_AUTONUM = { lowerLetter: "alphaLcPeriod", upperLetter: "alphaUcPeriod",
+    lowerRoman: "romanLcPeriod", upperRoman: "romanUcPeriod" };
+
+  // A wide picture (stretched across the page in Word) keeps its place in the
+  // words. It shares a slide with them only when it can have at least this
+  // share of the slide body's height; otherwise it goes to the next slide,
+  // which it fills. Without a stated size it is taken as 16:9.
+  var NAR_WIDE_MIN_SHARE = 0.45, NAR_WIDE_DEFAULT_RATIO = 16 / 9;
+
+  function narRunsText(runs) {
+    return (runs || []).map(function (r) { return r && r.text != null ? String(r.text) : ""; })
+      .join("");
+  }
+
+  /** A paragraph of Word runs, each keeping its own bold and italic, with an
+   *  optional bullet (o.bullet "char" | "num") at nesting level o.level. A
+   *  numbered paragraph states its own number (o.number, startAt), because
+   *  PowerPoint counts from 1 in every text box: without it the second column
+   *  of a list, and every "(continued)" slide, would start again at 1. */
+  function narrativePara(runs, o) {
+    var level = Math.max(0, Math.min(o.level || 0, 8));
+    // bullets and numbers share one text edge; a number hangs further out than
+    // a bullet, or "10." runs into its text
+    var hang = o.bullet === "num" ? 0.28 : 0.22;
+    var marL = o.bullet ? 0.34 + level * 0.3 : 0;
+    var number = parseInt(o.number, 10);
+    var bullet = o.bullet === "num" ? '<a:buFont typeface="' + STYLE.FONT +
+        '"/><a:buAutoNum type="' + (NAR_AUTONUM[o.format] || "arabicPeriod") + '"' +
+        (number > 0 ? ' startAt="' + number + '"' : "") + "/>"
+      : o.bullet ? '<a:buFont typeface="' + STYLE.FONT + '"/><a:buChar char="•"/>'
+      : "<a:buNone/>";
+    // coloured words take the brand colour and highlighted words the accent
+    // tint, as in the HTML: Word's own colours never reach the deck
+    var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
+    var marker = narTint(TR.charts.accentOf(), NAR_HIGHLIGHT_SHARE);
+    var body = (runs || []).map(function (r) {
+      var t = r && r.text != null ? String(r.text) : "";
+      if (!t) return "";
+      return runXml(t, (r && r.colour) ? brand : (o.colour || INK),
+        !!(o.bold || (r && r.bold)),
+        { size: o.size, italic: !!(r && r.italic), highlight: (r && r.highlight) ? marker : "" });
+    }).join("");
+    return '<a:p><a:pPr marL="' + inch(marL) + '" indent="' +
+      (o.bullet ? -inch(hang) : 0) + '"' + (level ? ' lvl="' + level + '"' : "") +
+      '><a:spcAft><a:spcPts val="600"/></a:spcAft>' + bullet + "</a:pPr>" +
+      (body || '<a:endParaRPr lang="en-US" dirty="0"/>') + "</a:p>";
+  }
+
+  /** One screen's blocks as layout elements, in document order. A text
+   *  element is one paragraph (grouped into a text box at layout time so it can
+   *  break across slides between paragraphs); quotes, tables and long lists
+   *  are placed whole. A wide picture is placed in its turn; a small one is
+   *  pulled out to the side column and is not an element here. */
+  function narrativeElements(blocks, textW, twoCols) {
+    var els = [], lead = true;
+    var text = function (runs, o, chars) {
+      var size = o.size;
+      els.push({ kind: "text", xml: narrativePara(runs, o),
+        h: narLines(chars, textW - (o.bullet ? 0.3 + (o.level || 0) * 0.3 : 0), size) *
+          narLineH(size) + NAR_GAP });
+    };
+    // numbers are worked out over the WHOLE list before it is split into
+    // columns or slides, so each part carries on from the last
+    var listParas = function (items, width, numbers) {
+      return (items || []).map(function (it, i) {
+        var lvl = Math.max(0, parseInt(it && it.level, 10) || 0);
+        var t = narRunsText(it && it.runs);
+        return { xml: narrativePara(it && it.runs, { size: SIZE.body, level: lvl,
+            bullet: it && it.ordered ? "num" : "char", number: numbers[i],
+            format: it && it.format }),
+          h: narLines(t, width - 0.3 - lvl * 0.3, SIZE.body) * narLineH(SIZE.body) + NAR_GAP };
+      });
+    };
+    (blocks || []).forEach(function (b) {
+      if (!b || typeof b !== "object") return;
+      if (b.type === "paragraph") {
+        var size = lead ? SIZE.lead : SIZE.body;
+        text(b.runs, { size: size }, narRunsText(b.runs));
+        lead = false;
+        return;
+      }
+      lead = false;
+      if (b.type === "subheading") {
+        // Heading 3 (level 3) is the smaller sub-heading, at body size
+        text([{ text: b.text || "", bold: true }],
+          { size: parseInt(b.level, 10) === 3 ? SIZE.body : SIZE.lead,
+            colour: TR.charts.brandOf().replace("#", "").toUpperCase() },
+          b.text || "");
+      } else if (b.type === "list") {
+        var items = b.items || [];
+        var numbers = TR.narrative.listNumbers(items);
+        // a long list reads in two columns, as it does in Present. Split at a
+        // top-level item so no sub-list is cut from its parent
+        if (twoCols && items.length > 6) {
+          var half = Math.ceil(items.length / 2);
+          while (half < items.length && (parseInt(items[half].level, 10) || 0) > 0) half++;
+          var colW = (textW - 0.4) / 2;
+          var left = listParas(items.slice(0, half), colW, numbers.slice(0, half));
+          var right = listParas(items.slice(half), colW, numbers.slice(half));
+          var sum = function (ps) { return ps.reduce(function (a, p) { return a + p.h; }, 0); };
+          els.push({ kind: "cols", left: left, right: right,
+            h: Math.max(sum(left), sum(right)), items: items });
+        } else {
+          listParas(items, textW, numbers).forEach(function (p) {
+            els.push({ kind: "text", xml: p.xml, h: p.h });
+          });
+        }
+      } else if (b.type === "quote") {
+        var qt = narRunsText(b.runs);
+        els.push({ kind: "band", runs: b.runs,
+          h: narLines(qt, textW - 0.5, SIZE.lead) * narLineH(SIZE.lead) + 0.3 });
+      } else if (b.type === "table") {
+        var rows = (b.rows || []).map(function (r) {
+          return (Array.isArray(r) ? r : [r]).map(function (c) { return c == null ? "" : String(c); });
+        }).filter(function (r) { return r.length; });
+        if (rows.length) els.push({ kind: "table", rows: rows });
+      } else if (b.type === "image" && b.wide) {
+        var pic = exporter.slidePicture({ image: b.src, w: b.width, h: b.height });
+        if (pic) els.push({ kind: "picture", pic: pic });
+      }
+    });
+    return els;
+  }
+
+  /**
+   * A narrative screen as deck slides: the Present layout in PowerPoint. The
+   * screen title leads in the shared header, the first paragraph is the lead,
+   * sub-headings are brand-coloured, bullets keep their nesting and numbering,
+   * a list longer than 6 reads in two columns, the Quote style is a gold band,
+   * simple tables are native tables, and small pictures sit in a column beside
+   * the words. A wide picture (stretched across the page in Word) spans the
+   * word column where it sits in the text, or fills the next slide when too
+   * little room is left. The pin's commentary is the gold insight band on the
+   * first slide.
+   *
+   * Nothing is dropped. Words that do not fit carry on to a "(continued)"
+   * slide at a paragraph, list item or table-row boundary; a table that
+   * breaks repeats its first row, which is styled as the header row (Word
+   * tables almost always open with one). Every picture goes on the first
+   * slide, sharing the column's height.
+   *
+   * @param {Object} screen - {id, title, blocks} from project.narrative
+   * @param {Object} [opts] - {kicker, note}
+   * @returns {Array} one or more rich slides {xml, charts, images}
+   */
+  exporter.narrativeSlides = function (screen, opts) {
+    opts = opts || {};
+    var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
+    var blocks = Array.isArray(screen && screen.blocks) ? screen.blocks : [];
+    var pics = blocks.filter(function (b) { return b && b.type === "image" && !b.wide; })
+      .map(function (b) {
+        return exporter.slidePicture({ image: b.src, w: b.width, h: b.height });
+      }).filter(Boolean);
+    var BODY = STYLE.BODY;
+    var textW = pics.length ? BODY.w * 0.58 : BODY.w;
+    // beside a picture the text column is too narrow to split again
+    var els = narrativeElements(blocks, textW, !pics.length);
+    var note = String(opts.note || "").trim();
+    var noteLines = note ? wrapText(note, 150) : [];
+    var noteH = note ? 0.45 + noteLines.length * 0.24 : 0;
+    var title = String((screen && screen.title) || "");
+    var slides = [];
+    var page = null;
+
+    var openPage = function () {
+      var id = 1;
+      var first = !slides.length;
+      page = { next: function () { return ++id; }, y: BODY.y, pending: [], textY: null,
+        bottom: BODY.y + BODY.h - (first && note ? noteH + 0.12 : 0), images: [],
+        empty: true };
+      page.xml = header(page.next, { kicker: opts.kicker || "",
+        title: first ? title : title + " (continued)" });
+      if (first && pics.length) placePictures();
+      if (first && note) page.xml += callout(page.next, noteLines, noteH);
+      slides.push(page);
+    };
+    var flushText = function () {
+      if (!page.pending.length) return;
+      var h = page.y - page.textY;
+      page.xml += textBox(page.next(), { x: BODY.x, y: page.textY, w: textW, h: h },
+        page.pending);
+      page.pending = [];
+      page.textY = null;
+    };
+    var closePage = function () {
+      flushText();
+      page.xml += footer(page.next, {});
+    };
+    var fits = function (h) { return page.empty || page.y + h <= page.bottom; };
+    var newPageIfNeeded = function (h) {
+      if (fits(h)) return;
+      closePage();
+      openPage();
+    };
+    // One picture on the current slide. Its rel is numbered by its place in
+    // page.images (TR.pptx.package numbers them from rId2 on a chart-less slide)
+    var addPicture = function (pic, box) {
+      page.xml += '<p:pic><p:nvPicPr><p:cNvPr id="' + page.next() + '" name="Picture"/>' +
+        '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>' +
+        '<p:blipFill><a:blip r:embed="rId' + (2 + page.images.length) + '"/><a:stretch>' +
+        "<a:fillRect/></a:stretch></p:blipFill><p:spPr>" +
+        '<a:xfrm><a:off x="' + inch(box.x) + '" y="' + inch(box.y) + '"/>' +
+        '<a:ext cx="' + inch(box.w) + '" cy="' + inch(box.h) + '"/></a:xfrm>' +
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+      page.images.push({ bytes: pic.bytes, ext: pic.ext });
+    };
+    function placePictures() {
+      var colX = BODY.x + textW + 0.35, colW = BODY.w - textW - 0.35;
+      var gap = 0.15, share = (page.bottom - BODY.y - gap * (pics.length - 1)) / pics.length;
+      var y = BODY.y;
+      pics.forEach(function (pic) {
+        var ar = (pic.w && pic.h) ? pic.w / pic.h : colW / share;
+        var w = colW, h = colW / ar;
+        if (h > share) { h = share; w = share * ar; }
+        addPicture(pic, { x: colX, y: y, w: w, h: h });
+        y += h + gap;
+      });
+    }
+    // A wide picture at its place in the words: the word column's width, or
+    // less to keep its shape in the room left; on to a new slide when that
+    // room is under NAR_WIDE_MIN_SHARE of the body and the picture wants more
+    var placeWide = function (pic) {
+      var ar = (pic.w && pic.h) ? pic.w / pic.h : NAR_WIDE_DEFAULT_RATIO;
+      var natural = textW / ar;
+      var least = Math.min(natural, NAR_WIDE_MIN_SHARE * (page.bottom - BODY.y));
+      if (!page.empty && page.bottom - page.y < least) { closePage(); openPage(); }
+      flushText();
+      var h = Math.min(natural, page.bottom - page.y), w = h * ar;
+      addPicture(pic, { x: BODY.x + (textW - w) / 2, y: page.y, w: w, h: h });
+      page.y += h + 0.12;
+      page.empty = false;
+    };
+    var placeTable = function (rows) {
+      // every row padded to the widest, so a ragged row never loses a cell
+      var width = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+      var pad = function (r) {
+        var cells = r.slice();
+        while (cells.length < width) cells.push("");
+        return cells;
+      };
+      var head = pad(rows[0]), body = rows.slice(1).map(pad);
+      var heights = narTableRowHeights([head].concat(body), textW, SIZE.tableSmall);
+      var headH = heights[0], bodyH = heights.slice(1);
+      var matrixOf = function (chunk) {
+        return { head: head, body: chunk.map(function (cells) {
+          return { kind: "row", cells: cells };
+        }) };
+      };
+      var i = 0;
+      do {
+        newPageIfNeeded(headH + (bodyH[i] || 0));
+        flushText();
+        // as many rows as fit under the repeated header, and always at least
+        // one, so a row taller than a slide still gets a slide of its own
+        var h = headH, end = i;
+        while (end < body.length && (end === i || page.y + h + bodyH[end] <= page.bottom)) {
+          h += bodyH[end];
+          end++;
+        }
+        var chunk = body.slice(i, end);
+        page.xml += tableFrame(page.next(), { x: BODY.x, y: page.y, w: textW, h: h },
+          matrixOf(chunk), brand, SIZE.tableSmall);
+        page.y += h + 0.18;
+        page.empty = false;
+        i = end;
+        if (i < body.length) { closePage(); openPage(); }
+      } while (i < body.length);
+    };
+
+    openPage();
+    els.forEach(function (el) {
+      if (el.kind === "cols" && el.h > page.bottom - BODY.y) {
+        // taller than a whole slide in two columns: one column that breaks
+        el = { kind: "split", parts: el.left.concat(el.right) };
+      }
+      if (el.kind === "split") {
+        el.parts.forEach(function (p) {
+          newPageIfNeeded(p.h);
+          if (page.textY === null) page.textY = page.y;
+          page.pending.push(p.xml);
+          page.y += p.h;
+          page.empty = false;
+        });
+        return;
+      }
+      if (el.kind === "text") {
+        if (!fits(el.h)) { closePage(); openPage(); }
+        if (page.textY === null) page.textY = page.y;
+        page.pending.push(el.xml);
+        page.y += el.h;
+        page.empty = false;
+        return;
+      }
+      if (el.kind === "table") { placeTable(el.rows); return; }
+      if (el.kind === "picture") { placeWide(el.pic); return; }
+      newPageIfNeeded(el.h);
+      flushText();
+      if (el.kind === "cols") {
+        var colW = (textW - 0.4) / 2;
+        page.xml += textBox(page.next(), { x: BODY.x, y: page.y, w: colW, h: el.h },
+          el.left.map(function (p) { return p.xml; }));
+        page.xml += textBox(page.next(), { x: BODY.x + colW + 0.4, y: page.y, w: colW,
+          h: el.h }, el.right.map(function (p) { return p.xml; }));
+      } else if (el.kind === "band") {
+        page.xml += rectShape(page.next(), { x: BODY.x, y: page.y, w: textW, h: el.h - 0.1 },
+          STYLE.CALLOUT_BG) +
+          rectShape(page.next(), { x: BODY.x, y: page.y, w: 0.05, h: el.h - 0.1 }, STYLE.GOLD) +
+          textBox(page.next(), { x: BODY.x + 0.2, y: page.y + 0.06, w: textW - 0.35,
+            h: el.h - 0.2 }, [narrativePara(el.runs, { size: SIZE.lead, bold: true })]);
+      }
+      page.y += el.h + 0.08;
+      page.empty = false;
+    });
+    closePage();
+    return slides.map(function (pg) {
+      return { xml: wrapSlide(pg.xml), charts: [], images: pg.images };
+    });
+  };
+
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July",
     "August", "September", "October", "November", "December"];
 
@@ -1376,7 +1750,7 @@
    * REPORT kicker, project name, client · wave · date, the authored exec
    * summary (first two paragraphs) and the leading findings as numbered
    * insight lines with gold chips. The same content as the HTML cover
-   * (reader.coverFindings / report.sectionText), passed in by the deck
+   * (reader.coverFindings / narrative.blocksText), passed in by the deck
    * assembler so this stays data-source-agnostic. Degrades to a clean title
    * cover when spec carries no exec text / findings.
    * spec = {exec, findings: [title, …]}. Replaces titleSlide in the editable

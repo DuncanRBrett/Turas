@@ -233,14 +233,24 @@ run("weighted base rows land in TSV and carry '–' for a column missing baseW",
 // Real exporter + real story assembler (30_story) and exhibit engine (30x)
 // over minimal state stubs. The asserts run against genuine slide XML.
 
+vm.runInContext(readFileSync(path.join(JS_DIR, "24b_narrative.js"), "utf8"), sandbox,
+  { filename: "24b_narrative.js" });
 vm.runInContext(readFileSync(path.join(JS_DIR, "30_story.js"), "utf8"), sandbox,
   { filename: "30_story.js" });
+
+// The first narrative screen is the deck cover's summary text (project.narrative,
+// the shape the R build emits; TR.narrative.blocksText makes it plain lines).
+const para = (text) => ({ type: "paragraph", runs: [{ text, bold: false, italic: false }] });
+
 vm.runInContext(readFileSync(path.join(JS_DIR, "30x_exhibit.js"), "utf8"), sandbox,
   { filename: "30x_exhibit.js" });
 
 function storyDeckSetup() {
   TR.AGG = { project: { name: "Deck fixture", client: "CCS", wave: "Wave 12",
-    brand_colour: "#123ABC" }, questions: [], banner_groups: [] };
+    brand_colour: "#123ABC", narrative: [{ id: "executive-summary",
+      title: "Executive summary",
+      blocks: [para("Overall service holds up."), para("Second paragraph.")] }] },
+    questions: [], banner_groups: [] };
   TR.d2 = { storeKey: (b) => b, bannerDescription: () => "All respondents",
     tracking: () => ({ enabled: false, waves: [] }),
     questionByCode: () => null, state: { filters: [] } };
@@ -248,8 +258,6 @@ function storyDeckSetup() {
   TR.shell = { toast: () => {} };
   TR.views = { _indexQuestions: () => [],
     _heatMatrix: () => ({ head: ["Metric"], rows: [] }) };
-  TR.report = { sectionText: (s) =>
-    s === "exec" ? "Overall service holds up.\nSecond paragraph." : "" };
   TR.conf = { methodNote: () => "Wilson 95%" };
   // I20 gate: a qualitative pin only renders while its quotes are still
   // published. This fixture's island publishes everything.

@@ -27,7 +27,7 @@
 import { readFileSync, writeFileSync, mkdtempSync, existsSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { inflateRawSync } from "node:zlib";
+import { inflateRawSync, deflateSync } from "node:zlib";
 import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
@@ -35,13 +35,13 @@ import vm from "node:vm";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
 
-const sandbox = { console, TextEncoder };
+const sandbox = { console, TextEncoder, atob };
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "13_zip.js",
   "14_pptx_parts.js", "23_render.js", "23z_charts.js", "23za_trend.js",
-  "23y_xlsx.js", "29_export.js", "30_story.js", "30x_exhibit.js"]) {
+  "23y_xlsx.js", "29_export.js", "24b_narrative.js", "30_story.js", "30x_exhibit.js"]) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
 }
 const TR = sandbox.TR;
@@ -57,10 +57,30 @@ function eq(a, b, msg) { if (a !== b) throw new Error(msg + ": expected " + JSON
 
 /* ================= fixture deck. Every archetype, weighted ================= */
 
+const para = (text) => ({ type: "paragraph", runs: [{ text, bold: false, italic: false }] });
+
 function setupFixture() {
   TR.AGG = {
     project: { name: "Turas visual QA fixture", client: "CCS", wave: "Wave 12",
-      brand_colour: "#123ABC", accent_colour: "#CC9900", weighted: true },
+      brand_colour: "#123ABC", accent_colour: "#CC9900", weighted: true,
+      // the cover screen's text is the deck cover's summary (coverScreen)
+      narrative: [{ id: "executive-summary-in-a-nutshell",
+        title: "Executive summary: in a nutshell", blocks: [
+        para("Overall service holds up this wave: satisfaction is stable and the " +
+          "branch channel keeps gaining share at the call centre's expense."),
+        para("The risk sits with recent graduates. Their verbatims say support is " +
+          "too slow, and their KPI recovery is the most fragile."),
+        { type: "subheading", text: "What moved" },
+        { type: "list", items: [li(0, false, "Branch share up 4 points"),
+          li(1, false, "Mostly from the call centre"), li(0, false, "App use flat"),
+          li(0, true, "Fix graduate support first"), li(0, true, "Then the app")] },
+        { type: "quote", runs: [r("\"Support is far too slow.\"")] },
+        { type: "table", rows: [["Channel", "Share", "Change"], ["Branch", "34%", "+4"],
+          ["App", "28%", "0"]] },
+        { type: "image", src: "data:image/png;base64," + panelPng(480, 300).toString("base64"),
+          alt: "Channel panel", width: 480, height: 300 },
+        { type: "paragraph", runs: [r("Read with the "), r("Detail", true),
+          r(" tables at the back.", false, true)] }] }] },
     questions: [], banner_groups: []
   };
   TR.d2 = { storeKey: (b) => b, bannerDescription: () => "All respondents",
@@ -68,12 +88,6 @@ function setupFixture() {
     questionByCode: () => null, state: { filters: [] } };
   TR.insights = { get: () => "" };
   TR.shell = { toast: () => {} };
-  TR.report = { sectionText: (s) => s === "exec"
-    ? "Overall service holds up this wave: satisfaction is stable and the " +
-      "branch channel keeps gaining share at the call centre's expense.\n" +
-      "The risk sits with recent graduates. Their verbatims say support is " +
-      "too slow, and their KPI recovery is the most fragile."
-    : "" };
   TR.conf = { methodNote: () => "Wilson 95%", modelIntervalKind: () => "props" };
   // I20 gate: qualitative pins render only while their quotes are published.
   TR.qual = { textPublished: () => true };
@@ -124,8 +138,52 @@ function setupFixture() {
   TR.model = { forQuestion: (code) => (MODELS[code] ? MODELS[code]() : null) };
 }
 
+/** A real PNG (solid panel with a darker band) so LibreOffice has a visible
+ *  picture to place on the narrative slide. Built here, not a binary fixture. */
+function panelPng(w, h) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xFFFFFFFF;
+    for (const b of buf) c = crcTable[(c ^ b) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
+    return Buffer.concat([len, td, c]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y++) {
+    raw[y * (w * 3 + 1)] = 0;
+    const band = y > h * 0.6 && y < h * 0.8;
+    for (let x = 0; x < w; x++) {
+      const o = y * (w * 3 + 1) + 1 + x * 3;
+      raw[o] = band ? 0x12 : 0x9F; raw[o + 1] = band ? 0x3A : 0xB6; raw[o + 2] = band ? 0xBC : 0xE8;
+    }
+  }
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+    chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+const r = (text, bold, italic) => ({ text, bold: !!bold, italic: !!italic });
+const li = (level, ordered, text) => ({ level, ordered, runs: [r(text)] });
+
 function fixtureItems() {
   return [
+    // a pinned narrative screen (the Word executive summary): lead with a bold
+    // run, sub-heading, nested bullets, a numbered list, a Quote band, a simple
+    // table and a picture beside the words, with the pin's commentary
+    { kind: "narrative", screen: "executive-summary-in-a-nutshell",
+      heading: "Executive summary: in a nutshell",
+      note: "Lead with this slide in the client meeting." },
     { kind: "divider", title: "What moved this wave", note: "Service experience" },
     // insight + weighted bar chart with analyst note (archetype 3: the chart
     // fills the body. Chart+table+note on one slide squeezes fitMatrix down
@@ -263,31 +321,38 @@ console.log("PPTX visual QA gate. Suite:");
 setupFixture();
 let slides, bytes;
 
-run("fixture deck assembles: cover + divider 01 + bar + quotes + trend + Detail 02 + matrix", () => {
+let NAR = 0;   // how many slides the narrative screen takes; the rest shift by it
+run("fixture deck assembles: cover + narrative + divider 01 + bar + quotes + trend + Detail 02 + matrix", () => {
   slides = TR.story2._slidesFor(fixtureItems());
-  eq(slides.length, 7, "slide count");
+  NAR = slides.length - 7;
+  assert(NAR >= 1, "the narrative screen has at least one slide, got " + NAR);
   const xmlOf = (s) => (typeof s === "string" ? s : s.xml);
+  const at = (i) => xmlOf(slides[i + NAR]);
   assert(xmlOf(slides[0]).indexOf("Turas visual QA fixture") !== -1, "cover leads");
   assert(xmlOf(slides[0]).indexOf("Overall service holds up") !== -1, "authored exec summary on the cover");
   assert(xmlOf(slides[0]).indexOf("Branch dominates and is pulling away") !== -1, "findings listed");
-  assert(xmlOf(slides[1]).indexOf(">01<") !== -1, "story divider numbered 01");
+  assert(xmlOf(slides[0]).indexOf("in a nutshell") === -1, "a narrative pin is not a cover finding");
+  assert(xmlOf(slides[1]).indexOf("Executive summary: in a nutshell") !== -1, "the narrative slide");
+  assert(slides[1].images && slides[1].images.length === 1, "carrying its picture");
+  assert(xmlOf(slides[1]).indexOf("Lead with this slide") !== -1, "and the pin's commentary");
+  assert(at(1).indexOf(">01<") !== -1, "story divider numbered 01");
   // WP6 render finding: a roundRect full-bleed background leaves white
   // notched corners on the rendered divider. The background must be sharp
   const FULL_BLEED = '<a:off x="0" y="0"/><a:ext cx="' +
     Math.round(13.333 * 914400) + '" cy="' + Math.round(7.5 * 914400) +
     '"/></a:xfrm><a:prstGeom prst="rect">';
-  assert(xmlOf(slides[1]).indexOf(FULL_BLEED) !== -1 &&
-    xmlOf(slides[5]).indexOf(FULL_BLEED) !== -1,
+  assert(at(1).indexOf(FULL_BLEED) !== -1 && at(5).indexOf(FULL_BLEED) !== -1,
     "divider backgrounds are sharp full-bleed rects, not roundRects");
-  assert(slides[2].charts && slides[2].charts.length === 1, "bar-chart slide carries a native chart");
-  assert(xmlOf(slides[2]).indexOf("n=412 (weighted 640 · effective 371)") !== -1,
+  assert(slides[2 + NAR].charts && slides[2 + NAR].charts.length === 1,
+    "bar-chart slide carries a native chart");
+  assert(at(2).indexOf("n=412 (weighted 640 · effective 371)") !== -1,
     "weighted footer base line");
-  assert(xmlOf(slides[3]).indexOf(">“<") !== -1, "quote slide glyph");
-  assert(xmlOf(slides[4]).indexOf("▲ +4pp •") !== -1, "trend slide delta chip");
-  assert(xmlOf(slides[4]).indexOf("Wilson 95% confidence bands shown") !== -1, "trend slide CI note");
-  assert(xmlOf(slides[5]).indexOf("Detail") !== -1 && xmlOf(slides[5]).indexOf(">02<") !== -1,
+  assert(at(3).indexOf(">“<") !== -1, "quote slide glyph");
+  assert(at(4).indexOf("▲ +4pp •") !== -1, "trend slide delta chip");
+  assert(at(4).indexOf("Wilson 95% confidence bands shown") !== -1, "trend slide CI note");
+  assert(at(5).indexOf("Detail") !== -1 && at(5).indexOf(">02<") !== -1,
     "Detail divider numbered 02");
-  assert(xmlOf(slides[6]).indexOf("Index heatmap") !== -1, "matrix slide last");
+  assert(at(6).indexOf("Index heatmap") !== -1, "matrix slide last");
 });
 
 const tmpDir = mkdtempSync(path.join(os.tmpdir(), "turas-pptx-qa-"));
@@ -311,7 +376,7 @@ run("zip structure: central directory reads, expected part inventory present", (
   const need = ["[Content_Types].xml", "_rels/.rels", "ppt/presentation.xml",
     "ppt/theme/theme1.xml", "ppt/slideMasters/slideMaster1.xml",
     "ppt/slideLayouts/slideLayout1.xml"];
-  for (let i = 1; i <= 7; i++) {
+  for (let i = 1; i <= slides.length; i++) {
     need.push("ppt/slides/slide" + i + ".xml", "ppt/slides/_rels/slide" + i + ".xml.rels");
   }
   need.forEach((n) => assert(names.indexOf(n) !== -1, "missing part " + n));
@@ -319,7 +384,10 @@ run("zip structure: central directory reads, expected part inventory present", (
   eq(names.filter((n) => /^ppt\/charts\/chart\d+\.xml$/.test(n)).length, 2, "chart parts");
   eq(names.filter((n) => /^ppt\/embeddings\/chart_data\d+\.xlsx$/.test(n)).length, 2,
     "embedded workbooks");
-  assert(names.indexOf("ppt/slides/slide8.xml") === -1, "no phantom slides");
+  assert(names.indexOf("ppt/slides/slide" + (slides.length + 1) + ".xml") === -1,
+    "no phantom slides");
+  // the narrative screen's picture, as its original PNG
+  eq(names.filter((n) => /^ppt\/media\/image\d+\.png$/.test(n)).length, 1, "picture part");
 });
 
 run("every XML part in the package is well-formed (incl. embedded workbook parts)", () => {
@@ -380,7 +448,7 @@ if (!haveSoffice) {
       assert(!r.error && r.status === 0, "pdftoppm failed: " +
         (r.error ? r.error.message : String(r.stderr).slice(0, 300)));
       pngs = readdirSync(tmpDir).filter((f) => /^slide-\d+\.png$/.test(f)).sort();
-      eq(pngs.length, 7, "one PNG per slide");
+      eq(pngs.length, slides.length, "one PNG per slide");
       pngs.forEach((f) => {
         const size = statSync(path.join(tmpDir, f)).size;
         assert(size > 4000, f + " looks blank (" + size + " bytes)");

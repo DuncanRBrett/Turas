@@ -259,5 +259,96 @@ run("legacy un-owning map state still merges over the island (back-compat)", () 
     "loading rewrites nothing. Legacy state stays un-owning until the reader changes something");
 });
 
+/* ================= screens first: the narrative seed ======================= */
+console.log("\nScreens first. The narrative seed never takes ownership:");
+
+const SCREENS = [{ id: "background", title: "Background", blocks: [] },
+  { id: "executive-summary", title: "Executive summary", blocks: [] }];
+const STORY_FILES = ["24b_narrative.js", "30_story.js"];
+/** A load with narrative screens on the island (read lazily by story2). */
+function bootScreens(island, store, screens) {
+  const b = boot(STORY_FILES, island, store);
+  b.TR.AGG.project.narrative = screens || SCREENS;
+  return b;
+}
+/** The Story tab's render, which is the passive (un-owning) persist. */
+function renderStory(b) {
+  const el = () => ({ innerHTML: "", addEventListener: () => {}, querySelector: () => null });
+  b.sandbox.document = { createElement: el, getElementById: () => null };
+  b.TR.story2.renderTab({ replaceChildren: () => {} });
+}
+const screensOf = (items) => items.map((it) => it.kind + ":" + it.screen).join(",");
+
+run("seed: an empty, unowned story opens with one pin per screen, in order", () => {
+  const a = bootScreens(null);
+  eq(screensOf(a.TR.story2.items()),
+    "narrative:background,narrative:executive-summary", "seeded in document order");
+  renderStory(a);
+  const raw = JSON.parse(a.store.get("turas_v2_story:proj"));
+  assert(Array.isArray(raw), "the passive persist stores the plain, un-owned form");
+  eq(raw.length, 2, "with the seeded pins");
+});
+
+run("seed: once stored, a section added in Word is NOT inserted on reload", () => {
+  const a = bootScreens(null);
+  renderStory(a);
+  const more = SCREENS.concat([{ id: "new-section", title: "New section", blocks: [] }]);
+  const b = bootScreens(null, a.store, more);
+  eq(screensOf(b.TR.story2.items()),
+    "narrative:background,narrative:executive-summary", "the stored story stands");
+});
+
+run("seed: a cleared story stays empty", () => {
+  const a = bootScreens(null);
+  a.sandbox.document = { getElementById: () => null };
+  a.sandbox.confirm = () => true;
+  a.TR.story2.renderTab = () => {};
+  a.TR.story2._topAction("clear");
+  eq(parse(a.store, "turas_v2_story")._owns, true, "Clear takes ownership");
+  const b = bootScreens(null, a.store);
+  eq(b.TR.story2.items().length, 0, "no reseed after a Clear");
+});
+
+run("seed: a saved copy seeds only when its story is empty", () => {
+  eq(bootScreens({ story: [] }).TR.story2.items().length, 2, "an empty saved story seeds");
+  const kept = bootScreens({ story: [{ kind: "divider", title: "A", note: "" }] });
+  eq(kept.TR.story2.items().length, 1, "a saved story with pins is left alone");
+  eq(kept.TR.story2.items()[0].kind, "divider", "and unchanged");
+});
+
+run("seed: legacy un-owned local state with pins is left alone", () => {
+  const legacy = new Map([["turas_v2_story:proj",
+    JSON.stringify([{ kind: "divider", title: "Mine", note: "" }])]]);
+  const a = bootScreens(null, legacy);
+  eq(a.TR.story2.items().length, 1, "no seed on a non-empty legacy story");
+  eq(a.TR.story2.items()[0].title, "Mine", "the reader's pin stands");
+});
+
+run("seed: importing a story does not show a seeded screen twice", () => {
+  const a = bootScreens(null);
+  eq(a.TR.story2.items().length, 2, "the fresh story is seeded");
+  a.TR.story2.merge([
+    { kind: "narrative", screen: "executive-summary", heading: "Executive summary",
+      note: "Lead with this." },
+    { kind: "narrative", screen: "background", heading: "Background", note: "" },
+    { kind: "divider", title: "Findings", note: "" }]);
+  const items = a.TR.story2.items();
+  eq(screensOf(items.filter((it) => it.kind === "narrative")),
+    "narrative:background,narrative:executive-summary", "each screen once, in its place");
+  eq(items[1].note, "Lead with this.", "the imported commentary replaced the bare pin");
+  eq(items.length, 3, "and the divider was added");
+  // a screen pinned twice on purpose, each with its own commentary, stays twice
+  a.TR.story2.merge([{ kind: "narrative", screen: "executive-summary",
+    heading: "Executive summary", note: "A second take." }]);
+  eq(a.TR.story2.items().filter((it) => it.screen === "executive-summary").length, 2,
+    "an annotated pin is never overwritten");
+});
+
+run("seed: no narrative on the island, no seed", () => {
+  eq(bootScreens(null, null, []).TR.story2.items().length, 0, "nothing to seed");
+  eq(boot(["30_story.js"], null).TR.story2.items().length, 0,
+    "a bundle without the narrative module seeds nothing");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

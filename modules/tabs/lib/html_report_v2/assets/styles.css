@@ -510,6 +510,18 @@ table.ws td.sparkcell { padding: 1px 8px; }
    is no card, so the block gets the same panel treatment as .pr-table */
 .present .si-quotes { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px 16px; box-shadow: var(--shadow); }
 .present .si-q { background: var(--soft); }
+/* A narrative screen presented as a slide: brand title, a lead paragraph, a long
+   list in two columns, and any picture beside the words rather than in them */
+.pr-narrative { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 26px 32px; box-shadow: var(--shadow); font-size: 15px; line-height: 1.6; }
+.present .pr-narrative .nar-title { font-size: 28px; color: var(--brand); margin-bottom: 14px; }
+.pr-narrative .nar-lead { font-size: 18px; line-height: 1.5; color: var(--ink); margin-bottom: 14px; }
+.pr-narrative .nar-sub { font-size: 16px; }
+.pr-narrative .nar-sub3 { font-size: 14.5px; }
+.pr-narrative .nar-callout { font-size: 17px; }
+.pr-narrative.long-list .nar-text > ul, .pr-narrative.long-list .nar-text > ol { columns: 2; column-gap: 36px; }
+.pr-narrative.long-list .nar-text > ul > li, .pr-narrative.long-list .nar-text > ol > li { break-inside: avoid; }
+.pr-narrative.has-pic .nar-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 28px; align-items: start; }
+@media (max-width: 760px) { .pr-narrative.has-pic .nar-grid { grid-template-columns: 1fr; } }
 
 /* ---------- misc ---------- */
 #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 400; pointer-events: none; }
@@ -656,6 +668,27 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .as-body p:last-child, .as-body ul:last-child { margin-bottom: 0; }
 .as-body ul { margin: 0 0 8px; padding-left: 18px; }
 .as-body li { margin: 0 0 4px; }
+/* Narrative screens (24b_narrative.js): one renderer for the Report tab card,
+   the cover, the story card and Present. Every block is authored in Word or the
+   Comments sheet, so the look is set here, never by the author. */
+.nar-body { font-size: 13px; line-height: 1.6; }
+.nar-body p, .pr-narrative p { max-width: 72ch; margin: 0 0 9px; }
+.nar-body ul, .nar-body ol, .pr-narrative ul, .pr-narrative ol { margin: 0 0 9px; padding-left: 20px; }
+.nar-body li ul, .nar-body li ol, .pr-narrative li ul, .pr-narrative li ol { margin: 3px 0 0; }
+.nar-body li, .pr-narrative li { margin: 0 0 4px; }
+.nar-sub { font-size: 13.5px; color: var(--brand); margin: 14px 0 6px; }
+.nar-sub3 { font-size: 12.5px; margin: 10px 0 4px; }
+/* Word's own colours never reach the page: any coloured words take the brand
+   colour, and the highlighter becomes a soft accent tint */
+.nar-em { color: var(--brand); }
+.nar-hl { background: var(--soft); background: color-mix(in srgb, var(--accent) 24%, transparent); color: inherit; padding: 0 2px; border-radius: 2px; }
+.nar-callout { border-left: 4px solid var(--accent); background: var(--soft); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 4px 0 12px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.nar-fig { margin: 6px 0 12px; }
+.nar-fig img { max-width: 100%; height: auto; display: block; border-radius: 6px; }
+.nar-fig-wide img { width: 100%; }
+.nar-table { border-collapse: collapse; margin: 4px 0 12px; font-size: 12.5px; }
+.nar-table td, .nar-table th { border: 1px solid var(--line); padding: 5px 10px; text-align: left; vertical-align: top; }
+.nar-table th { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
 .as-foot { display: flex; gap: 6px; padding: 7px 9px; border-top: 1px solid var(--line); background: var(--soft); }
 /* Config-authored study slides: the caption is static text, not an input. The
    report author owns it, so the reader reads it. */

@@ -387,6 +387,12 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
       out
     }))
   if (length(slides) > 0) proj$slides <- unname(slides)
+
+  # Narrative screens, list(id, title, blocks), built by load_narrative() from
+  # the narrative_file Word document or the Comments summary cells. Carried only
+  # when there is at least one, so a config with neither emits a byte-identical
+  # island.
+  if (length(config_obj$narrative) > 0) proj$narrative <- unname(config_obj$narrative)
   proj
 }
 

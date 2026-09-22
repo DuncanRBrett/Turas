@@ -47,7 +47,7 @@ function boot(diagnostics, reportMeta, projectExtra, prev) {
   // The construction note's words come from the callout registry, exactly as
   // they do in a real build. See _text.mjs.
   installText(sandbox);
-  for (const f of ["21_stats.js", "32_report.js"]) {
+  for (const f of ["21_stats.js", "24b_narrative.js", "32_report.js"]) {
     vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), sandbox, { filename: f });
   }
   return sandbox.TR;
@@ -371,50 +371,63 @@ run("no meta -> fields are omitted but the note still renders", () => {
   assert(h.indexOf("Report construction") >= 0, "the note renders regardless");
 });
 
-console.log("\nReport tab. Read-only authored sections (config-sourced):");
+console.log("\nReport tab. Read-only narrative screens (project.narrative):");
 
-run("background + exec render read-only from the config, one paragraph per line", () => {
-  const TR = boot(undefined, {
-    background: "Why we ran it.",
-    exec_summary: "First finding.\nSecond finding."
-  });
+// project.narrative as the R build emits it when narrative_file is blank:
+// the Comments sheet's _BACKGROUND and _EXECUTIVE_SUMMARY cells as two screens.
+// The full block renderer has its own gate (narrative_tests.mjs).
+const para = (text) => ({ type: "paragraph", runs: [{ text, bold: false, italic: false }] });
+const COMMENTS_SCREENS = [
+  { id: "background-method", title: "Background & method", blocks: [para("Why we ran it.")] },
+  { id: "executive-summary", title: "Executive summary",
+    blocks: [para("First finding."), para("Second finding.")] }
+];
+
+run("the screens render read-only, through the shared narrative renderer", () => {
+  const TR = boot(undefined, undefined, { narrative: COMMENTS_SCREENS });
   const h = TR.report.sectionsHtml();
   assert(h.indexOf("<textarea") < 0, "no editable textarea remains");
   assert(h.indexOf("<h3>Background & method</h3>") >= 0, "background card renders");
   assert(h.indexOf("<p>Why we ran it.</p>") >= 0, "background text as a paragraph");
   assert(h.indexOf("<p>First finding.</p><p>Second finding.</p>") >= 0,
-    "multi-line exec splits into paragraphs");
+    "the exec screen's paragraphs");
+  assert(h.indexOf(TR.narrative.blocksHtml(COMMENTS_SCREENS[1].blocks)) >= 0,
+    "the card body is TR.narrative.blocksHtml, not a splitter of its own");
 });
 
-run("populated sections are pinnable to the story (declarative snap markup)", () => {
-  const h = boot(undefined, { exec_summary: "Only exec." }).report.sectionsHtml();
-  assert(h.split("data-snap-pin").length - 1 === 1, "exactly one pin (the populated card)");
-  assert(h.indexOf('data-snap-source="report"') >= 0, "pin is tagged source=report");
-  assert(h.indexOf('data-snap-title="Executive summary"') >= 0, "pin carries the section title");
-  assert(h.split(" data-snap-card").length - 1 === 1, "only the populated card is snapshottable");
+run("each screen is pinnable to the story by reference", () => {
+  const h = boot(undefined, undefined, { narrative: COMMENTS_SCREENS.slice(1) })
+    .report.sectionsHtml();
+  assert(h.split("data-snap-pin").length - 1 === 1, "exactly one pin per screen");
+  assert(h.indexOf('data-snap-narrative="executive-summary"') >= 0, "pinned by screen id");
+  assert(h.indexOf('data-snap-title="Executive summary"') >= 0, "pin carries the title");
+  assert(h.split(" data-snap-card").length - 1 === 1, "one pinnable card");
 });
 
-run("an unset section shows the config hint instead of an editor", () => {
-  const h = boot(undefined, { exec_summary: "Only exec." }).report.sectionsHtml();
-  assert(h.indexOf("_BACKGROUND") >= 0, "the hint names the Comments-sheet row");
+run("an unauthored report shows the config hints instead of an editor", () => {
   const none = boot(undefined, undefined).report.sectionsHtml();
   assert(none.indexOf("_BACKGROUND") >= 0 && none.indexOf("_EXECUTIVE_SUMMARY") >= 0,
     "both hints when nothing is authored");
   assert(none.indexOf("data-snap-pin") < 0, "nothing to pin on an unauthored report");
+  // Deliberate change (stage 2): once any screen exists the hints go. They name
+  // Comments-sheet rows, which mean nothing to a report whose narrative is a
+  // Word document, and the island cannot tell the two sources apart.
+  const one = boot(undefined, undefined, { narrative: COMMENTS_SCREENS.slice(1) })
+    .report.sectionsHtml();
+  assert(one.indexOf("_BACKGROUND") < 0, "no hint beside an authored screen");
 });
 
-run("the fieldwork fallback still supplies Background & method", () => {
-  const h = boot(undefined, { fieldwork: "May 2026" }).report.sectionsHtml();
-  assert(h.indexOf("<p>Fieldwork: May 2026.</p>") >= 0, "the fieldwork line renders");
-});
-
-run("sectionText is config-only. Legacy stored edits are ignored", () => {
-  const TR = boot(undefined, { exec_summary: "CFG TEXT" });
-  TR.userState = { report: { sections: { exec: "OLD LOCAL EDIT" }, about: {}, slides: [] } };
-  assert(TR.report.sectionText("exec") === "CFG TEXT",
-    "the config value wins over stored analyst edits");
-  assert(boot(undefined, undefined).report.sectionText("exec") === "",
-    "empty when the config authors nothing");
+run("report_meta alone no longer makes a card. The narrative is the only source", () => {
+  // The Report tab reads project.narrative only. The "Fieldwork: <dates>."
+  // stand-in for a blank _BACKGROUND used to be built here; the R fallback
+  // (narrative_from_comments) builds it now, so it arrives as an ordinary
+  // screen and renders like any other (test_narrative_reader.R holds it).
+  const h = boot(undefined, { fieldwork: "May 2026", exec_summary: "Old path." })
+    .report.sectionsHtml();
+  assert(h.indexOf("Fieldwork: May 2026.") < 0, "no fieldwork stand-in");
+  assert(h.indexOf("Old path.") < 0, "report_meta text is not read here");
+  assert(typeof boot(undefined, undefined).report.sectionText === "undefined",
+    "the old section-text path is gone, not left alongside");
 });
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");

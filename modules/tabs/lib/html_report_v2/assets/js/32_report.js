@@ -1,7 +1,8 @@
 /**
- * v2 Report tab. The narrative wrapper around the numbers: background &
- * method and executive summary (authored in the config, read-only here,
- * pinnable to the story), added slides (text blocks or imported images,
+ * v2 Report tab. The narrative wrapper around the numbers: the narrative
+ * screens (background, executive summary and any others, authored in a Word
+ * document or the config's Comments sheet, read-only here, each pinnable to
+ * the story by reference; rendered by TR.narrative, 24b), added slides (text blocks or imported images,
  * e.g. from a qual phase), and About (analyst + contact from the config, the
  * standard report-construction note) plus the auto-generated methodology
  * notes. Added slides persist locally and travel inside saved report copies.
@@ -20,10 +21,11 @@
   var KEY = "turas_v2_report";
   var cache = null;
 
-  // [key, card title, the config Comments-sheet row that authors it]
-  var SECTIONS = [
-    ["background", "Background & method", "_BACKGROUND"],
-    ["exec", "Executive summary", "_EXECUTIVE_SUMMARY"]
+  // The two cards an unauthored report shows in place of its narrative:
+  // [card title, the config Comments-sheet row that fills it]
+  var UNSET_SECTIONS = [
+    ["Background & method", "_BACKGROUND"],
+    ["Executive summary", "_EXECUTIVE_SUMMARY"]
   ];
   var ABOUT_FIELDS = [
     ["analyst", "Analyst / author"],
@@ -90,16 +92,7 @@
 
   report.data = function () { return store(); };
 
-  /** Effective text of a narrative section. Authored by the report author in
-   *  the config (project.report_meta via the Comments sheet) and read-only in
-   *  the app, so this is always the config value. Legacy section edits in
-   *  stored state are deliberately ignored. The cover (24a) reads the same
-   *  value the Report tab shows. */
-  report.sectionText = function (sec) { return sectionDefault(sec); };
-
-  /* Defaults imported from the config (project.report_meta): shown until the
-   * analyst types their own. A field set in localStorage (even to "") wins, so
-   * the analyst can always override; an untouched field falls back here. */
+  /* About-card values imported from the config (project.report_meta). */
   function metaOf() { return (TR.AGG.project && TR.AGG.project.report_meta) || {}; }
   function aboutDefault(field) {
     var m = metaOf();
@@ -107,15 +100,6 @@
     if (field === "contact") {
       return [m.company, m.email, m.phone].filter(function (x) { return x; }).join(" · ");
     }
-    return "";
-  }
-  function sectionDefault(sec) {
-    var m = metaOf();
-    if (sec === "background") {
-      if (m.background) return m.background;            // config Comments _BACKGROUND
-      if (m.fieldwork) return "Fieldwork: " + m.fieldwork + ".";
-    }
-    if (sec === "exec" && m.exec_summary) return m.exec_summary;  // _EXECUTIVE_SUMMARY
     return "";
   }
 
@@ -165,36 +149,41 @@
     wire(wrap);
   };
 
-  /** Background & method + Executive summary. Authored by the report author
-   * in the config (Comments sheet _BACKGROUND / _EXECUTIVE_SUMMARY rows, with
-   * the fieldwork-dates fallback) and rendered read-only, one paragraph per
-   * line. A populated card is a data-snap-card with the standard snap-pin, so
-   * the section can be pinned to the story. The shell's document-level
-   * handler (24_shell) does the capture; no wiring here. A pure function of
-   * the data island so it is unit-testable. */
+  /** The narrative screens, one card each, read-only, in document order.
+   * Authored in the Word document named by narrative_file, or, when that is
+   * blank, in the config's Comments sheet (_BACKGROUND / _EXECUTIVE_SUMMARY).
+   * The R build turns either into project.narrative. Each card pins by
+   * REFERENCE (data-snap-narrative carries the screen id; the shell hands it to
+   * story2.pinNarrative), so a regenerated report refreshes the pinned screen
+   * rather than showing a frozen copy. An unauthored report shows the two
+   * config hints it always has. A pure function of the data island so it is
+   * unit-testable. */
   report.sectionsHtml = function () {
-    return SECTIONS.map(function (sec) {
-      var text = String(sectionDefault(sec[0]) || "").trim();
-      var body = text
-        ? text.split(/\n+/).map(function (p) {
-            return "<p>" + fmt.escapeHtml(p) + "</p>";
-          }).join("")
-        : TR.txt.block("report.section_unset", { row: sec[2] }, { cls: "hint" });
-      return '<div class="card rpt-sec-card"' + (text ? " data-snap-card" : "") +
-        "><h3>" + sec[1] + "</h3>" +
-        (text
-          ? '<button class="snap-pin" data-snap-pin data-snap-source="report" ' +
-            'data-snap-title="' + fmt.escapeHtml(sec[1]) + '" data-snap-context="" ' +
-            'title="Pin this section to the story" ' +
-            'aria-label="Pin section to story">📌</button>'
-          : "") + body + "</div>";
+    var screens = TR.narrative.screens();
+    if (!screens.length) {
+      return UNSET_SECTIONS.map(function (sec) {
+        return '<div class="card rpt-sec-card"><h3>' + sec[0] + "</h3>" +
+          TR.txt.block("report.section_unset", { row: sec[1] }, { cls: "hint" }) +
+          "</div>";
+      }).join("");
+    }
+    return screens.map(function (sc) {
+      var title = String((sc && sc.title) || "");
+      return '<div class="card rpt-sec-card nar-card" data-snap-card><h3>' +
+        fmt.escapeHtml(title) + "</h3>" +
+        '<button class="snap-pin" data-snap-pin data-snap-narrative="' +
+        fmt.escapeHtml(String((sc && sc.id) || "")) + '" data-snap-title="' +
+        fmt.escapeHtml(title) + '" title="Pin this section to the story" ' +
+        'aria-label="Pin section to story">📌</button>' +
+        '<div class="nar-body">' + TR.narrative.blocksHtml(sc && sc.blocks) +
+        "</div></div>";
     }).join("");
   };
 
   /** Study slides. Exhibits the REPORT AUTHOR put in the config's AddedSlides
    *  sheet, carried on the data island as project.slides. Distinct from the
    *  reader's own Added slides above: these are authored, so they are read-only
-   *  here, exactly like the narrative sections. They are deliberately NOT merged
+   *  here, exactly like the narrative screens. They are deliberately NOT merged
    *  into the reader's slide store. That store takes ownership on first edit
    *  and would then ignore anything a later run authored. */
   report.slides = function () {

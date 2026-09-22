@@ -312,14 +312,16 @@
    *  applied on top of this.
    *
    *  Two kinds are skipped. Dividers are structure, not findings. And a pin of a
-   *  Report-tab narrative section is skipped because the cover ALREADY renders
-   *  that section, above the findings, from the same authored text. An analyst
-   *  who pinned their background or executive summary was seeing it twice.
-   *  data-snap-source="report" is emitted only by those two section cards
-   *  (32_report.js), so this drops nothing else. The pin itself is untouched:
-   *  it still appears on the Story tab and gets its own slide in the deck. */
+   *  narrative screen is skipped: the cover opens with a screen already, and a
+   *  finding titled "Background & method" is a heading, not a finding. That is
+   *  every "narrative" item, plus the frozen "report" snapshots the section
+   *  cards made before screens pinned by reference, which a regenerated report
+   *  can still find in a reader's saved story. data-snap-source="report" was
+   *  only ever emitted by those cards, so this drops nothing else. The pin
+   *  itself is untouched: it still appears on the Story tab and in the deck. */
   function isSectionPin(it) {
-    return it.kind === "snapshot" && it.source === "report";
+    return it.kind === "narrative" ||
+      (it.kind === "snapshot" && it.source === "report");
   }
   reader.isCoverSectionPin = isSectionPin;   // exposed for the deck + tests
 
@@ -348,8 +350,8 @@
    * The cover opens only when the STUDY asked for it (html_report_v2_cover in
    * the config, carried as project.cover) AND this is a saved/shared copy
    * (user-state island present) that carries story content: story pins (incl.
-   * promoted hub insights) and/or an authored Report-tab executive summary /
-   * background section. Analyst-fresh reports keep today's landing exactly.
+   * promoted hub insights) and/or at least one narrative screen (Word document
+   * or Comments sheet). Analyst-fresh reports keep today's landing exactly.
    *
    * The config gate is first and absolute. A cover changes what a client sees
    * when they open the file, so it is opted into per project. A report built
@@ -360,10 +362,7 @@
     if (!(TR.AGG && TR.AGG.project && TR.AGG.project.cover)) return false;
     if (!TR.userState) return false;
     if (reader.coverFindings().length) return true;
-    var rpt = TR.report;
-    if (!rpt || !rpt.sectionText) return false;
-    return !!(String(rpt.sectionText("exec") || "").trim() ||
-      String(rpt.sectionText("background") || "").trim());
+    return !!(TR.narrative && TR.narrative.coverScreen());
   };
 
   /** Where "Explore the dashboard →" lands: the first READ tab (dashboard
@@ -372,16 +371,12 @@
     return TR.shell.tabGroups()[0].tabs[0][0];
   };
 
-  function coverParas(text) {
-    return String(text).trim().split(/\n+/).map(function (p) {
-      return "<p>" + fmt.escapeHtml(p) + "</p>";
-    }).join("");
-  }
-
   /**
-   * The cover page: report title/client/wave, the analyst headline sections
-   * (Report-tab background then executive summary, when authored, the same
-   * order the Report tab itself lists them in), then the leading findings. Each story pin as its insight sentence (pin title)
+   * The cover page: report title/client/wave, the cover's narrative screen
+   * (TR.narrative.coverScreen: the executive summary when there is one, read
+   * from the island, never from a pin, and rendered by the same
+   * TR.narrative.blocksHtml as the Report tab), then the leading findings.
+   * Each story pin as its insight sentence (pin title)
    * over a compact evidence thumbnail. Thumbnails re-use each pin's own
    * renderer (story2.itemBodyHtml), so disclosure gates travel with the pin,
    * never re-derived here.
@@ -398,15 +393,12 @@
       '<div class="cover-kicker">Report cover</div>' +
       "<h1>" + fmt.escapeHtml(p.name || "") + "</h1>" +
       (sub ? '<div class="cover-sub">' + sub + "</div>" : "") + explore + "</div>");
-    var rpt = TR.report;
-    [["background", "Background & method"], ["exec", "Executive summary"]]
-      .forEach(function (sec) {
-        var text = (rpt && rpt.sectionText)
-          ? String(rpt.sectionText(sec[0]) || "").trim() : "";
-        if (!text) return;
-        html.push('<div class="card cover-sec"><h3>' + sec[1] + "</h3>" +
-          coverParas(text) + "</div>");
-      });
+    var lead = TR.narrative ? TR.narrative.coverScreen() : null;
+    if (lead) {
+      html.push('<div class="card cover-sec"><h3>' + fmt.escapeHtml(lead.title || "") +
+        '</h3><div class="nar-body">' + TR.narrative.blocksHtml(lead.blocks) +
+        "</div></div>");
+    }
     var findings = reader.coverFindings();
     if (findings.length) {
       html.push('<h2 class="cover-h2">Leading findings</h2>');
