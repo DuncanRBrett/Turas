@@ -118,6 +118,8 @@ ul.tight li{margin-bottom:4px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:12.5px;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 .toast.show{opacity:1}
 @media (max-width:640px){header{padding:12px 14px 0}.aud,.strip,.picker{padding-left:14px;padding-right:14px}main{padding:14px}.hbtn{display:none}.hide-s{display:none}}
+.tag{display:inline-block;font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 5px;margin-left:6px;color:var(--muted);vertical-align:1px}
+.grp{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:12px 0 0}
 </style>
 </head>
 <body>
@@ -128,7 +130,7 @@ ul.tight li{margin-bottom:4px}
 <header>
   <div class="hrow">
     <div class="logo" aria-hidden="true"></div>
-    <div class="htitle"><h1>SACAP Student Survey 2025</h1><p><b>interactive report</b> · single file · works offline</p></div>
+    <div class="htitle"><h1 id="repTitle"></h1><p><b>interactive report</b> · single file · works offline</p></div>
     <button class="hbtn inert">ⓘ How to read</button><button class="hbtn inert">Save copy</button>
   </div>
   <nav class="tabs" role="tablist">
@@ -146,57 +148,64 @@ ul.tight li{margin-bottom:4px}
 
 <main>
   <div class="card">
-    <div class="cardhead"><div><h2>What if <span class="badge" id="modeBadge"></span></h2>
-      <p class="prov" id="prov"></p></div></div>
+    <h2>What if <span class="badge" id="modeBadge"></span></h2>
+    <p class="prov" id="prov"></p>
     <p class="note" id="modeNote"></p>
     <div class="kpis">
       <div class="kpi"><b id="kActual"></b><span>Actual NPS</span></div>
-      <div class="kpi"><b id="kN"></b><span>Students who answered</span></div>
+      <div class="kpi"><b id="kN"></b><span id="kNlab"></span></div>
       <div class="kpi"><b id="kScen"></b><span>NPS under the scenario below</span></div>
     </div>
     <div id="grpWarn"></div>
   </div>
 
   <div class="card" id="buildCard">
-    <div class="cardhead"><div><h3>Build a student</h3><p class="lead">Choose who the student is. The model gives the NPS it expects from students like this, against all students. The audience filter does not apply to this panel.</p></div><div class="acts"><button class="btn pin inert-p">📌 Pin to story</button></div></div>
+    <div class="cardhead"><div><h3 id="buildTitle"></h3><p class="lead" id="buildLead"></p></div><div class="acts"><button class="btn pin inert-p">📌 Pin to story</button></div></div>
     <div class="sentence" id="profSentence"></div>
     <div class="headline" id="profHead"></div>
     <div class="npsline" id="profLine"></div>
-    <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i>All students</span><span><i class="dot" style="background:var(--brand)"></i>This student, expected NPS</span><span><i class="dot" style="background:rgba(50,51,103,.25)"></i>90% range</span></div>
+    <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i><span id="legAll"></span></span><span><i class="dot" style="background:var(--brand)"></i><span id="legThis"></span></span><span><i class="dot" style="background:rgba(50,51,103,.25)"></i>90% range</span></div>
     <p class="note center" id="profMatch"></p>
-    <div class="btnrow"><button class="btn outline" id="profRandom">Show a random student</button><button class="btn outline" id="profReset">Reset</button></div>
+    <div class="btnrow"><button class="btn outline" id="profRandom"></button><button class="btn outline" id="profReset">Reset</button></div>
     <p class="note center" id="profHonest"></p>
   </div>
 
   <div class="card">
-    <div class="cardhead"><div><h3>Where to direct effort</h3><p class="lead">What NPS would lose if an area slipped one notch, and gain if every student rating it below Good were lifted to Good.</p></div>
+    <div class="cardhead"><div><h3>Where to direct effort</h3><p class="lead" id="effortLead"></p></div>
       <div class="acts"><button class="btn inert-x" data-what="table as Excel">Excel</button><button class="btn pin inert-p">📌 Pin to story</button></div></div>
-    <div class="tablewrap"><table id="effort"><thead><tr><th>Area</th><th class="num">Students below Good</th><th class="num">If it slips<br>one notch</th><th class="num">If lifted<br>to Good</th><th class="num">Net promoters per<br>100 students lifted</th><th class="hide-s" style="width:18%"></th></tr></thead><tbody></tbody></table></div>
-    <p class="note">NPS points. The small figures are the 90% range across the model's bootstrap refits. The last column is the gain per 100 students you would have to reach.</p>
+    <div class="tablewrap"><table id="effort"><thead><tr><th>Area</th><th class="num" id="needHead"></th><th class="num">If it slips</th><th class="num">If fixed</th><th class="num" id="per100Head"></th><th class="hide-s" style="width:16%"></th></tr></thead><tbody></tbody></table></div>
+    <p class="note" id="effortNote"></p>
   </div>
 
   <div class="card">
     <div class="cardhead"><div><h3>Build a scenario</h3><p class="lead" id="scenLead"></p></div><div class="acts"><button class="btn pin inert-p">📌 Pin to story</button></div></div>
-    <div class="grid" id="scenGrid"></div>
+    <div class="grp" id="scenRatLab">Service ratings</div>
+    <div class="grid" id="scenGridR"></div>
+    <div class="grp" id="scenCovLab">Service coverage</div>
+    <div class="grid" id="scenGridC"></div>
     <div class="scenres"><span class="lbl">RESULT FOR <span id="scenWho"></span></span><b id="scenFrom"></b><span>→</span><b id="scenTo"></b><span id="scenDelta" class="prov"></span></div>
     <div class="npsline" id="scenLine"></div>
     <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i>Now</span><span><i class="dot" style="background:var(--brand)"></i>Under this scenario</span><span><i class="dot" style="background:rgba(50,51,103,.25)"></i>90% range</span></div>
     <p class="note" id="scenNote"></p>
+    <h3 style="margin-top:16px">Bundles</h3>
+    <div class="tablewrap"><table id="bundleTable"><thead><tr><th>Bundle</th><th class="num">Worked out together</th><th class="num">Sum of each part</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">The two columns show how far adding up single-area results drifts from the combined answer. Client-safe reports rely on adding up.</p>
   </div>
 
   <details class="card">
-    <summary>Rate SACAP as one student</summary>
-    <p class="lead">Set how one student rates SACAP's services. The model gives the chance they would recommend it. This is the model behind the effort table and scenarios, seen from one student's side.</p>
+    <summary id="rateTitle"></summary>
+    <p class="lead" id="rateLead"></p>
     <div class="grid" id="rateGrid"></div>
     <div class="big" id="sHead"></div>
     <div class="stack" id="sStack"></div>
     <div class="legend"><span><i class="dot" style="background:var(--det)"></i>Detractor 0 to 6</span><span><i class="dot" style="background:var(--pas)"></i>Passive 7 to 8</span><span><i class="dot" style="background:var(--pro)"></i>Promoter 9 to 10</span></div>
-    <p class="note" id="sNote" style="text-align:center"></p>
+    <p class="note center" id="sNote"></p>
   </details>
 
   <details class="card">
     <summary>Diagnostics and method</summary>
     <ul class="tight" id="diag"></ul>
+    <div id="sympBox"></div>
     <div id="privacy"></div>
   </details>
 </main>
@@ -204,14 +213,16 @@ ul.tight li{margin-bottom:4px}
 <script>
 (function(){
 "use strict";
-var S = %%SAFE%%;   // client-safe: model + precomputed published groups, no respondent rows
+var S = %%SAFE%%;   // client-safe: models + precomputed published groups, no respondent rows
 var O = %%OPEN%%;   // open: respondent rows, as an open report already carries
-var LEV = S.levers, L = LEV.length, F = S.fits.length, K = S.min_group, GOOD = S.good, C = S.centre;
-var MOVES = S.moves, MI = {}; MOVES.forEach(function(m, i){ MI[m] = i; });
+var LEV = S.levers, L = LEV.length, F = S.fits.length, K = S.min_group, SC = S.scale, C = SC.centre, GOOD = SC.good;
+var UNIT = S.unit, UNITS = S.units, BRAND = S.meta.brand;
+var MI = {}; S.moves.forEach(function(m, i){ MI[m] = i; });
 var CTX = S.ctx, CI = {}; CTX.forEach(function(c){ CI[c.key] = c; });
-var UNCLEAR = {}; LEV.forEach(function(l, j){ if (S.sign[l.code] > 0.10) UNCLEAR[j] = S.sign[l.code]; });
-var N = O.y.length;
-var mode = "open", filters = [];   // filters: [{key, level}]
+var UNCLEAR = {}; LEV.forEach(function(l, j){ if (S.sign[l.key] > 0.10) UNCLEAR[j] = S.sign[l.key]; });
+var N = O.y.length, mode = "open", filters = [];
+var goodLabel = SC.labels ? SC.labels[GOOD - 1] : String(GOOD);
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 
 function $(id){ return document.getElementById(id); }
 function el(tag, attrs, text){ var e = document.createElement(tag); for (var a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
@@ -221,23 +232,69 @@ function pct(a, q){ var b = a.slice().sort(function(x, y){ return x - y; }); var
 function summ(d){ return { pt: d[0], lo: pct(d.slice(1), 0.05), hi: pct(d.slice(1), 0.95) }; }
 function sig(z){ return 1 / (1 + Math.exp(-z)); }
 function npsOf(fit, eta){ return 100 * ((1 - sig(fit.c2 - eta)) - sig(fit.c1 - eta)); }
+function sumDraws(list){ return list[0].map(function(_, f){ return list.reduce(function(s, p){ return s + p[f]; }, 0); }); }
 var toastT; function toast(msg){ var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove("show"); }, 2600); }
 document.querySelectorAll(".inert").forEach(function(b){ b.addEventListener("click", function(){ toast("Mockup: only the What if tab is built."); }); });
 document.querySelectorAll(".inert-p").forEach(function(b){ b.addEventListener("click", function(){ toast("In the report this pins the panel, as it stands now, to the Story tab."); }); });
 document.querySelectorAll(".inert-x").forEach(function(b){ b.addEventListener("click", function(){ toast("In the report this downloads the " + b.getAttribute("data-what") + "."); }); });
 
+// static text from the study definition
+document.title = "What if · " + S.meta.title;
+$("repTitle").textContent = S.meta.title;
+$("kNlab").textContent = cap(UNITS) + " who answered";
+$("buildTitle").textContent = "Build " + (/^[aeiou]/i.test(UNIT) ? "an " : "a ") + UNIT;
+$("buildLead").textContent = "Choose who the " + UNIT + " is. The model gives the NPS it expects from " + UNITS + " like this, against all " + UNITS + ". The audience filter does not apply to this panel.";
+$("legAll").textContent = "All " + UNITS; $("legThis").textContent = "This " + UNIT + ", expected NPS";
+$("profRandom").textContent = "Show a random " + UNIT;
+$("needHead").innerHTML = cap(UNITS) + " who<br>need it";
+$("per100Head").innerHTML = "Net promoters per<br>100 " + UNITS + " fixed";
+$("effortLead").textContent = "What NPS would lose if an area slipped, and gain if it were fixed for the " + UNITS + " who need it.";
+$("effortNote").textContent = "Ratings: slipping is one " + SC.step + " lower for everyone; fixing lifts every " + UNIT + " below " + goodLabel + " up to " + goodLabel + ". Coverage: slipping withdraws it from every " + UNIT + " that has it; fixing extends it to every " + UNIT + " without it. NPS points, with the 90% range across the bootstrap refits underneath. The last column is the fix per 100 " + UNITS + " you would have to reach.";
+$("rateTitle").textContent = "Rate " + BRAND + " as one " + UNIT;
+$("rateLead").textContent = "Set how one " + UNIT + " rates " + BRAND + "'s services. The model gives the chance they would recommend it. This is the model behind the effort table and scenarios, seen from one " + UNIT + "'s side.";
+
+// ---------------------------------------------------------------- moves
+function moveLabel(kind, m){
+  if (kind === "coverage") return { withdraw: "Withdrawn from every " + UNIT + " with it", extend: "Extended to every " + UNIT + " without it" }[m];
+  var st = SC.step, sts = st === "notch" ? "notches" : "points";
+  return { slip2: "Slips 2 " + sts, slip1: "Slips 1 " + st, up1: "Improves 1 " + st, up2: "Improves 2 " + sts, floor: "Everyone below " + goodLabel + " lifted to " + goodLabel }[m];
+}
+function slipMove(l){ return LEV[l].kind === "coverage" ? "withdraw" : "slip1"; }
+function fixMove(l){ return LEV[l].kind === "coverage" ? "extend" : "floor"; }
+
 // ---------------------------------------------------------------- open mode: live from respondent rows
 var baseEta = [];
-for (var f = 0; f < F; f++){ var a = new Float64Array(N), b = S.fits[f].b; for (var i = 0; i < N; i++){ var e = 0; for (var l = 0; l < L; l++) e += b[l] * (O.r[l][i] - C); a[i] = e; } baseEta.push(a); }
-function dxOf(l, move, i){ var r = O.r[l][i]; if (move === "floor") return Math.max(r, GOOD) - r; var s = { slip2: -2, slip1: -1, up1: 1, up2: 2 }[move]; return Math.max(1, Math.min(5, r + s)) - r; }
+for (var f = 0; f < F; f++){
+  var a = new Float64Array(N), b = S.fits[f].b;
+  for (var i = 0; i < N; i++){
+    var e = 0;
+    S.design.forEach(function(c, j){
+      var li = LEV.findIndex(function(l){ return l.key === c.lever; }), v = O.val[li][i], lv = LEV[li];
+      if (lv.kind === "rating") e += b[j] * (v - C);
+      else if (lv.kind === "coverage") e += b[j] * v;
+      else if (c.part === "has") e += b[j] * (v === null ? 0 : 1);
+      else e += b[j] * (v === null ? 0 : v - C);
+    });
+    a[i] = e;
+  }
+  baseEta.push(a);
+}
+function dxOf(l, move, i){
+  var lv = LEV[l], v = O.val[l][i];
+  if (lv.kind === "coverage"){ if (move === "extend") return v ? 0 : 1; if (move === "withdraw") return v ? -1 : 0; return 0; }
+  if (lv.kind === "nested" && v === null) return 0;
+  if (move === "floor") return Math.max(v, GOOD) - v;
+  var s = { slip2: -2, slip1: -1, up1: 1, up2: 2 }[move];
+  return s === undefined ? 0 : Math.max(SC.min, Math.min(SC.max, v + s)) - v;
+}
 function openIdx(){ var idx = []; for (var i = 0; i < N; i++){ var ok = true; for (var q = 0; q < filters.length; q++){ if (CI[filters[q].key].levels[O.ctx[filters[q].key][i]] !== filters[q].level){ ok = false; break; } } if (ok) idx.push(i); } return idx; }
-function openChange(idx, moves){   // exact, per bootstrap fit: moves = array of move names or null per lever
+function openChange(idx, moves){
   var out = [];
   for (var f = 0; f < F; f++){
     var fit = S.fits[f], E = baseEta[f], sw = 0, d = 0;
     for (var q = 0; q < idx.length; q++){
       var i = idx[q], e = E[i], e2 = e;
-      for (var l = 0; l < L; l++) if (moves[l]) e2 += fit.b[l] * dxOf(l, moves[l], i);
+      for (var l = 0; l < L; l++) if (moves[l]) e2 += fit.b[LEV[l].col] * dxOf(l, moves[l], i);
       d += O.w[i] * (npsOf(fit, e2) - npsOf(fit, e)); sw += O.w[i];
     }
     out.push(d / sw);
@@ -249,38 +306,41 @@ function openGroup(){
   var sw = 0, p = 0, dt = 0; idx.forEach(function(i){ sw += O.w[i]; if (O.y[i] === 2) p += O.w[i]; else if (O.y[i] === 0) dt += O.w[i]; });
   function one(l, m){ var mv = LEV.map(function(){ return null; }); mv[l] = m; return openChange(idx, mv); }
   return {
-    n: idx.length, actual_nps: 100 * (p - dt) / sw, idx: idx,
-    below_good: LEV.map(function(_, l){ var c = 0; idx.forEach(function(i){ if (O.r[l][i] < GOOD) c++; }); return c; }),
-    gain: LEV.map(function(_, l){ var g = []; g[MI.slip1] = one(l, "slip1"); g[MI.floor] = one(l, "floor"); return g; }),
-    scenario: function(moves){ return openChange(idx, moves); }, exact: true
+    n: idx.length, actual_nps: 100 * (p - dt) / sw, exact: true,
+    need: LEV.map(function(lv, l){ var c = 0; idx.forEach(function(i){ var v = O.val[l][i]; if (lv.kind === "coverage" ? !v : (v !== null && v < GOOD)) c++; }); return c; }),
+    slip: LEV.map(function(_, l){ return one(l, slipMove(l)); }), fix: LEV.map(function(_, l){ return one(l, fixMove(l)); }),
+    scenario: function(moves){ return openChange(idx, moves); },
+    bundle: function(bi){ var bs = S.bundles[bi].spec, mv = LEV.map(function(l){ return bs[l.key] || null; }); return openChange(idx, mv); }
   };
 }
 
 // ---------------------------------------------------------------- client-safe mode: published groups only
 function defKey(def){ return Object.keys(def).sort().map(function(k){ return k + "=" + def[k]; }).join("|"); }
 var BYKEY = {}; S.groups.forEach(function(g, i){ BYKEY[defKey(g.def)] = i; });
-var HIDDEN = {}; S.hidden.forEach(function(h){ HIDDEN[defKey(h.def)] = true; });
 var CROSSED = {}; S.crossings.forEach(function(c){ CROSSED[c.family] = true; });
-function famOf(k1, k2){ return CI[k1].label + " by " + CI[k2].label.toLowerCase(); }
+function famOf(k1, k2){ var l2 = CI[k2].label; return CI[k1].label + " by " + l2.charAt(0).toLowerCase() + l2.slice(1); }
 function crossingAllowed(k1, k2){ return CROSSED[famOf(k1, k2)] || CROSSED[famOf(k2, k1)]; }
 function curDef(){ var d = {}; filters.forEach(function(x){ d[x.key] = x.level; }); return d; }
 function safeGroup(){
   var i = BYKEY[defKey(curDef())]; if (i === undefined) return null;
   var g = S.groups[i];
-  return { n: g.n, actual_nps: g.actual_nps, below_good: g.below_good, gain: g.gain, exact: false,
-    scenario: function(moves){ var used = moves.map(function(m, l){ return m ? g.gain[l][MI[m]] : null; }).filter(Boolean); return used[0].map(function(_, f){ return used.reduce(function(s, p){ return s + p[f]; }, 0); }); } };
+  return { n: g.n, actual_nps: g.actual_nps, need: g.need, exact: false,
+    slip: LEV.map(function(_, l){ return g.gain[l][MI[slipMove(l)]]; }), fix: LEV.map(function(_, l){ return g.gain[l][MI[fixMove(l)]]; }),
+    scenario: function(moves){ return sumDraws(moves.map(function(m, l){ return m ? g.gain[l][MI[m]] : null; }).filter(Boolean)); },
+    bundle: function(bi){ return g.bundle[bi]; } };
 }
 
 // ---------------------------------------------------------------- audience bar
-function count(def){ var n = 0; for (var i = 0; i < N; i++){ var ok = true; for (var k in def){ if (CI[k].levels[O.ctx[k][i]] !== def[k]){ ok = false; break; } } if (ok) n++; } return n; }
+function openCount(def){ var n = 0; for (var i = 0; i < N; i++){ var ok = true; for (var k in def){ if (CI[k].levels[O.ctx[k][i]] !== def[k]){ ok = false; break; } } if (ok) n++; } return n; }
+function count(def){ if (mode === "open") return openCount(def); var i = BYKEY[defKey(def)]; return i === undefined ? null : S.groups[i].n; }
 function renderAudience(){
   var ch = $("chips"); ch.innerHTML = "";
   filters.forEach(function(x, q){ var c = el("span", {"class": "chip"}, CI[x.key].label + ": " + x.level + " "); var b = el("button", {"aria-label": "Remove filter"}, "×"); b.addEventListener("click", function(){ filters.splice(q, 1); closePicker(); update(); }); c.appendChild(b); ch.appendChild(c); });
   var n = count(curDef());
-  $("audNote").textContent = (filters.length ? "" : "everyone (n=" + N + ") · ") + "weighted data · " + (mode === "safe" ? "client-safe: up to two filters, published groups only" : "add a filter to recompute every tab for your area of interest");
+  $("audNote").textContent = (filters.length ? "" : "everyone (n=" + N + ") · ") + (S.weighted ? "weighted" : "unweighted") + " data · " + (mode === "safe" ? "client-safe: up to two filters, published groups only" : "add a filter to recompute every tab for your area of interest");
   $("addF").disabled = mode === "safe" && filters.length >= 2;
   $("stripWho").textContent = filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "Everyone";
-  $("stripN").textContent = n;
+  $("stripN").textContent = n == null ? "n/a" : n;
 }
 var pickKey = null;
 function closePicker(){ $("picker").classList.remove("open"); pickKey = null; }
@@ -301,10 +361,10 @@ function renderPicker(){
   $("pickTitle").textContent = CI[pickKey].label + ": pick one";
   CI[pickKey].levels.forEach(function(v){
     var d = curDef(); d[pickKey] = v;
+    if (!openCount(d)) return;   // an empty combination is not offered at all
     var n = count(d), b = el("button");
-    b.appendChild(document.createTextNode(v + " (n=" + n + ")"));
-    if (!n){ return; }
-    if (mode === "safe" && BYKEY[defKey(d)] === undefined){ b.disabled = true; b.textContent = v + " (hidden to protect small groups)"; }
+    if (n == null){ b.disabled = true; b.textContent = v + " (hidden to protect small groups)"; }
+    else b.textContent = v + " (n=" + n + ")";
     b.addEventListener("click", function(){ filters.push({ key: pickKey, level: v }); closePicker(); update(); });
     ql.appendChild(b);
   });
@@ -315,180 +375,221 @@ function npsLine(host, hollow, filled, band, hollowLabel){
   host.innerHTML = "";
   function pos(v){ return Math.max(0, Math.min(100, (v + 100) / 2)) + "%"; }
   host.appendChild(el("div", {"class": "track"}));
-  if (band){ var b = el("div", {"class": "band"}); b.style.left = pos(band[0]); b.style.width = "calc(" + pos(band[1]) + " - " + pos(band[0]) + ")"; host.appendChild(b); }
+  if (band){ var bd = el("div", {"class": "band"}); bd.style.left = pos(band[0]); bd.style.width = "calc(" + pos(band[1]) + " - " + pos(band[0]) + ")"; host.appendChild(bd); }
   host.appendChild(el("div", {"class": "zero"}));
   [-100, -50, 0, 50, 100].forEach(function(v){ var d = el("div", {"class": "tick"}, v); d.style.left = pos(v); host.appendChild(d); });
   if (hollow != null){ var h = el("div", {"class": "dotv hollow"}); h.style.left = pos(hollow); host.appendChild(h);
-    var cap = el("div", {"class": "cap"}, (hollowLabel || "All students") + " " + Math.round(hollow)); cap.style.left = pos(hollow); host.appendChild(cap); }
-  if (filled != null){ var f = el("div", {"class": "dotv fill"}, Math.round(filled)); f.style.left = pos(filled); host.appendChild(f); }
+    var cp = el("div", {"class": "cap"}, (hollowLabel || "All " + UNITS) + " " + Math.round(hollow)); cp.style.left = pos(hollow); host.appendChild(cp); }
+  if (filled != null){ var fl = el("div", {"class": "dotv fill"}, Math.round(filled)); fl.style.left = pos(filled); host.appendChild(fl); }
 }
 
-// ---------------------------------------------------------------- panels
+// ---------------------------------------------------------------- summary, effort, scenario
 var scen = LEV.map(function(){ return null; });
-var OPTS = [["", "No change"], ["slip2", "Slips 2 notches"], ["slip1", "Slips 1 notch"], ["up1", "Improves 1 notch"], ["up2", "Improves 2 notches"], ["floor", "Everyone below Good lifted to Good"]];
 (function(){
-  var gr = $("scenGrid");
+  var hasCov = LEV.some(function(l){ return l.kind === "coverage"; });
+  $("scenRatLab").style.display = hasCov ? "" : "none"; $("scenCovLab").style.display = hasCov ? "" : "none"; $("scenGridC").style.display = hasCov ? "" : "none";
   LEV.forEach(function(l, j){
-    var lab = el("label"); lab.appendChild(el("span", {}, l.label));
-    var s = el("select", {"aria-label": l.label + " scenario"}); OPTS.forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
-    if (j === 3) s.value = "floor";
+    var lab = el("label"), t = el("span", {}, l.label); if (l.kind === "nested") t.appendChild(el("small", {style: "display:block;font-size:11px"}, l.sub)); lab.appendChild(t);
+    var s = el("select", {"aria-label": l.label + " scenario"});
+    s.appendChild(el("option", {value: ""}, "No change"));
+    (l.kind === "coverage" ? ["extend", "withdraw"] : ["slip2", "slip1", "up1", "up2", "floor"]).forEach(function(m){ s.appendChild(el("option", {value: m}, moveLabel(l.kind, m))); });
     s.addEventListener("change", function(){ scen[j] = s.value || null; renderScen(); });
-    scen[j] = s.value || null; lab.appendChild(s); gr.appendChild(lab);
+    lab.appendChild(s); $(l.kind === "coverage" ? "scenGridC" : "scenGridR").appendChild(lab);
   });
 })();
 var G = null;
+function who(){ return filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "all " + UNITS; }
 function update(){
   renderAudience();
   G = mode === "open" ? openGroup() : safeGroup();
-  var who = filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "all students";
   $("modeBadge").className = "badge " + (mode === "open" ? "live" : "safe");
   $("modeBadge").textContent = mode === "open" ? "LIVE: follows the audience filter" : "CLIENT-SAFE: published groups only";
-  $("prov").innerHTML = "Outcome <b>Would you recommend SACAP? (Q017)</b> · ordinal model on Detractor, Passive, Promoter · estimated once on <b>" + N.toLocaleString("en-ZA") + "</b> students · weighted · showing <b>" + who.replace(/</g, "&lt;") + "</b>";
+  var esc = function(s){ return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+  $("prov").innerHTML = "Outcome <b>" + esc(S.meta.outcome) + "</b> · ordinal model on Detractor, Passive, Promoter · estimated once on <b>" + N.toLocaleString("en-ZA") + "</b> " + UNITS + " · " + (S.weighted ? "weighted" : "unweighted") + " · showing <b>" + esc(who()) + "</b>";
   $("modeNote").textContent = mode === "open"
-    ? "The model was estimated once, on every student. The audience filter changes who it is applied to, not the model itself, so this tab recalculates as you filter."
-    : "This file carries no individual answers. Results were prepared for groups of at least " + K + " students, and the filter offers only those groups.";
+    ? "The model was estimated once, on every " + UNIT + ". The audience filter changes who it is applied to, not the model itself, so this tab recalculates as you filter."
+    : "This file carries no individual answers. Results were prepared for groups of at least " + K + " " + UNITS + ", and the filter offers only those groups.";
   var gw = $("grpWarn"); gw.innerHTML = "";
-  if (!G){ ["kActual", "kN", "kScen"].forEach(function(id){ $(id).textContent = "n/a"; }); gw.appendChild(el("div", {"class": "warn"}, "No results for this audience.")); $("effort").querySelector("tbody").innerHTML = ""; $("scenNote").textContent = ""; return; }
-  if (G.n < K){ ["kActual", "kScen"].forEach(function(id){ $(id).textContent = "n/a"; }); $("kN").textContent = G.n; gw.appendChild(el("div", {"class": "warn"}, "Fewer than " + K + " students in this audience. Widen the filter.")); $("effort").querySelector("tbody").innerHTML = ""; $("scenNote").textContent = ""; return; }
+  var tb = $("effort").querySelector("tbody");
+  if (!G || G.n < K){
+    ["kActual", "kScen"].forEach(function(id){ $(id).textContent = "n/a"; }); $("kN").textContent = G ? G.n : "n/a";
+    gw.appendChild(el("div", {"class": "warn"}, G ? "Fewer than " + K + " " + UNITS + " in this audience. Widen the filter." : "No results for this audience."));
+    tb.innerHTML = ""; $("bundleTable").querySelector("tbody").innerHTML = ""; renderScen(); return;
+  }
   $("kActual").textContent = Math.round(G.actual_nps); $("kN").textContent = G.n;
-  if (G.n < S.reliability_floor) gw.appendChild(el("div", {"class": "warn"}, "Only " + G.n + " students in this audience. Results under " + S.reliability_floor + " are thin: a pointer, not a finding."));
-  renderEffort(); renderScen();
-}
-function renderEffort(){
+  if (G.n < S.reliability_floor) gw.appendChild(el("div", {"class": "warn"}, "Only " + G.n + " " + UNITS + " in this audience. Results under " + S.reliability_floor + " are thin: a pointer, not a finding."));
   var rows = LEV.map(function(l, j){
-    var slip = summ(G.gain[j][MI.slip1]), fix = summ(G.gain[j][MI.floor]), cnt = G.below_good[j];
-    if (mode === "safe" && cnt == null) cnt = null;
-    return { l: l, j: j, slip: slip, fix: fix, cnt: cnt, per100: cnt ? fix.pt * G.n / cnt : null, unclear: UNCLEAR[j] !== undefined };
+    var cnt = G.need[j], fix = summ(G.fix[j]);
+    return { l: l, j: j, slip: summ(G.slip[j]), fix: fix, cnt: cnt, per100: cnt ? fix.pt * G.n / cnt : null, unclear: UNCLEAR[j] !== undefined };
   }).sort(function(a, b){ return (a.unclear - b.unclear) || (b.fix.pt - a.fix.pt); });
   var mx = Math.max.apply(null, rows.filter(function(r){ return !r.unclear && r.per100 != null; }).map(function(r){ return r.per100; }).concat([1]));
-  var tb = $("effort").querySelector("tbody"); tb.innerHTML = "";
+  tb.innerHTML = "";
   rows.forEach(function(r){
     var tr = el("tr", r.unclear ? {"class": "unclear"} : {});
-    var td = el("td", {}, r.l.label); if (r.unclear) td.appendChild(el("small", {}, "Effect unclear: wrong way in " + Math.round(100 * UNCLEAR[r.j]) + "% of refits")); tr.appendChild(td);
-    var c = el("td", {"class": "num"}, r.cnt == null ? "under " + K : String(r.cnt)); if (r.cnt != null) c.appendChild(el("span", {"class": "rng"}, Math.round(100 * r.cnt / G.n) + "%")); tr.appendChild(c);
+    var td = el("td", {}, r.l.label);
+    td.appendChild(el("span", {"class": "tag"}, r.l.kind === "coverage" ? "coverage" : "rating"));
+    var sub = r.unclear ? "Effect unclear: wrong way in " + Math.round(100 * UNCLEAR[r.j]) + "% of refits" : r.l.sub;
+    if (sub) td.appendChild(el("small", {}, sub));
+    tr.appendChild(td);
+    var needTxt = r.l.kind === "coverage" ? "without it" : r.l.kind === "nested" ? "with it, below " + goodLabel : "below " + goodLabel;
+    var c = el("td", {"class": "num"}, r.cnt == null ? "under " + K : String(r.cnt)); c.appendChild(el("span", {"class": "rng"}, (r.cnt == null ? "" : Math.round(100 * r.cnt / G.n) + "%, ") + needTxt)); tr.appendChild(c);
     [r.slip, r.fix].forEach(function(s){ var x = el("td", {"class": "num"}, r.unclear ? "~0" : f1(s.pt)); if (!r.unclear) x.appendChild(el("span", {"class": "rng"}, f1(s.lo) + " to " + f1(s.hi))); tr.appendChild(x); });
     tr.appendChild(el("td", {"class": "num"}, r.unclear ? "~0" : r.per100 == null ? "n/a" : f0(r.per100)));
     var bt = el("td", {"class": "hide-s"}), bar = el("div", {"class": "bar"}), fill = el("i"); fill.style.width = r.unclear || r.per100 == null ? "0" : Math.max(0, 100 * r.per100 / mx) + "%"; bar.appendChild(fill); bt.appendChild(bar); tr.appendChild(bt);
     tb.appendChild(tr);
   });
+  var bb = $("bundleTable").querySelector("tbody"); bb.innerHTML = "";
+  S.bundles.forEach(function(bu, bi){
+    var ex = summ(G.bundle(bi)), parts = Object.keys(bu.spec).map(function(k){ var l = LEV.findIndex(function(x){ return x.key === k; }); return mode === "open" ? (function(){ var mv = LEV.map(function(){ return null; }); mv[l] = bu.spec[k]; return G.scenario(mv); })() : S.groups[BYKEY[defKey(curDef())]].gain[l][MI[bu.spec[k]]]; });
+    var ap = summ(sumDraws(parts));
+    var tr = el("tr"), td = el("td", {}, bu.name); td.appendChild(el("small", {}, bu.text)); tr.appendChild(td);
+    [ex, ap].forEach(function(s){ var x = el("td", {"class": "num"}, f1(s.pt)); x.appendChild(el("span", {"class": "rng"}, f1(s.lo) + " to " + f1(s.hi))); tr.appendChild(x); });
+    bb.appendChild(tr);
+  });
+  renderScen();
 }
 function renderScen(){
-  $("scenLead").textContent = mode === "open" ? "Combine moves across areas. Worked out exactly, student by student, for the current audience." : "Combine moves across areas. Each area's own result is added up, so combined results are approximate (usually within a point or two).";
-  $("scenWho").textContent = (filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "all students").toUpperCase();
-  if (!G || G.n < K){ $("kScen").textContent = "n/a"; $("scenFrom").textContent = "n/a"; $("scenTo").textContent = "n/a"; $("scenDelta").textContent = ""; $("scenLine").innerHTML = ""; return; }
-  if (!scen.some(Boolean)){ $("kScen").textContent = "n/a"; $("scenFrom").textContent = Math.round(G.actual_nps); $("scenTo").textContent = "n/a"; $("scenDelta").textContent = ""; npsLine($("scenLine"), G.actual_nps, null, null, "Now"); $("scenNote").textContent = "Choose at least one move."; return; }
+  $("scenLead").textContent = mode === "open" ? "Combine moves across areas. Worked out exactly, " + UNIT + " by " + UNIT + ", for the current audience." : "Combine moves across areas. Each area's own result is added up, so combined results are approximate; the bundles below show how close that gets.";
+  $("scenWho").textContent = who().toUpperCase();
+  if (!G || G.n < K){ ["kScen", "scenFrom", "scenTo"].forEach(function(id){ $(id).textContent = "n/a"; }); $("scenDelta").textContent = ""; $("scenLine").innerHTML = ""; $("scenNote").textContent = ""; return; }
+  $("scenFrom").textContent = Math.round(G.actual_nps);
+  if (!scen.some(Boolean)){ $("kScen").textContent = "n/a"; $("scenTo").textContent = "n/a"; $("scenDelta").textContent = ""; npsLine($("scenLine"), G.actual_nps, null, null, "Now"); $("scenNote").textContent = "Choose at least one move above."; return; }
   var s = summ(G.scenario(scen));
-  $("kScen").textContent = Math.round(G.actual_nps + s.pt);
-  $("scenFrom").textContent = Math.round(G.actual_nps); $("scenTo").textContent = Math.round(G.actual_nps + s.pt);
+  $("kScen").textContent = Math.round(G.actual_nps + s.pt); $("scenTo").textContent = Math.round(G.actual_nps + s.pt);
   $("scenDelta").textContent = f1(s.pt) + " points" + (G.exact ? "" : ", approximate");
   npsLine($("scenLine"), G.actual_nps, G.actual_nps + s.pt, [G.actual_nps + s.lo, G.actual_nps + s.hi], "Now");
   var unc = LEV.filter(function(_, j){ return scen[j] && UNCLEAR[j] !== undefined; }).map(function(l){ return l.label; });
-  $("scenNote").textContent = (G.exact ? "Change " : "Approximate change ") + f1(s.pt) + " NPS points (90% range " + f1(s.lo) + " to " + f1(s.hi) + ")." + (unc.length ? " " + unc.join(" and ") + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise." : "");
+  $("scenNote").textContent = "90% range " + f1(s.lo) + " to " + f1(s.hi) + " points." + (unc.length ? " " + unc.join(" and ") + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise." : "");
 }
 
-// ---------------------------------------------------------------- build a student: who they are
-var P = S.profile, PK = P.keys, prof = {};
-function profReset(){ PK.forEach(function(k){ prof[k.key] = k.levels[0]; }); }
+// ---------------------------------------------------------------- build a respondent: who they are
+var P = S.profile, PK = P.keys, PKI = {}, prof = {}, profSel = {};
+PK.forEach(function(k){ PKI[k.key] = k; });
+// Open reports start from the most common real profile. Client-safe files hold no
+// respondent rows, so they start from the most common value of each trait.
+function profReset(){
+  if (mode === "open"){
+    var cnt = {}, best = null, bestN = 0;
+    for (var i = 0; i < N; i++){ var key = PK.map(function(k){ return O.ctx[k.key][i]; }).join("|"); cnt[key] = (cnt[key] || 0) + 1; if (cnt[key] > bestN){ bestN = cnt[key]; best = i; } }
+    PK.forEach(function(k){ prof[k.key] = CI[k.key].levels[O.ctx[k.key][best]]; });
+  } else PK.forEach(function(k){ prof[k.key] = k.levels[0]; });
+  PK.forEach(function(k){ if (profSel[k.key]) profSel[k.key].value = prof[k.key]; });
+}
 profReset();
-var profSel = {};
 (function(){
   var host = $("profSentence");
-  var parts = [["", "A "], ["gender", ""], ["", " "], ["reg", ""], ["", " student aged "], ["age", ""], ["", ", studying "], ["intensity", ""], ["", " on "], ["course", ""], ["", ", in "], ["year", ""], ["", ", registered with "], ["campus", ""], ["", "."]];
-  var byKey = {}; PK.forEach(function(k){ byKey[k.key] = k; });
-  parts.forEach(function(p){
-    if (!p[0]){ host.appendChild(document.createTextNode(p[1])); return; }
-    var k = byKey[p[0]], s = el("select", {"aria-label": k.label});
-    var shown = k.levels.slice();
-    if (p[0] === "age") shown.sort(function(a, b){ var x = parseInt(a, 10), y = parseInt(b, 10); return (isNaN(x) ? 999 : x) - (isNaN(y) ? 999 : y); });
-    if (p[0] === "year"){ var yo = ["1st year", "2nd year", "3rd year", "Honours", "Masters", "Other"]; shown.sort(function(a, b){ return yo.indexOf(a) - yo.indexOf(b); }); }
-    shown.forEach(function(v){ s.appendChild(el("option", {value: v}, p[0] === "gender" || p[0] === "intensity" ? v.toLowerCase() : v)); });
+  P.sentence.forEach(function(p){
+    if (!p[0] || !PKI[p[0]]){ host.appendChild(document.createTextNode(p[1])); return; }
+    var k = PKI[p[0]], s = el("select", {"aria-label": k.label}), shown = k.levels.slice(), ord = (P.order || {})[k.key];
+    if (ord === "numeric") shown.sort(function(a, b){ var x = parseInt(a, 10), y = parseInt(b, 10); return (isNaN(x) ? 999 : x) - (isNaN(y) ? 999 : y); });
+    else if (Array.isArray(ord)) shown.sort(function(a, b){ return ord.indexOf(a) - ord.indexOf(b); });
+    shown.forEach(function(v){ s.appendChild(el("option", {value: v}, p[1] === "lower" ? v.charAt(0).toLowerCase() + v.slice(1) : v)); });
     s.value = prof[k.key]; s.addEventListener("change", function(){ prof[k.key] = s.value; renderProfile(); });
     profSel[k.key] = s; host.appendChild(s);
   });
 })();
-function profNPS(fit){
-  var eta = 0; PK.forEach(function(k){ eta += fit.b[k.key][k.levels.indexOf(prof[k.key])]; });
-  var a = sig(fit.c1 - eta), b = sig(fit.c2 - eta); return { nps: 100 * ((1 - b) - a), pro: 1 - b };
-}
+function profNPS(fit){ var eta = 0; PK.forEach(function(k){ eta += fit.b[k.key][k.levels.indexOf(prof[k.key])]; }); var a = sig(fit.c1 - eta), b = sig(fit.c2 - eta); return { nps: 100 * ((1 - b) - a), pro: 1 - b }; }
 function renderProfile(){
   var m = profNPS(P.fits[0]), draws = P.fits.slice(1).map(function(f){ return profNPS(f).nps; });
-  var lo = pct(draws, 0.05), hi = pct(draws, 0.95);
   $("profHead").textContent = "Expected NPS " + Math.round(m.nps) + " · " + Math.round(100 * m.pro) + "% chance of being a Promoter";
-  npsLine($("profLine"), S.overall_nps, m.nps, [lo, hi]);
+  npsLine($("profLine"), S.overall_nps, m.nps, [pct(draws, 0.05), pct(draws, 0.95)]);
   var mt = $("profMatch");
   if (mode === "open"){
-    var idx = []; for (var i = 0; i < N; i++){ var ok = PK.every(function(k){ return CI[k.key].levels[O.ctx[k.key][i]] === prof[k.key]; }); if (ok) idx.push(i); }
-    if (idx.length >= K){ var sw = 0, p = 0, d = 0; idx.forEach(function(i){ sw += O.w[i]; if (O.y[i] === 2) p += O.w[i]; else if (O.y[i] === 0) d += O.w[i]; }); mt.textContent = idx.length + " real students have exactly this profile. Their actual NPS is " + Math.round(100 * (p - d) / sw) + (idx.length < S.reliability_floor ? ", from too few students to lean on." : "."); }
-    else mt.textContent = (idx.length ? "Fewer than " + K : "No") + " real students have exactly this profile, so the estimate comes from adding up each characteristic's effect.";
-  } else mt.textContent = "An estimate from adding up each characteristic's effect. This file holds no individual answers, so it cannot say how many real students match.";
-  $("profHonest").textContent = "Who a student is explains little of any one student's answer, but groups do differ: across real students' profiles the expected NPS runs from about " + Math.round(P.spread[0]) + " to " + Math.round(P.spread[2]) + ".";
+    var idx = []; for (var i = 0; i < N; i++){ if (PK.every(function(k){ return CI[k.key].levels[O.ctx[k.key][i]] === prof[k.key]; })) idx.push(i); }
+    if (idx.length >= K){ var sw = 0, p = 0, d = 0; idx.forEach(function(i){ sw += O.w[i]; if (O.y[i] === 2) p += O.w[i]; else if (O.y[i] === 0) d += O.w[i]; }); mt.textContent = idx.length + " real " + UNITS + " have exactly this profile. Their actual NPS is " + Math.round(100 * (p - d) / sw) + (idx.length < S.reliability_floor ? ", from too few " + UNITS + " to lean on." : "."); }
+    else mt.textContent = (idx.length ? "Fewer than " + K : "No") + " real " + UNITS + " have exactly this profile, so the estimate comes from adding up each characteristic's effect.";
+  } else mt.textContent = "An estimate from adding up each characteristic's effect. This file holds no individual answers, so it cannot say how many real " + UNITS + " match.";
+  $("profHonest").textContent = "Who " + (/^[aeiou]/i.test(UNIT) ? "an " : "a ") + UNIT + " is explains little of any one " + UNIT + "'s answer, but groups do differ: across real " + UNITS + "' profiles the expected NPS runs from about " + Math.round(P.spread[0]) + " to " + Math.round(P.spread[2]) + ".";
 }
-$("profReset").addEventListener("click", function(){ profReset(); PK.forEach(function(k){ profSel[k.key].value = prof[k.key]; }); renderProfile(); });
+$("profReset").addEventListener("click", function(){ profReset(); renderProfile(); });
 $("profRandom").addEventListener("click", function(){
   if (mode === "open"){ var i = Math.floor(Math.random() * N); PK.forEach(function(k){ prof[k.key] = CI[k.key].levels[O.ctx[k.key][i]]; }); }
-  else {   // client-safe: each characteristic drawn on its own from published group sizes, so no real student is copied
-    PK.forEach(function(k){ var opts = S.groups.filter(function(g){ var ks = Object.keys(g.def); return ks.length === 1 && ks[0] === k.key; }); var tot = opts.reduce(function(s, g){ return s + g.n; }, 0), r = Math.random() * tot; for (var q = 0; q < opts.length; q++){ r -= opts[q].n; if (r <= 0){ prof[k.key] = opts[q].def[k.key]; break; } } });
-  }
+  else PK.forEach(function(k){   // client-safe: each characteristic drawn on its own from published group sizes, so no real respondent is copied
+    var opts = S.groups.filter(function(g){ var ks = Object.keys(g.def); return ks.length === 1 && ks[0] === k.key; });
+    var tot = opts.reduce(function(s, g){ return s + g.n; }, 0), r = Math.random() * tot;
+    for (var q = 0; q < opts.length; q++){ r -= opts[q].n; if (r <= 0){ prof[k.key] = opts[q].def[k.key]; break; } }
+  });
   PK.forEach(function(k){ profSel[k.key].value = prof[k.key]; }); renderProfile();
 });
 
-// build a student: how they rate
-var stud = LEV.map(function(){ return GOOD; });
+// ---------------------------------------------------------------- build a respondent: how they rate
+var rate = LEV.map(function(l){ return l.kind === "coverage" ? 1 : GOOD; }), rateHas = {}, rateSel = {};
 (function(){
   var gr = $("rateGrid");
+  function add(label, opts, get, set, key){
+    var lab = el("label"); lab.appendChild(el("span", {}, label));
+    var s = el("select", {"aria-label": label}); opts.forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+    s.value = String(get()); s.addEventListener("change", function(){ set(s.value); renderRate(); });
+    lab.appendChild(s); gr.appendChild(lab); if (key) rateSel[key] = s; return s;
+  }
+  var scaleOpts = []; for (var v = SC.max; v >= SC.min; v--) scaleOpts.push([v, SC.labels ? SC.labels[v - 1] : String(v)]);
   LEV.forEach(function(l, j){
-    var lab = el("label"); lab.appendChild(el("span", {}, l.label));
-    var s = el("select", {"aria-label": l.label}); for (var v = S.scale.length; v >= 1; v--) s.appendChild(el("option", {value: v}, S.scale[v - 1]));
-    s.value = stud[j]; s.addEventListener("change", function(){ stud[j] = +s.value; renderStudent(); });
-    lab.appendChild(s); gr.appendChild(lab);
+    if (l.kind === "coverage") add(l.label, [["1", "Yes"], ["0", "No"]], function(){ return rate[j]; }, function(v){ rate[j] = +v; });
+    else if (l.kind === "nested"){
+      rateHas[j] = 1;
+      add(l.has_label || ("Has " + l.label.toLowerCase()), [["1", "Yes"], ["0", "No"]], function(){ return rateHas[j]; }, function(v){ rateHas[j] = +v; rateSel[l.key].disabled = !+v; });
+      add(l.label, scaleOpts, function(){ return rate[j]; }, function(v){ rate[j] = +v; }, l.key);
+    } else add(l.label, scaleOpts, function(){ return rate[j]; }, function(v){ rate[j] = +v; });
   });
 })();
-function renderStudent(){
-  function probs(fit){ var e = 0; for (var j = 0; j < L; j++) e += fit.b[j] * (stud[j] - C); var a = sig(fit.c1 - e), b = sig(fit.c2 - e); return [a, b - a, 1 - b]; }
-  var p = probs(S.fits[0]), pro = S.fits.slice(1).map(function(f){ return probs(f)[2]; });
+function rateProbs(fit){
+  var e = 0;
+  S.design.forEach(function(c, i){
+    var j = LEV.findIndex(function(l){ return l.key === c.lever; }), l = LEV[j];
+    if (l.kind === "rating") e += fit.b[i] * (rate[j] - C);
+    else if (l.kind === "coverage") e += fit.b[i] * rate[j];
+    else if (c.part === "has") e += fit.b[i] * rateHas[j];
+    else e += fit.b[i] * rateHas[j] * (rate[j] - C);
+  });
+  var a = sig(fit.c1 - e), b = sig(fit.c2 - e); return [a, b - a, 1 - b];
+}
+function renderRate(){
+  var p = rateProbs(S.fits[0]), pro = S.fits.slice(1).map(function(f){ return rateProbs(f)[2]; });
   $("sHead").textContent = Math.round(100 * p[2]) + "% chance of being a Promoter";
   var st = $("sStack"); st.innerHTML = "";
   [[p[0], "var(--det)"], [p[1], "var(--pas)"], [p[2], "var(--pro)"]].forEach(function(x){ var d = el("div", {}, x[0] >= 0.07 ? Math.round(100 * x[0]) + "%" : ""); d.style.flexBasis = (100 * x[0]) + "%"; d.style.background = x[1]; st.appendChild(d); });
-  $("sNote").textContent = "90% range " + Math.round(100 * pct(pro, 0.05)) + "% to " + Math.round(100 * pct(pro, 0.95)) + "%. Expected NPS for students like this: " + Math.round(100 * (p[2] - p[0])) + "; all students: " + Math.round(S.overall_nps) + ".";
+  $("sNote").textContent = "90% range " + Math.round(100 * pct(pro, 0.05)) + "% to " + Math.round(100 * pct(pro, 0.95)) + "%. Expected NPS for " + UNITS + " like this: " + Math.round(100 * (p[2] - p[0])) + "; all " + UNITS + ": " + Math.round(S.overall_nps) + ".";
 }
 
-// diagnostics
+// ---------------------------------------------------------------- diagnostics
 function renderDiag(){
   var d = $("diag"); d.innerHTML = "";
   var unc = LEV.filter(function(_, j){ return UNCLEAR[j] !== undefined; });
   [
-    "Model: ordinal logistic regression, Detractor < Passive < Promoter, weighted, on eight experience ratings. Estimated once on all " + N.toLocaleString("en-ZA") + " students, with " + (F - 1) + " bootstrap refits for the ranges.",
-    "Who a student is (campus, course, year, gender, age) did not improve the ratings model on held-out students, so there it is used to choose audiences, not in the model.",
-    "Build a student uses a second, additive model on who the student is: campus, course, year, new or returning, gender, age, and full or part time, each adding its own effect. A penalty chosen by cross-validation (" + S.profile.penalty + ") pulls thinly supported groups toward the overall score. Held-out fit is small (pseudo R squared " + S.profile.cv_r2.toFixed(3) + "): it describes groups, not individuals.",
-    unc.length ? "Sign check: " + unc.map(function(l){ return l.label + " points the wrong way in " + Math.round(100 * S.sign[l.code]) + "% of refits"; }).join("; ") + ". Shown greyed; the data cannot separate its effect from the areas it overlaps." : "Sign check: all areas point the expected way.",
-    "This is association, not cause. Students who like SACAP rate everything higher, so real gains are probably smaller than shown. Value for money is partly a second measure of the same feeling.",
-    "\"Don't know\" answers were set to the middle rating: " + LEV.filter(function(l){ return l.dont_know; }).map(function(l){ return l.label + " " + l.dont_know; }).join(", ") + "."
-  ].forEach(function(t){ d.appendChild(el("li", {}, t)); });
+    "Model: ordinal logistic regression, Detractor < Passive < Promoter" + (S.weighted ? ", weighted" : "") + ", on the areas in the effort table. Estimated once on all " + N.toLocaleString("en-ZA") + " " + UNITS + " (" + S.n_det + " Detractors), with " + (F - 1) + " bootstrap refits for the ranges. Held-out fit: pseudo R squared " + S.lever_r2.toFixed(3) + ".",
+    "Build " + (/^[aeiou]/i.test(UNIT) ? "an " : "a ") + UNIT + " uses a second, additive model on who the " + UNIT + " is: " + PK.map(function(k){ return k.label.toLowerCase(); }).join(", ") + ", each adding its own effect. A penalty chosen by cross-validation (" + P.penalty + ") pulls thinly supported groups toward the overall score. Held-out fit is small (pseudo R squared " + P.cv_r2.toFixed(3) + "): it describes groups, not individuals.",
+    unc.length ? "Sign check: " + unc.map(function(l){ return l.label + " points the wrong way in " + Math.round(100 * S.sign[l.key]) + "% of refits"; }).join("; ") + ". Shown greyed; the data cannot separate its effect from the areas it overlaps." : "Sign check: every area points the expected way.",
+    "This is association, not cause. " + cap(UNITS) + " who like " + BRAND + " rate everything higher, so real gains are probably smaller than shown."
+  ].concat(S.notes).forEach(function(t){ d.appendChild(el("li", {}, t)); });
+  var sb = $("sympBox"); sb.innerHTML = "";
+  if (S.symptoms.length){
+    sb.appendChild(el("h3", {style: "margin-top:14px"}, "Looks like a lever, isn't one"));
+    var ul = el("ul", {"class": "tight"});
+    S.symptoms.forEach(function(s){ ul.appendChild(el("li", {}, s.label + ": " + f1(s.effect) + " NPS points, " + s.n + " " + UNITS + ". " + s.why)); });
+    sb.appendChild(ul);
+  }
   var pv = $("privacy"); pv.innerHTML = "";
   if (mode !== "safe") return;
   pv.appendChild(el("h3", {style: "margin-top:14px"}, "Privacy"));
   var ok = S.groups.every(function(g){ return g.n >= K; }) && S.audit.line_failures === 0 && S.audit.differencing_failures === 0 && S.audit.longest_list < S.n;
-  pv.appendChild(el("div", {"class": ok ? "ok" : "warn"}, ok ? "Checked in this browser: " + S.groups.length + " published groups, all with at least " + K + " students; no hidden group can be worked out by subtraction within a table or between pairs of groups (" + S.audit.nesting_hidden + " hidden by that check); no individual answers in the file." : "Privacy check failed. Do not send this file."));
+  pv.appendChild(el("div", {"class": ok ? "ok" : "warn"}, ok ? "Checked in this browser: " + S.groups.length + " published groups, all with at least " + K + " " + UNITS + "; no hidden group can be worked out by subtraction within a table or between pairs of groups (" + S.audit.nesting_hidden + " hidden by that check); no individual answers in the file." : "Privacy check failed. Do not send this file."));
   var t = el("table", {style: "margin-top:10px"}), h = el("tr"); ["Breakdown", "Groups", "Shown", "Hidden"].forEach(function(x, i){ h.appendChild(el("th", i ? {"class": "num"} : {}, x)); }); t.appendChild(h);
   S.crossings.forEach(function(c){ var tr = el("tr"); tr.appendChild(el("td", {}, c.family)); [c.cells, c.shown, c.cells - c.shown].forEach(function(v){ tr.appendChild(el("td", {"class": "num"}, v)); }); t.appendChild(tr); });
   pv.appendChild(t);
+  if (S.refused.length){ var ul2 = el("ul", {"class": "tight"}); S.refused.forEach(function(r){ ul2.appendChild(el("li", {}, r.group + ": " + r.why + ".")); }); pv.appendChild(ul2); }
 }
 
-// mode switch
+// ---------------------------------------------------------------- mode switch
 function setMode(m){
   mode = m; $("mOpen").classList.toggle("on", m === "open"); $("mSafe").classList.toggle("on", m === "safe");
   $("mockNote").textContent = m === "open" ? "Open: for national and panel studies. Recalculates for any filter." : "Client-safe: for list studies. Two filters at most, published groups only.";
-  if (m === "safe"){
-    // keep only filters that form a published group
-    while (filters.length > 2) filters.pop();
-    if (filters.length && BYKEY[defKey(curDef())] === undefined){ filters = []; toast("Filters cleared: that audience is not a published group."); }
-  }
-  closePicker(); update(); renderDiag(); renderProfile();
+  if (m === "safe"){ while (filters.length > 2) filters.pop(); if (filters.length && BYKEY[defKey(curDef())] === undefined){ filters = []; toast("Filters cleared: that audience is not a published group."); } }
+  closePicker(); update(); renderDiag(); profReset(); renderProfile();
 }
 $("mOpen").addEventListener("click", function(){ setMode("open"); });
 $("mSafe").addEventListener("click", function(){ setMode("safe"); });
 
-setMode("open"); renderStudent();
+setMode(S.mode_default || "open"); renderRate();
 })();
 </script>
 </body>

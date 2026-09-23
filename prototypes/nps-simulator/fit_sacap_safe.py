@@ -383,18 +383,3 @@ assert longest < N, f"a list of length {longest} looks respondent-level"
 out["audit"]["longest_list"] = longest
 json.dump(out, open("build/model_sacap_safe.json", "w"), separators=(",", ":"))
 print(f"longest list {longest} (respondents {N}); json kb {round(len(json.dumps(out, separators=(',', ':'))) / 1024)}")
-
-
-# ---------- open-mode data for the report mockup (template_whatif_mockup.html) ----------
-# An open ("records") report already carries every respondent's answers, so the
-# open mode of the mockup gets them too. This file is NOT client-safe and is only
-# ever used for the open view of the mockup.
-levels = {k: list(v.value_counts().index) for k, (_, v) in CTX.items()}
-open_out = {
-    "ctx": {k: [levels[k].index(x) for x in v] for k, (_, v) in CTX.items()},
-    "r": R.values.astype(int).T.tolist(),
-    "y": y.tolist(),
-    "w": np.round(w, 4).tolist(),
-}
-json.dump(open_out, open("build/model_sacap_open.json", "w"), separators=(",", ":"))
-print("open-mode respondent file written:", N, "respondents")

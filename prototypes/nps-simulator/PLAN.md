@@ -31,7 +31,8 @@ Cross-validated McFadden pseudo R squared unless stated.
 | Experience ratings alone | 0.198 | 0.162 (promoter vs rest) |
 | Context added to ratings | worse (0.184) | worse (0.144) |
 
-Context never predicts. It is a lens for picking groups, not a model input.
+Context never predicts on its own. CORRECTED 23 Sep 2026 (see "How robust is it"): added to the
+ratings WITH a ridge penalty, it improves SACAP's held-out fit and fixes its group calibration.
 
 CCPB specifics:
 
@@ -276,6 +277,150 @@ SACAP as one student". Open mode shows how many real students match a profile
 To check before building: that every lever question is in the microdata (a
 question with Include = N may not be), and how pins and the Story tab capture a
 live panel.
+
+## Generic engine and the CCPB tab (23 Sep 2026)
+
+The SACAP-only mockup became `whatif_engine.py` plus one study file per client
+(`study_sacap.py`, `study_ccpb.py`) and one page template (`template_whatif.html`).
+A study file is the prototype of the config a Turas build would read: outcome,
+levers with their kind (rating, nested, coverage) and grouped items, context for
+filters, the profile sentence, declared crossings, bundles and symptoms.
+
+SACAP through the engine reproduces the earlier numbers exactly. CCPB: lever model
+held-out pseudo R squared 0.172; 244 groups publish at a minimum of 5 (5 hidden by
+the nesting check). The profile model includes coverage facts (coolers, knows the
+sales manager, who merchandises), which is why it moves more than SACAP's (real
+outlet profiles 67 to 90, held-out 0.017). Spaza, delivery and rep both slipping
+one point: 82 to 69 exact in the open view, 71 approximate client-safe.
+
+## How robust is it (robustness.py, run 23 Sep 2026)
+
+| Check | SACAP | CCPB |
+|---|---|---|
+| Hand-built ordinal fit against R `ordinal::clm` | identical to 4 decimals | identical to 4 decimals |
+| Proportional odds (`nominal_test`, p<0.05) | 1 of 8 terms fails: value for money | 0 of 11 fail |
+| Held-out fit, ordinal against multinomial | 0.201 vs 0.197 | 0.172 vs 0.145 |
+| Straight line per point against a separate effect per band | 0.201 vs 0.189 | 0.174 vs 0.164 |
+| Groups of 30+ whose held-out predicted NPS misses the actual beyond its 95% band | 6 of 36 (about 2 expected) | 1 of 41 (about 2 expected) |
+| Highest correlation between rating levers; largest variance inflation | 0.71; 2.3 | 0.38; 1.3 |
+| Additive shortcut (client-safe) against exact, random 2 to 4 lever moves | median 0.3, worst 5.6 points | median 0.3, worst 4.9 points |
+
+What this says:
+
+- The engine computes what it claims: it matches the standard R package exactly.
+- The model's assumptions hold, with one exception: value for money in SACAP
+  behaves differently at the Detractor and Promoter ends. A partial model (one
+  extra slope for that lever) would handle it; the ranking is unaffected.
+- The main weakness was calibration in SACAP. Honours students recommend SACAP
+  far less than their ratings predict (actual 24, predicted 43 for BSocSci
+  Honours); 18 to 20 year olds and the Higher Certificate far more. Something
+  outside the eight ratings drives those groups.
+- Fix, tested: add who the respondent is to the lever model as baselines, with a
+  ridge penalty on those terms. SACAP: held-out fit 0.201 to 0.213, groups outside
+  their band 6 to 0, median group error 4.3 to 1.1 points. CCPB: no change
+  (Restaurants stay under-predicted, actual 97 against 78). The build should do
+  this, penalising only the context terms and choosing the penalty by
+  cross-validation. The prototype pages do not do it yet.
+- What no check can settle: cause. These are cross-sectional associations. The
+  honest reading is "outlets that rate delivery one point lower recommend less by
+  this much", not "fixing delivery will add this much". The tracker backtest is
+  the closest test available.
+- Not yet checked: bootstrap intervals treat the survey weights as fixed; "don't
+  know" is set to the middle score; CCPB has only 17 detractors, which the ordinal
+  model handles by sharing slopes, but the detractor end is thinly evidenced.
+
+## Setting it up for any study
+
+The study files are the prototype of a config. In Turas it would be a workbook,
+with labels, scales and routing read from Survey_Structure:
+
+- Settings: outcome question and how to band it (NPS 0 to 10, top two box, an
+  ordered scale), the unit noun, weight variable, minimum group, reliability floor.
+- Levers: label, question(s) averaged into it, kind (rating, coverage, nested),
+  what counts as having the service, the fix target (Good, 8), include or exclude
+  as a symptom.
+- Profile: the questions that describe a respondent, in sentence order, with the
+  words between them.
+- Filters and crossings: the audience variables and the declared two-way
+  breakdowns, like a banner.
+- Bundles: named combinations of moves.
+
+A preflight would flag what still needs judgement: rating questions correlating
+above about 0.7 (group them), a sign that flips across refits, routed questions
+(make them nested), and likely symptoms (contact, complaints, switching).
+
+## The profile builder on staff surveys (SACS question, 23 Sep 2026)
+
+The group what-if (effort table, scenarios) is fine for a staff survey such as
+SACS under the client-safe rules. The "Build an employee" profile line is not:
+
+- The sentence can describe a real person. In the SACS 2025 delivered file, 57 of
+  144 commenters were alone in their campus, department and tenure combination.
+  The estimate is not their answer, but it will be read as theirs, against an
+  invitation that promises no way to identify individual responses.
+- A characteristic's effect is learned from its members, so a level with fewer
+  than the minimum (a two-person department) leaks a near-average of those people.
+- The page ships the bootstrap refits; for staff surveys ship only the ranges.
+
+The SACAP client-safe mockup has the same issue more mildly: 532 of 1,361
+students are in groups under 5 on just four of its seven characteristics.
+
+DECIDED by Duncan, 23 Sep 2026 (staff surveys): (1) a per-study switch for the profile builder, off by
+default for employee surveys and any study where the client manages the
+respondents; (2) in client-safe mode, the builder offers only combinations that
+at least the minimum number of real respondents share, and every level entering
+the profile model must itself clear the minimum. The ratings-only view uses no
+demographics and stays on.
+
+## Weights (checked on SACAP, 23 Sep 2026)
+
+Weighting is a per-study setting that must match the study's report. SACAP
+student reports have always run unweighted (Duncan, 23 Sep 2026), so
+`study_sacap.py` now sets USE_WEIGHTS = False and the mockup shows NPS 45.6, as
+SACAP's report does; the earlier prototypes used the weighted file (46.6).
+National studies may run either way. CCPB CSAT runs unweighted.
+
+The engine already takes a weight column; SACAP runs weighted. SACAP's weights run
+0.20 to 3.69, design effect 1.12 (1,361 students count as about 1,215). Weighted
+against unweighted, all students: value for money -26.6 / +14.3 against -26.3 /
++14.1; held-out fit 0.201 against 0.204; two near-tied areas swap rank, inside their
+ranges. Same picture for Honours. Group counts for the privacy rules stay
+unweighted, which is correct. CCPB would take weights the same way; the open
+question is what population CCPB would weight to. One limit: the bootstrap keeps
+each respondent's weight fixed rather than re-weighting every resample, so ranges
+are a little narrow when weights are heavy. Fine at a design effect of 1.1; worth
+re-raking inside the bootstrap if a study's design effect is above about 1.5.
+
+## A brand tracker such as IPK (thinking, not tested on IPK data)
+
+From the IPK notes: four focal categories (each respondent answers one: BAK 250,
+PAS 300, POS 300, DSS 350), a six-level brand attitude per brand, awareness and
+purchase, category entry points, a female-only panel sample. What changes:
+
+- The unit is a respondent-brand pair, not a respondent. Each person rates every
+  brand in their category, so the data is stacked, each brand needs its own
+  baseline, and the bootstrap must resample people, not rows.
+- Outcome: attitude collapsed to an order (Love or Prefer / Ambivalent or Price /
+  Avoid, with No opinion left out), or bought in the last 3 months.
+- Levers: mostly yes/no links between a brand and an entry point or asset. That is
+  the coverage kind, but "extend to everyone" is unrealistic for a brand, so it
+  needs a partial move: "10% more category buyers link IPK to X".
+- Halo is much stronger than for service ratings: buyers link their own brand to
+  everything because they buy it. The honest designs split the question: what
+  moves non-buyers toward considering, and what keeps buyers loyal, fitted
+  separately, or with past purchase as a baseline.
+- The natural extension is share shift: model the choice among brands, so a
+  what-if says which competitors IPK would take from. That is the conjoint
+  simulator's pattern applied to survey data.
+- Per-category fits on 250 to 350 people give wider ranges, and small brands will
+  be thin.
+- The sample is an anonymous panel, so open mode and the profile builder are fine
+  (skip gender: female only).
+- It would sit in the brand report, following its portfolio pattern (focal brand
+  picker, JSON payload, JS re-render). New brand R files must be added to
+  .source_brand_module() or they never load.
+- A tracker is where the backtest becomes real: did brands whose links moved
+  between waves move in attitude as predicted?
 
 ## Prompts to direct the next session
 

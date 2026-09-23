@@ -12,9 +12,12 @@ for name in ["sacap", "ccpb", "ccpb_v3", "sacap_safe"]:
         out.write_text(tpl.read_text().replace("%%DATA%%", data.read_text()))
         print("wrote", out.name)
 
-# The What if tab mockup takes two data files: client-safe groups and open-mode respondents.
-mock, safe, opn = HERE / "template_whatif_mockup.html", HERE / "build" / "model_sacap_safe.json", HERE / "build" / "model_sacap_open.json"
-if mock.exists() and safe.exists() and opn.exists():
-    out = HERE / "build" / "whatif_tab_mockup.html"
-    out.write_text(mock.read_text().replace("%%SAFE%%", safe.read_text()).replace("%%OPEN%%", opn.read_text()))
-    print("wrote", out.name)
+# What if tab mockups: one per study, each built from its engine outputs.
+tpl = HERE / "template_whatif.html"
+for safe in sorted((HERE / "build").glob("whatif_*_safe.json")):
+    sid = safe.name[len("whatif_"):-len("_safe.json")]
+    opn = HERE / "build" / f"whatif_{sid}_open.json"
+    if tpl.exists() and opn.exists():
+        out = HERE / "build" / f"whatif_{sid}_mockup.html"
+        out.write_text(tpl.read_text().replace("%%SAFE%%", safe.read_text()).replace("%%OPEN%%", opn.read_text()))
+        print("wrote", out.name)

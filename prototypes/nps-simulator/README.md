@@ -10,14 +10,19 @@ Files:
   and nested levers, cascading group choices, effort table, 2025 vs 2026.
 - `fit_sacap_safe.py`, `template_sacap_safe.html`: SACAP client-safe build. No
   respondent rows in the page; group results precomputed, minimum group 5.
-- `template_whatif_mockup.html`: the "What if" tab as it would sit in the Turas
-  report, styled from the report's own tokens, with an Open / Client-safe switch.
-  Built from `model_sacap_safe.json` plus `model_sacap_open.json` (respondent rows,
-  written by `fit_sacap_safe.py`), so the built mockup is INTERNAL ONLY.
+- `whatif_engine.py`: the generic What if engine. A study file builds a spec
+  (data, levers, context, profile sentence, crossings, bundles, symptoms) and
+  calls `run(spec)`. Writes `build/whatif_<id>_safe.json` (no respondent rows,
+  audited) and `build/whatif_<id>_open.json` (respondent rows, open view only).
+- `study_sacap.py`, `study_ccpb.py`: the two study definitions.
+- `template_whatif.html`: the "What if" tab mockup in the report shell, one page
+  per study, with an Open / Client-safe switch. Built mockups carry respondent
+  rows for the open view, so they are INTERNAL ONLY.
 - `access_ccpb.py`, `stability_ccpb.py`: the analyses behind PLAN.md.
+- `robustness.py`: the robustness checks in PLAN.md (needs R with `ordinal`).
 - `build.py`: injects `build/model_*.json` into each template.
 
-Run from this folder: a fit script, then `python3 build.py`. Output lands in
+Run from this folder: a fit or study script, then `python3 build.py`. Output lands in
 `build/`, which is gitignored. The built pages and JSON contain respondent-level
 client data. They stay on disk and must never be committed or published.
 
