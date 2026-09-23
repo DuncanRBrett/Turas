@@ -791,6 +791,12 @@
       "context": "Bar above the tab content, the button that keeps the current view",
       "page": "Story"
     },
+    "story.explore": {
+      "title": "Story: explore a question slide",
+      "text": "Explore",
+      "context": "Present, question slide, opens the question in Crosstabs",
+      "page": "Story"
+    },
     "filter.weighting.summary": {
       "title": "Weighted data: summary line",
       "text": "⚖ Weighted data. Figures represent the population, not the raw sample. How the three bases work ▸",

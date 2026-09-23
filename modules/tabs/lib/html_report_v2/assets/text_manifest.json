@@ -658,6 +658,11 @@
     "context": "The bar above the tab content during a detour. The button that closes the bar and keeps the current view instead of going back.",
     "tokens": []
   },
+  "story.explore": {
+    "page": "Story",
+    "context": "Present, on a question slide. The button that opens the pinned question in Crosstabs with the pin's banner and filters. A bar then offers the way back to this slide.",
+    "tokens": []
+  },
   "filter.weighting.summary": {
     "page": "Crosstabs",
     "context": "Filter bar. The collapsed weighted-data summary line.",

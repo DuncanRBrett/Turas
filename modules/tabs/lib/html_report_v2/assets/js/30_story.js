@@ -22,6 +22,7 @@
   // Present is open.
   var presentAt = 0;
   var presenting = false;   // Present is open (its key listener is installed)
+  var wiredOverlay = null;   // the overlay whose delegated click listener is installed
 
   function load() {
     if (items) return items;
@@ -826,9 +827,26 @@
     if (!item || item.kind !== "question") return;
     // the return point is taken first, before anything changes
     if (TR.shell.returnPoint) TR.shell.returnPoint.leave({ kind: "story", at: i });
+    openPin(item);
+  };
+
+  /** The pinned question in the crosstabs with the pin's banner and filters. */
+  function openPin(item) {
     TR.d2.state.filters = JSON.parse(JSON.stringify(item.filters || []));
     TR.filterBar.render();
     TR.shell.goQuestion(item.q, item.banner);
+  }
+
+  /**
+   * Explore, from a question slide in Present: the pinned question in the
+   * crosstabs with the pin's banner and filters, under a return point to this
+   * slide, so Back reopens Present here.
+   */
+  story2.explore = function () {
+    var item = load()[presentAt];
+    if (!presenting || !item || item.kind !== "question" || !modelFor(item)) return;
+    story2.leavePresent();
+    openPin(item);
   };
 
   /** Open Present at slide index i (clamped to the story). */
@@ -1187,6 +1205,9 @@
 
   function presentKeys(e) {
     if (e.key === "Escape") { closePresent(); return; }
+    // Space on the focused Explore button presses it; it must not also move
+    // the slide (the redraw would remove the button before it is pressed)
+    if (e.target && e.target.closest && e.target.closest("[data-explore]")) return;
     if (e.key === "ArrowRight" || e.key === " ") {
       presentAt = Math.min(presentAt + 1, load().length - 1);
       renderPresent();
@@ -1267,6 +1288,9 @@
       var flags = item.flags || { table: true, insight: true };
       body = "<h1>" + fmt.escapeHtml(model.code + ": " + (item.title || model.title)) + "</h1>" +
         '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</p>" +
+        // Explore: the question in the crosstabs, under a return point here
+        '<button type="button" class="pr-explore" data-explore>' +
+        TR.txt.block("story.explore", null, { tag: "span" }) + "</button>" +
         ((flags.insight !== false && (item.note || TR.insights.get(item.q, item.banner))) ?
           '<div class="pr-note">' +
           fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner)) + "</div>" : "") +
@@ -1282,7 +1306,19 @@
     overlay.innerHTML = '<div class="present">' + head + body +
       '<div class="pr-foot">← → to navigate · Esc to exit</div></div>';
     overlay.querySelector("#pr-close").addEventListener("click", closePresent);
+    wireOverlay(overlay);
     setSlide(presentAt + 1);
+  }
+
+  /** One delegated click listener on the overlay, installed once: every render
+   *  replaces the Explore button, so wiring it per render would stack or miss. */
+  function wireOverlay(overlay) {
+    if (wiredOverlay === overlay) return;
+    wiredOverlay = overlay;
+    overlay.addEventListener("click", function (e) {
+      var t = e.target;
+      if (t && t.closest && t.closest("[data-explore]")) story2.explore();
+    });
   }
 
 })(typeof window !== "undefined" ? window : globalThis);

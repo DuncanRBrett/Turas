@@ -60,10 +60,9 @@ Prior art to copy, not reinvent: the Qualitative tab's jump and breadcrumb
 1. Explore from a question slide. In Present, a question slide gets an
    "Explore" button. It opens that question in the crosstabs with the pin's
    banner and filters, under a return point to that slide.
-2. Live in place. On a question slide in Present, a small control strip:
-   banner, chart or table, 95% intervals, and "Reset to pinned view". Changes
-   redraw the slide through `modelFor` on a temporary copy of the pin. They
-   never change the saved pin and never touch `TR.d2.state`.
+2. Live in place. DROPPED by Duncan on 23 September 2026 (decision 3 below).
+   It was built as a strip on each Present question slide (banner, chart or
+   table, 95% intervals, "Reset to pinned view"), seen on SACS, and taken out.
 3. Links from the narrative. In Word, the author selects words, presses
    Ctrl+K and types `turas:Q12`. The reader keeps the link on those runs;
    every narrative surface (Report tab card, cover, story card, Present)
@@ -101,7 +100,8 @@ Links in more detail (item 3), in plain terms:
   rule stands).
 - Explore from exhibits, heatmaps, composites or study slides. Question pins
   only.
-- "Save this view as the pin" from the live controls.
+- Any control on a Present slide beyond Explore (decision 3), and so any
+  "save this view as the pin".
 - Browser Back as a return. The bar is the return. Browser Back keeps its
   current behaviour.
 - The whole story re-shown for one group (idea 7 in the conversation). It
@@ -109,10 +109,9 @@ Links in more detail (item 3), in plain terms:
 
 ## Rules that apply
 
-- Disclosure travels. The live controls and the explore detour draw through
-  the same model path as the crosstabs (`TR.model.forQuestion`), so every
-  disclosure gate applies. A test on a gated fixture proves it; nothing is
-  re-derived in the story.
+- Disclosure travels. The explore detour lands in the crosstabs themselves,
+  and the slide draws through the same model path (`TR.model.forQuestion`),
+  so every disclosure gate applies. Nothing is re-derived in the story.
 - UI strings go through `TR.txt` and `assets/text_manifest.json`, with the
   shared registry `modules/shared/lib/callouts/callouts.json` kept in step (the
   `story.narrative_gone` precedent). `tests/mutate_text_check.mjs` guards it.
@@ -134,12 +133,10 @@ and keeps the view; (d) the slide link opens, clamps and updates while
 presenting; (e) the story card's open no longer loses the reader's filters.
 All node suites pass run one file at a time, and `mutate_text_check.mjs`.
 
-Stage 2, explore and live in place. Items 1 and 2. JS only. Check: node
-tests that Explore opens the pin's question, banner and filters under a
-return point; that each live control redraws the slide and leaves the saved
-pin and `TR.d2.state` byte-identical; that Reset restores the pinned view;
-and that a disclosure-gated column stays gated in the live slide. All node
-suites, one file at a time.
+Stage 2, explore. Item 1 only (item 2 was dropped, decision 3). JS only.
+Check: node tests that Explore opens the pin's question, banner and filters
+under a return point, and that Back reopens the slide with the reader's view
+restored. All node suites, one file at a time.
 
 Stage 3, links from Word. Item 3. R and JS. Before any code, prove the one
 real unknown on a document saved by Word itself, which Duncan makes (a
@@ -165,6 +162,12 @@ Duncan, 23 September 2026:
 2. The wording is "Explore" on the slide and "Back to the story" on the bar
    (with "Back to the Report tab" and "Back to the cover" for those origins).
    They are text keys, so they can be changed later without code.
+3. No live controls on a Present slide. After seeing the strip on a SACS
+   question slide, Duncan dropped item 2: the row of banners and toggles made
+   the slide busy and confusing, and the pin is already his curated view. The
+   slide carries the Explore button only, and anyone who wants another banner,
+   a filter or the intervals gets the full crosstabs there, with Back to
+   return. Do not rebuild the strip.
 
 ## Model and effort
 
