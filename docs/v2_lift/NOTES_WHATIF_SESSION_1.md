@@ -126,9 +126,10 @@ a regression test covers a spec with no profile.
   They belong with the session 2 preflight and the session 5 stats pack.
 - **Client-safe groups** (secondary suppression, the nesting check, the audit)
   are session 4, as the brief says. Session 1 takes groups as given.
-- **The brief's "56 of 90 course by year cells empty"** was not reproduced.
-  With the prototype's collapsed courses (10) and year bands (6) the count is
-  30 of 60. The 90 probably used a different course grouping. Unverified.
+- **The brief's "56 of 90 course by year cells empty"** reproduces with the 15
+  uncollapsed courses and the 6 year bands (56 of 90, checked 24 Sep 2026).
+  With the prototype's collapsed courses (10) it is 30 of 60. Structure rules
+  should be derived from the course list the profile actually offers.
 - **styler** is not installed in the renv library, so it was not run. lintr
   reports only object-name notes on upper-case constants and matrix names such
   as `X`, which match the house style elsewhere.
@@ -143,6 +144,9 @@ a regression test covers a spec with no profile.
   items averaged into one lever (CCPB's rep and delivery) should be averaged by
   the config reader before they reach the engine. Don't-know handling belongs
   there too: the engine refuses a missing rating.
+- `whatif_group_masks()` reads the respondent count from the first context
+  variable, so an empty context list errors instead of refusing. The config
+  reader should refuse a study with no context before it reaches the engine.
 - The CCPB 2026 reproduction is session 2's bar. It will be the first real run
   of nested and coverage levers; the synthetic suite covers both.
 
