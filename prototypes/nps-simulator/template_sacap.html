@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student NPS Simulator</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a66;--line:#d9d6cf;--card:#ffffff;--det:#c8423b;--pas:#b9b4a8;--pro:#2f7d5b;--accent:#2b4f7a;--warn-bg:#fff4dc;--warn-fg:#7a5200}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ecebe7;--muted:#a09e98;--line:#3a3935;--card:#211f1d;--det:#e0675f;--pas:#6d6a63;--pro:#4fb389;--accent:#8fb3dd;--warn-bg:#3a2e12;--warn-fg:#f1cf8a}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#ecebe7;--muted:#a09e98;--line:#3a3935;--card:#211f1d;--det:#e0675f;--pas:#6d6a63;--pro:#4fb389;--accent:#8fb3dd;--warn-bg:#3a2e12;--warn-fg:#f1cf8a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 24px}
+section{border-top:2px solid var(--fg);padding:22px 0 28px}
+.sentence{font-size:19px;line-height:2.3}
+select{font:inherit;font-weight:600;color:var(--fg);background:transparent;border:0;border-bottom:2px solid var(--fg);padding:0 2px;max-width:100%;cursor:pointer}
+select:focus{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px 24px;margin:14px 0 6px}
+.grid label{display:flex;justify-content:space-between;gap:10px;align-items:baseline;border-bottom:1px solid var(--line);padding:4px 0}
+.grid label span{color:var(--muted);font-size:15px}
+.grid select{font-size:15px;border-bottom-width:1px}
+.headline{font-size:22px;font-weight:700;text-align:center;margin:22px 0 10px}
+.stack{display:flex;height:34px;border-radius:4px;overflow:hidden;font-size:13px;font-weight:600;color:#fff}
+.stack div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;transition:flex-basis .25s}
+.legend{display:flex;gap:18px;justify-content:center;font-size:14px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.scale{position:relative;height:56px;margin:26px 8px 4px}
+.scale .track{position:absolute;top:26px;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--det),var(--pas) 50%,var(--pro))}
+.scale .zero{position:absolute;top:14px;left:50%;width:2px;height:28px;background:var(--fg)}
+.scale .tick{position:absolute;top:40px;font-size:12px;color:var(--muted);transform:translateX(-50%)}
+.pin{position:absolute;top:10px;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;transition:left .25s}
+.pin.me{background:var(--accent);color:var(--bg);z-index:2}
+.pin.all{background:var(--card);border:2px solid var(--fg);width:30px;height:30px;top:13px;font-size:11px}
+.note{font-size:14px;color:var(--muted);text-align:center;margin:8px 0 0}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:6px;padding:8px 12px;font-size:14px;margin-top:12px}
+.btns{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+button{font:inherit;font-size:15px;background:var(--card);color:var(--fg);border:2px solid var(--fg);border-radius:4px;padding:7px 16px;cursor:pointer}
+button:hover{background:var(--fg);color:var(--bg)}
+.kpis{display:flex;gap:28px;flex-wrap:wrap;margin:14px 0 18px}
+.kpi b{display:block;font-size:28px;line-height:1.1}
+.kpi span{font-size:13px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:13px;color:var(--muted);font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar{position:relative;height:14px;min-width:120px}
+.bar .ci{position:absolute;top:6px;height:2px;background:var(--muted)}
+.bar .pt{position:absolute;top:1px;width:12px;height:12px;border-radius:50%;background:var(--accent);transform:translateX(-50%)}
+.bar .ax{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+.caveats{font-size:14px;color:var(--muted)}
+.caveats li{margin-bottom:6px}
+@media (max-width:560px){.sentence{font-size:17px}.headline{font-size:19px}td.hide-s,th.hide-s{display:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Student NPS simulator</h1>
+<p class="sub">Prototype built on the SACAP 2025 student survey (n=<span id="nAll"></span>, weighted). For exploring the idea, not for the client.</p>
+
+<section>
+<h2>Build a student</h2>
+<p class="sub" style="margin-bottom:10px">Set who they are and how they rate SACAP. The model gives the chance they would recommend SACAP.</p>
+<div class="sentence" id="sentence"></div>
+<div class="grid" id="rateGrid"></div>
+<div class="headline" id="headline"></div>
+<div class="stack" id="stack"></div>
+<div class="legend"><span><i class="dot" style="background:var(--det)"></i>Detractor (0 to 6)</span><span><i class="dot" style="background:var(--pas)"></i>Passive (7 to 8)</span><span><i class="dot" style="background:var(--pro)"></i>Promoter (9 to 10)</span></div>
+<div class="scale" id="scale"></div>
+<div class="legend"><span><i class="dot" style="background:var(--accent)"></i>This student, expected NPS</span><span><i class="dot" style="border:2px solid var(--fg)"></i>All 2025 students</span></div>
+<p class="note" id="matchNote"></p>
+<div id="randNote"></div>
+<div class="btns"><button id="btnRandom">Show a real 2025 student</button><button id="btnTypical">Reset to typical ratings</button></div>
+</section>
+
+<section>
+<h2>What if</h2>
+<p class="sub" style="margin-bottom:10px">Pick a group of real 2025 students. See how their NPS would move if their ratings improved.</p>
+<div class="sentence" id="segSentence"></div>
+<div class="kpis">
+  <div class="kpi"><b id="kActual"></b><span>Actual NPS</span></div>
+  <div class="kpi"><b id="kN"></b><span>Students in group</span></div>
+  <div class="kpi"><b id="kScen"></b><span>NPS under your scenario</span></div>
+</div>
+<div id="segWarn"></div>
+<h3 style="font-size:16px;margin:18px 0 4px">Which lever moves NPS most?</h3>
+<p class="note" style="text-align:left;margin:0 0 8px">Every student in the group rates this one thing one notch higher. Students already at Excellent stay there. The line shows the 90% range across 200 bootstrap refits.</p>
+<table id="leverTable"><thead><tr><th>Lever</th><th class="hide-s">Already Good or Excellent</th><th>NPS gain</th><th style="width:40%"></th></tr></thead><tbody></tbody></table>
+<h3 style="font-size:16px;margin:24px 0 4px">Build a scenario</h3>
+<p class="note" style="text-align:left;margin:0 0 8px">Combine shifts. The scenario NPS appears above.</p>
+<div class="grid" id="scenGrid"></div>
+<p class="note" id="scenNote" style="text-align:left"></p>
+</section>
+
+<section class="caveats">
+<h2 style="color:var(--fg)">Read before believing it</h2>
+<ul>
+<li>This is association, not cause. Students who like SACAP tend to rate everything higher. So "raise educators by one notch" means "if educators were rated like students who rate them one notch higher currently are". The real gain from fixing something is probably smaller.</li>
+<li>The ratings overlap a lot. The ranking of levers is steadier than any single gain figure.</li>
+<li>Who a student is barely predicts their answer once you know their ratings. Tested on held-out students, context alone scores <span id="r2ctx"></span>, ratings alone <span id="r2rat"></span>, both together <span id="r2hyb"></span> (pseudo R squared, cross-validated).</li>
+<li>"Don't know" answers were set to the middle rating for that question: <span id="dkList"></span>.</li>
+<li>Model: multinomial logistic regression on Detractor, Passive and Promoter, weighted, fitted in scratch Python. A Turas build would use catdriver's R engine.</li>
+</ul>
+</section>
+</main>
+<script>
+(function(){
+"use strict";
+var M = %%DATA%%;
+var RAT = ["Terrible","Not very good","About average","Good","Excellent"];
+var CTXK = M.ctx.map(function(c){return c.key;});
+var CTXLAB = {campus:"registered with", course:"on", year:"in", reg:"A"};
+var L = M.levers.length, N = M.n, F = M.fits.length;
+
+// column index lookup: ctx dummy index by key+level, lever index
+var ctxCol = {}, levCol = [];
+M.cols.forEach(function(c, j){
+  if (c[0] === "ctx") ctxCol[c[1] + "|" + c[2]] = j; else levCol.push(j);
+});
+
+function softmax3(a, b, c){
+  var m = Math.max(a, b, c), ea = Math.exp(a - m), eb = Math.exp(b - m), ec = Math.exp(c - m), s = ea + eb + ec;
+  return [ea / s, eb / s, ec / s];
+}
+function logits(fit, ctxSel, ratings){
+  var z = fit.b0.slice();
+  for (var k = 0; k < 3; k++){
+    CTXK.forEach(function(key){
+      var j = ctxCol[key + "|" + ctxSel[key]];
+      if (j !== undefined) z[k] += fit.B[k][j];
+    });
+    for (var l = 0; l < L; l++) z[k] += fit.B[k][levCol[l]] * (ratings[l] - 3);
+  }
+  return z;
+}
+function fmt(x){ var r = Math.round(x); return (r > 0 ? "+" : "") + r; }
+function fmtN(x){ return Math.round(x).toString(); }
+function el(tag, attrs, text){ var e = document.createElement(tag); for (var a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+
+// ---------- respondent arrays ----------
+var R = M.resp, W = R.w, Y = R.y;
+var levelOf = {}; M.ctx.forEach(function(c){ levelOf[c.key] = c.levels; });
+function respCtx(i){ var o = {}; CTXK.forEach(function(k){ o[k] = levelOf[k][R.ctx[k][i]]; }); return o; }
+function respRat(i){ var r = []; for (var l = 0; l < L; l++) r.push(R.r[l][i]); return r; }
+
+// precompute per fit per respondent base logits (context + ratings)
+var baseZ = [];
+for (var f = 0; f < F; f++){
+  var arr = new Float64Array(N * 3);
+  for (var i = 0; i < N; i++){
+    var z = logits(M.fits[f], respCtx(i), respRat(i));
+    arr[i*3] = z[0]; arr[i*3+1] = z[1]; arr[i*3+2] = z[2];
+  }
+  baseZ.push(arr);
+}
+function wNPS(idx){ var p = 0, d = 0, s = 0; idx.forEach(function(i){ s += W[i]; if (Y[i] === 2) p += W[i]; if (Y[i] === 0) d += W[i]; }); return s ? 100 * (p - d) / s : NaN; }
+function modelNPS(f, idx, shifts){
+  var fit = M.fits[f], Z = baseZ[f], acc = 0, s = 0;
+  for (var q = 0; q < idx.length; q++){
+    var i = idx[q], z0 = Z[i*3], z1 = Z[i*3+1], z2 = Z[i*3+2];
+    if (shifts) for (var l = 0; l < L; l++){
+      if (!shifts[l]) continue;
+      var r = R.r[l][i], nr = Math.min(5, r + shifts[l]), dx = nr - r;
+      if (dx){ var c = levCol[l]; z0 += fit.B[0][c] * dx; z1 += fit.B[1][c] * dx; z2 += fit.B[2][c] * dx; }
+    }
+    var p = softmax3(z0, z1, z2); acc += W[i] * (p[2] - p[0]); s += W[i];
+  }
+  return 100 * acc / s;
+}
+function pct(a, q){ var b = a.slice().sort(function(x, y){ return x - y; }); var k = (b.length - 1) * q, lo = Math.floor(k), hi = Math.ceil(k); return b[lo] + (b[hi] - b[lo]) * (k - lo); }
+
+// ---------- Build a student ----------
+var cur = { ctx: {}, rat: [] };
+CTXK.forEach(function(k){ cur.ctx[k] = levelOf[k][0]; });
+function typicalRatings(){ var r = []; for (var l = 0; l < L; l++){ var c = [0,0,0,0,0,0]; for (var i = 0; i < N; i++) c[R.r[l][i]] += W[i]; r.push(c.indexOf(Math.max.apply(null, c))); } return r; }
+cur.rat = typicalRatings();
+
+function ctxSelect(key, withAll, value, onChange){
+  var s = el("select", {"aria-label": key});
+  if (withAll) s.appendChild(el("option", {value: ""}, withAll));
+  levelOf[key].forEach(function(v){ var o = el("option", {value: v}, v); s.appendChild(o); });
+  s.value = value; s.addEventListener("change", function(){ onChange(s.value); });
+  return s;
+}
+var sentence = document.getElementById("sentence");
+var ctxSelects = {};
+function buildSentence(){
+  sentence.innerHTML = "";
+  var parts = [["reg", "A "], ["", " student, "], ["year", ""], ["", ", on "], ["course", ""], ["", ", registered with "], ["campus", ""], ["", ", who rates SACAP like this:"]];
+  parts.forEach(function(p){
+    if (!p[0]){ sentence.appendChild(document.createTextNode(p[1])); return; }
+    if (p[1]) sentence.appendChild(document.createTextNode(p[1]));
+    var s = ctxSelect(p[0], null, cur.ctx[p[0]], function(v){ cur.ctx[p[0]] = v; clearRand(); renderStudent(); });
+    ctxSelects[p[0]] = s; sentence.appendChild(s);
+  });
+}
+var rateSelects = [];
+function buildRateGrid(){
+  var g = document.getElementById("rateGrid");
+  M.levers.forEach(function(lv, l){
+    var lab = el("label"); lab.appendChild(el("span", {}, lv.label));
+    var s = el("select", {"aria-label": lv.label});
+    RAT.forEach(function(t, k){ s.appendChild(el("option", {value: k + 1}, t)); });
+    s.value = cur.rat[l]; s.addEventListener("change", function(){ cur.rat[l] = +s.value; clearRand(); renderStudent(); });
+    rateSelects.push(s); lab.appendChild(s); g.appendChild(lab);
+  });
+}
+var scale = document.getElementById("scale");
+(function(){
+  scale.appendChild(el("div", {"class": "track"})); scale.appendChild(el("div", {"class": "zero"}));
+  [-100, -50, 0, 50, 100].forEach(function(t){ var d = el("div", {"class": "tick"}, t); d.style.left = ((t + 100) / 2) + "%"; scale.appendChild(d); });
+  var a = el("div", {"class": "pin all", id: "pinAll"}); scale.appendChild(a);
+  var m = el("div", {"class": "pin me", id: "pinMe"}); scale.appendChild(m);
+})();
+function renderStudent(){
+  var p = softmax3.apply(null, logits(M.fits[0], cur.ctx, cur.rat));
+  var nps = 100 * (p[2] - p[0]);
+  document.getElementById("headline").textContent = Math.round(100 * p[2]) + "% chance of being a Promoter";
+  var st = document.getElementById("stack"); st.innerHTML = "";
+  [[p[0], "var(--det)"], [p[1], "var(--pas)"], [p[2], "var(--pro)"]].forEach(function(x){
+    var d = el("div", {}, x[0] >= 0.07 ? Math.round(100 * x[0]) + "%" : ""); d.style.flexBasis = (100 * x[0]) + "%"; d.style.background = x[1]; st.appendChild(d);
+  });
+  var me = document.getElementById("pinMe"); me.textContent = fmtN(nps); me.style.left = ((nps + 100) / 2) + "%";
+  var al = document.getElementById("pinAll"); al.textContent = fmtN(M.actual_nps); al.style.left = ((M.actual_nps + 100) / 2) + "%";
+  var idx = []; for (var i = 0; i < N; i++){ var ok = true; CTXK.forEach(function(k){ if (levelOf[k][R.ctx[k][i]] !== cur.ctx[k]) ok = false; }); if (ok) idx.push(i); }
+  var mn = document.getElementById("matchNote");
+  mn.textContent = "Real 2025 students with this same course, year, campus and registration: " + idx.length + (idx.length >= 10 ? ". Their actual NPS: " + fmtN(wNPS(idx)) + "." : ".");
+  var w = document.getElementById("randWarn");
+  if (idx.length < 10){ if (!w){ w = el("div", {"class": "warn", id: "randWarn"}); mn.after(w); } w.textContent = idx.length === 0 ? "No real student has this combination. The number is the model filling in a blank." : "Very few real students have this combination. Read the number as the model's estimate, not evidence."; }
+  else if (w) w.remove();
+}
+function clearRand(){ document.getElementById("randNote").innerHTML = ""; }
+document.getElementById("btnRandom").addEventListener("click", function(){
+  var i = Math.floor(Math.random() * N);
+  cur.ctx = respCtx(i); cur.rat = respRat(i);
+  CTXK.forEach(function(k){ ctxSelects[k].value = cur.ctx[k]; });
+  rateSelects.forEach(function(s, l){ s.value = cur.rat[l]; });
+  renderStudent();
+  var p = softmax3.apply(null, logits(M.fits[0], cur.ctx, cur.rat));
+  var said = ["a Detractor", "a Passive", "a Promoter"][Y[i]];
+  var guess = ["a Detractor", "a Passive", "a Promoter"][p.indexOf(Math.max.apply(null, p))];
+  var n = document.getElementById("randNote"); n.innerHTML = "";
+  n.appendChild(el("p", {"class": "note"}, "This student was actually " + said + ". The model's most likely call was " + guess + "."));
+});
+document.getElementById("btnTypical").addEventListener("click", function(){
+  cur.rat = typicalRatings(); rateSelects.forEach(function(s, l){ s.value = cur.rat[l]; }); clearRand(); renderStudent();
+});
+
+// ---------- What if ----------
+var seg = {}; CTXK.forEach(function(k){ seg[k] = ""; });
+var scen = []; for (var l = 0; l < L; l++) scen.push(0);
+function segIdx(){ var idx = []; for (var i = 0; i < N; i++){ var ok = true; CTXK.forEach(function(k){ if (seg[k] && levelOf[k][R.ctx[k][i]] !== seg[k]) ok = false; }); if (ok) idx.push(i); } return idx; }
+function buildSeg(){
+  var s = document.getElementById("segSentence");
+  var parts = [["", "Students: "], ["reg", ""], ["", ", "], ["year", ""], ["", ", "], ["course", ""], ["", ", "], ["campus", ""]];
+  var allLab = {reg: "new and returning", year: "any year", course: "any course", campus: "any campus"};
+  parts.forEach(function(p){
+    if (!p[0]){ s.appendChild(document.createTextNode(p[1])); return; }
+    s.appendChild(ctxSelect(p[0], allLab[p[0]], "", function(v){ seg[p[0]] = v; renderWhatIf(); }));
+  });
+}
+function buildScen(){
+  var g = document.getElementById("scenGrid");
+  M.levers.forEach(function(lv, l){
+    var lab = el("label"); lab.appendChild(el("span", {}, lv.label));
+    var s = el("select", {"aria-label": lv.label + " shift"});
+    [["0","No change"],["1","One notch up"],["2","Two notches up"]].forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+    s.addEventListener("change", function(){ scen[l] = +s.value; renderScen(); });
+    lab.appendChild(s); g.appendChild(lab);
+  });
+}
+function gainDist(idx, shifts){
+  var g = []; for (var f = 0; f < F; f++) g.push(modelNPS(f, idx, shifts) - modelNPS(f, idx, null));
+  return { pt: g[0], lo: pct(g.slice(1), 0.05), hi: pct(g.slice(1), 0.95) };
+}
+function renderScen(){
+  var idx = segIdx(), kS = document.getElementById("kScen"), note = document.getElementById("scenNote");
+  if (idx.length < 30 || scen.every(function(x){ return !x; })){ kS.textContent = "n/a"; note.textContent = idx.length < 30 ? "" : "Choose at least one shift below."; return; }
+  var g = gainDist(idx, scen), base = modelNPS(0, idx, null);
+  kS.textContent = fmtN(wNPS(idx) + g.pt);
+  note.textContent = "Scenario gain " + fmt(g.pt) + " points (90% range " + fmt(g.lo) + " to " + fmt(g.hi) + "). Model baseline for this group is " + fmtN(base) + ".";
+}
+function renderWhatIf(){
+  var idx = segIdx();
+  document.getElementById("kActual").textContent = idx.length ? fmtN(wNPS(idx)) : "n/a";
+  document.getElementById("kN").textContent = idx.length;
+  var sw = document.getElementById("segWarn"); sw.innerHTML = "";
+  var tb = document.querySelector("#leverTable tbody"); tb.innerHTML = "";
+  if (idx.length < 30){ sw.appendChild(el("div", {"class": "warn"}, "Fewer than 30 students in this group. Too few to simulate. Widen the group.")); renderScen(); return; }
+  var rows = M.levers.map(function(lv, l){
+    var sh = []; for (var k = 0; k < L; k++) sh.push(k === l ? 1 : 0);
+    var hi = 0, s = 0; idx.forEach(function(i){ s += W[i]; if (R.r[l][i] >= 4) hi += W[i]; });
+    return { lv: lv, g: gainDist(idx, sh), top: 100 * hi / s };
+  }).sort(function(a, b){ return b.g.pt - a.g.pt; });
+  var mx = Math.max(10, Math.ceil(Math.max.apply(null, rows.map(function(r){ return r.g.hi; })) / 5) * 5);
+  rows.forEach(function(r){
+    var tr = el("tr"); tr.appendChild(el("td", {}, r.lv.label));
+    tr.appendChild(el("td", {"class": "num hide-s"}, Math.round(r.top) + "%"));
+    tr.appendChild(el("td", {"class": "num"}, fmt(r.g.pt)));
+    var td = el("td"), bar = el("div", {"class": "bar"});
+    var ax = el("div", {"class": "ax"}); ax.style.left = "0%"; bar.appendChild(ax);
+    var ci = el("div", {"class": "ci"}); ci.style.left = Math.max(0, 100 * r.g.lo / mx) + "%"; ci.style.width = Math.max(0, 100 * (r.g.hi - Math.max(0, r.g.lo)) / mx) + "%"; bar.appendChild(ci);
+    var pt = el("div", {"class": "pt"}); pt.style.left = Math.max(0, 100 * r.g.pt / mx) + "%"; bar.appendChild(pt);
+    td.appendChild(bar); tr.appendChild(td); tb.appendChild(tr);
+  });
+  renderScen();
+}
+
+// ---------- footer facts ----------
+document.getElementById("nAll").textContent = N.toLocaleString("en-ZA");
+document.getElementById("r2ctx").textContent = M.r2.context_only.toFixed(3);
+document.getElementById("r2rat").textContent = M.r2.ratings_only.toFixed(3);
+document.getElementById("r2hyb").textContent = M.r2.hybrid.toFixed(3);
+document.getElementById("dkList").textContent = M.levers.filter(function(l){ return l.dk; }).map(function(l){ return l.label + " " + l.dk; }).join(", ");
+
+buildSentence(); buildRateGrid(); renderStudent();
+buildSeg(); buildScen(); renderWhatIf();
+})();
+</script>
+</body>
+</html>

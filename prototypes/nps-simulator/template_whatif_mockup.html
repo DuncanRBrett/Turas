@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What If Tab Mockup</title>
+<style>
+/* Tokens copied from modules/tabs/lib/html_report_v2/assets/styles.css so the mockup reads as the real report. */
+:root{--brand:#323367;--accent:#CC9900;--ink:#1e293b;--muted:#64748b;--faint:#94a3b8;--bg:#f8f7f5;--card:#ffffff;--line:#e2e8f0;--soft:#f3f4f8;--green:#1b6e53;--red:#b3372f;--teal:#1f7f7a;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.05);--font:"Inter",ui-sans-serif,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--det:#b3372f;--pas:#c9c3b6;--pro:#1b6e53;--warn-bg:#fdf3dc;--warn-fg:#7a5200;--ok-bg:#e6f2ec;--ok-fg:#1b5e45;--mock:#7c3aed}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e7e9ee;--muted:#a2abb9;--faint:#7c8595;--bg:#15171c;--card:#1e2128;--line:#2f343e;--soft:#23262e;--pas:#5d5a53;--warn-bg:#3a2e12;--warn-fg:#f1cf8a;--ok-bg:#16301f;--ok-fg:#9fd9b8}}
+:root[data-theme="dark"]{--ink:#e7e9ee;--muted:#a2abb9;--faint:#7c8595;--bg:#15171c;--card:#1e2128;--line:#2f343e;--soft:#23262e;--pas:#5d5a53;--warn-bg:#3a2e12;--warn-fg:#f1cf8a;--ok-bg:#16301f;--ok-fg:#9fd9b8}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5}
+button{font-family:inherit}
+/* mockup strip */
+.mockbar{background:var(--mock);color:#fff;font-size:12px;padding:6px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.mockbar b{font-weight:700}
+.seg{display:inline-flex;background:rgba(255,255,255,.18);border-radius:999px;padding:2px}
+.seg button{border:0;background:transparent;color:#fff;font-size:12px;padding:3px 12px;border-radius:999px;cursor:pointer}
+.seg button.on{background:#fff;color:var(--mock);font-weight:700}
+/* header */
+header{background:linear-gradient(180deg,#232646,#2d3160);color:#fff;padding:14px 22px 0}
+.hrow{display:flex;align-items:center;gap:14px}
+.logo{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#caa033,#8a6a1e);flex:none}
+.htitle{flex:1;min-width:0}
+.htitle h1{margin:0;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htitle p{margin:0;font-size:11px;color:#c9cbe0}
+.htitle p b{color:#e8c46a;font-weight:600}
+.hbtn{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+nav.tabs{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin-top:14px}
+.tabgrp-label{font-size:9.5px;letter-spacing:.14em;color:#9aa0c7;font-weight:700;margin:0 8px 0 2px}
+.tabsep{width:1px;height:20px;background:rgba(255,255,255,.25);margin:0 10px}
+.tabbtn{border:0;background:transparent;color:#e6e7f2;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:8px 8px 0 0;cursor:pointer}
+.tabbtn.on{background:var(--bg);color:var(--teal)}
+.tabbtn .new{font-size:9px;background:var(--accent);color:#1e1e1e;border-radius:6px;padding:1px 5px;margin-left:5px;vertical-align:1px}
+/* audience */
+.aud{background:var(--card);border-bottom:1px solid var(--line);padding:8px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:9.5px;letter-spacing:.14em;color:var(--faint);font-weight:700}
+.addf{border:1.5px dashed var(--teal);color:var(--teal);background:transparent;border-radius:999px;padding:3px 12px;font-weight:700;font-size:12px;cursor:pointer}
+.addf:disabled{opacity:.4;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;font-size:12px;font-weight:600}
+.chip button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 4px}
+.audnote{color:var(--muted);font-size:12px}
+.picker{background:var(--card);border-bottom:1px solid var(--line);padding:12px 22px 14px;display:none}
+.picker.open{display:block}
+.picker h4{margin:0 0 8px;font-size:13px}
+.qlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 22px}
+.qlist button{text-align:left;border:0;background:transparent;color:var(--ink);font-size:12.5px;padding:3px 0;cursor:pointer}
+.qlist button:disabled{color:var(--faint);cursor:not-allowed}
+.qlist button b{color:var(--teal);margin-right:5px}
+.strip{background:#efeee9;padding:6px 22px;font-size:12px;color:var(--muted)}
+:root[data-theme="dark"] .strip{background:#1b1d23}
+.strip b{color:var(--ink)}
+/* content */
+main{max-width:1100px;margin:0 auto;padding:18px 22px 60px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+.card h2{margin:0 0 4px;font-size:16px}
+.card h3{margin:0 0 4px;font-size:14px}
+.card .lead{color:var(--muted);margin:0 0 12px}
+.cardhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.acts{display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+.btn.pin{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:700}
+.prov{color:var(--muted)}
+.prov b{color:var(--ink)}
+.note{color:var(--muted);font-size:12px;margin:8px 0 0}
+.kpis{display:flex;gap:30px;flex-wrap:wrap;margin:12px 0 2px}
+.kpi b{display:block;font-size:26px;line-height:1.1;font-weight:700}
+.kpi span{font-size:11.5px;color:var(--muted)}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:8px;padding:8px 12px;margin-top:10px}
+.ok{background:var(--ok-bg);color:var(--ok-fg);border-radius:8px;padding:8px 12px;margin-top:10px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11px;color:var(--muted);font-weight:600;vertical-align:bottom}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td small,.rng{display:block;font-size:11px;color:var(--muted)}
+tr.unclear td{color:var(--faint)}
+.bar{position:relative;height:10px;min-width:90px;background:var(--soft);border-radius:3px}
+.bar i{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:var(--teal)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:4px 26px;margin:10px 0 4px}
+.grid label select{flex:none;width:200px}
+.grid label span{flex:1;min-width:0}
+@media (max-width:420px){.grid{grid-template-columns:1fr}.grid label select{width:160px}}
+.grid label{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:5px 0}
+.grid label span{color:var(--muted)}
+select{font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 6px;max-width:100%}
+details.card summary{cursor:pointer;font-weight:700;font-size:14px}
+details.card[open] summary{margin-bottom:8px}
+.stack{display:flex;height:30px;border-radius:6px;overflow:hidden;font-size:12px;font-weight:700;color:#fff;margin-top:10px}
+.stack div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;transition:flex-basis .25s}
+.legend{display:flex;gap:16px;justify-content:center;font-size:12px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.big{font-size:20px;font-weight:700;text-align:center;margin:14px 0 0}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px}
+.badge.live{background:var(--ok-bg);color:var(--ok-fg)}
+.badge.safe{background:#ede9fe;color:#5b21b6}
+ul.tight{margin:6px 0 0;padding-left:18px;color:var(--muted)}
+ul.tight li{margin-bottom:4px}
+.npsline{position:relative;height:58px;margin:30px 14px 2px}
+.npsline .track{position:absolute;top:27px;left:0;right:0;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--det),var(--pas) 50%,var(--pro))}
+.npsline .zero{position:absolute;top:15px;left:50%;width:2px;height:28px;background:var(--ink)}
+.npsline .tick{position:absolute;top:44px;font-size:10.5px;color:var(--faint);transform:translateX(-50%)}
+.npsline .band{position:absolute;top:21px;height:16px;border-radius:8px;background:rgba(50,51,103,.16);transition:left .25s,width .25s}
+.npsline .dotv{position:absolute;top:11px;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:left .25s}
+.npsline .dotv.fill{background:var(--brand);color:#fff;z-index:2;box-shadow:0 0 0 3px var(--card)}
+.npsline .dotv.hollow{background:var(--card);border:2px solid var(--ink);width:18px;height:18px;top:20px}
+.npsline .cap{position:absolute;top:-14px;transform:translateX(-50%);font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;transition:left .25s}
+:root[data-theme="dark"] .npsline .dotv.fill{background:#8f93e0}
+.sentence{font-size:16px;line-height:2.4}
+.sentence select{font-size:15px;font-weight:700;border:0;border-bottom:2px solid var(--ink);border-radius:0;background:transparent;padding:0 2px}
+.headline{font-size:18px;font-weight:700;text-align:center;margin:16px 0 0}
+.center{text-align:center}
+.btnrow{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.btn.outline{border:2px solid var(--ink);font-weight:700;padding:6px 16px}
+.scenres{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:12px}
+.scenres b{font-size:24px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:12.5px;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1}
+@media (max-width:640px){header{padding:12px 14px 0}.aud,.strip,.picker{padding-left:14px;padding-right:14px}main{padding:14px}.hbtn{display:none}.hide-s{display:none}}
+</style>
+</head>
+<body>
+<div class="mockbar"><b>MOCKUP</b> of a "What if" tab in the Turas report. Only this tab works. <span>View as:</span>
+  <span class="seg" role="group" aria-label="Report mode"><button id="mOpen" class="on">Open report</button><button id="mSafe">Client-safe report</button></span>
+  <span id="mockNote"></span>
+</div>
+<header>
+  <div class="hrow">
+    <div class="logo" aria-hidden="true"></div>
+    <div class="htitle"><h1>SACAP Student Survey 2025</h1><p><b>interactive report</b> · single file · works offline</p></div>
+    <button class="hbtn inert">ⓘ How to read</button><button class="hbtn inert">Save copy</button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <span class="tabgrp-label" aria-hidden="true">READ</span>
+    <button class="tabbtn inert">Dashboard</button><button class="tabbtn inert">Group overview</button><button class="tabbtn inert">Tracking</button><button class="tabbtn inert">Qualitative</button>
+    <button class="tabbtn on" role="tab" aria-selected="true">What if<span class="new">NEW</span></button>
+    <button class="tabbtn inert">Story</button>
+    <span class="tabsep" aria-hidden="true"></span><span class="tabgrp-label" aria-hidden="true">ANALYSE</span>
+    <button class="tabbtn inert">Crosstabs</button><button class="tabbtn inert">Differences</button><button class="tabbtn inert">Report</button>
+  </nav>
+</header>
+<div class="aud"><span class="lbl">AUDIENCE</span><button class="addf" id="addF">+ Add filter</button><span id="chips"></span><span class="audnote" id="audNote"></span></div>
+<div class="picker" id="picker"><h4 id="pickTitle">Filter the whole report by…</h4><div class="qlist" id="qlist"></div></div>
+<div class="strip"><span class="lbl">AUDIENCE</span> <b id="stripWho">Everyone</b> · n=<span id="stripN"></span></div>
+
+<main>
+  <div class="card">
+    <div class="cardhead"><div><h2>What if <span class="badge" id="modeBadge"></span></h2>
+      <p class="prov" id="prov"></p></div></div>
+    <p class="note" id="modeNote"></p>
+    <div class="kpis">
+      <div class="kpi"><b id="kActual"></b><span>Actual NPS</span></div>
+      <div class="kpi"><b id="kN"></b><span>Students who answered</span></div>
+      <div class="kpi"><b id="kScen"></b><span>NPS under the scenario below</span></div>
+    </div>
+    <div id="grpWarn"></div>
+  </div>
+
+  <div class="card" id="buildCard">
+    <div class="cardhead"><div><h3>Build a student</h3><p class="lead">Choose who the student is. The model gives the NPS it expects from students like this, against all students. The audience filter does not apply to this panel.</p></div><div class="acts"><button class="btn pin inert-p">📌 Pin to story</button></div></div>
+    <div class="sentence" id="profSentence"></div>
+    <div class="headline" id="profHead"></div>
+    <div class="npsline" id="profLine"></div>
+    <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i>All students</span><span><i class="dot" style="background:var(--brand)"></i>This student, expected NPS</span><span><i class="dot" style="background:rgba(50,51,103,.25)"></i>90% range</span></div>
+    <p class="note center" id="profMatch"></p>
+    <div class="btnrow"><button class="btn outline" id="profRandom">Show a random student</button><button class="btn outline" id="profReset">Reset</button></div>
+    <p class="note center" id="profHonest"></p>
+  </div>
+
+  <div class="card">
+    <div class="cardhead"><div><h3>Where to direct effort</h3><p class="lead">What NPS would lose if an area slipped one notch, and gain if every student rating it below Good were lifted to Good.</p></div>
+      <div class="acts"><button class="btn inert-x" data-what="table as Excel">Excel</button><button class="btn pin inert-p">📌 Pin to story</button></div></div>
+    <div class="tablewrap"><table id="effort"><thead><tr><th>Area</th><th class="num">Students below Good</th><th class="num">If it slips<br>one notch</th><th class="num">If lifted<br>to Good</th><th class="num">Net promoters per<br>100 students lifted</th><th class="hide-s" style="width:18%"></th></tr></thead><tbody></tbody></table></div>
+    <p class="note">NPS points. The small figures are the 90% range across the model's bootstrap refits. The last column is the gain per 100 students you would have to reach.</p>
+  </div>
+
+  <div class="card">
+    <div class="cardhead"><div><h3>Build a scenario</h3><p class="lead" id="scenLead"></p></div><div class="acts"><button class="btn pin inert-p">📌 Pin to story</button></div></div>
+    <div class="grid" id="scenGrid"></div>
+    <div class="scenres"><span class="lbl">RESULT FOR <span id="scenWho"></span></span><b id="scenFrom"></b><span>→</span><b id="scenTo"></b><span id="scenDelta" class="prov"></span></div>
+    <div class="npsline" id="scenLine"></div>
+    <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i>Now</span><span><i class="dot" style="background:var(--brand)"></i>Under this scenario</span><span><i class="dot" style="background:rgba(50,51,103,.25)"></i>90% range</span></div>
+    <p class="note" id="scenNote"></p>
+  </div>
+
+  <details class="card">
+    <summary>Rate SACAP as one student</summary>
+    <p class="lead">Set how one student rates SACAP's services. The model gives the chance they would recommend it. This is the model behind the effort table and scenarios, seen from one student's side.</p>
+    <div class="grid" id="rateGrid"></div>
+    <div class="big" id="sHead"></div>
+    <div class="stack" id="sStack"></div>
+    <div class="legend"><span><i class="dot" style="background:var(--det)"></i>Detractor 0 to 6</span><span><i class="dot" style="background:var(--pas)"></i>Passive 7 to 8</span><span><i class="dot" style="background:var(--pro)"></i>Promoter 9 to 10</span></div>
+    <p class="note" id="sNote" style="text-align:center"></p>
+  </details>
+
+  <details class="card">
+    <summary>Diagnostics and method</summary>
+    <ul class="tight" id="diag"></ul>
+    <div id="privacy"></div>
+  </details>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+"use strict";
+var S = %%SAFE%%;   // client-safe: model + precomputed published groups, no respondent rows
+var O = %%OPEN%%;   // open: respondent rows, as an open report already carries
+var LEV = S.levers, L = LEV.length, F = S.fits.length, K = S.min_group, GOOD = S.good, C = S.centre;
+var MOVES = S.moves, MI = {}; MOVES.forEach(function(m, i){ MI[m] = i; });
+var CTX = S.ctx, CI = {}; CTX.forEach(function(c){ CI[c.key] = c; });
+var UNCLEAR = {}; LEV.forEach(function(l, j){ if (S.sign[l.code] > 0.10) UNCLEAR[j] = S.sign[l.code]; });
+var N = O.y.length;
+var mode = "open", filters = [];   // filters: [{key, level}]
+
+function $(id){ return document.getElementById(id); }
+function el(tag, attrs, text){ var e = document.createElement(tag); for (var a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+function f1(x){ var r = Math.round(x * 10) / 10; if (r === 0) return "0.0"; return (r > 0 ? "+" : "−") + Math.abs(r).toFixed(1); }
+function f0(x){ var r = Math.round(x); return r === 0 ? "0" : (r > 0 ? "+" : "−") + Math.abs(r); }
+function pct(a, q){ var b = a.slice().sort(function(x, y){ return x - y; }); var k = (b.length - 1) * q, lo = Math.floor(k), hi = Math.ceil(k); return b[lo] + (b[hi] - b[lo]) * (k - lo); }
+function summ(d){ return { pt: d[0], lo: pct(d.slice(1), 0.05), hi: pct(d.slice(1), 0.95) }; }
+function sig(z){ return 1 / (1 + Math.exp(-z)); }
+function npsOf(fit, eta){ return 100 * ((1 - sig(fit.c2 - eta)) - sig(fit.c1 - eta)); }
+var toastT; function toast(msg){ var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove("show"); }, 2600); }
+document.querySelectorAll(".inert").forEach(function(b){ b.addEventListener("click", function(){ toast("Mockup: only the What if tab is built."); }); });
+document.querySelectorAll(".inert-p").forEach(function(b){ b.addEventListener("click", function(){ toast("In the report this pins the panel, as it stands now, to the Story tab."); }); });
+document.querySelectorAll(".inert-x").forEach(function(b){ b.addEventListener("click", function(){ toast("In the report this downloads the " + b.getAttribute("data-what") + "."); }); });
+
+// ---------------------------------------------------------------- open mode: live from respondent rows
+var baseEta = [];
+for (var f = 0; f < F; f++){ var a = new Float64Array(N), b = S.fits[f].b; for (var i = 0; i < N; i++){ var e = 0; for (var l = 0; l < L; l++) e += b[l] * (O.r[l][i] - C); a[i] = e; } baseEta.push(a); }
+function dxOf(l, move, i){ var r = O.r[l][i]; if (move === "floor") return Math.max(r, GOOD) - r; var s = { slip2: -2, slip1: -1, up1: 1, up2: 2 }[move]; return Math.max(1, Math.min(5, r + s)) - r; }
+function openIdx(){ var idx = []; for (var i = 0; i < N; i++){ var ok = true; for (var q = 0; q < filters.length; q++){ if (CI[filters[q].key].levels[O.ctx[filters[q].key][i]] !== filters[q].level){ ok = false; break; } } if (ok) idx.push(i); } return idx; }
+function openChange(idx, moves){   // exact, per bootstrap fit: moves = array of move names or null per lever
+  var out = [];
+  for (var f = 0; f < F; f++){
+    var fit = S.fits[f], E = baseEta[f], sw = 0, d = 0;
+    for (var q = 0; q < idx.length; q++){
+      var i = idx[q], e = E[i], e2 = e;
+      for (var l = 0; l < L; l++) if (moves[l]) e2 += fit.b[l] * dxOf(l, moves[l], i);
+      d += O.w[i] * (npsOf(fit, e2) - npsOf(fit, e)); sw += O.w[i];
+    }
+    out.push(d / sw);
+  }
+  return out;
+}
+function openGroup(){
+  var idx = openIdx(); if (!idx.length) return null;
+  var sw = 0, p = 0, dt = 0; idx.forEach(function(i){ sw += O.w[i]; if (O.y[i] === 2) p += O.w[i]; else if (O.y[i] === 0) dt += O.w[i]; });
+  function one(l, m){ var mv = LEV.map(function(){ return null; }); mv[l] = m; return openChange(idx, mv); }
+  return {
+    n: idx.length, actual_nps: 100 * (p - dt) / sw, idx: idx,
+    below_good: LEV.map(function(_, l){ var c = 0; idx.forEach(function(i){ if (O.r[l][i] < GOOD) c++; }); return c; }),
+    gain: LEV.map(function(_, l){ var g = []; g[MI.slip1] = one(l, "slip1"); g[MI.floor] = one(l, "floor"); return g; }),
+    scenario: function(moves){ return openChange(idx, moves); }, exact: true
+  };
+}
+
+// ---------------------------------------------------------------- client-safe mode: published groups only
+function defKey(def){ return Object.keys(def).sort().map(function(k){ return k + "=" + def[k]; }).join("|"); }
+var BYKEY = {}; S.groups.forEach(function(g, i){ BYKEY[defKey(g.def)] = i; });
+var HIDDEN = {}; S.hidden.forEach(function(h){ HIDDEN[defKey(h.def)] = true; });
+var CROSSED = {}; S.crossings.forEach(function(c){ CROSSED[c.family] = true; });
+function famOf(k1, k2){ return CI[k1].label + " by " + CI[k2].label.toLowerCase(); }
+function crossingAllowed(k1, k2){ return CROSSED[famOf(k1, k2)] || CROSSED[famOf(k2, k1)]; }
+function curDef(){ var d = {}; filters.forEach(function(x){ d[x.key] = x.level; }); return d; }
+function safeGroup(){
+  var i = BYKEY[defKey(curDef())]; if (i === undefined) return null;
+  var g = S.groups[i];
+  return { n: g.n, actual_nps: g.actual_nps, below_good: g.below_good, gain: g.gain, exact: false,
+    scenario: function(moves){ var used = moves.map(function(m, l){ return m ? g.gain[l][MI[m]] : null; }).filter(Boolean); return used[0].map(function(_, f){ return used.reduce(function(s, p){ return s + p[f]; }, 0); }); } };
+}
+
+// ---------------------------------------------------------------- audience bar
+function count(def){ var n = 0; for (var i = 0; i < N; i++){ var ok = true; for (var k in def){ if (CI[k].levels[O.ctx[k][i]] !== def[k]){ ok = false; break; } } if (ok) n++; } return n; }
+function renderAudience(){
+  var ch = $("chips"); ch.innerHTML = "";
+  filters.forEach(function(x, q){ var c = el("span", {"class": "chip"}, CI[x.key].label + ": " + x.level + " "); var b = el("button", {"aria-label": "Remove filter"}, "×"); b.addEventListener("click", function(){ filters.splice(q, 1); closePicker(); update(); }); c.appendChild(b); ch.appendChild(c); });
+  var n = count(curDef());
+  $("audNote").textContent = (filters.length ? "" : "everyone (n=" + N + ") · ") + "weighted data · " + (mode === "safe" ? "client-safe: up to two filters, published groups only" : "add a filter to recompute every tab for your area of interest");
+  $("addF").disabled = mode === "safe" && filters.length >= 2;
+  $("stripWho").textContent = filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "Everyone";
+  $("stripN").textContent = n;
+}
+var pickKey = null;
+function closePicker(){ $("picker").classList.remove("open"); pickKey = null; }
+$("addF").addEventListener("click", function(){ if ($("picker").classList.contains("open")){ closePicker(); return; } pickKey = null; renderPicker(); $("picker").classList.add("open"); });
+function renderPicker(){
+  var ql = $("qlist"); ql.innerHTML = "";
+  if (!pickKey){
+    $("pickTitle").textContent = "Filter the whole report by…";
+    CTX.forEach(function(c){
+      if (filters.some(function(x){ return x.key === c.key; })) return;
+      var b = el("button"); b.appendChild(el("b", {}, c.key.toUpperCase())); b.appendChild(document.createTextNode(c.label));
+      if (mode === "safe" && filters.length === 1 && !crossingAllowed(filters[0].key, c.key)){ b.disabled = true; b.appendChild(document.createTextNode(" (not published with " + CI[filters[0].key].label.toLowerCase() + ")")); }
+      b.addEventListener("click", function(){ pickKey = c.key; renderPicker(); });
+      ql.appendChild(b);
+    });
+    return;
+  }
+  $("pickTitle").textContent = CI[pickKey].label + ": pick one";
+  CI[pickKey].levels.forEach(function(v){
+    var d = curDef(); d[pickKey] = v;
+    var n = count(d), b = el("button");
+    b.appendChild(document.createTextNode(v + " (n=" + n + ")"));
+    if (!n){ return; }
+    if (mode === "safe" && BYKEY[defKey(d)] === undefined){ b.disabled = true; b.textContent = v + " (hidden to protect small groups)"; }
+    b.addEventListener("click", function(){ filters.push({ key: pickKey, level: v }); closePicker(); update(); });
+    ql.appendChild(b);
+  });
+}
+
+// ---------------------------------------------------------------- the NPS line (Economist style)
+function npsLine(host, hollow, filled, band, hollowLabel){
+  host.innerHTML = "";
+  function pos(v){ return Math.max(0, Math.min(100, (v + 100) / 2)) + "%"; }
+  host.appendChild(el("div", {"class": "track"}));
+  if (band){ var b = el("div", {"class": "band"}); b.style.left = pos(band[0]); b.style.width = "calc(" + pos(band[1]) + " - " + pos(band[0]) + ")"; host.appendChild(b); }
+  host.appendChild(el("div", {"class": "zero"}));
+  [-100, -50, 0, 50, 100].forEach(function(v){ var d = el("div", {"class": "tick"}, v); d.style.left = pos(v); host.appendChild(d); });
+  if (hollow != null){ var h = el("div", {"class": "dotv hollow"}); h.style.left = pos(hollow); host.appendChild(h);
+    var cap = el("div", {"class": "cap"}, (hollowLabel || "All students") + " " + Math.round(hollow)); cap.style.left = pos(hollow); host.appendChild(cap); }
+  if (filled != null){ var f = el("div", {"class": "dotv fill"}, Math.round(filled)); f.style.left = pos(filled); host.appendChild(f); }
+}
+
+// ---------------------------------------------------------------- panels
+var scen = LEV.map(function(){ return null; });
+var OPTS = [["", "No change"], ["slip2", "Slips 2 notches"], ["slip1", "Slips 1 notch"], ["up1", "Improves 1 notch"], ["up2", "Improves 2 notches"], ["floor", "Everyone below Good lifted to Good"]];
+(function(){
+  var gr = $("scenGrid");
+  LEV.forEach(function(l, j){
+    var lab = el("label"); lab.appendChild(el("span", {}, l.label));
+    var s = el("select", {"aria-label": l.label + " scenario"}); OPTS.forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+    if (j === 3) s.value = "floor";
+    s.addEventListener("change", function(){ scen[j] = s.value || null; renderScen(); });
+    scen[j] = s.value || null; lab.appendChild(s); gr.appendChild(lab);
+  });
+})();
+var G = null;
+function update(){
+  renderAudience();
+  G = mode === "open" ? openGroup() : safeGroup();
+  var who = filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "all students";
+  $("modeBadge").className = "badge " + (mode === "open" ? "live" : "safe");
+  $("modeBadge").textContent = mode === "open" ? "LIVE: follows the audience filter" : "CLIENT-SAFE: published groups only";
+  $("prov").innerHTML = "Outcome <b>Would you recommend SACAP? (Q017)</b> · ordinal model on Detractor, Passive, Promoter · estimated once on <b>" + N.toLocaleString("en-ZA") + "</b> students · weighted · showing <b>" + who.replace(/</g, "&lt;") + "</b>";
+  $("modeNote").textContent = mode === "open"
+    ? "The model was estimated once, on every student. The audience filter changes who it is applied to, not the model itself, so this tab recalculates as you filter."
+    : "This file carries no individual answers. Results were prepared for groups of at least " + K + " students, and the filter offers only those groups.";
+  var gw = $("grpWarn"); gw.innerHTML = "";
+  if (!G){ ["kActual", "kN", "kScen"].forEach(function(id){ $(id).textContent = "n/a"; }); gw.appendChild(el("div", {"class": "warn"}, "No results for this audience.")); $("effort").querySelector("tbody").innerHTML = ""; $("scenNote").textContent = ""; return; }
+  if (G.n < K){ ["kActual", "kScen"].forEach(function(id){ $(id).textContent = "n/a"; }); $("kN").textContent = G.n; gw.appendChild(el("div", {"class": "warn"}, "Fewer than " + K + " students in this audience. Widen the filter.")); $("effort").querySelector("tbody").innerHTML = ""; $("scenNote").textContent = ""; return; }
+  $("kActual").textContent = Math.round(G.actual_nps); $("kN").textContent = G.n;
+  if (G.n < S.reliability_floor) gw.appendChild(el("div", {"class": "warn"}, "Only " + G.n + " students in this audience. Results under " + S.reliability_floor + " are thin: a pointer, not a finding."));
+  renderEffort(); renderScen();
+}
+function renderEffort(){
+  var rows = LEV.map(function(l, j){
+    var slip = summ(G.gain[j][MI.slip1]), fix = summ(G.gain[j][MI.floor]), cnt = G.below_good[j];
+    if (mode === "safe" && cnt == null) cnt = null;
+    return { l: l, j: j, slip: slip, fix: fix, cnt: cnt, per100: cnt ? fix.pt * G.n / cnt : null, unclear: UNCLEAR[j] !== undefined };
+  }).sort(function(a, b){ return (a.unclear - b.unclear) || (b.fix.pt - a.fix.pt); });
+  var mx = Math.max.apply(null, rows.filter(function(r){ return !r.unclear && r.per100 != null; }).map(function(r){ return r.per100; }).concat([1]));
+  var tb = $("effort").querySelector("tbody"); tb.innerHTML = "";
+  rows.forEach(function(r){
+    var tr = el("tr", r.unclear ? {"class": "unclear"} : {});
+    var td = el("td", {}, r.l.label); if (r.unclear) td.appendChild(el("small", {}, "Effect unclear: wrong way in " + Math.round(100 * UNCLEAR[r.j]) + "% of refits")); tr.appendChild(td);
+    var c = el("td", {"class": "num"}, r.cnt == null ? "under " + K : String(r.cnt)); if (r.cnt != null) c.appendChild(el("span", {"class": "rng"}, Math.round(100 * r.cnt / G.n) + "%")); tr.appendChild(c);
+    [r.slip, r.fix].forEach(function(s){ var x = el("td", {"class": "num"}, r.unclear ? "~0" : f1(s.pt)); if (!r.unclear) x.appendChild(el("span", {"class": "rng"}, f1(s.lo) + " to " + f1(s.hi))); tr.appendChild(x); });
+    tr.appendChild(el("td", {"class": "num"}, r.unclear ? "~0" : r.per100 == null ? "n/a" : f0(r.per100)));
+    var bt = el("td", {"class": "hide-s"}), bar = el("div", {"class": "bar"}), fill = el("i"); fill.style.width = r.unclear || r.per100 == null ? "0" : Math.max(0, 100 * r.per100 / mx) + "%"; bar.appendChild(fill); bt.appendChild(bar); tr.appendChild(bt);
+    tb.appendChild(tr);
+  });
+}
+function renderScen(){
+  $("scenLead").textContent = mode === "open" ? "Combine moves across areas. Worked out exactly, student by student, for the current audience." : "Combine moves across areas. Each area's own result is added up, so combined results are approximate (usually within a point or two).";
+  $("scenWho").textContent = (filters.length ? filters.map(function(x){ return x.level; }).join(", ") : "all students").toUpperCase();
+  if (!G || G.n < K){ $("kScen").textContent = "n/a"; $("scenFrom").textContent = "n/a"; $("scenTo").textContent = "n/a"; $("scenDelta").textContent = ""; $("scenLine").innerHTML = ""; return; }
+  if (!scen.some(Boolean)){ $("kScen").textContent = "n/a"; $("scenFrom").textContent = Math.round(G.actual_nps); $("scenTo").textContent = "n/a"; $("scenDelta").textContent = ""; npsLine($("scenLine"), G.actual_nps, null, null, "Now"); $("scenNote").textContent = "Choose at least one move."; return; }
+  var s = summ(G.scenario(scen));
+  $("kScen").textContent = Math.round(G.actual_nps + s.pt);
+  $("scenFrom").textContent = Math.round(G.actual_nps); $("scenTo").textContent = Math.round(G.actual_nps + s.pt);
+  $("scenDelta").textContent = f1(s.pt) + " points" + (G.exact ? "" : ", approximate");
+  npsLine($("scenLine"), G.actual_nps, G.actual_nps + s.pt, [G.actual_nps + s.lo, G.actual_nps + s.hi], "Now");
+  var unc = LEV.filter(function(_, j){ return scen[j] && UNCLEAR[j] !== undefined; }).map(function(l){ return l.label; });
+  $("scenNote").textContent = (G.exact ? "Change " : "Approximate change ") + f1(s.pt) + " NPS points (90% range " + f1(s.lo) + " to " + f1(s.hi) + ")." + (unc.length ? " " + unc.join(" and ") + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise." : "");
+}
+
+// ---------------------------------------------------------------- build a student: who they are
+var P = S.profile, PK = P.keys, prof = {};
+function profReset(){ PK.forEach(function(k){ prof[k.key] = k.levels[0]; }); }
+profReset();
+var profSel = {};
+(function(){
+  var host = $("profSentence");
+  var parts = [["", "A "], ["gender", ""], ["", " "], ["reg", ""], ["", " student aged "], ["age", ""], ["", ", studying "], ["intensity", ""], ["", " on "], ["course", ""], ["", ", in "], ["year", ""], ["", ", registered with "], ["campus", ""], ["", "."]];
+  var byKey = {}; PK.forEach(function(k){ byKey[k.key] = k; });
+  parts.forEach(function(p){
+    if (!p[0]){ host.appendChild(document.createTextNode(p[1])); return; }
+    var k = byKey[p[0]], s = el("select", {"aria-label": k.label});
+    var shown = k.levels.slice();
+    if (p[0] === "age") shown.sort(function(a, b){ var x = parseInt(a, 10), y = parseInt(b, 10); return (isNaN(x) ? 999 : x) - (isNaN(y) ? 999 : y); });
+    if (p[0] === "year"){ var yo = ["1st year", "2nd year", "3rd year", "Honours", "Masters", "Other"]; shown.sort(function(a, b){ return yo.indexOf(a) - yo.indexOf(b); }); }
+    shown.forEach(function(v){ s.appendChild(el("option", {value: v}, p[0] === "gender" || p[0] === "intensity" ? v.toLowerCase() : v)); });
+    s.value = prof[k.key]; s.addEventListener("change", function(){ prof[k.key] = s.value; renderProfile(); });
+    profSel[k.key] = s; host.appendChild(s);
+  });
+})();
+function profNPS(fit){
+  var eta = 0; PK.forEach(function(k){ eta += fit.b[k.key][k.levels.indexOf(prof[k.key])]; });
+  var a = sig(fit.c1 - eta), b = sig(fit.c2 - eta); return { nps: 100 * ((1 - b) - a), pro: 1 - b };
+}
+function renderProfile(){
+  var m = profNPS(P.fits[0]), draws = P.fits.slice(1).map(function(f){ return profNPS(f).nps; });
+  var lo = pct(draws, 0.05), hi = pct(draws, 0.95);
+  $("profHead").textContent = "Expected NPS " + Math.round(m.nps) + " · " + Math.round(100 * m.pro) + "% chance of being a Promoter";
+  npsLine($("profLine"), S.overall_nps, m.nps, [lo, hi]);
+  var mt = $("profMatch");
+  if (mode === "open"){
+    var idx = []; for (var i = 0; i < N; i++){ var ok = PK.every(function(k){ return CI[k.key].levels[O.ctx[k.key][i]] === prof[k.key]; }); if (ok) idx.push(i); }
+    if (idx.length >= K){ var sw = 0, p = 0, d = 0; idx.forEach(function(i){ sw += O.w[i]; if (O.y[i] === 2) p += O.w[i]; else if (O.y[i] === 0) d += O.w[i]; }); mt.textContent = idx.length + " real students have exactly this profile. Their actual NPS is " + Math.round(100 * (p - d) / sw) + (idx.length < S.reliability_floor ? ", from too few students to lean on." : "."); }
+    else mt.textContent = (idx.length ? "Fewer than " + K : "No") + " real students have exactly this profile, so the estimate comes from adding up each characteristic's effect.";
+  } else mt.textContent = "An estimate from adding up each characteristic's effect. This file holds no individual answers, so it cannot say how many real students match.";
+  $("profHonest").textContent = "Who a student is explains little of any one student's answer, but groups do differ: across real students' profiles the expected NPS runs from about " + Math.round(P.spread[0]) + " to " + Math.round(P.spread[2]) + ".";
+}
+$("profReset").addEventListener("click", function(){ profReset(); PK.forEach(function(k){ profSel[k.key].value = prof[k.key]; }); renderProfile(); });
+$("profRandom").addEventListener("click", function(){
+  if (mode === "open"){ var i = Math.floor(Math.random() * N); PK.forEach(function(k){ prof[k.key] = CI[k.key].levels[O.ctx[k.key][i]]; }); }
+  else {   // client-safe: each characteristic drawn on its own from published group sizes, so no real student is copied
+    PK.forEach(function(k){ var opts = S.groups.filter(function(g){ var ks = Object.keys(g.def); return ks.length === 1 && ks[0] === k.key; }); var tot = opts.reduce(function(s, g){ return s + g.n; }, 0), r = Math.random() * tot; for (var q = 0; q < opts.length; q++){ r -= opts[q].n; if (r <= 0){ prof[k.key] = opts[q].def[k.key]; break; } } });
+  }
+  PK.forEach(function(k){ profSel[k.key].value = prof[k.key]; }); renderProfile();
+});
+
+// build a student: how they rate
+var stud = LEV.map(function(){ return GOOD; });
+(function(){
+  var gr = $("rateGrid");
+  LEV.forEach(function(l, j){
+    var lab = el("label"); lab.appendChild(el("span", {}, l.label));
+    var s = el("select", {"aria-label": l.label}); for (var v = S.scale.length; v >= 1; v--) s.appendChild(el("option", {value: v}, S.scale[v - 1]));
+    s.value = stud[j]; s.addEventListener("change", function(){ stud[j] = +s.value; renderStudent(); });
+    lab.appendChild(s); gr.appendChild(lab);
+  });
+})();
+function renderStudent(){
+  function probs(fit){ var e = 0; for (var j = 0; j < L; j++) e += fit.b[j] * (stud[j] - C); var a = sig(fit.c1 - e), b = sig(fit.c2 - e); return [a, b - a, 1 - b]; }
+  var p = probs(S.fits[0]), pro = S.fits.slice(1).map(function(f){ return probs(f)[2]; });
+  $("sHead").textContent = Math.round(100 * p[2]) + "% chance of being a Promoter";
+  var st = $("sStack"); st.innerHTML = "";
+  [[p[0], "var(--det)"], [p[1], "var(--pas)"], [p[2], "var(--pro)"]].forEach(function(x){ var d = el("div", {}, x[0] >= 0.07 ? Math.round(100 * x[0]) + "%" : ""); d.style.flexBasis = (100 * x[0]) + "%"; d.style.background = x[1]; st.appendChild(d); });
+  $("sNote").textContent = "90% range " + Math.round(100 * pct(pro, 0.05)) + "% to " + Math.round(100 * pct(pro, 0.95)) + "%. Expected NPS for students like this: " + Math.round(100 * (p[2] - p[0])) + "; all students: " + Math.round(S.overall_nps) + ".";
+}
+
+// diagnostics
+function renderDiag(){
+  var d = $("diag"); d.innerHTML = "";
+  var unc = LEV.filter(function(_, j){ return UNCLEAR[j] !== undefined; });
+  [
+    "Model: ordinal logistic regression, Detractor < Passive < Promoter, weighted, on eight experience ratings. Estimated once on all " + N.toLocaleString("en-ZA") + " students, with " + (F - 1) + " bootstrap refits for the ranges.",
+    "Who a student is (campus, course, year, gender, age) did not improve the ratings model on held-out students, so there it is used to choose audiences, not in the model.",
+    "Build a student uses a second, additive model on who the student is: campus, course, year, new or returning, gender, age, and full or part time, each adding its own effect. A penalty chosen by cross-validation (" + S.profile.penalty + ") pulls thinly supported groups toward the overall score. Held-out fit is small (pseudo R squared " + S.profile.cv_r2.toFixed(3) + "): it describes groups, not individuals.",
+    unc.length ? "Sign check: " + unc.map(function(l){ return l.label + " points the wrong way in " + Math.round(100 * S.sign[l.code]) + "% of refits"; }).join("; ") + ". Shown greyed; the data cannot separate its effect from the areas it overlaps." : "Sign check: all areas point the expected way.",
+    "This is association, not cause. Students who like SACAP rate everything higher, so real gains are probably smaller than shown. Value for money is partly a second measure of the same feeling.",
+    "\"Don't know\" answers were set to the middle rating: " + LEV.filter(function(l){ return l.dont_know; }).map(function(l){ return l.label + " " + l.dont_know; }).join(", ") + "."
+  ].forEach(function(t){ d.appendChild(el("li", {}, t)); });
+  var pv = $("privacy"); pv.innerHTML = "";
+  if (mode !== "safe") return;
+  pv.appendChild(el("h3", {style: "margin-top:14px"}, "Privacy"));
+  var ok = S.groups.every(function(g){ return g.n >= K; }) && S.audit.line_failures === 0 && S.audit.differencing_failures === 0 && S.audit.longest_list < S.n;
+  pv.appendChild(el("div", {"class": ok ? "ok" : "warn"}, ok ? "Checked in this browser: " + S.groups.length + " published groups, all with at least " + K + " students; no hidden group can be worked out by subtraction within a table or between pairs of groups (" + S.audit.nesting_hidden + " hidden by that check); no individual answers in the file." : "Privacy check failed. Do not send this file."));
+  var t = el("table", {style: "margin-top:10px"}), h = el("tr"); ["Breakdown", "Groups", "Shown", "Hidden"].forEach(function(x, i){ h.appendChild(el("th", i ? {"class": "num"} : {}, x)); }); t.appendChild(h);
+  S.crossings.forEach(function(c){ var tr = el("tr"); tr.appendChild(el("td", {}, c.family)); [c.cells, c.shown, c.cells - c.shown].forEach(function(v){ tr.appendChild(el("td", {"class": "num"}, v)); }); t.appendChild(tr); });
+  pv.appendChild(t);
+}
+
+// mode switch
+function setMode(m){
+  mode = m; $("mOpen").classList.toggle("on", m === "open"); $("mSafe").classList.toggle("on", m === "safe");
+  $("mockNote").textContent = m === "open" ? "Open: for national and panel studies. Recalculates for any filter." : "Client-safe: for list studies. Two filters at most, published groups only.";
+  if (m === "safe"){
+    // keep only filters that form a published group
+    while (filters.length > 2) filters.pop();
+    if (filters.length && BYKEY[defKey(curDef())] === undefined){ filters = []; toast("Filters cleared: that audience is not a published group."); }
+  }
+  closePicker(); update(); renderDiag(); renderProfile();
+}
+$("mOpen").addEventListener("click", function(){ setMode("open"); });
+$("mSafe").addEventListener("click", function(){ setMode("safe"); });
+
+setMode("open"); renderStudent();
+})();
+</script>
+</body>
+</html>

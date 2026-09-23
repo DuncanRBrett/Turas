@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outlet NPS Simulator v3</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a66;--line:#d9d6cf;--card:#ffffff;--det:#c8423b;--pas:#b9b4a8;--pro:#2f7d5b;--accent:#2b4f7a;--warn-bg:#fff4dc;--warn-fg:#7a5200}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ecebe7;--muted:#a09e98;--line:#3a3935;--card:#211f1d;--det:#e0675f;--pas:#6d6a63;--pro:#4fb389;--accent:#8fb3dd;--warn-bg:#3a2e12;--warn-fg:#f1cf8a}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#ecebe7;--muted:#a09e98;--line:#3a3935;--card:#211f1d;--det:#e0675f;--pas:#6d6a63;--pro:#4fb389;--accent:#8fb3dd;--warn-bg:#3a2e12;--warn-fg:#f1cf8a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:920px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:20px;margin:0 0 4px}
+h3{font-size:16px;margin:22px 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+section{border-top:2px solid var(--fg);padding:22px 0 28px}
+.sentence{font-size:18px;line-height:2.3}
+select{font:inherit;font-weight:600;color:var(--fg);background:transparent;border:0;border-bottom:2px solid var(--fg);padding:0 2px;max-width:100%;cursor:pointer}
+select:disabled{opacity:.4;cursor:not-allowed}
+select:focus{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:6px 24px;margin:14px 0 6px}
+.grid label{display:flex;justify-content:space-between;gap:10px;align-items:baseline;border-bottom:1px solid var(--line);padding:4px 0}
+.grid label span{color:var(--muted);font-size:15px}
+.grid label small{display:block;font-size:12px;color:var(--muted)}
+.grid select{font-size:15px;border-bottom-width:1px}
+.grp{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:16px 0 0}
+.headline{font-size:22px;font-weight:700;text-align:center;margin:22px 0 10px}
+.stack{display:flex;height:34px;border-radius:4px;overflow:hidden;font-size:13px;font-weight:600;color:#fff}
+.stack div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;transition:flex-basis .25s}
+.legend{display:flex;gap:18px;justify-content:center;font-size:14px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.note{font-size:14px;color:var(--muted);margin:8px 0 0}
+.center{text-align:center}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:6px;padding:8px 12px;font-size:14px;margin-top:12px}
+.kpis{display:flex;gap:28px;flex-wrap:wrap;margin:14px 0 18px}
+.kpi b{display:block;font-size:28px;line-height:1.1}
+.kpi span{font-size:13px;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;vertical-align:bottom}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td small{display:block;font-size:12px;color:var(--muted)}
+td .rng{display:block;font-size:12px;color:var(--muted)}
+tr.unclear td{color:var(--muted)}
+.tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:0 5px;margin-left:6px;color:var(--muted);vertical-align:middle}
+.bar{position:relative;height:12px;min-width:90px;background:transparent}
+.bar i{position:absolute;top:0;bottom:0;left:0;border-radius:2px;background:var(--pro)}
+.caveats{font-size:14px;color:var(--muted)}
+.caveats li{margin-bottom:6px}
+@media (max-width:600px){.sentence{font-size:16px}.headline{font-size:19px}.hide-s{display:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Outlet NPS simulator, v3</h1>
+<p class="sub">Prototype on the CCPB 2026 main study (n=<span id="nAll"></span> outlets, unweighted). Answers the question "where should we direct effort?". Internal only.</p>
+
+<section>
+<h2>Where to direct effort</h2>
+<p class="sub" style="margin-bottom:8px">Pick a group of outlets. Each row asks two questions: what would NPS lose if this slipped, and what would it gain if we fixed it for the outlets that need it?</p>
+<div class="sentence" id="segSentence"></div>
+<div class="kpis">
+  <div class="kpi"><b id="kActual"></b><span>Actual NPS</span></div>
+  <div class="kpi"><b id="kN"></b><span>Outlets in group</span></div>
+  <div class="kpi"><b id="kScen"></b><span>NPS under your scenario</span></div>
+</div>
+<div id="segWarn"></div>
+<div class="tablewrap"><table id="effortTable">
+<thead><tr>
+<th>Area</th>
+<th class="num">Room to act<br>(outlets that need it)</th>
+<th class="num">Protect<br>(if it slips)</th>
+<th class="num">Fix<br>(for those who need it)</th>
+<th class="num">Net promoters per<br>100 outlets fixed</th>
+<th class="hide-s"></th>
+</tr></thead><tbody></tbody></table></div>
+<p class="note">Ratings: slip is one point lower for every outlet; fix lifts every outlet below 8 up to 8. Coverage: slip withdraws it from every outlet that has it; fix extends it to every outlet without it. NPS points, with the 90% range across 200 bootstrap refits underneath. The last column is the fix, per 100 outlets you would have to reach. It is the closest the data gets to value for effort.</p>
+
+<h3>Build a scenario</h3>
+<p class="note" style="margin:0 0 8px">Combine moves. The scenario NPS appears in the summary above.</p>
+<div id="scenGrid"></div>
+<p class="note" id="scenNote"></p>
+</section>
+
+<section>
+<h2>Build an outlet</h2>
+<p class="sub" style="margin-bottom:8px">Set what the outlet has and how it rates CCPB. Signage condition can only be set for an outlet with Coke signage.</p>
+<div id="outletGrid"></div>
+<div class="headline" id="headline"></div>
+<div class="stack" id="stack"></div>
+<div class="legend"><span><i class="dot" style="background:var(--det)"></i>Detractor (0 to 6)</span><span><i class="dot" style="background:var(--pas)"></i>Passive (7 to 8)</span><span><i class="dot" style="background:var(--pro)"></i>Promoter (9 to 10)</span></div>
+<p class="note center" id="outletNote"></p>
+</section>
+
+<section>
+<h2>Does it hold from one wave to the next?</h2>
+<p class="sub" style="margin-bottom:8px">NPS lost if each rating slips one point, fitted separately on each wave with the same model. The ranking is what to trust; the sizes move.</p>
+<div class="tablewrap"><table id="waveTable"><thead><tr><th>Area</th><th class="num" id="w25h"></th><th class="num" id="w26h"></th></tr></thead><tbody></tbody></table></div>
+<p class="note">In 2025 the sales rep area averages two questions (rep overall, complaints). The third, help with coolers and signage, was new in 2026. So the sales rep row is not a like-for-like comparison.</p>
+</section>
+
+<section>
+<h2>Looks like a lever, isn't one</h2>
+<p class="sub" style="margin-bottom:8px">These move with the recommend score but are symptoms or outcomes, so they are left out of the levers.</p>
+<ul id="symList"></ul>
+</section>
+
+<section class="caveats">
+<h2 style="color:var(--fg)">Read before believing it</h2>
+<ul>
+<li>This is association, not cause. Outlets that like CCPB rate everything higher. Coverage effects may partly reflect which outlets CCPB chose to serve. Real gains from fixing something are probably smaller than shown.</li>
+<li id="ctrlLi"></li>
+<li>The model is ordinal (Detractor, Passive, Promoter in order), so it can move outlets down to Detractor as well as out of Promoter, even with only <span id="nDet"></span> Detractors in the data.</li>
+<li>With most outlets at 9 or 10, each rating's effect rests on the minority who scored lower. The ranges show that uncertainty.</li>
+<li id="signLi"></li>
+<li>Held-out fit (pseudo R squared, cross-validated): ratings only <span id="r2a"></span>, ratings plus coverage and signage <span id="r2b"></span>, plus size and channel controls <span id="r2c"></span>.</li>
+<li>Group dropdowns only offer combinations that exist in the data, and counts under 5 are shown as "under 5". Groups under 30 are not simulated.</li>
+<li>Model fitted in scratch Python with a near-zero penalty. A Turas build would use catdriver's R engine.</li>
+</ul>
+</section>
+</main>
+<script>
+(function(){
+"use strict";
+var M = %%DATA%%;
+var C = M.centre, N = M.n, F = M.fits.length, R = M.resp;
+var RL = M.ratings, CV = M.coverage, NS = M.nested[0];
+var colIdx = {}; M.cols.forEach(function(c, j){ colIdx[c[0] + ":" + c[1]] = j; });
+var CTXK = M.ctx.map(function(c){ return c.key; });
+var levelOf = {}; M.ctx.forEach(function(c){ levelOf[c.key] = c.levels; });
+
+function el(tag, attrs, text){ var e = document.createElement(tag); for (var a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+function sig(z){ return 1 / (1 + Math.exp(-z)); }
+function f1(x){ var r = Math.round(x * 10) / 10; if (r === 0) return "0.0"; return (r > 0 ? "+" : "−") + Math.abs(r).toFixed(1); }
+function f0(x){ var r = Math.round(x); return r === 0 ? "0" : (r > 0 ? "+" : "−") + Math.abs(r); }
+function band(n){ return n < 5 ? "under 5" : String(n); }
+function clamp(v){ return Math.max(1, Math.min(10, v)); }
+function pct(a, q){ var b = a.slice().sort(function(x, y){ return x - y; }); var k = (b.length - 1) * q, lo = Math.floor(k), hi = Math.ceil(k); return b[lo] + (b[hi] - b[lo]) * (k - lo); }
+function probs(fit, eta){ var a = sig(fit.c1 - eta), b = sig(fit.c2 - eta); return [a, b - a, 1 - b]; }
+
+// ---------- lever registry ----------
+// each lever: key, label, kind (rating | nested | coverage), col index, value accessor, applies(i)
+var LEVERS = [];
+RL.forEach(function(l, k){ LEVERS.push({ key: l.key, label: l.label, kind: "rating", col: colIdx["rating:" + l.key], sub: l.items.length > 1 ? "average of " + l.items.join(", ") : "", val: function(i){ return R.rat[k][i]; }, applies: function(){ return true; } }); });
+LEVERS.push({ key: NS.key, label: NS.label, kind: "nested", col: colIdx["nested_val:" + NS.key], sub: "only " + NS.applies, val: function(i){ return R.sign_val[i]; }, applies: function(i){ return R.sign_has[i] === 1; } });
+CV.forEach(function(c, k){ LEVERS.push({ key: c.key, label: c.label, kind: "coverage", col: colIdx["coverage:" + c.key], sub: "", val: function(i){ return R.cov[k][i]; }, applies: function(){ return true; } }); });
+var UNCLEAR = {}; LEVERS.forEach(function(l){ if ((M.sign[l.key] || 0) > 0.10) UNCLEAR[l.key] = M.sign[l.key]; });
+
+// base linear predictor per fit per outlet
+var baseEta = [];
+for (var f = 0; f < F; f++){
+  var b = M.fits[f].b, a = new Float64Array(N);
+  for (var i = 0; i < N; i++){
+    var e = 0;
+    for (var k = 0; k < RL.length; k++) e += b[colIdx["rating:" + RL[k].key]] * (R.rat[k][i] - C);
+    e += b[colIdx["nested_has:" + NS.key]] * R.sign_has[i] + b[colIdx["nested_val:" + NS.key]] * R.sign_has[i] * (R.sign_val[i] - C);
+    for (k = 0; k < CV.length; k++) e += b[colIdx["coverage:" + CV[k].key]] * R.cov[k][i];
+    a[i] = e;
+  }
+  baseEta.push(a);
+}
+
+// a move: {type: add|floor|extend|withdraw, v}. Returns the change in that lever's x for outlet i.
+function dx(lever, move, i){
+  if (!move || !lever.applies(i)) return 0;
+  var v = lever.val(i);
+  if (lever.kind === "coverage"){ if (move.type === "extend") return v ? 0 : 1; if (move.type === "withdraw") return v ? -1 : 0; return 0; }
+  if (move.type === "add") return clamp(v + move.v) - v;
+  if (move.type === "floor") return Math.max(v, move.v) - v;
+  return 0;
+}
+function touched(lever, move, idx){ var n = 0; idx.forEach(function(i){ if (dx(lever, move, i) !== 0) n++; }); return n; }
+function groupNPS(f, idx, moves){
+  var fit = M.fits[f], E = baseEta[f], acc = 0;
+  for (var q = 0; q < idx.length; q++){
+    var i = idx[q], e = E[i];
+    if (moves) for (var l = 0; l < LEVERS.length; l++){ if (moves[l]){ var d = dx(LEVERS[l], moves[l], i); if (d) e += fit.b[LEVERS[l].col] * d; } }
+    var p = probs(fit, e); acc += p[2] - p[0];
+  }
+  return 100 * acc / idx.length;
+}
+function change(idx, moves){
+  var g = []; for (var f = 0; f < F; f++) g.push(groupNPS(f, idx, moves) - groupNPS(f, idx, null));
+  return { pt: g[0], lo: pct(g.slice(1), 0.05), hi: pct(g.slice(1), 0.95) };
+}
+function one(l, move){ return LEVERS.map(function(_, k){ return k === l ? move : null; }); }
+function actualNPS(idx){ var p = 0, d = 0; idx.forEach(function(i){ if (R.y[i] === 2) p++; else if (R.y[i] === 0) d++; }); return 100 * (p - d) / idx.length; }
+
+// ---------- group picker: cascading, only combinations that exist ----------
+var seg = {}; CTXK.forEach(function(k){ seg[k] = ""; });
+var ALL = { centre: "any centre", office: "any office", method: "any sales method", size: "any size", channel: "any channel" };
+var segSel = {};
+function matches(i, except){ for (var q = 0; q < CTXK.length; q++){ var k = CTXK[q]; if (k !== except && seg[k] && levelOf[k][R.ctx[k][i]] !== seg[k]) return false; } return true; }
+function segIdx(){ var idx = []; for (var i = 0; i < N; i++) if (matches(i, null)) idx.push(i); return idx; }
+function refreshSegOptions(){
+  CTXK.forEach(function(k){
+    var cnt = {}; for (var i = 0; i < N; i++) if (matches(i, k)){ var v = levelOf[k][R.ctx[k][i]]; cnt[v] = (cnt[v] || 0) + 1; }
+    var s = segSel[k], keep = seg[k]; s.innerHTML = "";
+    s.appendChild(el("option", {value: ""}, ALL[k]));
+    levelOf[k].forEach(function(v){ if (cnt[v]) s.appendChild(el("option", {value: v}, v + " (" + band(cnt[v]) + ")")); });
+    s.value = keep;
+  });
+}
+(function(){
+  var s = document.getElementById("segSentence");
+  var parts = [["", "Outlets in "], ["centre", ""], ["", ", served from "], ["office", ""], ["", ", on "], ["method", ""], ["", ", "], ["size", ""], ["", ", "], ["channel", ""]];
+  parts.forEach(function(p){
+    if (!p[0]){ s.appendChild(document.createTextNode(p[1])); return; }
+    var sel = el("select", {"aria-label": p[0]}); segSel[p[0]] = sel;
+    sel.addEventListener("change", function(){ seg[p[0]] = sel.value; refreshSegOptions(); renderEffort(); });
+    s.appendChild(sel);
+  });
+  refreshSegOptions();
+})();
+
+// ---------- effort table ----------
+var MOVES = { rating: { slip: {type: "add", v: -1}, fix: {type: "floor", v: 8} }, nested: { slip: {type: "add", v: -1}, fix: {type: "floor", v: 8} }, coverage: { slip: {type: "withdraw"}, fix: {type: "extend"} } };
+function renderEffort(){
+  var idx = segIdx();
+  document.getElementById("kActual").textContent = idx.length >= 5 ? Math.round(actualNPS(idx)) : "n/a";
+  document.getElementById("kN").textContent = band(idx.length);
+  var sw = document.getElementById("segWarn"); sw.innerHTML = "";
+  var tb = document.querySelector("#effortTable tbody"); tb.innerHTML = "";
+  if (idx.length < 30){ sw.appendChild(el("div", {"class": "warn"}, "Fewer than 30 outlets in this group. Too few to simulate. Widen the group.")); renderScen(); return; }
+  var rows = LEVERS.map(function(l, j){
+    var mv = MOVES[l.kind], nFix = touched(l, mv.fix, idx), nApp = idx.filter(function(i){ return l.applies(i); }).length;
+    var slip = change(idx, one(j, mv.slip)), fix = change(idx, one(j, mv.fix));
+    var per100 = nFix ? fix.pt * idx.length / nFix : 0;
+    var top = 0; if (l.kind !== "coverage"){ idx.forEach(function(i){ if (l.applies(i) && l.val(i) >= 9) top++; }); }
+    return { l: l, j: j, nFix: nFix, nApp: nApp, slip: slip, fix: fix, per100: per100, unclear: UNCLEAR[l.key] !== undefined, topShare: nApp ? top / nApp : 0 };
+  });
+  rows.sort(function(a, b){ return (a.unclear - b.unclear) || (b.fix.pt - a.fix.pt); });
+  var mx = Math.max.apply(null, rows.filter(function(r){ return !r.unclear; }).map(function(r){ return r.per100; })) || 1;
+  rows.forEach(function(r){
+    var tr = el("tr", r.unclear ? {"class": "unclear"} : {});
+    var td = el("td", {}, r.l.label);
+    td.appendChild(el("span", {"class": "tag"}, r.l.kind === "coverage" ? "coverage" : "rating"));
+    var subt = r.unclear ? (r.topShare > 0.8 ? "Too little variation to measure: " + Math.round(100 * r.topShare) + "% already give 9 or 10" : "Effect unclear: points the wrong way in " + Math.round(100 * UNCLEAR[r.l.key]) + "% of refits") : r.l.sub;
+    if (subt) td.appendChild(el("small", {}, subt));
+    tr.appendChild(td);
+    var room = el("td", {"class": "num"}, band(r.nFix));
+    room.appendChild(el("span", {"class": "rng"}, Math.round(100 * r.nFix / idx.length) + "% of group" + (r.l.kind === "nested" ? ", of " + band(r.nApp) + " with signage" : "")));
+    tr.appendChild(room);
+    [r.slip, r.fix].forEach(function(g){
+      var c = el("td", {"class": "num"}, r.unclear ? "~0" : f1(g.pt));
+      if (!r.unclear) c.appendChild(el("span", {"class": "rng"}, f1(g.lo) + " to " + f1(g.hi)));
+      tr.appendChild(c);
+    });
+    tr.appendChild(el("td", {"class": "num"}, r.unclear || !r.nFix ? "~0" : f0(r.per100)));
+    var bt = el("td", {"class": "hide-s"}), bar = el("div", {"class": "bar"}), fill = el("i");
+    fill.style.width = r.unclear || !r.nFix ? "0" : Math.max(0, 100 * r.per100 / mx) + "%"; bar.appendChild(fill); bt.appendChild(bar); tr.appendChild(bt);
+    tb.appendChild(tr);
+  });
+  renderScen();
+}
+
+// ---------- scenario ----------
+var scen = LEVERS.map(function(){ return null; });
+var OPTS = {
+  rating: [["", "No change"], ["add:-2", "Slips 2 points"], ["add:-1", "Slips 1 point"], ["add:1", "Improves 1 point"], ["add:2", "Improves 2 points"], ["floor:8", "Everyone below 8 lifted to 8"]],
+  coverage: [["", "No change"], ["extend:0", "Extend to every outlet without it"], ["withdraw:0", "Withdraw from every outlet with it"]]
+};
+(function(){
+  var host = document.getElementById("scenGrid");
+  [["Service ratings", ["rating", "nested"]], ["Service coverage", ["coverage"]]].forEach(function(g){
+    host.appendChild(el("div", {"class": "grp"}, g[0]));
+    var grid = el("div", {"class": "grid"});
+    LEVERS.forEach(function(l, j){
+      if (g[1].indexOf(l.kind) < 0) return;
+      var lab = el("label"), t = el("span", {}, l.label); if (l.kind === "nested") t.appendChild(el("small", {}, "applies only to " + NS.applies)); lab.appendChild(t);
+      var s = el("select", {"aria-label": l.label + " scenario"});
+      OPTS[l.kind === "coverage" ? "coverage" : "rating"].forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+      s.addEventListener("change", function(){ var v = s.value; scen[j] = v ? { type: v.split(":")[0], v: +v.split(":")[1] } : null; renderScen(); });
+      lab.appendChild(s); grid.appendChild(lab);
+    });
+    host.appendChild(grid);
+  });
+})();
+function renderScen(){
+  var idx = segIdx(), k = document.getElementById("kScen"), n = document.getElementById("scenNote");
+  if (idx.length < 30){ k.textContent = "n/a"; n.textContent = ""; return; }
+  if (scen.every(function(x){ return !x; })){ k.textContent = "n/a"; n.textContent = "Choose at least one move below."; return; }
+  var g = change(idx, scen);
+  k.textContent = Math.round(actualNPS(idx) + g.pt);
+  var unc = LEVERS.filter(function(l, j){ return scen[j] && UNCLEAR[l.key] !== undefined; }).map(function(l){ return l.label; });
+  n.textContent = "Scenario change " + f1(g.pt) + " NPS points (90% range " + f1(g.lo) + " to " + f1(g.hi) + ")." + (unc.length ? " " + unc.join(" and ") + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise." : "");
+}
+
+// ---------- build an outlet ----------
+var out = { rat: RL.map(function(_, k){ var v = R.rat[k].slice().sort(function(a, b){ return a - b; }); return Math.round(v[Math.floor(v.length / 2)]); }), signHas: 1, signVal: 9, cov: CV.map(function(){ return 1; }) };
+var signSel;
+(function(){
+  var host = document.getElementById("outletGrid");
+  host.appendChild(el("div", {"class": "grp"}, "What the outlet has"));
+  var g1 = el("div", {"class": "grid"});
+  function yn(label, get, set){
+    var lab = el("label"); lab.appendChild(el("span", {}, label));
+    var s = el("select", {"aria-label": label}); [["1", "Yes"], ["0", "No"]].forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+    s.value = String(get()); s.addEventListener("change", function(){ set(+s.value); renderOutlet(); });
+    lab.appendChild(s); g1.appendChild(lab);
+  }
+  CV.forEach(function(c, k){ yn(c.label, function(){ return out.cov[k]; }, function(v){ out.cov[k] = v; }); });
+  yn("Has Coke signage", function(){ return out.signHas; }, function(v){ out.signHas = v; signSel.disabled = !v; });
+  host.appendChild(g1);
+  host.appendChild(el("div", {"class": "grp"}, "How it rates CCPB (1 to 10)"));
+  var g2 = el("div", {"class": "grid"});
+  function rate(label, sub, get, set){
+    var lab = el("label"), t = el("span", {}, label); if (sub) t.appendChild(el("small", {}, sub)); lab.appendChild(t);
+    var s = el("select", {"aria-label": label}); for (var v = 10; v >= 1; v--) s.appendChild(el("option", {value: v}, v));
+    s.value = get(); s.addEventListener("change", function(){ set(+s.value); renderOutlet(); });
+    lab.appendChild(s); g2.appendChild(lab); return s;
+  }
+  RL.forEach(function(l, k){ rate(l.label, l.items.length > 1 ? "average of " + l.items.join(", ") : "", function(){ return out.rat[k]; }, function(v){ out.rat[k] = v; }); });
+  signSel = rate(NS.label, "only for outlets with Coke signage", function(){ return out.signVal; }, function(v){ out.signVal = v; });
+  host.appendChild(g2);
+})();
+function renderOutlet(){
+  var fit = M.fits[0], b = fit.b, e = 0;
+  RL.forEach(function(l, k){ e += b[colIdx["rating:" + l.key]] * (out.rat[k] - C); });
+  e += b[colIdx["nested_has:" + NS.key]] * out.signHas + b[colIdx["nested_val:" + NS.key]] * out.signHas * (out.signVal - C);
+  CV.forEach(function(c, k){ e += b[colIdx["coverage:" + c.key]] * out.cov[k]; });
+  var p = probs(fit, e);
+  document.getElementById("headline").textContent = Math.round(100 * p[2]) + "% chance of being a Promoter";
+  var st = document.getElementById("stack"); st.innerHTML = "";
+  [[p[0], "var(--det)"], [p[1], "var(--pas)"], [p[2], "var(--pro)"]].forEach(function(x){ var d = el("div", {}, x[0] >= 0.07 ? Math.round(100 * x[0]) + "%" : ""); d.style.flexBasis = (100 * x[0]) + "%"; d.style.background = x[1]; st.appendChild(d); });
+  var exp = Math.round(100 * (p[2] - p[0]));
+  document.getElementById("outletNote").textContent = "Expected NPS for outlets like this: " + exp + ". All 2026 outlets: " + Math.round(actualNPS(allIdx)) + "." + (out.signHas ? "" : " Signage condition is switched off because this outlet has no Coke signage.");
+}
+
+// ---------- waves, symptoms, footer ----------
+var allIdx = []; for (var i = 0; i < N; i++) allIdx.push(i);
+(function(){
+  var W = M.waves; document.getElementById("w25h").textContent = "2025 (n=" + W["2025"].n + ", NPS " + Math.round(W["2025"].nps) + ")"; document.getElementById("w26h").textContent = "2026 (n=" + W["2026"].n + ", NPS " + Math.round(W["2026"].nps) + ")";
+  var tb = document.querySelector("#waveTable tbody");
+  RL.map(function(l){ return l; }).sort(function(a, b){ return W["2026"].slip[a.key][0] - W["2026"].slip[b.key][0]; }).forEach(function(l){
+    var tr = el("tr"); tr.appendChild(el("td", {}, l.label));
+    ["2025", "2026"].forEach(function(y){ var s = W[y].slip[l.key], c = el("td", {"class": "num"}, f1(s[0])); c.appendChild(el("span", {"class": "rng"}, f1(s[1]) + " to " + f1(s[2]))); tr.appendChild(c); });
+    tb.appendChild(tr);
+  });
+  var ul = document.getElementById("symList");
+  M.symptoms.forEach(function(s){ var li = el("li"); li.appendChild(el("b", {}, s.label + ": ")); li.appendChild(document.createTextNode(f1(s.effect) + " NPS points, " + s.n + " outlets. " + s.why)); ul.appendChild(li); });
+  document.getElementById("nAll").textContent = N; document.getElementById("nDet").textContent = M.n_det;
+  document.getElementById("r2a").textContent = M.r2.ratings_only.toFixed(3); document.getElementById("r2b").textContent = M.r2.levers.toFixed(3); document.getElementById("r2c").textContent = M.r2.levers_and_controls.toFixed(3);
+  document.getElementById("ctrlLi").textContent = "Size and channel were tested as controls, to check that coverage is not just big stores standing in for coolers. The coverage effects barely moved (" + CV.map(function(c){ var x = M.control_check[c.key]; return c.label.toLowerCase() + " " + f1(x[0]) + " without, " + f1(x[1]) + " with"; }).join("; ") + ") and held-out prediction got worse, so the model leaves them out.";
+  var unc = LEVERS.filter(function(l){ return UNCLEAR[l.key] !== undefined; });
+  document.getElementById("signLi").textContent = unc.length ? "Sign check: " + unc.map(function(l){ return l.label + " points the wrong way in " + Math.round(100 * UNCLEAR[l.key]) + "% of refits"; }).join("; ") + ". Shown greyed with no number. That means the data cannot measure it, not that it does not matter." : "Sign check: every lever points the expected way in at least 90% of refits.";
+})();
+
+renderEffort(); renderOutlet();
+})();
+</script>
+</body>
+</html>

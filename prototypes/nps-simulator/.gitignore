@@ -1,0 +1,8 @@
+# Built pages and model JSON embed respondent-level client data (ratings and
+# recommend scores). They stay on disk only and must never be committed.
+build/
+*.json
+*_prototype*.html
+
+# Templates are source code and carry no data
+!template_*.html

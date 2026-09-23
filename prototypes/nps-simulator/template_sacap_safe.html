@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student NPS Simulator</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a66;--line:#d9d6cf;--card:#ffffff;--det:#c8423b;--pas:#b9b4a8;--pro:#2f7d5b;--accent:#2b4f7a;--warn-bg:#fff4dc;--warn-fg:#7a5200;--ok-bg:#e8f3ec;--ok-fg:#1f5a3f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ecebe7;--muted:#a09e98;--line:#3a3935;--card:#211f1d;--det:#e0675f;--pas:#6d6a63;--pro:#4fb389;--accent:#8fb3dd;--warn-bg:#3a2e12;--warn-fg:#f1cf8a;--ok-bg:#16301f;--ok-fg:#9fd9b8}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#ecebe7;--muted:#a09e98;--line:#3a3935;--card:#211f1d;--det:#e0675f;--pas:#6d6a63;--pro:#4fb389;--accent:#8fb3dd;--warn-bg:#3a2e12;--warn-fg:#f1cf8a;--ok-bg:#16301f;--ok-fg:#9fd9b8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:920px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:20px;margin:0 0 4px}
+h3{font-size:16px;margin:22px 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+.badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;background:var(--ok-bg);color:var(--ok-fg);border-radius:4px;padding:2px 8px;margin-bottom:10px}
+section{border-top:2px solid var(--fg);padding:22px 0 28px}
+select{font:inherit;font-weight:600;color:var(--fg);background:transparent;border:0;border-bottom:2px solid var(--fg);padding:0 2px;max-width:100%;cursor:pointer}
+select:focus{outline:2px solid var(--accent);outline-offset:2px}
+.picker{font-size:18px;line-height:2.2}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:6px 24px;margin:14px 0 6px}
+.grid label{display:flex;justify-content:space-between;gap:10px;align-items:baseline;border-bottom:1px solid var(--line);padding:4px 0}
+.grid label span{color:var(--muted);font-size:15px}
+.grid select{font-size:15px;border-bottom-width:1px}
+.headline{font-size:22px;font-weight:700;text-align:center;margin:22px 0 4px}
+.stack{display:flex;height:34px;border-radius:4px;overflow:hidden;font-size:13px;font-weight:600;color:#fff;margin-top:10px}
+.stack div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;transition:flex-basis .25s}
+.legend{display:flex;gap:18px;justify-content:center;font-size:14px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.note{font-size:14px;color:var(--muted);margin:8px 0 0}
+.center{text-align:center}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:6px;padding:8px 12px;font-size:14px;margin-top:12px}
+.ok{background:var(--ok-bg);color:var(--ok-fg);border-radius:6px;padding:8px 12px;font-size:14px;margin-top:12px}
+.kpis{display:flex;gap:28px;flex-wrap:wrap;margin:14px 0 18px}
+.kpi b{display:block;font-size:28px;line-height:1.1}
+.kpi span{font-size:13px;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;vertical-align:bottom}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td small,td .rng{display:block;font-size:12px;color:var(--muted)}
+tr.unclear td{color:var(--muted)}
+.bar{position:relative;height:12px;min-width:90px}
+.bar i{position:absolute;top:0;bottom:0;left:0;border-radius:2px;background:var(--pro)}
+.caveats,.audit{font-size:14px;color:var(--muted)}
+.caveats li,.audit li{margin-bottom:6px}
+.audit b{color:var(--fg);font-weight:600}
+@media (max-width:600px){.picker{font-size:16px}.headline{font-size:19px}.hide-s{display:none}}
+</style>
+</head>
+<body>
+<main>
+<div class="badge" id="badge"></div>
+<h1>Student NPS simulator</h1>
+<p class="sub">SACAP 2025 student survey, n=<span id="nAll"></span>. What would move students' willingness to recommend SACAP, and for which students?</p>
+
+<section>
+<h2>Where to direct effort</h2>
+<p class="sub" style="margin-bottom:8px">Pick a group of students. Each row shows what NPS would lose if that area slipped, and what it would gain if every student rating it below Good were lifted to Good.</p>
+<div class="picker">Students: <select id="groupSel" aria-label="Group of students"></select> <span id="andWrap">and <select id="andSel" aria-label="Narrow the group"></select></span></div>
+<div class="kpis">
+  <div class="kpi"><b id="kActual"></b><span>Actual NPS</span></div>
+  <div class="kpi"><b id="kN"></b><span>Students who answered</span></div>
+  <div class="kpi"><b id="kScen"></b><span>NPS under your scenario</span></div>
+</div>
+<div id="groupWarn"></div>
+<div class="tablewrap"><table id="effortTable">
+<thead><tr>
+<th>Area</th>
+<th class="num">Students below Good</th>
+<th class="num">If it slips<br>one notch</th>
+<th class="num">If lifted<br>to Good</th>
+<th class="num">Net promoters per<br>100 students lifted</th>
+<th class="hide-s"></th>
+</tr></thead><tbody></tbody></table></div>
+<p class="note">NPS points, with the 90% range across 200 bootstrap refits underneath. The last column is the gain per 100 students you would have to reach, the closest the data gets to value for effort.</p>
+
+<h3>Build a scenario</h3>
+<p class="note" style="margin:0 0 8px">Combine moves across areas. Combined results are the sum of each area's own result, so they are approximate; the bundles below show how close that gets.</p>
+<div class="grid" id="scenGrid"></div>
+<p class="note" id="scenNote"></p>
+<h3>Bundles, exact against approximate</h3>
+<div class="tablewrap"><table id="bundleTable"><thead><tr><th>Bundle</th><th class="num">Exact</th><th class="num">Sum of parts</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+<h2>Build a student</h2>
+<p class="sub" style="margin-bottom:8px">Set how a student rates SACAP. The model gives the chance they would recommend it. Who the student is (campus, course, year) did not improve the prediction, so it is not asked.</p>
+<div class="grid" id="rateGrid"></div>
+<div class="headline" id="headline"></div>
+<p class="note center" id="headRange"></p>
+<div class="stack" id="stack"></div>
+<div class="legend"><span><i class="dot" style="background:var(--det)"></i>Detractor (0 to 6)</span><span><i class="dot" style="background:var(--pas)"></i>Passive (7 to 8)</span><span><i class="dot" style="background:var(--pro)"></i>Promoter (9 to 10)</span></div>
+<p class="note center" id="studentNote"></p>
+</section>
+
+<section class="audit">
+<h2 style="color:var(--fg)">What this file contains</h2>
+<div id="auditBox"></div>
+<ul id="auditList"></ul>
+<h3 style="color:var(--fg)">Hidden to protect small groups</h3>
+<p>In each two-way breakdown, groups with fewer than the minimum are hidden, plus just enough other groups that the small ones cannot be worked out by subtraction. The page does not say which hidden groups are small.</p>
+<div class="tablewrap"><table id="hiddenTable"><thead><tr><th>Breakdown</th><th class="num">Groups</th><th class="num">Shown</th><th class="num">Hidden</th></tr></thead><tbody></tbody></table></div>
+<ul id="refusedList"></ul>
+</section>
+
+<section class="caveats">
+<h2 style="color:var(--fg)">Read before believing it</h2>
+<ul>
+<li>This is association, not cause. Students who like SACAP rate everything higher, so real gains from fixing something are probably smaller than shown. Value for money behaves partly like a second measure of the same feeling.</li>
+<li>The ratings overlap, so the ranking of areas is steadier than any single figure.</li>
+<li id="signLi"></li>
+<li id="dkLi"></li>
+<li>The checks cover subtraction within a table and between pairs of groups. Longer chains of sums across several tables are not checked; a full audit of those is a linear programming problem, which statistics offices run with specialist tools. Counts under the minimum inside a group are hidden. A zero gain can still show that nobody in a group needs a fix. That reveals no more than the rating tables for the same groups in the main report.</li>
+<li>Model: ordinal logistic regression on Detractor, Passive and Promoter, weighted, fitted in scratch Python. A Turas build would use its R engine.</li>
+</ul>
+</section>
+</main>
+<script>
+(function(){
+"use strict";
+var M = %%DATA%%;
+var LEV = M.levers, L = LEV.length, F = M.fits.length, K = M.min_group;
+var MOVES = M.moves, MI = {}; MOVES.forEach(function(m, i){ MI[m] = i; });
+var UNCLEAR = {}; LEV.forEach(function(l, j){ if (M.sign[l.code] > 0.10) UNCLEAR[j] = M.sign[l.code]; });
+
+function el(tag, attrs, text){ var e = document.createElement(tag); for (var a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+function f1(x){ var r = Math.round(x * 10) / 10; if (r === 0) return "0.0"; return (r > 0 ? "+" : "−") + Math.abs(r).toFixed(1); }
+function f0(x){ var r = Math.round(x); return r === 0 ? "0" : (r > 0 ? "+" : "−") + Math.abs(r); }
+function pct(a, q){ var b = a.slice().sort(function(x, y){ return x - y; }); var k = (b.length - 1) * q, lo = Math.floor(k), hi = Math.ceil(k); return b[lo] + (b[hi] - b[lo]) * (k - lo); }
+function summ(draws){ return { pt: draws[0], lo: pct(draws.slice(1), 0.05), hi: pct(draws.slice(1), 0.95) }; }
+function sig(z){ return 1 / (1 + Math.exp(-z)); }
+
+// ---------- group picker: a group, then optionally narrow it ----------
+var sel = document.getElementById("groupSel"), andSel = document.getElementById("andSel"), fams = {};
+var byKey = {}; M.groups.forEach(function(g, i){ byKey[defKey(g.def)] = i; });
+function defKey(def){ return Object.keys(def).sort().map(function(k){ return k + "=" + def[k]; }).join("|"); }
+M.groups.forEach(function(g, i){
+  if (Object.keys(g.def).length > 1) return;
+  if (!fams[g.family]){ fams[g.family] = el("optgroup", {label: g.family}); sel.appendChild(fams[g.family]); }
+  fams[g.family].appendChild(el("option", {value: i}, g.label + " (" + g.n + ")"));
+});
+function fillAnd(){
+  var g = M.groups[+sel.value], keys = Object.keys(g.def);
+  andSel.innerHTML = ""; andSel.appendChild(el("option", {value: ""}, "no further breakdown"));
+  document.getElementById("andWrap").style.display = keys.length ? "" : "none";
+  if (!keys.length) return;
+  var k = keys[0], lv = g.def[k];
+  M.ctx.forEach(function(c){
+    if (c.key === k) return;
+    var og = el("optgroup", {label: c.label}), any = false;
+    c.levels.forEach(function(v){
+      var d = {}; d[k] = lv; d[c.key] = v;
+      var i = byKey[defKey(d)];
+      if (i !== undefined){ og.appendChild(el("option", {value: i}, v + " (" + M.groups[i].n + ")")); any = true; return; }
+      var hid = M.hidden.some(function(h){ return defKey(h.def) === defKey(d); });
+      if (hid){ og.appendChild(el("option", {value: "", disabled: "disabled"}, v + " (hidden)")); any = true; }
+    });
+    if (any) andSel.appendChild(og);
+  });
+}
+function current(){ return M.groups[andSel.value !== "" ? +andSel.value : +sel.value]; }
+sel.addEventListener("change", function(){ fillAnd(); render(); });
+andSel.addEventListener("change", render);
+
+// ---------- effort table ----------
+function render(){
+  var g = current();
+  document.getElementById("kActual").textContent = Math.round(g.actual_nps);
+  document.getElementById("kN").textContent = g.n;
+  var gw = document.getElementById("groupWarn"); gw.innerHTML = "";
+  if (g.n < M.reliability_floor) gw.appendChild(el("div", {"class": "warn"}, "Only " + g.n + " students answered in this group. It clears the privacy minimum of " + K + ", but results under " + M.reliability_floor + " are thin. Treat them as a pointer, not a finding."));
+  var rows = LEV.map(function(l, j){
+    var slip = summ(g.gain[j][MI.slip1]), fix = summ(g.gain[j][MI.floor]), cnt = g.below_good[j];
+    return { l: l, j: j, slip: slip, fix: fix, cnt: cnt, pctv: g.below_good_pct[j], per100: cnt ? fix.pt * g.n / cnt : null, unclear: UNCLEAR[j] !== undefined };
+  }).sort(function(a, b){ return (a.unclear - b.unclear) || (b.fix.pt - a.fix.pt); });
+  var mx = Math.max.apply(null, rows.filter(function(r){ return !r.unclear && r.per100 != null; }).map(function(r){ return r.per100; }).concat([1]));
+  var tb = document.querySelector("#effortTable tbody"); tb.innerHTML = "";
+  rows.forEach(function(r){
+    var tr = el("tr", r.unclear ? {"class": "unclear"} : {});
+    var td = el("td", {}, r.l.label); if (r.unclear) td.appendChild(el("small", {}, "Effect unclear: points the wrong way in " + Math.round(100 * UNCLEAR[r.j]) + "% of refits")); tr.appendChild(td);
+    var c = el("td", {"class": "num"}, r.cnt == null ? "under " + K : String(r.cnt)); if (r.cnt != null) c.appendChild(el("span", {"class": "rng"}, r.pctv + "% of group")); tr.appendChild(c);
+    [r.slip, r.fix].forEach(function(s){ var x = el("td", {"class": "num"}, r.unclear ? "~0" : f1(s.pt)); if (!r.unclear) x.appendChild(el("span", {"class": "rng"}, f1(s.lo) + " to " + f1(s.hi))); tr.appendChild(x); });
+    tr.appendChild(el("td", {"class": "num"}, r.unclear ? "~0" : r.per100 == null ? "n/a" : f0(r.per100)));
+    var bt = el("td", {"class": "hide-s"}), bar = el("div", {"class": "bar"}), fill = el("i");
+    fill.style.width = r.unclear || r.per100 == null ? "0" : Math.max(0, 100 * r.per100 / mx) + "%"; bar.appendChild(fill); bt.appendChild(bar); tr.appendChild(bt);
+    tb.appendChild(tr);
+  });
+  var bb = document.querySelector("#bundleTable tbody"); bb.innerHTML = "";
+  M.bundles.forEach(function(bu, bi){
+    var ex = summ(g.bundle[bi]), parts = Object.keys(bu.spec).map(function(l){ return g.gain[+l][MI["up" + bu.spec[l]]]; });
+    var ap = summ(parts[0].map(function(_, f){ return parts.reduce(function(s, p){ return s + p[f]; }, 0); }));
+    var tr = el("tr"), td = el("td", {}, bu.name); td.appendChild(el("small", {}, bu.text)); tr.appendChild(td);
+    [ex, ap].forEach(function(s){ var x = el("td", {"class": "num"}, f1(s.pt)); x.appendChild(el("span", {"class": "rng"}, f1(s.lo) + " to " + f1(s.hi))); tr.appendChild(x); });
+    bb.appendChild(tr);
+  });
+  renderScen();
+}
+
+// ---------- scenario (sum of single-area results, per bootstrap draw) ----------
+var scen = LEV.map(function(){ return null; });
+var OPTS = [["", "No change"], ["slip2", "Slips 2 notches"], ["slip1", "Slips 1 notch"], ["up1", "Improves 1 notch"], ["up2", "Improves 2 notches"], ["floor", "Everyone below Good lifted to Good"]];
+(function(){
+  var gr = document.getElementById("scenGrid");
+  LEV.forEach(function(l, j){
+    var lab = el("label"); lab.appendChild(el("span", {}, l.label));
+    var s = el("select", {"aria-label": l.label + " scenario"}); OPTS.forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+    s.addEventListener("change", function(){ scen[j] = s.value || null; renderScen(); });
+    lab.appendChild(s); gr.appendChild(lab);
+  });
+})();
+function renderScen(){
+  var g = current(), k = document.getElementById("kScen"), n = document.getElementById("scenNote");
+  var used = scen.map(function(m, j){ return m ? g.gain[j][MI[m]] : null; }).filter(Boolean);
+  if (!used.length){ k.textContent = "n/a"; n.textContent = "Choose at least one move."; return; }
+  var s = summ(used[0].map(function(_, f){ return used.reduce(function(a, p){ return a + p[f]; }, 0); }));
+  k.textContent = Math.round(g.actual_nps + s.pt);
+  var unc = LEV.filter(function(_, j){ return scen[j] && UNCLEAR[j] !== undefined; }).map(function(l){ return l.label; });
+  n.textContent = "Approximate change " + f1(s.pt) + " NPS points (90% range " + f1(s.lo) + " to " + f1(s.hi) + ")." + (unc.length ? " " + unc.join(" and ") + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise." : "");
+}
+
+// ---------- build a student (coefficients only) ----------
+var stud = LEV.map(function(){ return M.good; });
+(function(){
+  var gr = document.getElementById("rateGrid");
+  LEV.forEach(function(l, j){
+    var lab = el("label"); lab.appendChild(el("span", {}, l.label));
+    var s = el("select", {"aria-label": l.label}); for (var v = M.scale.length; v >= 1; v--) s.appendChild(el("option", {value: v}, M.scale[v - 1]));
+    s.value = stud[j]; s.addEventListener("change", function(){ stud[j] = +s.value; renderStudent(); });
+    lab.appendChild(s); gr.appendChild(lab);
+  });
+})();
+function studentProbs(fit){ var e = 0; for (var j = 0; j < L; j++) e += fit.b[j] * (stud[j] - M.centre); var a = sig(fit.c1 - e), b = sig(fit.c2 - e); return [a, b - a, 1 - b]; }
+function renderStudent(){
+  var p = studentProbs(M.fits[0]), pro = M.fits.slice(1).map(function(f){ return studentProbs(f)[2]; });
+  document.getElementById("headline").textContent = Math.round(100 * p[2]) + "% chance of being a Promoter";
+  document.getElementById("headRange").textContent = "90% range " + Math.round(100 * pct(pro, 0.05)) + "% to " + Math.round(100 * pct(pro, 0.95)) + "%";
+  var st = document.getElementById("stack"); st.innerHTML = "";
+  [[p[0], "var(--det)"], [p[1], "var(--pas)"], [p[2], "var(--pro)"]].forEach(function(x){ var d = el("div", {}, x[0] >= 0.07 ? Math.round(100 * x[0]) + "%" : ""); d.style.flexBasis = (100 * x[0]) + "%"; d.style.background = x[1]; st.appendChild(d); });
+  document.getElementById("studentNote").textContent = "Expected NPS for students who rate SACAP like this: " + Math.round(100 * (p[2] - p[0])) + ". All students: " + Math.round(M.overall_nps) + ".";
+}
+
+// ---------- audit panel (checked again here, in the browser) ----------
+(function(){
+  var small = M.groups.filter(function(g){ return g.n < K; }).length;
+  var cells = M.groups.reduce(function(a, g){ return a + g.below_good.filter(function(c){ return c != null && c < K; }).length; }, 0);
+  var ok = small === 0 && cells === 0 && M.audit.differencing_failures === 0 && M.audit.longest_list < M.n;
+  document.getElementById("badge").textContent = "CLIENT-SAFE BUILD · minimum group " + K + " " + M.basis;
+  var box = document.getElementById("auditBox"); box.appendChild(el("div", {"class": ok ? "ok" : "warn"}, ok ? "Checked in this browser: every published group has at least " + K + " " + M.basis + ", no count under " + K + " is shown, and no list in the file is as long as the number of respondents." : "Audit failed in this browser. Do not send this file."));
+  var smallest = Math.min.apply(null, M.groups.map(function(g){ return g.n; }));
+  [["No respondent rows.", "The file holds the model (" + F + " sets of " + L + " coefficients) and results for " + M.groups.length + " groups. The longest list in it has " + M.audit.longest_list + " entries, against " + M.n + " respondents."],
+   ["Minimum group " + K + " " + M.basis + ".", "The smallest published group has " + smallest + "."],
+   ["Small groups cannot be worked out by subtraction within a table.", "In every row and column of every breakdown, the hidden groups are either none or add up to at least " + K + ". Failures found: " + M.audit.line_failures + "."],
+   ["Or across tables.", "For any published group that sits inside another (Honours year inside a campus, say, against an Honours course at that campus), the difference is zero or at least " + K + ". " + M.audit.nesting_hidden + " groups were hidden by this check. Failures left: " + M.audit.differencing_failures + "."]
+  ].forEach(function(x){ var li = el("li"); li.appendChild(el("b", {}, x[0] + " ")); li.appendChild(document.createTextNode(x[1])); document.getElementById("auditList").appendChild(li); });
+  var ht = document.querySelector("#hiddenTable tbody");
+  M.crossings.forEach(function(c){ var tr = el("tr"); tr.appendChild(el("td", {}, c.family)); [c.cells, c.shown, c.cells - c.shown].forEach(function(v){ tr.appendChild(el("td", {"class": "num"}, v)); }); ht.appendChild(tr); });
+  M.refused.forEach(function(r){ document.getElementById("refusedList").appendChild(el("li", {}, r.group + ": " + r.why + ".")); });
+  document.getElementById("nAll").textContent = M.n.toLocaleString("en-ZA");
+  var unc = LEV.filter(function(_, j){ return UNCLEAR[j] !== undefined; });
+  document.getElementById("signLi").textContent = unc.length ? "Sign check: " + unc.map(function(l){ return l.label + " points the wrong way in " + Math.round(100 * M.sign[l.code]) + "% of refits"; }).join("; ") + ". Shown greyed with no number. The data cannot separate its effect from the areas it overlaps with; that does not mean it is unimportant." : "Sign check: every area points the expected way in at least 90% of refits.";
+  document.getElementById("dkLi").textContent = "\"Don't know\" answers were set to the middle rating for that question: " + LEV.filter(function(l){ return l.dont_know; }).map(function(l){ return l.label + " " + l.dont_know; }).join(", ") + ".";
+})();
+
+fillAnd(); render(); renderStudent();
+})();
+</script>
+</body>
+</html>
