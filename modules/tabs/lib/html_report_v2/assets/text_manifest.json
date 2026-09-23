@@ -663,6 +663,16 @@
     "context": "Present, on a question slide. The button that opens the pinned question in Crosstabs with the pin's banner and filters. A bar then offers the way back to this slide.",
     "tokens": []
   },
+  "story.present.fullscreen": {
+    "page": "Story",
+    "context": "Present, top right of every slide. The button that takes the whole page full screen for a projector or a shared screen. It fades with the other controls while the mouse rests.",
+    "tokens": []
+  },
+  "story.present.exit_fullscreen": {
+    "page": "Story",
+    "context": "Present, top right of every slide, while the page is full screen. The button that leaves full screen and stays in Present.",
+    "tokens": []
+  },
   "filter.weighting.summary": {
     "page": "Crosstabs",
     "context": "Filter bar. The collapsed weighted-data summary line.",
