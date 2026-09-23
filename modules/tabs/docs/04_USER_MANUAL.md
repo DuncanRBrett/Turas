@@ -545,6 +545,23 @@ with no headings at all is one screen titled "Executive summary". Charts and
 result tables belong in Turas, not in Word: pin the Turas chart after the
 screen it supports.
 
+**Linking words to a question.** To let a reader jump from a sentence to the
+table behind it, select the words in Word, press Ctrl+K (Cmd+K on a Mac) and
+type `turas:` followed by the question code as the address, for example
+`turas:Q12`. The report shows those words as a link in the brand colour on the
+Report tab card, the cover, the story card and in Present. A click opens Q12
+in the crosstabs, with the reader's own banner and filters, and a bar offers
+**Back** to where they were (in Present, the same slide). The link stays
+inside the report: the page never carries the `turas:` address. A few rules:
+
+- the code must be a question in this report. If it is not, the console says
+  which words and which code, and the words show without a link
+- a link in a heading or a table keeps its words and loses the link; put it in
+  a paragraph or a bullet
+- any other hyperlink (a web address) keeps its words and loses the link, as
+  before, and the console counts it
+- the PowerPoint export shows the linked words as plain text
+
 **How pictures are laid out.** Size the picture in Word. A picture you
 stretch across the page (at least 80% of the width between the margins) is a
 wide picture: in Present and the PowerPoint export it spans the width of the

@@ -391,8 +391,11 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # Narrative screens, list(id, title, blocks), built by load_narrative() from
   # the narrative_file Word document or the Comments summary cells. Carried only
   # when there is at least one, so a config with neither emits a byte-identical
-  # island.
-  if (length(config_obj$narrative) > 0) proj$narrative <- unname(config_obj$narrative)
+  # island. [[ ]], not $: $ matches a name partly, so with no screens (the
+  # element is NULL, so absent) config_obj$narrative would read narrative_file
+  # and put that setting's text on the island.
+  narrative <- config_obj[["narrative"]]
+  if (is.list(narrative) && length(narrative) > 0) proj$narrative <- unname(narrative)
   proj
 }
 
@@ -1260,6 +1263,12 @@ build_data_layer <- function(all_results, banner_info, config_obj,
     }
   }
   questions <- .validate_linked_open(questions, all_results, survey_structure)
+  # A narrative link (turas:Q12 in the Word document) must open a question this
+  # report carries; checked here, the one place both are known
+  if (is.list(project[["narrative"]]) && length(project[["narrative"]]) > 0) {
+    project$narrative <- .dl_check_narrative_links(
+      project[["narrative"]], vapply(questions, function(q) as.character(q$code), character(1)))
+  }
 
   columns <- .validate_column_populations(
     build_dl_columns(banner_info, config_obj), questions
@@ -1391,6 +1400,49 @@ dl_suppress_subk_columns <- function(dl, config_obj) {
     }
   }
   questions
+}
+
+
+#' Drop every narrative link whose question is not in the report
+#'
+#' The reader keeps a turas:Q12 Word hyperlink as \code{link = "Q12"} on its
+#' runs (narrative_reader.R). A link to a code this report does not carry
+#' would open nothing, so its words stay and the link goes, with one console
+#' line naming the linked words and the code. Turas runs under Shiny, so the
+#' line is the only place the author sees it. The JS repeats the check
+#' (24b_narrative.js), so a hand-edited island cannot produce a dead link.
+#' Screens without links pass through untouched (byte-identical).
+#'
+#' @param narrative Screens, list(id, title, blocks)
+#' @param codes Question codes in the report (exact, case-sensitive)
+#' @return The screens, with links to unknown codes removed
+#' @keywords internal
+.dl_check_narrative_links <- function(narrative, codes) {
+  check_runs <- function(runs, title) {
+    for (k in seq_along(runs)) {
+      code <- runs[[k]]$link
+      if (is.null(code) || code %in% codes) next
+      cat(sprintf(paste0(
+        "  [WARNING] Narrative file, screen \"%s\": the link on \"%s\" points at turas:%s, ",
+        "and %s is not a question in this report. The words are shown without the link. ",
+        "Check the code in Word (select the words, Ctrl+K).\n"),
+        title, runs[[k]]$text, code, code))
+      runs[[k]]$link <- NULL
+    }
+    runs
+  }
+  for (i in seq_along(narrative)) {
+    title <- narrative[[i]]$title %||% ""
+    blocks <- narrative[[i]]$blocks
+    for (j in seq_along(blocks)) {
+      if (!is.null(blocks[[j]]$runs)) blocks[[j]]$runs <- check_runs(blocks[[j]]$runs, title)
+      for (m in seq_along(blocks[[j]]$items)) {
+        blocks[[j]]$items[[m]]$runs <- check_runs(blocks[[j]]$items[[m]]$runs, title)
+      }
+    }
+    narrative[[i]]$blocks <- blocks
+  }
+  narrative
 }
 
 

@@ -512,7 +512,8 @@ run("N5: bullets keep their nesting and numbering; sub-headings are brand", () =
   at(paraOf("First step"), '<a:buAutoNum type="arabicPeriod" startAt="1"/>',
     "a numbered list numbers, stating each item's number");
   at(paraOf("Second step"), 'startAt="2"', "the second item is 2");
-  at(paraOf("A paragraph between lists."), "<a:buNone/>", "a paragraph has no bullet");
+  // the fixture links "between lists" (turas:Q999); the deck keeps the words
+  at(paraOf("between lists"), "<a:buNone/>", "a paragraph has no bullet");
   const sub = runWith(x, "How we asked");
   assert(/ b="1"/.test(sub), "the sub-heading is bold");
 });

@@ -607,6 +607,9 @@
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-cover-open]")) shell.goTab("cover");
     });
+    // A Turas link in a narrative screen (a Word link to a question) opens its
+    // question under a return point, from every surface that shows the text
+    if (TR.narrative && TR.narrative.wireLinks) TR.narrative.wireLinks(document);
     // One "How to read this" panel for the whole report. Every ⓘ trigger
     // (header, collapsed PE box, crosstabs footer) opens the same dialog.
     document.addEventListener("click", function (e) {

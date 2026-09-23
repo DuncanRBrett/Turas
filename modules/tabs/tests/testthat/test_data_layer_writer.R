@@ -1503,3 +1503,57 @@ test_that("a composite index is tracked in a no-microdata build, with its Total 
   expect_null(comp$scores)              # nothing per-respondent, ever
   expect_null(comp$weights)
 })
+
+# ==============================================================================
+# Narrative links (turas:Q12 in Word, STORY_EXPLORE_AND_RETURN_BRIEF item 3)
+# ==============================================================================
+
+context("data_layer_writer: narrative links")
+
+narrative_with_links <- function() {
+  r <- function(text, link = NULL) {
+    out <- list(text = text, bold = FALSE, italic = FALSE)
+    if (!is.null(link)) out$link <- link
+    out
+  }
+  list(list(id = "executive-summary", title = "Executive summary", blocks = list(
+    list(type = "paragraph", runs = list(r("Awareness", "Q1"), r(" is up."))),
+    list(type = "paragraph", runs = list(r("Morale", "Q999"), r(" is flat."))),
+    list(type = "list", items = list(
+      list(level = 0L, ordered = FALSE, runs = list(r("Sat", "Q2"))),
+      list(level = 0L, ordered = FALSE, runs = list(r("Gone", "QX"))))))))
+}
+
+test_that("a link to a question in the report is kept; any other loses its link, loudly", {
+  console <- capture.output(dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(narrative = narrative_with_links())))
+  blocks <- dl$project$narrative[[1]]$blocks
+  expect_identical(blocks[[1]]$runs[[1]]$link, "Q1")
+  expect_identical(blocks[[3]]$items[[1]]$runs[[1]]$link, "Q2")
+  # the words stay, the link goes
+  expect_identical(blocks[[2]]$runs[[1]], list(text = "Morale", bold = FALSE, italic = FALSE))
+  expect_null(blocks[[3]]$items[[2]]$runs[[1]]$link)
+  expect_identical(blocks[[3]]$items[[2]]$runs[[1]]$text, "Gone")
+  joined <- paste(console, collapse = "\n")
+  expect_true(grepl(paste0("[WARNING] Narrative file, screen \"Executive summary\": the link on ",
+    "\"Morale\" points at turas:Q999, and Q999 is not a question in this report."),
+    joined, fixed = TRUE))
+  expect_true(grepl("turas:QX, and QX is not a question", joined, fixed = TRUE))
+  expect_false(grepl("turas:Q1,", joined, fixed = TRUE))
+  expect_false(grepl("\u2014", joined, fixed = TRUE))
+})
+
+test_that("a narrative without links passes the island check untouched", {
+  screens <- narrative_with_links()
+  for (i in seq_along(screens[[1]]$blocks)) {
+    b <- screens[[1]]$blocks[[i]]
+    if (!is.null(b$runs)) b$runs <- lapply(b$runs, function(x) { x$link <- NULL; x })
+    if (!is.null(b$items)) b$items <- lapply(b$items, function(it) {
+      it$runs <- lapply(it$runs, function(x) { x$link <- NULL; x }); it })
+    screens[[1]]$blocks[[i]] <- b
+  }
+  console <- capture.output(dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(narrative = screens)))
+  expect_identical(dl$project$narrative, screens)
+  expect_false(any(grepl("Narrative file", console, fixed = TRUE)))
+})

@@ -24,7 +24,8 @@
 #               wide: TRUE when Word shows it across the page's text width
 #   table       list(type, rows = list(list("cell", ...))) text cells only
 # A run is list(text, bold, italic), plus colour = TRUE (a font colour with a
-# hue) and highlight = TRUE (Word's highlighter) only when set.
+# hue), highlight = TRUE (Word's highlighter) and link = "Q12" (a turas:Q12
+# hyperlink, STORY_EXPLORE_AND_RETURN_BRIEF item 3) only when set.
 #
 # Everything outside that list is counted and named in the console, never
 # silently dropped and never partly rendered. The counts ride on the result as
@@ -61,7 +62,7 @@
 .NARRATIVE_IGNORED <- list(
   preamble         = c("paragraph(s) before the first Heading 1", "Not read. Put them under a Heading 1."),
   minor_headings   = c("Heading 4 or lower", "Read as ordinary paragraphs."),
-  hyperlinks       = c("hyperlink(s)", "The words are kept and the link is dropped."),
+  hyperlinks       = c("hyperlink(s)", "The words are kept and the link is dropped. Only a turas: link in body text is kept."),
   tracked_changes  = c("tracked change(s)", "Read as if accepted. Accept or reject them in Word to be sure."),
   comments         = c("comment(s)", "Review comments never reach the report."),
   footnotes        = c("footnote(s) or endnote(s)", "Not read. Move the note into the text."),
@@ -219,6 +220,7 @@ read_narrative_docx <- function(path) {
   ctx$parts <- parts
   ctx$counts <- counts
   ctx$list_counters <- list()   # numId -> the count at each list level
+  ctx$links_kept <- 0L          # Turas links kept on a screen's runs
 
   screens <- tryCatch({
     out <- .narrative_assemble(ctx)
@@ -513,6 +515,7 @@ read_narrative_docx <- function(path) {
       add_block(it$block)
     } else if (identical(it$kind, "blocks")) {
       for (b in it$blocks) add_block(b)
+      ctx$links_kept <- ctx$links_kept + (it$links %||% 0L)
     }
   }
   if (!is.null(current)) screens[[length(screens) + 1L]] <- current
@@ -619,7 +622,7 @@ read_narrative_docx <- function(path) {
     if (length(runs) > 0) {
       blocks <- list(list(type = "list", items = list(.narrative_list_item(ctx, num, level, runs))))
     }
-    return(list(kind = "blocks", blocks = c(blocks, images)))
+    return(list(kind = "blocks", blocks = c(blocks, images), links = attr(segments, "links")))
   }
 
   # A paragraph or quote keeps each picture where it sits in the text
@@ -640,7 +643,8 @@ read_narrative_docx <- function(path) {
     }
   }
   flush()
-  list(kind = "blocks", blocks = blocks)
+  # links: the Turas links these blocks keep (a heading's are dropped)
+  list(kind = "blocks", blocks = blocks, links = attr(segments, "links"))
 }
 
 #' What a paragraph style makes a paragraph: a heading (and its level), a
@@ -701,12 +705,22 @@ read_narrative_docx <- function(path) {
 .narrative_segments <- function(p, ctx, pictures = TRUE) {
   ns <- .NARRATIVE_NS
   out <- list()
+  link <- NULL   # the question code of the Turas link being walked, if any
+  n_links <- 0L  # Turas links walked, so the caller can count the ones it keeps
   walk <- function(node) {
     for (child in xml2::xml_children(node)) {
       nm <- xml2::xml_name(child, ns)
       if (nm == "w:r") {
         read_run(child)
-      } else if (nm %in% c("w:hyperlink", "w:ins", "w:moveTo", "w:smartTag",
+      } else if (nm == "w:hyperlink") {
+        # A Turas link (turas:Q12) marks its runs; any other link keeps its
+        # words and loses the link, counted in .narrative_count_document
+        code <- .narrative_turas_link(child, ctx)
+        if (!is.null(code)) n_links <<- n_links + 1L
+        link <<- code
+        walk(child)
+        link <<- NULL
+      } else if (nm %in% c("w:ins", "w:moveTo", "w:smartTag",
                            "w:customXml", "w:fldSimple", "w:bdo", "w:dir")) {
         walk(child)
       } else if (nm == "w:sdt") {
@@ -742,7 +756,8 @@ read_narrative_docx <- function(path) {
       }
       if (!is.null(text)) {
         out[[length(out) + 1L]] <<- list(type = "run", text = text, bold = bold, italic = italic,
-                                         colour = marks$colour, highlight = marks$highlight)
+                                         colour = marks$colour, highlight = marks$highlight,
+                                         link = link)
       }
     }
   }
@@ -753,7 +768,35 @@ read_narrative_docx <- function(path) {
     if (!is.null(block)) out[[length(out) + 1L]] <<- list(type = "image", block = block)
   }
   walk(p)
+  attr(out, "links") <- n_links
   out
+}
+
+#' The question code a Word hyperlink points at, when it is a Turas link
+#'
+#' In Word the author selects words, presses Ctrl+K and types turas:Q12 as the
+#' address. Word (16.0, proved on a document it saved, 23 Sep 2026) stores that
+#' as a w:hyperlink whose r:id names an External hyperlink relationship with
+#' Target="turas:Q12", verbatim. A link to a place in the document (w:anchor,
+#' no r:id), a web address, or an address with nothing after "turas:" is not
+#' a Turas link. Whether the code is a question in the report is checked where
+#' the island is assembled (.dl_check_narrative_links).
+#'
+#' @param node A w:hyperlink element
+#' @param ctx The reader context (ctx$parts$rels)
+#' @return The question code, or NULL
+#' @keywords internal
+.narrative_turas_link <- function(node, ctx) {
+  rid <- xml2::xml_attr(node, "r:id", .NARRATIVE_NS)
+  if (is.na(rid)) return(NULL)
+  rels <- ctx$parts$rels
+  row <- which(rels$id == rid & rels$type == "hyperlink")
+  if (length(row) == 0) return(NULL)
+  target <- rels$target[row[1]]
+  if (is.na(target) || !grepl("^turas:", target, ignore.case = TRUE)) return(NULL)
+  code <- trimws(tryCatch(utils::URLdecode(sub("^turas:", "", target, ignore.case = TRUE)),
+                          error = function(e) ""))
+  if (nzchar(code)) code else NULL
 }
 
 #' Is a run toggle (w:b, w:i) on? Present means on unless its value says off.
@@ -797,12 +840,15 @@ read_narrative_docx <- function(path) {
 #' Merge adjacent runs of the same formatting and trim the ends
 #'
 #' A run is list(text, bold, italic), plus colour = TRUE and highlight = TRUE
-#' only when set, so an ordinary document's runs keep their three fields.
+#' only when set, and link = "Q12" only on a Turas link's words, so an ordinary
+#' document's runs keep their three fields. Runs merge only when their links
+#' match.
 #' @keywords internal
 .narrative_runs <- function(segments) {
   same <- function(a, b) {
     a$bold == b$bold && a$italic == b$italic &&
-      isTRUE(a$colour) == isTRUE(b$colour) && isTRUE(a$highlight) == isTRUE(b$highlight)
+      isTRUE(a$colour) == isTRUE(b$colour) && isTRUE(a$highlight) == isTRUE(b$highlight) &&
+      identical(a$link, b$link)
   }
   runs <- list()
   for (s in segments) {
@@ -813,6 +859,7 @@ read_narrative_docx <- function(path) {
       run <- list(text = s$text, bold = s$bold, italic = s$italic)
       if (isTRUE(s$colour)) run$colour <- TRUE
       if (isTRUE(s$highlight)) run$highlight <- TRUE
+      if (!is.null(s$link)) run$link <- s$link
       runs[[n + 1L]] <- run
     }
   }
@@ -937,7 +984,9 @@ read_narrative_docx <- function(path) {
   add <- function(key, k) ctx$counts[[key]] <- ctx$counts[[key]] + as.integer(k)
   live <- "[not(ancestor::mc:Fallback)][not(ancestor::w:txbxContent)][not(ancestor::w:sdt[parent::w:body])]"
 
-  add("hyperlinks", n(paste0(".//w:hyperlink", live)))
+  # every link but the Turas links a screen kept (a web link, a link to a place
+  # in the document, a Turas link in a heading or a table)
+  add("hyperlinks", n(paste0(".//w:hyperlink", live)) - ctx$links_kept)
   add("tracked_changes", n(paste0(".//w:ins", live)) + n(paste0(".//w:del", live)) +
         n(paste0(".//w:moveFrom", live)) + n(paste0(".//w:moveTo", live)))
   add("comments", n(paste0(".//w:commentReference", live)))
@@ -997,6 +1046,16 @@ read_narrative_docx <- function(path) {
     cat(sprintf("  [INFO] Narrative file: no Heading 1 was found, so the whole document is one screen titled \"%s\".\n",
                 .NARRATIVE_UNTITLED))
     cat("         To split it into screens, give each section title Word's Heading 1 style.\n")
+  }
+  if (ctx$links_kept > 0L) {
+    codes <- unique(unlist(lapply(screens, function(s) lapply(s$blocks, function(b) {
+      runs <- c(b$runs, unlist(lapply(b$items, function(it) it$runs), recursive = FALSE))
+      vapply(runs, function(r) r$link %||% NA_character_, character(1))
+    }))))
+    codes <- codes[!is.na(codes)]
+    cat(sprintf("  [INFO] Narrative file: %d Turas link%s kept, to %s.\n",
+                ctx$links_kept, if (ctx$links_kept == 1L) "" else "s",
+                paste(codes, collapse = ", ")))
   }
   if (length(screens) == 0) {
     cat("  [WARNING] Narrative file: the document holds no text the report can show.\n")

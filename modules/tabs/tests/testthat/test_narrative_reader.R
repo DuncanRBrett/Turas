@@ -70,6 +70,8 @@ read_quietly <- function(path) {
 }
 
 run <- function(text, bold = FALSE, italic = FALSE) list(text = text, bold = bold, italic = italic)
+# a Turas link's words: the run carries link = the question code
+link_run <- function(text, code) c(run(text), list(link = code))
 para <- function(...) list(type = "paragraph", runs = list(...))
 item <- function(text, level = 0L, ordered = FALSE, number = NULL) {
   out <- list(level = level, ordered = ordered, runs = list(run(text)))
@@ -114,10 +116,14 @@ test_that("the fixture reads to exactly the expected screens and blocks", {
            run("two", italic = TRUE), run(" sections.")),
       para(run("See the Turas site for more.")),
       para(run("Line one line two")),
+      # a Turas link in a heading keeps its words and loses the link
       list(type = "subheading", text = "How we asked"),
       list(type = "list", items = list(
-        item("Online survey"), item("Invites by email", level = 1L), item("Two reminders"))),
-      para(run("A paragraph between lists.")),
+        item("Online survey"), item("Invites by email", level = 1L),
+        list(level = 0L, ordered = FALSE,
+             runs = list(run("Two "), link_run("reminders", "Q2"))))),
+      # the reader keeps any turas: code; the island check drops unknown ones
+      para(run("A paragraph "), link_run("between lists", "Q999"), run(".")),
       list(type = "list", items = list(
         item("First step", ordered = TRUE, number = 1L),
         item("Second step", ordered = TRUE, number = 2L))),
@@ -126,7 +132,8 @@ test_that("the fixture reads to exactly the expected screens and blocks", {
       para(run("Response rate fell to 58%."))
     )),
     list(id = "executive-summary", title = "Executive summary", blocks = list(
-      para(run("Ratings are stable.")),
+      # Word split the link over two runs; they merge, the plain words do not
+      para(link_run("Ratings", "Q1"), run(" are stable.")),
       list(type = "quote", runs = list(run("\"Culture varies by campus.\""))),
       list(type = "image", src = "<png>", alt = "Response chart", width = 40L, height = 20L),
       para(run("Text before.")),
@@ -150,7 +157,8 @@ test_that("every ignored feature in the fixture is counted exactly once", {
   ignored <- attr(screens, "ignored")
 
   expected <- c(
-    preamble = 1L, minor_headings = 0L, hyperlinks = 1L, tracked_changes = 2L,
+    # hyperlinks: the web link, the Turas link in a heading, the w:anchor link
+    preamble = 1L, minor_headings = 0L, hyperlinks = 3L, tracked_changes = 2L,
     comments = 1L, footnotes = 1L, text_boxes = 1L, shapes = 1L, smartart = 1L,
     charts = 1L, picture_formats = 1L, linked_pictures = 1L, table_drawings = 1L,
     merged_tables = 1L, nested_tables = 0L, embedded_objects = 1L,
@@ -180,6 +188,8 @@ test_that("the console names every skipped kind and how many", {
     expect_true(grepl(.NARRATIVE_IGNORED[[key]][1], joined, fixed = TRUE), info = key)
   }
   expect_true(grepl("2 tracked change(s)", joined, fixed = TRUE))
+  expect_true(grepl("3 hyperlink(s). The words are kept and the link is dropped.", joined, fixed = TRUE))
+  expect_true(grepl("[INFO] Narrative file: 3 Turas links kept, to Q2, Q999, Q1.", joined, fixed = TRUE))
   expect_true(grepl("Found: EMF.", joined, fixed = TRUE))
   # a kind with nothing skipped says nothing
   expect_false(grepl("table(s) inside a table", joined, fixed = TRUE))
@@ -346,6 +356,28 @@ test_that("a heading style built on Heading 1 starts a screen; TOC Heading does 
 fx_run_props <- function(text, props) {
   sprintf('<w:r><w:rPr>%s</w:rPr><w:t xml:space="preserve">%s</w:t></w:r>', props, fx_esc(text))
 }
+
+test_that("only a turas: address is a Turas link, read case-blind, trimmed and decoded", {
+  targets <- c(rA = "TURAS: Q7 ", rB = "turas:Q%5F1", rC = "turas:", rD = "https://example.org",
+               rE = "mailto:a@b.c")
+  rels <- paste(vapply(names(targets), function(id) sprintf(
+    '<Relationship Id="%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="%s" TargetMode="External"/>',
+    id, targets[[id]]), character(1)), collapse = "")
+  body <- paste0(fx_par(fx_run("Links")), paste(vapply(names(targets), function(id) {
+    fx_par(fx_run("Go "), fx_link(id, fx_link_run(paste0("to ", id))))
+  }, character(1)), collapse = ""))
+  path <- tempfile(fileext = ".docx")
+  on.exit(unlink(path), add = TRUE)
+  write_narrative_docx(path, body, doc_rels = rels)
+  screens <- read_quietly(path)
+  links <- vapply(screens[[1]]$blocks[-1], function(b) b$runs[[length(b$runs)]]$link %||% "",
+                  character(1))
+  expect_identical(links, c("Q7", "Q_1", "", "", ""))
+  # the three that are not Turas links keep their words and are counted
+  expect_identical(attr(screens, "ignored")[["hyperlinks"]], 3L)
+  expect_identical(screens[[1]]$blocks[[4]]$runs,
+                   list(run("Go to rC")))
+})
 
 test_that("a font colour with a hue, and the highlighter, mark a run; black and greys do not", {
   p <- tempfile(fileext = ".docx")
@@ -633,6 +665,12 @@ test_that("project.narrative rides the island only when there are screens", {
   expect_identical(proj$narrative, screens)
   expect_false("narrative" %in% names(build_dl_project(list())))
   expect_false("narrative" %in% names(build_dl_project(list(narrative = NULL))))
+  # the real loader's shape when there are no screens: narrative_file is set
+  # (blank) and narrative is absent, so $ would have read narrative_file
+  cfg <- list(narrative_file = "")
+  cfg$narrative <- NULL
+  expect_false("narrative" %in% names(build_dl_project(cfg)))
+  expect_false("narrative" %in% names(build_dl_project(list(narrative_file = "C:/doc.docx"))))
 })
 
 test_that("the island JSON keeps screens, blocks, items and table rows as arrays", {
