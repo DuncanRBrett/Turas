@@ -716,10 +716,22 @@ read_narrative_docx <- function(path) {
         # A Turas link (turas:Q12) marks its runs; any other link keeps its
         # words and loses the link, counted in .narrative_count_document
         code <- .narrative_turas_link(child, ctx)
-        if (!is.null(code)) n_links <<- n_links + 1L
+        first <- length(out) + 1L
         link <<- code
         walk(child)
         link <<- NULL
+        if (!is.null(code)) {
+          # A link on nothing but spaces is no link: its words (spaces) stay
+          # plain and it is counted as dropped, never as kept with no words
+          mine <- if (first <= length(out)) first:length(out) else integer(0)
+          mine <- mine[vapply(out[mine], function(s) identical(s$type, "run"), logical(1))]
+          words <- paste(vapply(out[mine], function(s) s$text, character(1)), collapse = "")
+          if (grepl("\\S", words)) {
+            n_links <<- n_links + 1L
+          } else {
+            for (k in mine) out[[k]]$link <<- NULL
+          }
+        }
       } else if (nm %in% c("w:ins", "w:moveTo", "w:smartTag",
                            "w:customXml", "w:fldSimple", "w:bdo", "w:dir")) {
         walk(child)
