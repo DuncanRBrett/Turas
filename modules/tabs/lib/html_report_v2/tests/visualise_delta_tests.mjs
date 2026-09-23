@@ -111,8 +111,9 @@ run("the zero line is the emphasised gridline, mid-axis", () => {
   ]), { delta: true });
   const base = [...svg.matchAll(/<line x1="46" y1="([\d.]+)"[^>]*stroke="#d8dcea"/g)];
   eq(base.length, 1, "exactly one emphasised gridline");
-  // symmetric axis: zero sits mid-plot (padT 18 + plotH 192 / 2 = 114)
-  eq(base[0][1], "114", "and it is the zero line");
+  // symmetric axis: zero sits mid-plot (padT 18 + plotH 184 / 2 = 110; the
+  // plot is 184 high since padB grew to 38 to clear the footnote)
+  eq(base[0][1], "110", "and it is the zero line");
 });
 
 /* ---------------- 3. percentage metrics + mixes ---------------- */

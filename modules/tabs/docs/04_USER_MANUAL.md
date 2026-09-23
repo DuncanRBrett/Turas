@@ -667,6 +667,15 @@ story full-screen, or export it as a native, editable PowerPoint deck.
 The story persists in the browser and travels inside any saved copy of
 the report.
 
+On a tracked question, **Pin distribution + trend** makes one slide with
+this wave's chart above the trend over waves. Its insight is the note you
+type on the pin in the Story tab, or, when you leave that empty, the
+question's own insight from the crosstabs. The trend of a rated question
+runs over the question's own scale, so a 1 to 5 agreement score tops out
+at 5, not 10.
+To show the priority comments, pin them as the next slide: open the pin
+menu again, tick only **Priority comments** and press **Pin**.
+
 **Presenting.** Present shows each pin as a slide on a 16:9 stage that
 scales to whatever window it is in, so the same slides work on a
 projector and in a Teams share. On a projector or a shared screen, press

@@ -39,6 +39,20 @@
     }).filter(Boolean);
   };
 
+  /**
+   * The insight an exhibit shows: the note typed on the pin, else, for a pin
+   * of one question, that question's own insight (the callout under its
+   * title), as a question pin does. A composite or a pinned tracking view has
+   * no single question behind it, so only its note counts. "" when the pin
+   * was made without the insight.
+   */
+  exhibit.noteFor = function (item) {
+    if (!item || (item.flags || {}).insight === false) return "";
+    if (item.note) return item.note;
+    if (isSeriesItem(item) || !item.qs || item.qs.length !== 1) return "";
+    return (TR.insights && TR.insights.get) ? (TR.insights.get(item.qs[0], item.banner) || "") : "";
+  };
+
   exhibit.titleFor = function (item, models) {
     if (item.title) return item.title;
     // default pin titles prefer the analyst ShortLabel when the model carries one
@@ -398,12 +412,49 @@
     }).join("") + "</tbody></table>";
   }
 
-  /** Distribution / trend / table panels as HTML (story card + present). */
-  exhibit.panelsHtml = function (item) {
+  /** A wave's label as the trend axis prints it ("SACS 2026", or the year). */
+  function waveLabel(year) {
+    return (TR.trk && TR.trk.yLabel) ? TR.trk.yLabel(year) : String(year);
+  }
+
+  /**
+   * Short captions naming each panel of a one-question exhibit on a slide:
+   * the distribution is this wave ("SACS 2026"), the trend names the one
+   * series it draws and its span ("Mean · SACS 2023 to SACS 2026"). Built from
+   * data labels only. A trend drawing several series is named by its legend,
+   * so its caption is the span alone.
+   * @returns {{dist: string, trend: string}}
+   */
+  exhibit.captions = function (item, models) {
+    var out = { dist: "", trend: "" };
+    if (isSeriesItem(item) || models.length !== 1) return out;
+    out.dist = waveLabel(TR.render.currentYear());
+    var rows = TR.render.trendPlotRows(exhibit.trendModel(item, models)).rows;
+    var years = [];
+    rows.forEach(function (r) {
+      TR.render.wavePoints(r).forEach(function (p) {
+        if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
+      });
+    });
+    TR.render.waveKeySort(years);
+    if (years.length > 1) {
+      out.trend = (rows.length === 1 ? rows[0].label + " · " : "") +
+        waveLabel(years[0]) + " to " + waveLabel(years[years.length - 1]);
+    }
+    return out;
+  };
+
+  /** Distribution / trend / table panels as HTML (story card + present).
+   *  opts.captions (Present) puts exhibit.captions above each chart. */
+  exhibit.panelsHtml = function (item, opts) {
     var models = exhibit.models(item);
     if (!models.length) return "";
     var flags = item.flags || {};
     var out = [];
+    var caps = (opts && opts.captions) ? exhibit.captions(item, models) : { dist: "", trend: "" };
+    var cap = function (text) {
+      return text ? '<div class="ex-cap">' + fmt.escapeHtml(text) + "</div>" : "";
+    };
     // A composite (2+ metrics) is one scorecard. It carries the latest value
     // (was the dist chart) AND the trajectory (was the trend lines) per metric,
     // so it replaces both, with the detailed table underneath.
@@ -419,7 +470,7 @@
     if (flags.dist) {
       var dist = exhibit.distModel(item, models);
       var type = item.distType === "line" ? "column" : (item.distType || "column");
-      out.push('<div class="chart ex-chart">' +
+      out.push('<div class="chart ex-chart">' + cap(caps.dist) +
         TR.render.chartBy(type, dist, item.chartCols || [0]) + "</div>");
       if (dist._dropped && dist._dropped.length) {
         out.push('<p class="trknote">Different scale, not on this chart, ' +
@@ -428,7 +479,7 @@
       }
     }
     if (flags.trend) {
-      out.push('<div class="chart ex-chart">' +
+      out.push('<div class="chart ex-chart">' + cap(caps.trend) +
         TR.render.trendChart(exhibit.trendModel(item, models),
           { annotations: item.annotations || [],
             ci: seriesCi(item),
@@ -478,6 +529,34 @@
     return bits.join(" · ");
   };
 
+  /**
+   * The context line on a Present slide, for a room rather than an analyst:
+   * who the chart shows and how many answered ("Total (n = 500)"), instead of
+   * the banner and the history source. The banner means nothing on a slide
+   * that charts only Total. When the chart shows other columns, the line says
+   * the trend is still the Total, and a filter is named with the wave it
+   * applies to (history is never filtered). A composite or a pinned tracking
+   * view keeps the analyst line, which names its metrics.
+   */
+  exhibit.slideContext = function (item, models) {
+    if (isSeriesItem(item) || models.length !== 1) return exhibit.contextLine(item, models);
+    var m = models[0];
+    var flags = item.flags || {};
+    var cols = flags.dist && item.chartCols && item.chartCols.length ? item.chartCols : [0];
+    var shown = cols.map(function (i) { return m.columns[i]; }).filter(Boolean);
+    if (!shown.length) return exhibit.contextLine(item, models);
+    var bits = [shown.map(function (c) {
+      return c.label + (c.base != null ? " (n = " + fmt.base(c.base) + ")" : "");
+    }).join(" · ")];
+    if (flags.trend && shown.some(function (c) { return c !== m.columns[0]; })) {
+      bits.push("trend: " + m.columns[0].label);
+    }
+    if (item.filters && item.filters.length) {
+      bits.push("filtered, " + waveLabel(TR.render.currentYear()) + " only");
+    }
+    return bits.join(" · ");
+  };
+
   /** WP5 wave-delta chip for a trend slide: the headline series' move vs the
    *  prior wave, formatted by the same deltaText the exhibit table uses.
    *  null when the exhibit has no trend panel or no delta to report. */
@@ -523,7 +602,7 @@
         meta: exhibit.contextLine(item, models),
         charts: [],
         matrix: exhibit.matrix(item, models),
-        note: (flags.insight !== false && item.note) ? item.note : ""
+        note: exhibit.noteFor(item)
       });
     }
     if (flags.dist) {
@@ -546,7 +625,7 @@
       meta: exhibit.contextLine(item, models) + scaleNote,
       charts: charts,
       matrix: flags.table ? exhibit.matrix(item, models) : null,
-      note: (flags.insight !== false && item.note) ? item.note : "",
+      note: exhibit.noteFor(item),
       chip: slideChip(item, models),                // WP5 wave-delta chip
       footer: slideCiNotes(item, models) || {}      // WP5 CI note when bands on
     });

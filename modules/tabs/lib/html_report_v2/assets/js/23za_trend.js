@@ -258,19 +258,51 @@
    *   zero-centred axis sized to the changes, signed unit-true labels
    *   ("+0.2" mean points, "+3pp"), the zero gridline emphasised}.
    */
-  render.trendChart = function (model, opts) {
-    opts = opts || {};
-    var rows = trendRows(model);
-    if (!rows.length) return "";
-    var small = rows.filter(function (r) {
+  /**
+   * The rating scale a mean trend is drawn on, when the question declares one:
+   * the view model's scale_max (Scale_Max, or the project's dashboard scale),
+   * with Scale_Min from the question when it was declared, else 0. Only a real
+   * view model carries scale_max; the Visualise and composite pseudo models do
+   * not, so their axes are unchanged. The same rule as the PowerPoint export's
+   * honest mean axes (29_export.js scaleOf).
+   * @returns {{min: number, max: number}|null}
+   */
+  function declaredScale(model) {
+    var max = model && model.scale_max;
+    if (typeof max !== "number" || !isFinite(max) || max <= 0) return null;
+    var q = (TR.d2 && TR.d2.questionByCode) ? TR.d2.questionByCode(model.code) : null;
+    var min = q && typeof q.scale_min === "number" && isFinite(q.scale_min) ? q.scale_min : 0;
+    return min < max ? { min: min, max: max } : null;
+  }
+  render._declaredScale = declaredScale;   // exposed for the node gate
+
+  /**
+   * The rows a trend chart draws: those with wave history, then the dominant
+   * scale family only (0-10 means never share an axis with percentages), at
+   * most six. Shared by trendChart and the Present exhibit caption, so the
+   * caption names exactly what is drawn.
+   * @returns {{rows: Array, meanScale: boolean, dropped: number}}
+   */
+  render.trendPlotRows = function (model) {
+    var all = trendRows(model);
+    var small = all.filter(function (r) {
       return r.kind === "mean" && Math.max.apply(null, r.waves.map(function (w) {
         return w.value;
       })) <= 10;
     });
-    var pct = rows.filter(function (r) { return small.indexOf(r) === -1; });
+    var pct = all.filter(function (r) { return small.indexOf(r) === -1; });
     var meanScale = small.length > pct.length;
-    rows = (meanScale ? small : pct).slice(0, 6);
-    var dropped = trendRows(model).length - rows.length;
+    var rows = (meanScale ? small : pct).slice(0, 6);
+    return { rows: rows, meanScale: meanScale, dropped: all.length - rows.length };
+  };
+
+  render.trendChart = function (model, opts) {
+    opts = opts || {};
+    var plot = render.trendPlotRows(model);
+    var rows = plot.rows;
+    if (!rows.length) return "";
+    var meanScale = plot.meanScale;
+    var dropped = plot.dropped;
 
     // row.isMean matters only on delta pseudo rows (27v forces their kind
     // to "net" so they never join the anchored 0-10 mean axis, but their
@@ -303,6 +335,18 @@
     } else {
       axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
       axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+      // a mean on a declared 1 to 5 scale runs over that scale, not 0 to 10,
+      // which flattened every line into the middle of an empty chart
+      var scale = meanScale ? declaredScale(model) : null;
+      if (scale) {
+        // lo and hi above start at 0, so take the data's own lowest point
+        var dataLo = Infinity;
+        series.forEach(function (s) {
+          s.points.forEach(function (p) { if (p.value < dataLo) dataLo = p.value; });
+        });
+        axisMax = Math.max(scale.max, hi);
+        axisMin = Math.min(scale.min, dataLo);
+      }
     }
     if (opts.yMax !== undefined && opts.yMax !== null) axisMax = opts.yMax;
     if (opts.yMin !== undefined && opts.yMin !== null) axisMin = opts.yMin;
@@ -313,7 +357,8 @@
     // mixed-unit selection leaves the axis bare (the footer names units)
     var deltaUnit = series.every(function (s) { return !s.isMean; }) ? "pp" : "";
 
-    var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 30;
+    // padB leaves the wave labels and the footnote a clear line apart
+    var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 38;
     var plotW = W - padL - padR, plotH = H - padT - padB;
     var xOf = function (year) {
       return years.length === 1 ? padL + plotW / 2
@@ -324,7 +369,14 @@
     };
     var palette = render.palette();
     var body = [];
-    [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+    // a short rating scale (1 to 5, 0 to 5) gets a gridline per point, so
+    // the ticks read 1, 2, 3 rather than 1.3, 2.5, 3.8
+    var span = axisMax - axisMin;
+    var steps = (!delta && meanScale && span <= 6 && span === Math.round(span) &&
+      axisMin === Math.round(axisMin)) ? span : 4;
+    var fractions = [];
+    for (var fi = 0; fi <= steps; fi++) fractions.push(fi / steps);
+    fractions.forEach(function (f) {
       var v = axisMin + (axisMax - axisMin) * f;
       // delta charts emphasise the zero line (mid-axis), not the floor
       var isBase = delta ? Math.abs(v) < 1e-9 : f === 0;
@@ -438,7 +490,11 @@
         // right edge already carries the final value, so stop one short.
         var labelThis = labelAll && pi < s.points.length - 1;
         if (labelThis && labelMode !== "none") {
-          pointLabels.push({ x: xOf(p.year), pos: yOf(p.value) - 8,
+          // the first wave's label starts at its point, clear of the axis
+          // tick labels to its left
+          var first = years.length > 1 && years.indexOf(p.year) === 0;
+          pointLabels.push({ x: xOf(p.year) + (first ? 4 : 0), pos: yOf(p.value) - 8,
+            anchor: first ? "start" : "middle",
             text: delta ? fmtDelta(p.value, s.isMean) + (s.isMean ? "" : "pp")
               : fmtVal(p.value, s.isMean), colour: colour,
             weight: p.current ? 700 : 400 });
@@ -466,7 +522,7 @@
       // white halo (paint-order: stroke) keeps the label legible where it sits
       // over its own point, the line, or a neighbouring series.
       body.push(S.text(l.x, l.pos, l.text,
-        { "text-anchor": "middle", "font-size": 9.5,
+        { "text-anchor": l.anchor || "middle", "font-size": 9.5,
           "font-weight": l.weight, fill: l.colour,
           stroke: "#fff", "stroke-width": 3, "paint-order": "stroke" }));
     });
@@ -488,9 +544,9 @@
         // full text. The legend wraps long labels; clip only the extreme
         return { label: TR.charts.clip(s.label, 300),
           colour: palette[k % palette.length] };
-      }), padL, H + 4, W - padL - 10);
+      }), padL, H + 16, W - padL - 10);   // below the footnote, not on it
       body.push(legend.body);
-      height = H + legend.height + 8;
+      height = H + legend.height + 20;
     }
     return S.root(W, height, model.code + ", trend over waves", body.join(""));
   };

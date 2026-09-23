@@ -692,7 +692,7 @@
         quoteBlockHtml(item) +
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
-            fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
+            fmt.escapeHtml(TR.exhibit.noteFor(item)) + "</textarea>" : "") + "</div>";
     }
     if (item.kind === "slide") {
       return '<div class="card story-item story-snapshot" data-i="' + i + '">' +
@@ -1368,9 +1368,12 @@
       var exModels = TR.exhibit.models(item);
       body = "<h1>" + fmt.escapeHtml(TR.exhibit.titleFor(item, exModels)) + "</h1>" +
         '<p class="pr-ctx">' +
-        fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</p>" +
-        (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
-        '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>" +
+        fmt.escapeHtml(TR.exhibit.slideContext(item, exModels)) + "</p>" +
+        // the insight in its callout box: the pin's note, else the question's
+        (TR.exhibit.noteFor(item) ? '<div class="pr-note">' +
+          fmt.escapeHtml(TR.exhibit.noteFor(item)) + "</div>" : "") +
+        '<div class="pr-table pr-chart pr-exhibit">' +
+        TR.exhibit.panelsHtml(item, { captions: true }) + "</div>" +
         quoteBlockHtml(item);
     } else if (item.kind === "slide") {
       body = "<h1>" + fmt.escapeHtml(story2.pinTitle(item)) + "</h1>" +

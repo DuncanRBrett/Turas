@@ -534,6 +534,18 @@ table.ws td.sparkcell { padding: 1px 8px; }
 #present-overlay.pr-idle .pr-chrome:has(:focus-visible), #present-overlay.pr-idle .pr-explore:focus-visible { opacity: 1; }
 /* a chart fills the width it reads well at, never the whole stage */
 .pr-stage .pr-chart svg { display: block; max-width: 900px; margin: 0 auto; }
+/* An exhibit slide: each panel carries a small caption (this wave; the trend's
+   series and span) and the two panels are divided by a hairline, so a room
+   reads "where we are" and "how it moved" as two parts of one chart */
+/* One width for both panels, so their captions line up, chosen so a
+   distribution bar plus a trend fits the 720-high stage without scrolling on
+   a 1280 x 720 share (measured about 750 logical pixels, scale 0.96) and shows
+   at about 1.44x on a 1920 x 1080 screen */
+.pr-stage .pr-exhibit { padding: 16px 28px 10px; }
+.pr-stage .pr-exhibit .ex-chart { max-width: 760px; margin: 0 auto; }
+.pr-stage .pr-exhibit .ex-chart + .ex-chart { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 12px; }
+.pr-stage .pr-exhibit .ex-chart svg { max-width: 100%; }
+.pr-stage .ex-cap { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
 .present h1 { font-size: 26px; margin-bottom: 6px; color: var(--brand); }
 .pr-ctx { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
 /* Explore on a question slide (30_story.js, renderPresent) */
