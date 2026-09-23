@@ -404,6 +404,20 @@ run("(2) nothing the live path does reaches the story tab card or the saved copy
     "no live view in storage");
 });
 
+run("(2) pressing what is already showing changes nothing and leaves Reset off", () => {
+  const w = sandbox();
+  presentPin(w);
+  const pinned = overlayOf(w).innerHTML;
+  clickOn(overlayOf(w), { "[data-live-banner]": attr("data-live-banner", "Region") });
+  clickOn(overlayOf(w), { "[data-live-view]": attr("data-live-view", "table") });
+  w.TR.story2.live({ intervals: false });
+  eq(w.TR.story2._live(), null, "no live view");
+  eq(overlayOf(w).innerHTML, pinned, "the slide is as pinned, Reset still disabled");
+  w.TR.story2.live({ intervals: true });
+  w.TR.story2.live({ intervals: true });
+  eq(w.TR.story2._live().item.intervals, true, "a real change still lands");
+});
+
 /* ---------------- (3) Reset ---------------- */
 
 run("(3) Reset restores the pinned view exactly", () => {

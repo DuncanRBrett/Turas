@@ -1376,8 +1376,8 @@
     if (!presenting || !item || item.kind !== "question" || !modelFor(item)) return;
     if (change === "reset") { live = null; renderPresent(); return; }
     change = change || {};
-    if (!live) live = { at: presentAt, item: JSON.parse(JSON.stringify(item)) };
-    var v = live.item;
+    var from = live ? live.item : item;
+    var v = JSON.parse(JSON.stringify(from));
     if ("banner" in change && change.banner !== v.banner) {
       v.banner = change.banner;
       // hidden columns are the pinned banner's labels and the sort names one of
@@ -1394,6 +1394,9 @@
       v.flags.table = change.view === "table";
     }
     if ("intervals" in change) v.intervals = !!change.intervals;
+    // a press on what is already showing changes nothing, so Reset stays off
+    if (JSON.stringify(v) === JSON.stringify(from)) return;
+    live = { at: presentAt, item: v };
     renderPresent();
   };
 
