@@ -14,7 +14,14 @@
  *
  * Everything here is authored text, so every value is escaped and no markup
  * inside a run is honoured. Bold and italic come from the run flags only.
- * Pure: no DOM access, so it unit-tests in node.
+ * Pure: no DOM access, so it unit-tests in node. The one exception is
+ * wireLinks, which is handed the document by the shell.
+ *
+ * A run with link = "Q12" is a Turas link (the author's Ctrl+K address in
+ * Word names the question). It renders as an in-page control whose href is
+ * the report's own route (#tab=crosstabs&q=Q12), never the Word address, so
+ * the page stays self-contained. A click opens the question under a return point
+ * (STORY_EXPLORE_AND_RETURN_BRIEF item 3).
  */
 (function (global) {
   "use strict";
@@ -72,9 +79,22 @@
     return Array.isArray(block && block.runs) ? block.runs : [];
   }
 
+  /**
+   * The question a run links to, or "" when it is not a live link. The code
+   * must be a question the report carries: the R build drops any other with a
+   * console line, and this repeats the check so a hand-edited island cannot
+   * produce a dead link. Its words then show as plain text.
+   */
+  narrative.linkCode = function (r) {
+    var code = r && typeof r.link === "string" ? r.link : "";
+    if (!code || !TR.d2 || !TR.d2.questionByCode || !TR.d2.questionByCode(code)) return "";
+    return code;
+  };
+
   /** Runs as HTML. A coloured run (any font colour with a hue in Word) takes
    *  the report's brand colour and a highlighted run the accent tint, via the
-   *  nar-em / nar-hl classes, so Word's own colours never reach the page. */
+   *  nar-em / nar-hl classes, so Word's own colours never reach the page. A
+   *  Turas link wraps the lot, as an in-page route (narrative.linkCode). */
   function runsHtml(runs) {
     return runs.map(function (r) {
       var t = fmt.escapeHtml(r && r.text != null ? r.text : "");
@@ -82,9 +102,47 @@
       if (r && r.bold) t = "<strong>" + t + "</strong>";
       if (r && r.colour) t = '<span class="nar-em">' + t + "</span>";
       if (r && r.highlight) t = '<mark class="nar-hl">' + t + "</mark>";
+      var code = narrative.linkCode(r);
+      if (code) {
+        t = '<a class="nar-link" href="' +
+          fmt.escapeHtml("#tab=crosstabs&q=" + encodeURIComponent(code)) +
+          '" data-nar-link="' + fmt.escapeHtml(code) + '">' + t + "</a>";
+      }
       return t;
     }).join("");
   }
+
+  /**
+   * Follow a Turas link: the question in the crosstabs, with the reader's own
+   * banner and filters, under a return point to where they were. From Present
+   * that is the slide showing (story2.leavePresent); elsewhere it is the tab
+   * (returnPoint.leave, which keeps an open return point rather than replace
+   * it, so Back still goes to where the reader first left).
+   * @returns {boolean} false when the code is not a question in the report
+   */
+  narrative.follow = function (code) {
+    if (!narrative.linkCode({ link: code })) return false;
+    if (TR.story2 && TR.story2.leavePresent) TR.story2.leavePresent();
+    if (TR.shell.returnPoint) TR.shell.returnPoint.leave();
+    TR.shell.goQuestion(code);
+    return true;
+  };
+
+  /**
+   * One delegated click listener for every narrative surface (Report tab,
+   * cover, story card, Present), installed once by the shell. A click with a
+   * modifier key, or not with the main button, is left to the browser, whose
+   * href is the report's own in-page route.
+   */
+  narrative.wireLinks = function (doc) {
+    doc.addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest("[data-nar-link]") : null;
+      if (!a) return;
+      if (e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      narrative.follow(a.getAttribute("data-nar-link"));
+    });
+  };
 
   // Word list formats the report keeps, as HTML list types and label makers.
   var LIST_TYPES = { lowerLetter: "a", upperLetter: "A", lowerRoman: "i", upperRoman: "I" };

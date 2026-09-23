@@ -17,7 +17,14 @@
 #   - Heading 1 under a non-English style id ("berschrift1", named "heading 1"),
 #     so the reader is proved to match style NAMES, as localised Word writes them
 #   - Heading 2 under the Dutch id "Kop2"; one Heading 3 (read as a paragraph)
-#   - bold and italic runs, a hyperlink, a soft line break
+#   - bold and italic runs, a web hyperlink, a soft line break
+#   - Turas links (turas:Q1 typed with Ctrl+K) in Word's own shape, proved on a
+#     document Word 16 saved (23 Sep 2026): w:hyperlink r:id w:history="1"
+#     around runs styled Hyperlink, the relationship Target="turas:Q1"
+#     TargetMode="External". One split over two runs (they merge), one in a
+#     list item, one to a code no report carries (Q999), one in a Heading 2
+#     (dropped and counted), and a link to a place in the document (w:anchor,
+#     no r:id: not a Turas link, counted)
 #   - a bulleted list with a nested level, a numbered list, and a bullet whose
 #     numbering comes from its style (List Bullet) rather than the paragraph
 #   - a Quote paragraph; a picture on its own; a picture mid-paragraph
@@ -66,6 +73,16 @@ fx_run <- function(text, bold = FALSE, italic = FALSE) {
   rpr <- paste0(if (bold) "<w:b/>" else "", if (italic) "<w:i/>" else "")
   if (nzchar(rpr)) rpr <- paste0("<w:rPr>", rpr, "</w:rPr>")
   sprintf('<w:r>%s<w:t xml:space="preserve">%s</w:t></w:r>', rpr, fx_esc(text))
+}
+
+# A Word hyperlink around runs, as Word writes one made with Ctrl+K
+fx_link <- function(rid, ...) {
+  paste0(sprintf('<w:hyperlink r:id="%s" w:history="1">', rid), paste0(..., collapse = ""),
+         "</w:hyperlink>")
+}
+fx_link_run <- function(text) {
+  sprintf('<w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r>',
+          fx_esc(text))
 }
 
 fx_par <- function(..., style = NULL, num = NULL) {
@@ -249,11 +266,13 @@ build_narrative_fixture <- function(path) {
     fx_par(fx_run("See the "), '<w:hyperlink r:id="rIdLink">', fx_run("Turas site"),
            '</w:hyperlink>', fx_run(" for more.")),
     fx_par('<w:r><w:t>Line one</w:t><w:br/><w:t>line two</w:t></w:r>'),
-    fx_par(fx_run("How we asked"), style = "Kop2"),
+    fx_par(fx_run("How we "), fx_link("rIdTurasHead", fx_link_run("asked")), style = "Kop2"),
     fx_par(fx_run("Online survey"), style = "ListParagraph", num = c(1, 0)),
     fx_par(fx_run("Invites by email"), style = "ListParagraph", num = c(1, 1)),
-    fx_par(fx_run("Two reminders"), style = "ListParagraph", num = c(1, 0)),
-    fx_par(fx_run("A paragraph between lists.")),
+    fx_par(fx_run("Two "), fx_link("rIdTuras2", fx_link_run("reminders")),
+           style = "ListParagraph", num = c(1, 0)),
+    fx_par(fx_run("A paragraph "), fx_link("rIdTurasGone", fx_link_run("between lists")),
+           fx_run(".")),
     fx_par(fx_run("First step"), style = "ListParagraph", num = c(2, 0)),
     fx_par(fx_run("Second step"), style = "ListParagraph", num = c(2, 0)),
     fx_table(
@@ -266,7 +285,8 @@ build_narrative_fixture <- function(path) {
            '<w:del w:id="2" w:author="A" w:date="2026-09-22T00:00:00Z"><w:r><w:delText xml:space="preserve">rose </w:delText></w:r></w:del>',
            fx_run("to 58%.")),
     fx_par(fx_run("Executive summary"), style = "berschrift1"),
-    fx_par('<w:commentRangeStart w:id="0"/>', fx_run("Ratings are stable."),
+    fx_par('<w:commentRangeStart w:id="0"/>',
+           fx_link("rIdTuras1", fx_link_run("Rat"), fx_link_run("ings")), fx_run(" are stable."),
            '<w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r>',
            '<w:r><w:footnoteReference w:id="1"/></w:r>'),
     fx_par(fx_run("\"Culture varies by campus.\""), style = "Quote"),
@@ -287,7 +307,8 @@ build_narrative_fixture <- function(path) {
     fx_par(fx_run("Styled bullet"), style = "ListBullet"),
     '<w:sdt><w:sdtPr/><w:sdtContent>', fx_par(fx_run("Inside a control")), '</w:sdtContent></w:sdt>',
     fx_par(fx_run("Executive summary"), style = "berschrift1"),
-    fx_par(fx_run("Second occurrence.")),
+    fx_par('<w:hyperlink w:anchor="_Toc1" w:history="1">', fx_run("Second"), "</w:hyperlink>",
+           fx_run(" occurrence.")),
     '<w:sectPr><w:headerReference w:type="default" r:id="rIdHdr1"/>',
     '<w:footerReference w:type="default" r:id="rIdFtr1"/>',
     '<w:pgSz w:w="11906" w:h="16838"/><w:cols w:num="2" w:space="720"/></w:sectPr>')
@@ -301,6 +322,10 @@ build_narrative_fixture <- function(path) {
     rel("rIdImg2", "image", "media/image2.emf"),
     rel("rIdLinked", "image", "file:///C:/charts/linked.png", external = TRUE),
     rel("rIdLink", "hyperlink", "https://example.org/turas", external = TRUE),
+    rel("rIdTuras1", "hyperlink", "turas:Q1", external = TRUE),
+    rel("rIdTuras2", "hyperlink", "turas:Q2", external = TRUE),
+    rel("rIdTurasGone", "hyperlink", "turas:Q999", external = TRUE),
+    rel("rIdTurasHead", "hyperlink", "turas:Q1", external = TRUE),
     rel("rIdHdr1", "header", "header1.xml"),
     rel("rIdFtr1", "footer", "footer1.xml"),
     rel("rIdFootnotes", "footnotes", "footnotes.xml"),

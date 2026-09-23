@@ -89,9 +89,15 @@
               "ordered": false,
               "runs": [
                 {
-                  "text": "Two reminders",
+                  "text": "Two ",
                   "bold": false,
                   "italic": false
+                },
+                {
+                  "text": "reminders",
+                  "bold": false,
+                  "italic": false,
+                  "link": "Q2"
                 }
               ]
             }
@@ -101,7 +107,18 @@
           "type": "paragraph",
           "runs": [
             {
-              "text": "A paragraph between lists.",
+              "text": "A paragraph ",
+              "bold": false,
+              "italic": false
+            },
+            {
+              "text": "between lists",
+              "bold": false,
+              "italic": false,
+              "link": "Q999"
+            },
+            {
+              "text": ".",
               "bold": false,
               "italic": false
             }
@@ -171,7 +188,13 @@
           "type": "paragraph",
           "runs": [
             {
-              "text": "Ratings are stable.",
+              "text": "Ratings",
+              "bold": false,
+              "italic": false,
+              "link": "Q1"
+            },
+            {
+              "text": " are stable.",
               "bold": false,
               "italic": false
             }
