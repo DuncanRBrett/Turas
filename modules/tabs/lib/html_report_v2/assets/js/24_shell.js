@@ -367,6 +367,9 @@
       // A3: who the numbers describe. Persistent on EVERY tab; polite so a
       // cut change is announced without stealing focus
       '<div id="audstrip" class="audstrip" aria-live="polite"></div>' +
+      // The return point's "Back to the story" bar. Outside the tab host, so a
+      // tab render never destroys it while the reader wanders.
+      '<div id="returnbar" class="returnbar" hidden></div>' +
       '<div id="tabhost" class="tabhost"></div>' +
       '<div id="toast" role="status" aria-live="polite"></div>' +
       '<div id="present-overlay" hidden></div>';
@@ -414,6 +417,7 @@
       d2.state.tab === "catdriver" ||
       d2.state.tab === "cover" || d2.state.tab === "conjoint";
     if (TR.reader) TR.reader.renderStrip();
+    shell.returnPoint.renderBar();
     shell.autoGrowNotes(host);   // every tab render lands here
     d2.pushHash();
   };
@@ -433,6 +437,149 @@
     if (bannerId) d2.state.banner = bannerId;
     d2.state.tab = "crosstabs";
     shell.route();
+  };
+
+  /* ---------------- return point ---------------- */
+
+  /**
+   * One return point: where the reader was and how the report looked before a
+   * detour, so "Back" brings them there exactly (STORY_EXPLORE_AND_RETURN_BRIEF).
+   *
+   * It holds the origin and a deep copy of TR.d2.state taken as the reader
+   * leaves. Origins: {kind: "present", at: slide index}, {kind: "story", at:
+   * card index}, {kind: "report"}, {kind: "cover"}. While it is open the bar
+   * above the tab content offers Back and Stay here, and it stays across tabs,
+   * questions, banners and filters, because wandering is the point.
+   *
+   * Back restores the saved state WHOLE, in place, so every view looks exactly
+   * as it did (Duncan, 23 Sep 2026); Stay here is the only way to keep what the
+   * reader found. One at a time: a detour started while one is open keeps the
+   * first, so Back always goes to where the reader first left.
+   *
+   * Memory only, for the page's life. Never written to localStorage, and never
+   * in a saved copy: the bar lives inside #app, which saveCopy empties.
+   * Browser Back is deliberately not a return (the brief rules it out), so
+   * nothing here touches history beyond route()'s own replaceState.
+   */
+  var rp = shell.returnPoint = {};
+  var returnTo = null;     // { origin, state, scrollY } while a return point is open
+  var wiredBar = null;     // the bar element whose click listener is installed
+
+  /**
+   * Deep copy of report state. JSON would do for the values, but not for
+   * collapsedCats, which is null-prototype on purpose (a category named
+   * "constructor" is legal): a JSON copy would read that name back as the
+   * inherited function and show the category collapsed.
+   */
+  function cloneState(v) {
+    if (Array.isArray(v)) return v.map(cloneState);
+    if (v && typeof v === "object") {
+      var out = Object.getPrototypeOf(v) === null ? Object.create(null) : {};
+      Object.keys(v).forEach(function (k) { out[k] = cloneState(v[k]); });
+      return out;
+    }
+    return v;
+  }
+  shell._cloneState = cloneState;   // exposed for the node gate
+
+  /** The origin the reader is at now, or null where a detour has no origin. */
+  rp.originHere = function () {
+    var s = TR.d2.state;
+    if (s.tab === "story" && s.slide) return { kind: "present", at: s.slide - 1 };
+    if (s.tab === "story") return { kind: "story", at: null };
+    if (s.tab === "report") return { kind: "report" };
+    if (s.tab === "cover") return { kind: "cover" };
+    return null;
+  };
+
+  /**
+   * Open a return point before a detour. Call it BEFORE changing anything, so
+   * the copy is of the view the reader is leaving.
+   * @param {object} [origin] - defaults to rp.originHere()
+   * @returns {boolean} true when this call opened it; false when one was
+   *   already open (the first is kept) or there is no origin here
+   */
+  rp.leave = function (origin) {
+    if (returnTo) return false;
+    origin = origin || rp.originHere();
+    if (!origin) return false;
+    returnTo = { origin: cloneState(origin), state: cloneState(TR.d2.state),
+      scrollY: typeof global.scrollY === "number" ? global.scrollY : 0 };
+    rp.renderBar();
+    return true;
+  };
+
+  /** The open return point's origin (a copy), or null. */
+  rp.current = function () {
+    return returnTo ? cloneState(returnTo.origin) : null;
+  };
+
+  /** Back: restore the saved state whole and reopen the origin where it was. */
+  rp.back = function () {
+    if (!returnTo) return;
+    var back = returnTo;
+    returnTo = null;
+    // In place: modules hold TR.d2.state by reference inside their functions,
+    // and a key added during the detour must not survive the return.
+    var s = TR.d2.state, saved = cloneState(back.state);
+    Object.keys(s).forEach(function (k) { delete s[k]; });
+    Object.keys(saved).forEach(function (k) { s[k] = saved[k]; });
+    var o = back.origin;
+    if (o.kind === "present") { s.tab = "story"; s.slide = o.at + 1; }
+    else if (o.kind === "story") s.tab = "story";
+    else if (o.kind === "report") s.tab = "report";
+    else if (o.kind === "cover") s.tab = "cover";
+    // the hashchange handler's sequence; a Present origin reopens from the
+    // Story tab render, which opens Present at state.slide
+    TR.filterBar.render();
+    shell.route();
+    if (o.kind !== "present" && typeof global.scrollTo === "function") {
+      global.scrollTo(0, back.scrollY);
+    }
+  };
+
+  /** Stay here: drop the return point and keep the current view. */
+  rp.stay = function () {
+    returnTo = null;
+    rp.renderBar();
+  };
+
+  /** The bar's content, or "" when no return point is open. */
+  rp.barHtml = function () {
+    if (!returnTo) return "";
+    var o = returnTo.origin, label;
+    if (o.kind === "present") {
+      var total = TR.story2 ? TR.story2.items().length : 0;
+      label = TR.txt.block("story.return.present",
+        { n: o.at + 1, total: Math.max(total, o.at + 1) }, { tag: "span" });
+    } else if (o.kind === "story") {
+      label = TR.txt.block("story.return.story", null, { tag: "span" });
+    } else if (o.kind === "report") {
+      label = TR.txt.block("story.return.report", null, { tag: "span" });
+    } else {
+      label = TR.txt.block("story.return.cover", null, { tag: "span" });
+    }
+    return '<button type="button" class="rb-back" data-return-back>‹ ' + label +
+      "</button>" +
+      '<button type="button" class="rb-stay" data-return-stay>' +
+      TR.txt.block("story.return.stay", null, { tag: "span" }) + "</button>";
+  };
+
+  /** Draw (or hide) the bar. Called on every route and on leave/back/stay. */
+  rp.renderBar = function () {
+    if (typeof document === "undefined") return;   // headless (node gate)
+    var bar = document.getElementById("returnbar");
+    if (!bar) return;
+    var html = rp.barHtml();
+    bar.innerHTML = html;
+    bar.hidden = !html;
+    if (wiredBar !== bar) {
+      wiredBar = bar;
+      bar.addEventListener("click", function (e) {
+        if (e.target.closest("[data-return-back]")) rp.back();
+        else if (e.target.closest("[data-return-stay]")) rp.stay();
+      });
+    }
   };
 
   function wireTopLevel() {

@@ -755,6 +755,42 @@
       "context": "Story tab, Present and the deck, in place of a pinned narrative screen",
       "page": "Story"
     },
+    "story.present_from_here": {
+      "title": "Story: present from this card",
+      "text": "Present from here",
+      "context": "Story tab, button on each story card",
+      "page": "Story"
+    },
+    "story.return.present": {
+      "title": "Story: back to Present after a detour",
+      "text": "Back to the story, slide {n} of {total}",
+      "context": "Bar above the tab content, returning to a Present slide",
+      "page": "Story"
+    },
+    "story.return.story": {
+      "title": "Story: back to the Story tab after opening a pin",
+      "text": "Back to the story",
+      "context": "Bar above the tab content, returning to the Story tab",
+      "page": "Story"
+    },
+    "story.return.report": {
+      "title": "Story: back to the Report tab after a detour",
+      "text": "Back to the Report tab",
+      "context": "Bar above the tab content, returning to the Report tab",
+      "page": "Story"
+    },
+    "story.return.cover": {
+      "title": "Story: back to the cover after a detour",
+      "text": "Back to the cover",
+      "context": "Bar above the tab content, returning to the cover",
+      "page": "Story"
+    },
+    "story.return.stay": {
+      "title": "Story: keep the current view",
+      "text": "Stay here",
+      "context": "Bar above the tab content, the button that keeps the current view",
+      "page": "Story"
+    },
     "filter.weighting.summary": {
       "title": "Weighted data: summary line",
       "text": "⚖ Weighted data. Figures represent the population, not the raw sample. How the three bases work ▸",

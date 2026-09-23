@@ -51,7 +51,11 @@
     collapsedCats: Object.create(null),
     qualQ: null,            // focused open-end in the Qualitative tab (hash round-trips it)
     qualFrom: null,         // the closed/composite code we jumped FROM (breadcrumb + back)
-    qualFromTab: null       // the tab to return to on "back" (crosstabs | dashboard)
+    qualFromTab: null,      // the tab to return to on "back" (crosstabs | dashboard)
+    // Present's current slide, 1-based, while Present is open; null otherwise.
+    // Hash-driven, so #tab=story&slide=7 opens Present at slide 7 and the
+    // address carries the slide being shown (30_story.js).
+    slide: null
   };
 
   /** Row scope derived from the two visibility toggles. */
@@ -384,12 +388,14 @@
     // browser-back returns to the closed view). The cut itself is the filter= above.
     if (s.tab === "qualitative" && s.qualQ) parts.push("qq=" + s.qualQ);
     if (s.qualFrom) parts.push("qfrom=" + s.qualFrom);
+    if (s.tab === "story" && s.slide) parts.push("slide=" + s.slide);
     return "#" + parts.join("&");
   };
 
   d2.decodeHash = function (hash) {
     var s = d2.state;
     s.qualFrom = null;          // jump breadcrumb is hash-driven (absent => cleared)
+    s.slide = null;             // so is the Present slide
     String(hash || "").replace(/^#/, "").split("&").forEach(function (kv) {
       var eq = kv.indexOf("=");
       if (eq < 0) return;
@@ -398,6 +404,12 @@
       if (k === "q") s.activeQ = v;
       if (k === "qq") s.qualQ = v;
       if (k === "qfrom") s.qualFrom = v;
+      if (k === "slide") {
+        // Clamped to the story's length where Present opens, since only the
+        // story knows it. Here: a number, at least 1, else no slide at all.
+        var n = parseInt(v, 10);
+        s.slide = isNaN(n) ? null : Math.max(1, n);
+      }
       if (k === "banner") s.banner = v;
       if (k === "count") s.showCounts = v === "1";
       if (k === "iv") s.showIntervals = v === "1";
@@ -439,6 +451,9 @@
         });
       }
     });
+    // A slide means Present, which lives on the Story tab. A slide on any other
+    // tab would otherwise linger and open Present on the next Story click.
+    if (s.tab !== "story") s.slide = null;
   };
 
   d2.pushHash = function () {

@@ -63,6 +63,17 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .audstrip:empty { display: none; }
 .audstrip > * { vertical-align: baseline; }
 .audstrip { padding: 5px 28px; max-width: none; }
+/* The return point's bar (24_shell.js, returnPoint): Back to where the reader
+   left, or Stay here. Outside the tab host, so it survives every tab render. */
+.returnbar { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 7px 28px;
+  background: var(--bg); border-bottom: 2px solid var(--brand); font-size: 13px; }
+.returnbar[hidden] { display: none; }
+.rb-back { border: 0; background: transparent; color: var(--brand); font: inherit; font-weight: 700;
+  cursor: pointer; padding: 0; }
+.rb-back:hover { text-decoration: underline; }
+.rb-stay { margin-left: auto; border: 1px solid var(--line); background: #fff; border-radius: 999px;
+  padding: 2px 12px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.rb-stay:hover { color: var(--brand); border-color: var(--brand); }
 .aud-label { font-size: 10px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: var(--faint); margin-right: 8px; }
 .aud-cut strong { color: var(--ink); font-weight: 600; }
 .aud-sep { margin: 0 7px; color: var(--faint); }
