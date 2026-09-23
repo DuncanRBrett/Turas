@@ -658,6 +658,41 @@
     "context": "The bar above the tab content during a detour. The button that closes the bar and keeps the current view instead of going back.",
     "tokens": []
   },
+  "story.explore": {
+    "page": "Story",
+    "context": "Present, on a question slide. The button that opens the pinned question in Crosstabs with the pin's banner and filters. A bar then offers the way back to this slide.",
+    "tokens": []
+  },
+  "story.live.banner": {
+    "page": "Story",
+    "context": "Present, on a question slide. The label before the buttons that redraw the slide by another banner. Nothing the reader does here changes the pin.",
+    "tokens": []
+  },
+  "story.live.total": {
+    "page": "Story",
+    "context": "Present, on a question slide of a report with no banners. The banner button that shows the Total column only.",
+    "tokens": []
+  },
+  "story.live.chart": {
+    "page": "Story",
+    "context": "Present, on a question slide. The button that redraws the slide as a chart. The pin itself is not changed.",
+    "tokens": []
+  },
+  "story.live.table": {
+    "page": "Story",
+    "context": "Present, on a question slide. The button that redraws the slide as a table. The pin itself is not changed.",
+    "tokens": []
+  },
+  "story.live.intervals": {
+    "page": "Story",
+    "context": "Present, on a question slide. The button that shows or hides the 95% interval range under each number. The pin itself is not changed.",
+    "tokens": []
+  },
+  "story.live.reset": {
+    "page": "Story",
+    "context": "Present, on a question slide. The button that undoes the banner, chart or table and interval changes and shows the slide as it was pinned.",
+    "tokens": []
+  },
   "filter.weighting.summary": {
     "page": "Crosstabs",
     "context": "Filter bar. The collapsed weighted-data summary line.",

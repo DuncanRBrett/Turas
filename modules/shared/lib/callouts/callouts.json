@@ -791,6 +791,48 @@
       "context": "Bar above the tab content, the button that keeps the current view",
       "page": "Story"
     },
+    "story.explore": {
+      "title": "Story: explore a question slide",
+      "text": "Explore",
+      "context": "Present, question slide, opens the question in Crosstabs",
+      "page": "Story"
+    },
+    "story.live.banner": {
+      "title": "Story: live banner label",
+      "text": "Banner",
+      "context": "Present, question slide, label before the banner buttons",
+      "page": "Story"
+    },
+    "story.live.total": {
+      "title": "Story: live Total banner",
+      "text": "Total",
+      "context": "Present, question slide, the Total-only banner button",
+      "page": "Story"
+    },
+    "story.live.chart": {
+      "title": "Story: live chart view",
+      "text": "Chart",
+      "context": "Present, question slide, shows the slide as a chart",
+      "page": "Story"
+    },
+    "story.live.table": {
+      "title": "Story: live table view",
+      "text": "Table",
+      "context": "Present, question slide, shows the slide as a table",
+      "page": "Story"
+    },
+    "story.live.intervals": {
+      "title": "Story: live 95% intervals",
+      "text": "95% intervals",
+      "context": "Present, question slide, turns the interval ranges on or off",
+      "page": "Story"
+    },
+    "story.live.reset": {
+      "title": "Story: back to the pinned view",
+      "text": "Reset to pinned view",
+      "context": "Present, question slide, undoes the live changes",
+      "page": "Story"
+    },
     "filter.weighting.summary": {
       "title": "Weighted data: summary line",
       "text": "⚖ Weighted data. Figures represent the population, not the raw sample. How the three bases work ▸",

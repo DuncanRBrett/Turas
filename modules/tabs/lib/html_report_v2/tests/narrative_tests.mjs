@@ -57,7 +57,8 @@ const item = (level, ordered, text) => ({ level, ordered, runs: [run1(text)] });
 function sandbox(opts) {
   opts = opts || {};
   const store = {};
-  const overlay = { hidden: true, innerHTML: "",
+  // Present wires one delegated click listener on the overlay (the live strip)
+  const overlay = { hidden: true, innerHTML: "", addEventListener: () => {},
     querySelector: () => ({ addEventListener: () => {} }) };
   const sb = { console, TextEncoder, atob,
     localStorage: {

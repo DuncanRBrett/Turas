@@ -22,6 +22,12 @@
   // Present is open.
   var presentAt = 0;
   var presenting = false;   // Present is open (its key listener is installed)
+  // The live view of the question slide showing: { at: slide index, item: a
+  // deep copy of the pin the controls vary }. Never the saved pin, never
+  // persisted, never TR.d2.state. Dropped when the slide changes or Present
+  // closes, so every slide opens at its pinned view.
+  var live = null;
+  var wiredOverlay = null;   // the overlay whose delegated click listener is installed
 
   function load() {
     if (items) return items;
@@ -826,9 +832,26 @@
     if (!item || item.kind !== "question") return;
     // the return point is taken first, before anything changes
     if (TR.shell.returnPoint) TR.shell.returnPoint.leave({ kind: "story", at: i });
+    openPin(item);
+  };
+
+  /** The pinned question in the crosstabs with the pin's banner and filters. */
+  function openPin(item) {
     TR.d2.state.filters = JSON.parse(JSON.stringify(item.filters || []));
     TR.filterBar.render();
     TR.shell.goQuestion(item.q, item.banner);
+  }
+
+  /**
+   * Explore, from a question slide in Present: the pinned question in the
+   * crosstabs with the PIN's banner and filters (not the live strip's), under a
+   * return point to this slide, so Back reopens Present here.
+   */
+  story2.explore = function () {
+    var item = load()[presentAt];
+    if (!presenting || !item || item.kind !== "question" || !modelFor(item)) return;
+    story2.leavePresent();
+    openPin(item);
   };
 
   /** Open Present at slide index i (clamped to the story). */
@@ -1187,6 +1210,9 @@
 
   function presentKeys(e) {
     if (e.key === "Escape") { closePresent(); return; }
+    // Space or an arrow on a focused live control works that control only;
+    // it must not also move the slide
+    if (e.target && e.target.closest && e.target.closest(".pr-live")) return;
     if (e.key === "ArrowRight" || e.key === " ") {
       presentAt = Math.min(presentAt + 1, load().length - 1);
       renderPresent();
@@ -1200,6 +1226,7 @@
   function closePresent() {
     document.removeEventListener("keydown", presentKeys);
     presenting = false;
+    live = null;
     var overlay = document.getElementById("present-overlay");
     overlay.hidden = true;
     overlay.innerHTML = "";
@@ -1210,6 +1237,9 @@
     var overlay = document.getElementById("present-overlay");
     var item = load()[presentAt];
     if (!item) { closePresent(); return; }
+    // one rule for every way the slide changes (arrows, a slide link, Present
+    // from here, Back): a live view belongs to its slide only
+    if (live && live.at !== presentAt) live = null;
     var head = '<div class="pr-head"><span>' + (presentAt + 1) + " / " + load().length +
       " · " + fmt.escapeHtml(TR.AGG.project.name) + "</span>" +
       '<button id="pr-close" aria-label="Exit presentation">✕ esc</button></div>';
@@ -1263,26 +1293,132 @@
         '<p class="pr-ctx">This pin references a question that is not in ' +
         "this report.</p></div>";
     } else {
-      var model = modelFor(item);
-      var flags = item.flags || { table: true, insight: true };
+      // The live view when the strip has varied this slide, else the pin. The
+      // title, commentary and quotes stay the pin's: only the view varies.
+      var shown = live ? live.item : item;
+      var model = modelFor(shown);
+      var flags = shown.flags || { table: true, insight: true };
       body = "<h1>" + fmt.escapeHtml(model.code + ": " + (item.title || model.title)) + "</h1>" +
-        '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</p>" +
+        '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(shown, model)) + "</p>" +
+        liveStripHtml(item, shown) +
         ((flags.insight !== false && (item.note || TR.insights.get(item.q, item.banner))) ?
           '<div class="pr-note">' +
           fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner)) + "</div>" : "") +
         (flags.chart ? '<div class="pr-table pr-chart">' +
-          TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
+          TR.render.chartBy(shown.chartType || "bar", model, shown.chartCols || [0]) +
           "</div>" : "") +
         (flags.table !== false ? '<div class="pr-table">' + TR.render.tableHtml(model,
           { heatmap: true, showDeltas: TR.d2.tracking().enabled,
-            intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>" : "") +
+            intervals: !!shown.intervals, showCounts: !!shown.counts }) + "</div>" : "") +
         quoteBlockHtml(item);
     }
     overlay.hidden = false;
     overlay.innerHTML = '<div class="present">' + head + body +
       '<div class="pr-foot">← → to navigate · Esc to exit</div></div>';
     overlay.querySelector("#pr-close").addEventListener("click", closePresent);
+    wireOverlay(overlay);
     setSlide(presentAt + 1);
+  }
+
+  /* ---------------- live in place (question slides) ---------------- */
+
+  /** The banners a question slide can switch to: the report's banners (an
+   *  explicit Total on a Total-only report), plus the pin's own banner when it
+   *  is not one of them (a custom or composite banner). */
+  function liveBanners(item) {
+    var list = (TR.AGG.banner_groups || []).map(function (g) {
+      return { id: g.id, name: g.name };
+    });
+    if (!list.length) list.push({ id: "", name: TR.txt("story.live.total") });
+    var own = item.banner || "";
+    if (!list.some(function (b) { return b.id === own; })) {
+      list.push({ id: own, name: TR.charts.clip(TR.d2.bannerDescription(own), 36) });
+    }
+    return list;
+  }
+
+  /** Explore and the live controls, above a question slide's evidence. Every
+   *  control is a button: a focused select would take the arrow keys. */
+  function liveStripHtml(item, shown) {
+    var flags = shown.flags || {};
+    var press = function (on) { return ' aria-pressed="' + (on ? "true" : "false") + '"'; };
+    var label = function (key) { return TR.txt.block(key, null, { tag: "span" }); };
+    var banners = liveBanners(item);
+    return '<div class="pr-live" role="group">' +
+      '<button type="button" class="pr-explore" data-live-explore>' +
+      label("story.explore") + "</button>" +
+      (banners.length > 1 ? '<span class="pr-live-grp">' +
+        TR.txt.block("story.live.banner", null, { tag: "span", cls: "pr-live-lab" }) +
+        banners.map(function (b) {
+          return '<button type="button" data-live-banner="' + fmt.escapeHtml(b.id) + '"' +
+            press(shown.banner === b.id) + ">" + fmt.escapeHtml(b.name) + "</button>";
+        }).join("") + "</span>" : "") +
+      '<span class="pr-live-grp">' +
+      '<button type="button" data-live-view="chart"' + press(!!flags.chart) + ">" +
+      label("story.live.chart") + "</button>" +
+      '<button type="button" data-live-view="table"' + press(flags.table !== false) + ">" +
+      label("story.live.table") + "</button></span>" +
+      '<button type="button" data-live-intervals' + press(!!shown.intervals) + ">" +
+      label("story.live.intervals") + "</button>" +
+      '<button type="button" class="pr-live-reset" data-live-reset' +
+      (live ? "" : " disabled") + ">" + label("story.live.reset") + "</button></div>";
+  }
+
+  /**
+   * Vary the question slide showing, in place. `change` is "reset" or any of
+   * {banner: id}, {view: "chart"|"table"}, {intervals: bool}. The change lands
+   * on a deep copy of the pin and redraws through modelFor, the crosstabs'
+   * model path, so every disclosure gate applies. It never writes the saved
+   * pin, never persists, and never touches TR.d2.state.
+   */
+  story2.live = function (change) {
+    var item = load()[presentAt];
+    if (!presenting || !item || item.kind !== "question" || !modelFor(item)) return;
+    if (change === "reset") { live = null; renderPresent(); return; }
+    change = change || {};
+    if (!live) live = { at: presentAt, item: JSON.parse(JSON.stringify(item)) };
+    var v = live.item;
+    if ("banner" in change && change.banner !== v.banner) {
+      v.banner = change.banner;
+      // hidden columns are the pinned banner's labels and the sort names one of
+      // its columns: neither means anything on another banner. The chart shows
+      // every column of the new one, or switching would change nothing on it.
+      v.hiddenCols = [];
+      v.sort = null;
+      var m = modelFor(v);
+      v.chartCols = m ? m.columns.map(function (c, ci) { return ci; }) : [0];
+    }
+    if (change.view === "chart" || change.view === "table") {
+      v.flags = JSON.parse(JSON.stringify(v.flags || {}));
+      v.flags.chart = change.view === "chart";
+      v.flags.table = change.view === "table";
+    }
+    if ("intervals" in change) v.intervals = !!change.intervals;
+    renderPresent();
+  };
+
+  /** The live view's copy of the pin, or null (exposed for the node gate). */
+  story2._live = function () { return live ? JSON.parse(JSON.stringify(live)) : null; };
+
+  /** One delegated click listener on the overlay, installed once: every render
+   *  replaces the buttons, so wiring them one by one would stack or miss. */
+  function wireOverlay(overlay) {
+    if (wiredOverlay === overlay) return;
+    wiredOverlay = overlay;
+    overlay.addEventListener("click", function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest("[data-live-explore]")) { story2.explore(); return; }
+      if (t.closest("[data-live-reset]")) { story2.live("reset"); return; }
+      var b = t.closest("[data-live-banner]");
+      if (b) { story2.live({ banner: b.getAttribute("data-live-banner") }); return; }
+      var view = t.closest("[data-live-view]");
+      if (view) { story2.live({ view: view.getAttribute("data-live-view") }); return; }
+      if (t.closest("[data-live-intervals]")) {
+        var shown = live ? live.item : load()[presentAt];
+        story2.live({ intervals: !(shown && shown.intervals) });
+      }
+    });
   }
 
 })(typeof window !== "undefined" ? window : globalThis);
