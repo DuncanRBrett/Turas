@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { installText } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -76,6 +77,7 @@ function slideSandbox(opts) {
   for (const f of ["00_namespace.js", "01_format.js", "03_svg.js", "13_zip.js",
     "14_pptx_parts.js", "23_render.js", "23z_charts.js", "23za_trend.js",
     "23y_xlsx.js", "29_export.js"]) load(sb, f);
+  installText(sb);                            // the story cards' authored labels
   const TR = sb.TR;
   TR.AGG = {
     // "slides" in opts, not opts.slides. A test needs to express an island

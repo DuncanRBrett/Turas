@@ -17,7 +17,11 @@
   var KEY = "turas_v2_story";
   var items = null;
   var owned = false;   // the reader has changed the story in this browser
+  // The last slide Present showed in this page's life, so Present resumes
+  // there. Deliberately separate from d2.state.slide, which is set only while
+  // Present is open.
   var presentAt = 0;
+  var presenting = false;   // Present is open (its key listener is installed)
 
   function load() {
     if (items) return items;
@@ -635,10 +639,17 @@
     wire(wrap);
     if (TR.shell && TR.shell.autoGrowNotes) TR.shell.autoGrowNotes(wrap);   // pin commentary opens at its full height
     persist();
+    // A slide link (#tab=story&slide=7), or Back to a Present origin, arrives
+    // on this tab with state.slide set: open Present at that slide.
+    var want = TR.d2.state.slide;
+    if (want) startPresent(want - 1);
   };
 
   function itemHtml(item, i) {
-    var buttons = '<span class="si-btns"><button data-move="-1" title="Move up">↑</button>' +
+    var buttons = '<span class="si-btns">' +
+      '<button data-present-from>▶ ' +
+      TR.txt.block("story.present_from_here", null, { tag: "span" }) + "</button>" +
+      '<button data-move="-1" title="Move up">↑</button>' +
       '<button data-move="1" title="Move down">↓</button>' +
       (item.kind === "question" ? '<button data-png title="Download as PNG">PNG</button>' +
         '<button data-open title="Open in Crosstabs">⧉</button>' : "") +
@@ -781,10 +792,9 @@
           title: item.title || null   // D2: PNG title = pin title
         });
       } else if (e.target.closest("[data-open]")) {
-        var openItem = load()[i];
-        TR.d2.state.filters = JSON.parse(JSON.stringify(openItem.filters || []));
-        TR.filterBar.render();
-        TR.shell.goQuestion(openItem.q, openItem.banner);
+        story2.openItem(i);
+      } else if (e.target.closest("[data-present-from]")) {
+        startPresent(i);
       }
     });
     host.addEventListener("input", function (e) {
@@ -805,6 +815,37 @@
       });
     }
   }
+
+  /**
+   * The story card's "open": the pinned question in the crosstabs with the
+   * pin's banner and filters, under a return point to this card. Back puts the
+   * reader's own filters back, so opening a pin no longer overwrites them.
+   */
+  story2.openItem = function (i) {
+    var item = load()[i];
+    if (!item || item.kind !== "question") return;
+    // the return point is taken first, before anything changes
+    if (TR.shell.returnPoint) TR.shell.returnPoint.leave({ kind: "story", at: i });
+    TR.d2.state.filters = JSON.parse(JSON.stringify(item.filters || []));
+    TR.filterBar.render();
+    TR.shell.goQuestion(item.q, item.banner);
+  };
+
+  /** Open Present at slide index i (clamped to the story). */
+  story2.presentFrom = function (i) { startPresent(i); };
+
+  /**
+   * Leave Present for a detour, under a return point to the slide showing.
+   * The mechanism's Present end: Explore and the narrative links (stages 2 and
+   * 3 of the brief) call this, then navigate.
+   */
+  story2.leavePresent = function () {
+    if (!presenting) return;
+    if (TR.shell && TR.shell.returnPoint) {
+      TR.shell.returnPoint.leave({ kind: "present", at: presentAt });
+    }
+    closePresent();
+  };
 
   /** WP3 cover: the same content as the HTML cover. Project head, the
    *  cover's narrative screen as plain lines (TR.narrative.coverScreen and
@@ -1120,11 +1161,28 @@
 
   /* ---------------- present mode ---------------- */
 
-  function startPresent() {
-    if (!load().length) return;
-    presentAt = 0;
+  /** Open Present at slide index `at`, or where it last stopped when `at` is
+   *  omitted. Clamped, so a slide link past the end opens the last slide. Safe
+   *  to call while Present is open: it moves to the slide and never installs a
+   *  second key listener. */
+  function startPresent(at) {
+    var n = load().length;
+    if (!n) { setSlide(null); return; }
+    if (typeof at === "number" && !isNaN(at)) presentAt = at;
+    presentAt = Math.max(0, Math.min(presentAt, n - 1));
     renderPresent();
-    document.addEventListener("keydown", presentKeys);
+    if (!presenting) {
+      presenting = true;
+      document.addEventListener("keydown", presentKeys);
+    }
+  }
+
+  /** The Present slide into report state and the address (1-based; null when
+   *  Present is closed). Guarded: the older node sandboxes stub d2 without it. */
+  function setSlide(slide) {
+    if (!TR.d2 || !TR.d2.state) return;
+    TR.d2.state.slide = slide;
+    if (TR.d2.pushHash) TR.d2.pushHash();
   }
 
   function presentKeys(e) {
@@ -1141,9 +1199,11 @@
 
   function closePresent() {
     document.removeEventListener("keydown", presentKeys);
+    presenting = false;
     var overlay = document.getElementById("present-overlay");
     overlay.hidden = true;
     overlay.innerHTML = "";
+    setSlide(null);
   }
 
   function renderPresent() {
@@ -1222,6 +1282,7 @@
     overlay.innerHTML = '<div class="present">' + head + body +
       '<div class="pr-foot">← → to navigate · Esc to exit</div></div>';
     overlay.querySelector("#pr-close").addEventListener("click", closePresent);
+    setSlide(presentAt + 1);
   }
 
 })(typeof window !== "undefined" ? window : globalThis);

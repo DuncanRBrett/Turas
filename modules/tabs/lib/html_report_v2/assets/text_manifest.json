@@ -621,6 +621,43 @@
     "context": "Story tab, Present and the deck. Shown in place of a pinned summary screen the report no longer carries, because its heading was renamed or the section deleted in the Word document.",
     "tokens": []
   },
+  "story.present_from_here": {
+    "page": "Story",
+    "context": "Story tab, the button on every story card that opens Present at that card.",
+    "tokens": []
+  },
+  "story.return.present": {
+    "page": "Story",
+    "context": "The bar above the tab content while the reader is away from Present on a detour. Its button returns to Present at the slide they left, with the report exactly as it looked.",
+    "tokens": [
+      "n",
+      "total"
+    ],
+    "token_help": {
+      "n": "the slide the reader left, e.g. 7",
+      "total": "how many slides the story has, e.g. 18"
+    }
+  },
+  "story.return.story": {
+    "page": "Story",
+    "context": "The bar above the tab content after the reader opened a pinned question from a Story tab card. Its button returns to the Story tab, with the report exactly as it looked.",
+    "tokens": []
+  },
+  "story.return.report": {
+    "page": "Story",
+    "context": "The bar above the tab content while the reader is away from the Report tab on a detour. Its button returns there, with the report exactly as it looked.",
+    "tokens": []
+  },
+  "story.return.cover": {
+    "page": "Story",
+    "context": "The bar above the tab content while the reader is away from the cover on a detour. Its button returns there, with the report exactly as it looked.",
+    "tokens": []
+  },
+  "story.return.stay": {
+    "page": "Story",
+    "context": "The bar above the tab content during a detour. The button that closes the bar and keeps the current view instead of going back.",
+    "tokens": []
+  },
   "filter.weighting.summary": {
     "page": "Crosstabs",
     "context": "Filter bar. The collapsed weighted-data summary line.",

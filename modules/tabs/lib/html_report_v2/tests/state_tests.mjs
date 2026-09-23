@@ -25,6 +25,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { installText } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -60,6 +61,7 @@ function boot(files, island, store) {
     AGG: { project: { name: "proj" } },
     userState: island || null
   };
+  installText(sandbox);                       // the story cards' authored labels
   for (const f of files) {
     vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), sandbox, { filename: f });
   }

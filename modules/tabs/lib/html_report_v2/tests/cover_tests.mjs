@@ -29,6 +29,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { installText } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -68,6 +69,7 @@ function coverSandbox(opts) {
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
   load(sb, "21_stats.js");                    // level wording + dualMode()
+  installText(sb);                            // the story cards' authored labels
   const TR = sb.TR;
   // Every contract below is "GIVEN the study asked for a cover" (config
   // html_report_v2_cover -> project.cover), so the sandbox opts in by default
