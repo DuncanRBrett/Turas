@@ -422,6 +422,49 @@ purchase, category entry points, a female-only panel sample. What changes:
 - A tracker is where the backtest becomes real: did brands whose links moved
   between waves move in attitude as predicted?
 
+## IPK feasibility, Baking Mixes (ipk_feasibility.py, 23 Sep 2026)
+
+Every IPK category carries both entry points and attributes (DSS 15 and 10, BAK
+13 and 10, POS 12 and 10, PAS 10 and 10). The data names them two ways: BAK and
+POS use BRANDCEP_<cat>NN for entry points (POS attributes are BRANDATTR_POSNN, no
+ATT); DSS and PAS keep both inside BRANDATTR_<cat>_CEPNN and _ATTNN. A build must
+read the mapping from the structure's QuestionMap, never guess from column names.
+
+Baking: 250 people, 11 brands, 2,358 person-brand pairs with an opinion
+(committed 1,598, conditional 713, avoid 47). People held out in cross-validation.
+
+| Model (all with a baseline per brand) | Held-out pseudo R squared |
+|---|---|
+| brand baselines only | 0.081 |
+| + number of entry-point links | 0.183 |
+| + number of attribute links | 0.177 |
+| + every link separately | 0.188 |
+| + every link + bought in 12 months | 0.195 |
+| bought in 12 months alone | 0.141 |
+
+- Links explain how people feel about a brand better than past purchase does,
+  and the NUMBER of links carries almost all of it: which link barely matters.
+- Halo is real but partial: past purchase as a baseline shrinks a link's effect by
+  about a fifth (entry point 0.276 to 0.225, attribute 0.370 to 0.296). Among
+  people who have not bought the brand, links still predict attitude (0.197,
+  0.170), so they are not only buyers praising what they buy.
+- Single links are weak levers: 10 more IPK raters in 100 linking IPK to one
+  entry point or attribute moves IPK's committed share by at most about 1 point
+  ("bakes with the right texture" +1.1, range +0.7 to +1.5), and most ranges
+  overlap zero. The ranking of single links is not dependable.
+- Mental availability is the lever: one more entry-point link for every IPK rater
+  adds +2.7 points of committed share (range +1.9 to +3.6); one more attribute
+  link +3.0 (+1.8 to +4.1). IPK averages 3.9 entry-point and 3.0 attribute links
+  per rater against 4.6 and 3.4 for the average brand. IPK is committed-to by 58%
+  of raters with an opinion; 33% bought in 12 months.
+- IPK leads on "is an expensive brand" (42% against 29%) and "comforting bake";
+  it trails on "easy to find" (24% against 35%) and "good value" (24% against 36%).
+- Levers need an expected direction in the config: "is an expensive brand" is
+  meant to count against a brand, so the sign check cannot assume every lever helps.
+
+So a brand What if is feasible, but it should lead with mental availability
+(links in total, and where IPK trails the category), with single links as detail.
+
 ## Prompts to direct the next session
 
 1. "Read prototypes/nps-simulator/PLAN.md and the catdriver module. Recommend
