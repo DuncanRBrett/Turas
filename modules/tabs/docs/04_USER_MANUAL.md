@@ -667,6 +667,21 @@ story full-screen, or export it as a native, editable PowerPoint deck.
 The story persists in the browser and travels inside any saved copy of
 the report.
 
+**Presenting.** Present shows each pin as a slide on a 16:9 stage that
+scales to whatever window it is in, so the same slides work on a
+projector and in a Teams share. On a projector or a shared screen, press
+**Full screen** (top right). On Teams you can also share just the browser
+window: the slides fit the window as it is, and resizing it refits them.
+The controls and the mouse pointer fade after two seconds without the
+mouse moving, and come back when it moves. A slide too long for the
+screen is shrunk to fit; a very long table or chart that would become too
+small to read scrolls instead, so pin fewer rows or columns for a slide
+you will present. Use the arrow keys or Space to move, Esc to leave full
+screen and Esc again to close Present.
+
+The story lives in the browser you built it in. To present from another
+computer or browser, use **Save copy** and open that file there.
+
 ------------------------------------------------------------------------
 
 ## Step 6: Troubleshooting

@@ -24,6 +24,20 @@
   var presenting = false;   // Present is open (its key listener is installed)
   var wiredOverlay = null;   // the overlay whose delegated click listener is installed
 
+  // Present lays every slide out on one fixed 16:9 stage and scales the stage
+  // to the window it is in, so a slide looks the same on a projector, a shared
+  // Teams window or a laptop. The stage size is the one type-scale knob: the
+  // report's own sizes (12px tables, 26px titles) show at 1.5x on a 1920x1080
+  // screen. A slide taller than the stage shrinks to fit, down to FIT_FLOOR of
+  // the full scale and never below MIN_SCALE (0.9 keeps a 12px table at about
+  // 10px on screen, on a 1280x720 Teams share too); below that it scrolls
+  // rather than become unreadable.
+  var STAGE_W = 1280, STAGE_H = 720, FIT_FLOOR = 0.55, MIN_SCALE = 0.9;
+  // The controls (counter, full screen, exit, Explore, the key hint) fade after
+  // this long without the mouse moving, and return when it moves
+  var IDLE_MS = 2200;
+  var idleTimer = null;
+
   function load() {
     if (items) return items;
     items = [];
@@ -1192,6 +1206,80 @@
     if (!presenting) {
       presenting = true;
       document.addEventListener("keydown", presentKeys);
+      if (typeof global.addEventListener === "function") {
+        global.addEventListener("resize", fitPresent);
+      }
+      wakePresent();
+    }
+  }
+
+  /**
+   * The stage's scale for a window of vw x vh and a slide of contentH logical
+   * pixels. Pure, so the node gate can prove it.
+   * @returns {{scale: number, height: number, scrolls: boolean}} height is the
+   *   stage's logical height (the slide's, when taller than the stage)
+   */
+  story2._presentFit = function (vw, vh, contentH) {
+    var full = Math.min(vw / STAGE_W, vh / STAGE_H);
+    var height = Math.max(STAGE_H, contentH || 0);
+    // the floor never lifts a slide past the window's own width
+    var floor = Math.min(full, Math.max(full * FIT_FLOOR, MIN_SCALE));
+    var scale = Math.max(Math.min(vw / STAGE_W, vh / height), floor);
+    return { scale: scale, height: height, scrolls: height * scale > vh + 0.5 };
+  };
+
+  /** Scale the stage to the window. Measures, never re-renders, so a resize
+   *  (a Teams window dragged, full screen entered) is cheap. A no-op where
+   *  there is nothing to measure (the node sandboxes). */
+  function fitPresent() {
+    var overlay = document.getElementById("present-overlay");
+    if (!overlay || typeof overlay.querySelector !== "function") return;
+    var sizer = overlay.querySelector(".pr-sizer");
+    var stage = overlay.querySelector(".pr-stage");
+    var deck = overlay.querySelector(".present");
+    if (!sizer || !stage || !deck || !sizer.style || !stage.style || !stage.classList) return;
+    var vw = overlay.clientWidth, vh = overlay.clientHeight;
+    if (typeof vw !== "number" || !vw || !vh) return;
+    // the slide's own height, without the stage's minimum
+    stage.classList.add("pr-measuring");
+    var natural = deck.offsetHeight;
+    stage.classList.remove("pr-measuring");
+    var f = story2._presentFit(vw, vh, natural);
+    stage.style.height = f.height + "px";
+    stage.style.transform = "scale(" + f.scale + ")";
+    sizer.style.width = STAGE_W * f.scale + "px";
+    sizer.style.height = f.height * f.scale + "px";
+    sizer.style.marginTop = Math.max(0, (vh - f.height * f.scale) / 2) + "px";
+    if (overlay.classList) overlay.classList.toggle("pr-scrolls", f.scrolls);
+  }
+
+  /** Show the controls, and fade them again after IDLE_MS without the mouse
+   *  moving. The cursor goes with them, so it never sits on a projected slide. */
+  function wakePresent() {
+    var overlay = document.getElementById("present-overlay");
+    if (!overlay || !overlay.classList) return;
+    overlay.classList.remove("pr-idle");
+    if (typeof global.setTimeout !== "function") return;
+    if (idleTimer) global.clearTimeout(idleTimer);
+    idleTimer = global.setTimeout(function () {
+      if (presenting) overlay.classList.add("pr-idle");
+    }, IDLE_MS);
+  }
+
+  /** Full screen is the reader's choice, never automatic: on Teams the window
+   *  being shared must stay the window it was. The whole page goes full screen,
+   *  so an Explore detour and Back stay full screen too. */
+  function canFullscreen() {
+    var root = document.documentElement;
+    return !!(root && typeof root.requestFullscreen === "function");
+  }
+  function toggleFullscreen() {
+    if (!canFullscreen()) return;
+    if (document.fullscreenElement) {
+      if (typeof document.exitFullscreen === "function") document.exitFullscreen();
+    } else {
+      var p = document.documentElement.requestFullscreen();
+      if (p && typeof p.catch === "function") p.catch(function () { /* refused */ });
     }
   }
 
@@ -1204,7 +1292,16 @@
   }
 
   function presentKeys(e) {
-    if (e.key === "Escape") { closePresent(); return; }
+    if (e.key === "Escape") {
+      // the first Esc in full screen only leaves full screen (a browser that
+      // keeps that Esc to itself gets the same result); the next closes Present
+      if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+        document.exitFullscreen();
+        return;
+      }
+      closePresent();
+      return;
+    }
     // Space on the focused Explore button presses it; it must not also move
     // the slide (the redraw would remove the button before it is pressed)
     if (e.target && e.target.closest && e.target.closest("[data-explore]")) return;
@@ -1220,10 +1317,16 @@
 
   function closePresent() {
     document.removeEventListener("keydown", presentKeys);
+    if (typeof global.removeEventListener === "function") {
+      global.removeEventListener("resize", fitPresent);
+    }
+    if (idleTimer && typeof global.clearTimeout === "function") global.clearTimeout(idleTimer);
+    idleTimer = null;
     presenting = false;
     var overlay = document.getElementById("present-overlay");
     overlay.hidden = true;
     overlay.innerHTML = "";
+    if (overlay.classList) overlay.classList.remove("pr-idle", "pr-scrolls");
     setSlide(null);
   }
 
@@ -1231,9 +1334,13 @@
     var overlay = document.getElementById("present-overlay");
     var item = load()[presentAt];
     if (!item) { closePresent(); return; }
-    var head = '<div class="pr-head"><span>' + (presentAt + 1) + " / " + load().length +
-      " · " + fmt.escapeHtml(TR.AGG.project.name) + "</span>" +
-      '<button id="pr-close" aria-label="Exit presentation">✕ esc</button></div>';
+    var total = load().length;
+    var head = '<div class="pr-head pr-chrome"><span>' + (presentAt + 1) + " / " + total +
+      " · " + fmt.escapeHtml(TR.AGG.project.name) + "</span><span>" +
+      (canFullscreen() ? '<button type="button" data-pr-fullscreen>' +
+        TR.txt.block(document.fullscreenElement ? "story.present.exit_fullscreen"
+          : "story.present.fullscreen", null, { tag: "span" }) + "</button>" : "") +
+      '<button id="pr-close" aria-label="Exit presentation">✕ esc</button></span></div>';
     var body;
     if (item.kind === "divider") {
       body = '<div class="pr-divider"><h1>' + fmt.escapeHtml(item.title) + "</h1>" +
@@ -1303,10 +1410,17 @@
         quoteBlockHtml(item);
     }
     overlay.hidden = false;
-    overlay.innerHTML = '<div class="present">' + head + body +
-      '<div class="pr-foot">← → to navigate · Esc to exit</div></div>';
+    // sizer (the stage's size on screen, so the overlay scrolls a slide taller
+    // than the window) > stage (fixed logical 16:9, scaled) > the slide
+    overlay.innerHTML = '<div class="pr-sizer"><div class="pr-stage">' +
+      '<div class="pr-progress"><span style="width:' +
+      (100 * (presentAt + 1) / total).toFixed(2) + '%"></span></div>' +
+      '<div class="present' + (item.kind === "divider" ? " pr-is-divider" : "") + '">' +
+      head + '<div class="pr-body">' + body + "</div>" +
+      '<div class="pr-foot pr-chrome">← → to navigate · Esc to exit</div></div></div></div>';
     overlay.querySelector("#pr-close").addEventListener("click", closePresent);
     wireOverlay(overlay);
+    fitPresent();
     setSlide(presentAt + 1);
   }
 
@@ -1315,8 +1429,18 @@
   function wireOverlay(overlay) {
     if (wiredOverlay === overlay) return;
     wiredOverlay = overlay;
+    // the controls come back when the mouse moves; a picture that finishes
+    // loading changes the slide's height, so the stage is fitted again
+    overlay.addEventListener("mousemove", wakePresent);
+    overlay.addEventListener("load", fitPresent, true);
+    if (typeof document.addEventListener === "function") {
+      document.addEventListener("fullscreenchange", function () {
+        if (presenting) renderPresent();   // the button's label follows
+      });
+    }
     overlay.addEventListener("click", function (e) {
       var t = e.target;
+      if (t && t.closest && t.closest("[data-pr-fullscreen]")) toggleFullscreen();
       if (t && t.closest && t.closest("[data-explore]")) story2.explore();
     });
   }

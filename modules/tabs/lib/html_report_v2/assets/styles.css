@@ -509,9 +509,31 @@ table.ws td.sparkcell { padding: 1px 8px; }
    anyway, and the deck then looks like the rest of the report. Every colour
    below is a token. No present-only palette to keep in step. */
 #present-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 300; overflow: auto; }
-.present { max-width: 1240px; margin: 0 auto; padding: 26px 40px; color: var(--ink); }
-.pr-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 22px; }
-.pr-head button { background: var(--card); border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 4px 12px; cursor: pointer; }
+/* One fixed 16:9 stage (1280 x 720 logical pixels), scaled to the window by
+   fitPresent (30_story.js). The sizer takes the stage's size on screen, so a
+   slide taller than the window still scrolls. A slide shorter than the stage
+   keeps the stage's height, its foot at the bottom. */
+.pr-sizer { position: relative; margin: 0 auto; }
+.pr-stage { position: absolute; top: 0; left: 0; width: 1280px; transform-origin: 0 0; }
+.present { box-sizing: border-box; width: 1280px; min-height: 720px; padding: 22px 44px 18px; color: var(--ink); display: flex; flex-direction: column; }
+.pr-measuring .present { min-height: 0; }
+.pr-body { flex: 1 0 auto; }
+/* a section divider sits in the middle of the stage */
+.pr-is-divider .pr-body { display: flex; flex-direction: column; justify-content: center; }
+/* progress through the story: a thin brand line across the top of the stage */
+.pr-progress { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--line); }
+.pr-progress span { display: block; height: 100%; background: var(--brand); }
+.pr-head { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+.pr-head button { background: var(--card); border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 4px 12px; cursor: pointer; margin-left: 8px; font: inherit; }
+/* The controls fade when the mouse rests (and the cursor with them), so a
+   projected or shared slide shows only the slide; they return when the mouse
+   moves or a control takes the keyboard focus (not a mouse click's focus) */
+.pr-chrome, .pr-explore { transition: opacity .35s; }
+#present-overlay.pr-idle { cursor: none; }
+#present-overlay.pr-idle .pr-chrome, #present-overlay.pr-idle .pr-explore { opacity: 0; }
+#present-overlay.pr-idle .pr-chrome:has(:focus-visible), #present-overlay.pr-idle .pr-explore:focus-visible { opacity: 1; }
+/* a chart fills the width it reads well at, never the whole stage */
+.pr-stage .pr-chart svg { display: block; max-width: 900px; margin: 0 auto; }
 .present h1 { font-size: 26px; margin-bottom: 6px; color: var(--brand); }
 .pr-ctx { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
 /* Explore on a question slide (30_story.js, renderPresent) */
@@ -659,6 +681,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .divider-title { letter-spacing: 1px; text-transform: uppercase; font-size: 13px; color: var(--brand); }
 .pr-divider { text-align: center; padding: 120px 0; }
 .pr-divider h1 { font-size: 40px; }
+/* on the Present stage a divider is centred by the stage, not by padding */
+.pr-stage .pr-divider { padding: 0 0 40px; }
+.pr-stage .pr-divider h1 { font-size: 48px; }
+.pr-stage .pr-divider .pr-ctx { font-size: 17px; }
 .rpt-sec-card { position: relative; }   /* anchors the absolute snap-pin */
 .rpt-field { display: flex; gap: 10px; align-items: center; margin: 7px 0; }
 .rpt-field label { width: 200px; font-size: 12px; font-weight: 600; color: var(--muted); }

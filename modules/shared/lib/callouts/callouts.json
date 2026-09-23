@@ -797,6 +797,18 @@
       "context": "Present, question slide, opens the question in Crosstabs",
       "page": "Story"
     },
+    "story.present.fullscreen": {
+      "title": "Story: Present full screen",
+      "text": "Full screen",
+      "context": "Present, top right, takes the page full screen",
+      "page": "Story"
+    },
+    "story.present.exit_fullscreen": {
+      "title": "Story: leave full screen",
+      "text": "Exit full screen",
+      "context": "Present, top right while full screen, leaves full screen",
+      "page": "Story"
+    },
     "filter.weighting.summary": {
       "title": "Weighted data: summary line",
       "text": "⚖ Weighted data. Figures represent the population, not the raw sample. How the three bases work ▸",
