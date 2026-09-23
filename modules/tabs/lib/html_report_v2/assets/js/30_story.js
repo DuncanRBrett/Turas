@@ -848,22 +848,42 @@
   };
 
   /** The pinned question in the crosstabs with the pin's banner and filters. */
-  function openPin(item) {
+  function openPin(item, code) {
     TR.d2.state.filters = JSON.parse(JSON.stringify(item.filters || []));
     TR.filterBar.render();
-    TR.shell.goQuestion(item.q, item.banner);
+    TR.shell.goQuestion(code || item.q, item.banner);
+  }
+
+  /** The question Explore opens from a slide, or null where there is none: a
+   *  question pin's own, or the one question a trend or tracking exhibit is
+   *  about (TR.exhibit.exploreCode). Only a question the report carries. */
+  function exploreCodeFor(item) {
+    if (!item) return null;
+    if (item.kind === "question") return modelFor(item) ? item.q : null;
+    if (item.kind !== "exhibit" || !TR.exhibit || !TR.exhibit.exploreCode) return null;
+    var code = TR.exhibit.exploreCode(item);
+    return code && TR.d2.questionByCode(code) ? code : null;
+  }
+
+  /** The Explore button for a slide ("" when the slide has no one question). */
+  function exploreButtonHtml(item) {
+    return exploreCodeFor(item)
+      ? '<button type="button" class="pr-explore" data-explore>' +
+        TR.txt.block("story.explore", null, { tag: "span" }) + "</button>" : "";
   }
 
   /**
-   * Explore, from a question slide in Present: the pinned question in the
-   * crosstabs with the pin's banner and filters, under a return point to this
-   * slide, so Back reopens Present here.
+   * Explore, from a question slide in Present, or from a trend or tracking
+   * slide about one question: that question in the crosstabs with the pin's
+   * banner and filters, under a return point to this slide, so Back reopens
+   * Present here.
    */
   story2.explore = function () {
     var item = load()[presentAt];
-    if (!presenting || !item || item.kind !== "question" || !modelFor(item)) return;
+    var code = presenting ? exploreCodeFor(item) : null;
+    if (!code) return;
     story2.leavePresent();
-    openPin(item);
+    openPin(item, code);
   };
 
   /** Open Present at slide index i (clamped to the story). */
@@ -1369,6 +1389,8 @@
       body = "<h1>" + fmt.escapeHtml(TR.exhibit.titleFor(item, exModels)) + "</h1>" +
         '<p class="pr-ctx">' +
         fmt.escapeHtml(TR.exhibit.slideContext(item, exModels)) + "</p>" +
+        // Explore: the exhibit's question in the crosstabs, as on a question slide
+        exploreButtonHtml(item) +
         // the insight in its callout box: the pin's note, else the question's
         (TR.exhibit.noteFor(item) ? '<div class="pr-note">' +
           fmt.escapeHtml(TR.exhibit.noteFor(item)) + "</div>" : "") +
@@ -1418,8 +1440,7 @@
       body = "<h1>" + fmt.escapeHtml(model.code + ": " + (item.title || model.title)) + "</h1>" +
         '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</p>" +
         // Explore: the question in the crosstabs, under a return point here
-        '<button type="button" class="pr-explore" data-explore>' +
-        TR.txt.block("story.explore", null, { tag: "span" }) + "</button>" +
+        exploreButtonHtml(item) +
         ((flags.insight !== false && (item.note || TR.insights.get(item.q, item.banner))) ?
           '<div class="pr-note">' +
           fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner)) + "</div>" : "") +

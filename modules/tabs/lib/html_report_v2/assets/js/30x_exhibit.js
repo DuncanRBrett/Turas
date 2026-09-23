@@ -530,6 +530,23 @@
   };
 
   /**
+   * The one question an exhibit is about, for Explore on its slide: the code
+   * when every question it draws is the same one (a distribution + trend pin,
+   * or a pinned tracking view of one question's segments), else null (a
+   * composite has no single table to open).
+   */
+  exhibit.exploreCode = function (item) {
+    var codes = [];
+    (item && item.qs ? item.qs : []).forEach(function (c) {
+      if (codes.indexOf(c) === -1) codes.push(c);
+    });
+    (item && item.series ? item.series : []).forEach(function (e) {
+      if (e && e.code && codes.indexOf(e.code) === -1) codes.push(e.code);
+    });
+    return codes.length === 1 ? codes[0] : null;
+  };
+
+  /**
    * The context line on a Present slide, for a room rather than an analyst:
    * who the chart shows and how many answered ("Total (n = 500)"), instead of
    * the banner and the history source. The banner means nothing on a slide

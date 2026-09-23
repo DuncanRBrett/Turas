@@ -17,6 +17,9 @@
  *    in one captioned exhibit card.
  * E6 The slide's context line says who is charted and how many answered,
  *    never the banner and history source the Story card shows an analyst.
+ * E7 A trend or tracking slide about one question has Explore, as a question
+ *    slide does: that question's table with the pin's banner and filters,
+ *    under a return point to the slide. A composite has none.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/present_exhibit_tests.mjs
  */
@@ -239,6 +242,55 @@ run("E6: who is charted and how many; other columns note the trend is Total", ()
   const composite = Object.assign({}, pin, { qs: ["Q07", "Q08"] });
   eq(TR.exhibit.slideContext(composite, [model, model]),
     TR.exhibit.contextLine(composite, [model, model]), "a composite keeps the analyst line");
+});
+
+/* ---------------- E7: Explore from a trend or tracking slide --------------- */
+
+run("E7: the one question an exhibit is about; none for a composite", () => {
+  const TR = sandbox({}).TR;
+  eq(TR.exhibit.exploreCode({ qs: ["Q07"] }), "Q07", "distribution + trend");
+  eq(TR.exhibit.exploreCode({ qs: ["Q07"], series: [{ code: "Q07", seg: "total" },
+    { code: "Q07", seg: "academic" }] }), "Q07", "a tracking view of one question's segments");
+  eq(TR.exhibit.exploreCode({ qs: ["Q07", "Q08"] }), null, "a composite");
+  eq(TR.exhibit.exploreCode({ qs: ["Q07"], series: [{ code: "Q07" }, { code: "Q08" }] }), null,
+    "a tracking view across questions");
+});
+
+run("E7: Explore on the slide opens the question's table under a return point", () => {
+  const model = q07Model([meanRow("Mean", [4.2, 4.2, 4.1], 4.2)], 5);
+  const sb = sandbox({ model, questions: { Q07: { code: "Q07" } } });
+  const TR = sb.TR;
+  const clicks = [];
+  const overlay = { hidden: true, innerHTML: "", clientWidth: 1920, clientHeight: 1080,
+    scrollTop: 0, classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    addEventListener(type, fn) { if (type === "click") clicks.push(fn); },
+    querySelector: (s) => (s === "#pr-close" ? { addEventListener() {} } : null) };
+  sb.addEventListener = () => {};
+  sb.removeEventListener = () => {};
+  sb.setTimeout = () => 1;
+  sb.clearTimeout = () => {};
+  sb.document = { documentElement: {}, fullscreenElement: null,
+    getElementById: (id) => (id === "present-overlay" ? overlay : null),
+    addEventListener() {}, removeEventListener() {} };
+  const pin = (qs) => ({ kind: "exhibit", qs: qs, banner: "Dept", filters: [{ q: "Region" }],
+    flags: { dist: true, trend: true, table: false, insight: true, comments: false },
+    distType: "bar", chartKind: "summary", note: "" });
+  TR.userState = { story: [pin(["Q07"]), pin(["Q07", "Q08"])] };
+  let opened = null, left = null;
+  TR.shell = { toast() {}, goQuestion: (code, banner) => { opened = [code, banner]; },
+    returnPoint: { current: () => null, stay() {}, leave: (o) => { left = o; return true; } } };
+  TR.filterBar = { render() {} };
+  TR.exporter = {};
+  load(sb, "30_story.js");
+  TR.story2.presentFrom(0);
+  assert(overlay.innerHTML.indexOf("data-explore") !== -1, "the trend slide has Explore");
+  clicks.forEach((fn) => fn({ target: { closest: (s) => (s === "[data-explore]" ? {} : null) } }));
+  eq(left, { kind: "present", at: 0 }, "a return point to this slide");
+  eq(opened, ["Q07", "Dept"], "the question's table, with the pin's banner");
+  eq(JSON.parse(JSON.stringify(TR.d2.state.filters)), [{ q: "Region" }], "and the pin's filters");
+  assert(overlay.hidden, "Present closed for the detour");
+  TR.story2.presentFrom(1);
+  assert(overlay.innerHTML.indexOf("data-explore") === -1, "a composite slide has none");
 });
 
 console.log((failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
