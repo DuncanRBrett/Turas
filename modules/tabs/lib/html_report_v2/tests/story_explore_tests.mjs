@@ -300,14 +300,19 @@ run("(2) Explore opens the slide showing, after moving through the story", () =>
   eq(w.TR.shell.returnPoint.current(), { kind: "present", at: 2 }, "a return point to slide 3");
 });
 
-run("(2) Explore while a return point is already open keeps the first", () => {
+// Starting Present is a new context, not a detour: a point left open from
+// before closes, so Back from Explore returns to the slide (review finding I1,
+// 23 Sep 2026). A detour started while one is open still keeps the first
+// (narrative_links_tests L2).
+run("(2) Starting Present closes an older return point, so Explore's Back is the slide", () => {
   const w = sandbox();
   go(w, "report");
   w.TR.shell.returnPoint.leave();
   go(w, "story");
   w.TR.story2.presentFrom(1);
+  eq(w.TR.shell.returnPoint.current(), null, "the Report tab point closed as Present opened");
   w.TR.story2.explore();
-  eq(w.TR.shell.returnPoint.current(), { kind: "report" }, "Back still goes to the Report tab");
+  eq(w.TR.shell.returnPoint.current(), { kind: "present", at: 1 }, "Back goes to the slide");
   eq(w.TR.d2.state.activeQ, "Q1", "the detour still opened the question");
 });
 

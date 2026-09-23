@@ -37,6 +37,9 @@
   // this long without the mouse moving, and return when it moves
   var IDLE_MS = 2200;
   var idleTimer = null;
+  // The slide last drawn, so a new slide opens at its top while a redraw of
+  // the same slide (full screen toggled) keeps its scroll
+  var renderedAt = null;
 
   function load() {
     if (items) return items;
@@ -1202,6 +1205,12 @@
     if (!n) { setSlide(null); return; }
     if (typeof at === "number" && !isNaN(at)) presentAt = at;
     presentAt = Math.max(0, Math.min(presentAt, n - 1));
+    // Starting a presentation is a new context: a return point still open from
+    // an earlier detour would otherwise win over the slide (the first point is
+    // kept), and Back from a link or Explore would leave Present for it. Back
+    // itself clears its point before it reopens Present, so this never drops
+    // the point being returned to.
+    if (!presenting) dropStaleReturnPoint();
     renderPresent();
     if (!presenting) {
       presenting = true;
@@ -1211,6 +1220,12 @@
       }
       wakePresent();
     }
+  }
+
+  /** Close any return point left open when Present starts (startPresent). */
+  function dropStaleReturnPoint() {
+    var rp = TR.shell && TR.shell.returnPoint;
+    if (rp && typeof rp.current === "function" && rp.current()) rp.stay();
   }
 
   /**
@@ -1305,6 +1320,9 @@
     // Space on the focused Explore button presses it; it must not also move
     // the slide (the redraw would remove the button before it is pressed)
     if (e.target && e.target.closest && e.target.closest("[data-explore]")) return;
+    // the same for Space on the other controls (Full screen, exit)
+    if (e.key === " " && e.target && e.target.closest &&
+        e.target.closest("#present-overlay button")) return;
     if (e.key === "ArrowRight" || e.key === " ") {
       presentAt = Math.min(presentAt + 1, load().length - 1);
       renderPresent();
@@ -1323,6 +1341,7 @@
     if (idleTimer && typeof global.clearTimeout === "function") global.clearTimeout(idleTimer);
     idleTimer = null;
     presenting = false;
+    renderedAt = null;
     var overlay = document.getElementById("present-overlay");
     overlay.hidden = true;
     overlay.innerHTML = "";
@@ -1421,6 +1440,10 @@
     overlay.querySelector("#pr-close").addEventListener("click", closePresent);
     wireOverlay(overlay);
     fitPresent();
+    // the overlay is the scroller and outlives each slide, so without this the
+    // next slide inherits the last one's offset and opens with its top hidden
+    if (renderedAt !== presentAt) overlay.scrollTop = 0;
+    renderedAt = presentAt;
     setSlide(presentAt + 1);
   }
 

@@ -14,6 +14,10 @@
  *    listener installed when Present opens and removed when it closes.
  * P4 The controls fade after the idle time and return when the mouse moves.
  * P5 Full screen is a button, only where the browser offers it; it toggles.
+ * P6 Starting Present closes a return point left open by an earlier detour,
+ *    so Back from a slide's link or Explore returns to the slide.
+ * P7 A new slide opens at its top; a redraw of the same slide keeps its scroll.
+ * P8 Space on a focused control presses it and does not move the slide.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/present_stage_tests.mjs
  */
@@ -70,7 +74,7 @@ function overlay(vw, vh, contentH) {
     get: () => (stage.classList.contains("pr-measuring") ? o.contentH : Math.max(720, o.contentH))
   });
   const o = {
-    hidden: true, innerHTML: "", clientWidth: vw, clientHeight: vh, contentH,
+    hidden: true, innerHTML: "", clientWidth: vw, clientHeight: vh, contentH, scrollTop: 0,
     classList: classList(), listeners, stage, sizer,
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     querySelector(sel) {
@@ -125,12 +129,15 @@ function sandbox(opts) {
     { kind: "divider", title: "Next", note: "" }] };
   TR.d2 = { storeKey: (b) => b + ":p", state: { tab: "story", filters: [] },
     questionByCode: () => null, tracking: () => ({ enabled: false }) };
-  TR.shell = { toast: () => {} };
+  // a return point with the shell's current/stay contract (24_shell.js)
+  const rp = { open: opts.returnPoint || null, stays: 0 };
+  TR.shell = { toast: () => {}, returnPoint: {
+    current: () => rp.open, stay: () => { rp.stays++; rp.open = null; } } };
   TR.insights = { get: () => "" };
   TR.model = { forQuestion: () => null };
   TR.exporter = {};
   load(sb, "30_story.js");
-  return { sb, TR, ov, winListeners, docListeners, timers, fs };
+  return { sb, TR, ov, winListeners, docListeners, timers, fs, rp };
 }
 
 const click = (w, sel) => (w.ov.listeners.click || []).forEach((fn) => fn({
@@ -280,6 +287,59 @@ run("P5: no full screen button where the browser has none", () => {
   w.TR.story2.presentFrom(0);
   assert(w.ov.innerHTML.indexOf("data-pr-fullscreen") === -1, "no button");
   at(w.ov.innerHTML, 'id="pr-close"', "the exit stays");
+});
+
+/* ---------------- P6: a stale return point never outranks the slide -------- */
+
+run("P6: starting Present closes a return point left open by an earlier detour", () => {
+  const w = sandbox({ returnPoint: { kind: "report" } });
+  w.TR.story2.presentFrom(0);
+  eq([w.rp.open, w.rp.stays], [null, 1], "the Report tab point is gone");
+  w.rp.open = { kind: "present", at: 0 };
+  w.TR.story2.presentFrom(1);
+  eq(w.rp.stays, 1, "moving between slides while presenting leaves a point alone");
+  const again = sandbox({ returnPoint: { kind: "present", at: 3 } });
+  again.TR.story2.presentFrom(0);
+  eq(again.rp.open, null, "pressing Present again mid-detour restarts: the old point goes");
+  const n = sandbox({});
+  n.TR.story2.presentFrom(0);
+  eq(n.rp.stays, 0, "nothing to close, nothing closed");
+});
+
+/* ---------------- P7: each slide opens at its top --------------------------- */
+
+run("P7: a new slide opens at its top; the same slide redrawn keeps its scroll", () => {
+  const w = sandbox({ vw: 1280, vh: 720, contentH: 950 });
+  w.TR.story2.presentFrom(0);
+  w.ov.scrollTop = 200;
+  const key = (k) => (w.docListeners.keydown || []).slice()
+    .forEach((fn) => fn({ key: k, target: null }));
+  key("ArrowRight");
+  eq(w.ov.scrollTop, 0, "ArrowRight: the next slide starts at the top");
+  w.ov.scrollTop = 120;
+  key("ArrowLeft");
+  eq(w.ov.scrollTop, 0, "ArrowLeft too");
+  w.ov.scrollTop = 80;
+  w.sb.document.fullscreenElement = {};
+  (w.docListeners.fullscreenchange || []).forEach((fn) => fn());
+  eq(w.ov.scrollTop, 80, "entering full screen redraws the same slide in place");
+});
+
+/* ---------------- P8: Space presses a focused control ----------------------- */
+
+run("P8: Space on a focused control presses it; elsewhere it moves the slide", () => {
+  const w = sandbox({});
+  w.TR.story2.presentFrom(0);
+  const on = (sel) => ({ closest: (s) => (s === sel ? {} : null) });
+  const key = (k, target) => (w.docListeners.keydown || []).slice()
+    .forEach((fn) => fn({ key: k, target }));
+  key(" ", on("#present-overlay button"));
+  eq(w.TR.d2.state.slide, 1, "Space on Full screen or exit: the slide stays");
+  key("ArrowRight", on("#present-overlay button"));
+  eq(w.TR.d2.state.slide, 2, "an arrow still moves, focus or not");
+  w.TR.story2.presentFrom(0);
+  key(" ", on("body"));
+  eq(w.TR.d2.state.slide, 2, "Space with nothing focused moves the slide");
 });
 
 console.log((failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");

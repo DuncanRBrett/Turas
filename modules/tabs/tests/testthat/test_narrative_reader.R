@@ -357,6 +357,31 @@ fx_run_props <- function(text, props) {
   sprintf('<w:r><w:rPr>%s</w:rPr><w:t xml:space="preserve">%s</w:t></w:r>', props, fx_esc(text))
 }
 
+test_that("a Turas link on nothing but spaces is no link, and the console counts it as dropped", {
+  rels <- paste0(
+    '<Relationship Id="rQ1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="turas:Q1" TargetMode="External"/>',
+    '<Relationship Id="rQ2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="turas:Q2" TargetMode="External"/>')
+  body <- paste0(
+    fx_par(fx_run("Findings"), style = "berschrift1"),
+    # a space-only link mid-sentence, and one at the end the trim removes
+    fx_par(fx_run("Awareness"), fx_link("rQ1", fx_link_run(" ")), fx_run("rose.")),
+    fx_par(fx_run("Usage held."), fx_link("rQ2", fx_link_run(" "))),
+    # a real link split over two runs, one of them only a space, still links
+    fx_par(fx_link("rQ2", fx_link_run("usage"), fx_link_run(" ")), fx_run("is flat.")))
+  path <- tempfile(fileext = ".docx")
+  on.exit(unlink(path), add = TRUE)
+  write_narrative_docx(path, body, doc_rels = rels)
+  screens <- read_quietly(path)
+  blocks <- screens[[1]]$blocks
+  expect_identical(blocks[[1]]$runs, list(run("Awareness rose.")))
+  expect_identical(blocks[[2]]$runs, list(run("Usage held.")))
+  expect_identical(blocks[[3]]$runs, list(link_run("usage ", "Q2"), run("is flat.")))
+  expect_identical(attr(screens, "ignored")[["hyperlinks"]], 2L)
+  console <- paste(attr(screens, "console"), collapse = "\n")
+  expect_true(grepl("[INFO] Narrative file: 1 Turas link kept, to Q2.", console, fixed = TRUE))
+  expect_false(grepl("kept, to .", console, fixed = TRUE))
+})
+
 test_that("only a turas: address is a Turas link, read case-blind, trimmed and decoded", {
   targets <- c(rA = "TURAS: Q7 ", rB = "turas:Q%5F1", rC = "turas:", rD = "https://example.org",
                rE = "mailto:a@b.c")

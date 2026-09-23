@@ -47,6 +47,8 @@ anywhere, and brings them back.
   current view.
 - One return point at a time. A detour started while one is open keeps the
   first return point, so "Back" always goes to where the reader first left.
+  Starting Present is not a detour: it closes any point left open, so Back
+  from a slide always returns to the slide (review finding I1, 23 Sep 2026).
 - It lives in memory for the page's life. A reload drops it. It is never
   written to localStorage and never travels in a saved copy.
 
