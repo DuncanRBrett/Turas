@@ -99,6 +99,25 @@ to the gitignored `build/` and carry client data: never commit them.
    student runs unweighted.
 9. **Version 1 scope**: effort table, scenarios, Build a student, Rate as one
    student, diagnostics. No brand support, no wave backtest.
+10. **Build a student never offers an impossible combination** (Duncan, 23 Sep
+   2026): no Masters student on the Bachelor of Social Work. Only STRUCTURAL
+   traits are constrained: those set by how the programme or business is
+   organised (course, year of study, campus, full or part time; for CCPB, sales
+   office within centre, sales method with outlet size). Personal traits (age,
+   gender, race, income) are never blocked: a combination nobody in the sample
+   has is shown with the "no real students like this" note, not refused.
+   Measured on SACAP 2025: 56 of 90 course by year cells are empty, almost all
+   by design (Masters exists only for MSocSci, all 21 Masters students; Honours
+   only for the three honours programmes; the higher certificates only have
+   first-years). A plain "never seen together" rule over-blocks: of 64 empty
+   pairs where one side has 20+ students, 44 are among structural traits and
+   look right, while 20 involve age or gender and include possible people (no
+   male Masters student answered, yet one could exist). Chance cannot settle it
+   either: Masters with Social Work would only be expected 1.2 times at random.
+   So the rules are derived from the data for structural traits only, shown in
+   preflight, and confirmed or edited by Duncan in the config. The 2026 SACAP
+   student list holds only student number, name and email, so it cannot supply
+   the rules.
 
 **Still open, for Duncan before session 5:** whether the SACAP deliverable is
 open or client-safe. Notes from early September say SACAP's report has shipped
@@ -166,6 +185,8 @@ Verification bar:
   prototype's main fit exactly (all students, value for money: slip -26.3, lift
   to Good +14.1, from `study_sacap.py`). Bootstrap ranges match within noise.
 - With baselines on: the calibration table re-measured, unweighted.
+- The profile model is never asked about an impossible combination: a test
+  that the engine refuses one the Structure rules block.
 
 Starting prompt:
 > Read docs/v2_lift/BRIEF_WHATIF_SIMULATOR.md sections 1 to 6 and
@@ -181,10 +202,15 @@ to band it, unit noun, weight variable, minimum group, reliability floor, profil
 builder on or off, bootstrap count), Levers (label, question codes averaged into
 it, kind, what counts as having the service, fix target, expected direction,
 include or symptom), Profile (questions in sentence order with the words
-between), Filters and Crossings, Bundles. Labels, scales and routing come from
+between, and which of them are structural), Structure (the allowed
+combinations of structural traits, decision 10), Filters and Crossings,
+Bundles. Labels, scales and routing come from
 Survey_Structure. A preflight flags rating questions correlating above about
 0.7, routed questions (suggest nested), likely symptoms (contact, complaints,
-switching), and a lever whose sign is unstable.
+switching), a lever whose sign is unstable, and the proposed Structure
+rules: every pair of structural levels never seen together where one side has
+20 or more respondents, listed for Duncan to confirm, with personal traits
+excluded.
 
 Verification bar: SACAP 2025 and CCPB 2026 expressed as configs, and both runs
 reproduce the session 1 numbers. Every config error is a TRS refusal with a fix.
@@ -197,6 +223,12 @@ the Read group. In records mode the tab is LIVE: the group is the report's own
 audience filter, and lever answers come from the respondent data the report
 already carries, so the island adds only the model. In none mode it shows the
 whole sample and each banner column.
+
+Build a student honours the Structure rules: once a structural level is
+chosen, levels that cannot go with it are not offered; if a change makes the
+current choice impossible, switch it to the allowed level most respondents
+have and say so in the note. "Show a random student" only produces allowed
+combinations.
 
 Decide and record: how Pin and the Story tab capture a panel that changes with
 the filter; what happens when a lever question is not in the respondent data
@@ -212,7 +244,9 @@ The secondary suppression and nesting check go into the shared disclosure layer
 (`modules/shared/lib/`), not into the module, so tabs can use them later. The
 engine precomputes results for the slices the cube publishes, at the same
 minimum. The release audit learns the simulator island. The profile builder
-rules from decision 7.
+rules from decision 7, and the client-safe "Show a random student", which draws
+traits one at a time, draws them in an order that respects the Structure rules
+(the prototype draws them independently and can produce an impossible student).
 
 Verification bar: the prototype's SACAP counts at minimum 5 reproduced (291
 groups; campus by course 38 of 53 shown; 3 cells hidden by the nesting check);

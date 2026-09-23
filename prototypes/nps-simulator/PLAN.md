@@ -423,6 +423,14 @@ purchase, category entry points, a female-only panel sample. What changes:
 - A tracker is where the backtest becomes real: did brands whose links moved
   between waves move in attitude as predicted?
 
+## No impossible students (Duncan, 23 Sep 2026)
+
+Build a student must not offer an impossible combination, such as a Masters
+student on the Bachelor of Social Work. Constrain structural traits only (course,
+year, campus, full or part time), from data-derived rules Duncan confirms in the
+config; never block personal traits. Numbers and the design are in the build
+brief, decision 10. The prototype pages do not do this yet.
+
 ## Prompts to direct the next session
 
 1. "Read prototypes/nps-simulator/PLAN.md and the catdriver module. Recommend
