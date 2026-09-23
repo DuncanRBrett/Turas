@@ -465,6 +465,33 @@ Baking: 250 people, 11 brands, 2,358 person-brand pairs with an opinion
 So a brand What if is feasible, but it should lead with mental availability
 (links in total, and where IPK trails the category), with single links as detail.
 
+## IPK Baking Mixes What if sub-tab (built 23 Sep 2026)
+
+`whatif_brand.py` and `template_whatif_brand.html`: a "What if" sub-tab beside
+Mental Availability, Brand and Buying, Brand Meaning and Audience, styled after
+the brand report. The fit checks itself against the report and stops if IPK's
+mental penetration and network size differ from it (60%, 5.42: they match).
+
+- Headline: committed now, mental penetration, network size and image links, each
+  with the category average; then three what-ifs for the focal brand: one more
+  entry-point link each (+2.6 points committed share for IPK, range +1.7 to +3.8),
+  one more image link each (+3.3), and match the category average wherever the
+  brand trails (+5.0, +4.1 to +6.0).
+- Link by link: the brand against the average brand on every link, the gap, and
+  10 in 100 more (or fewer, for "is an expensive brand"). 12 of 23 single links
+  point the wrong way in more than 1 refit in 10 and are greyed.
+- Build a scenario: combine link changes and the three totals; worked out person
+  by person for the audience.
+- Build a shopper: age, race, region (Western Cape, Gauteng, rest), income and
+  whether they bought the brand, from a separate model per brand.
+- Audience: age, race, region, income, and buyers or non-buyers of the focal brand.
+  Among IPK non-buyers (137 with an opinion, 46% committed), matching the category
+  where IPK trails is worth +11.5 points: the acquisition lever is where the room is.
+- Any brand can be the focal brand. Snowflake leads on every link, so "match the
+  category" shows 0 for it.
+- Not yet tested: whether a link is worth the same for every brand (the model
+  assumes it).
+
 ## Prompts to direct the next session
 
 1. "Read prototypes/nps-simulator/PLAN.md and the catdriver module. Recommend

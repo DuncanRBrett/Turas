@@ -21,3 +21,11 @@ for safe in sorted((HERE / "build").glob("whatif_*_safe.json")):
         out = HERE / "build" / f"whatif_{sid}_mockup.html"
         out.write_text(tpl.read_text().replace("%%SAFE%%", safe.read_text()).replace("%%OPEN%%", opn.read_text()))
         print("wrote", out.name)
+
+# Brand What if mockups: one per brand study category.
+btpl = HERE / "template_whatif_brand.html"
+for data in sorted((HERE / "build").glob("whatif_brand_*.json")):
+    if btpl.exists():
+        out = HERE / "build" / (data.stem + "_mockup.html")
+        out.write_text(btpl.read_text().replace("%%DATA%%", data.read_text()))
+        print("wrote", out.name)

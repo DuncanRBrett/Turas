@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brand What If Mockup</title>
+<style>
+/* Styled after the Turas brand report (IPK Brand Health, 7 Sep 2026 build) so the tab reads as part of it. */
+:root{--navy:#1a2744;--ink:#111827;--muted:#6b7280;--faint:#9ca3af;--bg:#f5f4f0;--card:#ffffff;--line:#e5e7eb;--soft:#f3f4f6;--accent:#2E86C1;--committed:#1b6e53;--cond:#c9c3b6;--avoid:#b3372f;--warn-bg:#fdf3dc;--warn-fg:#7a5200;--mock:#7c3aed;--shadow:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.05);--font:"Inter",ui-sans-serif,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e7e9ee;--muted:#a2abb9;--faint:#7c8595;--bg:#15171c;--card:#1e2128;--line:#2f343e;--soft:#23262e;--cond:#5d5a53;--warn-bg:#3a2e12;--warn-fg:#f1cf8a}}
+:root[data-theme="dark"]{--ink:#e7e9ee;--muted:#a2abb9;--faint:#7c8595;--bg:#15171c;--card:#1e2128;--line:#2f343e;--soft:#23262e;--cond:#5d5a53;--warn-bg:#3a2e12;--warn-fg:#f1cf8a}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:13.5px;line-height:1.5}
+button,select{font-family:inherit}
+.mockbar{background:var(--mock);color:#fff;font-size:12px;padding:6px 16px}
+header{background:var(--navy);color:#fff;padding:18px 26px 16px;border-radius:0 0 14px 14px}
+.kicker{font-size:11px;letter-spacing:.16em;color:#aab3c8;text-transform:uppercase}
+header h1{margin:4px 0 10px;font-size:22px}
+.metaline{font-size:11.5px;color:#dfe4f0;display:flex;gap:12px;flex-wrap:wrap}
+.metaline span+span:before{content:"|";margin-right:12px;color:#6b7597}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--card);border-bottom:1px solid var(--line);padding:0 18px}
+nav.tabs button{border:0;background:transparent;padding:12px 14px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent}
+nav.tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+main{max-width:1180px;margin:0 auto;padding:18px 24px 60px}
+.catbar{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.lbl{font-size:10.5px;letter-spacing:.14em;color:var(--muted);font-weight:600;text-transform:uppercase}
+select{font-size:13px;color:var(--ink);background:var(--card);border:1px solid #d1d5db;border-radius:7px;padding:5px 8px;max-width:100%}
+.subtabs{display:flex;gap:6px;margin:16px 0 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.subtabs button{border:0;background:transparent;padding:9px 12px;font-size:13px;color:var(--faint);font-weight:600;cursor:pointer;border-bottom:2px solid transparent}
+.subtabs button.on{color:var(--ink);border-bottom-color:var(--ink)}
+.subtabs .new{font-size:9px;background:#CC9900;color:#1e1e1e;border-radius:6px;padding:1px 5px;margin-left:5px}
+.aud{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.aud .n{color:var(--muted);font-size:12px}
+.focal{background:#000;color:#fff;border-radius:10px;padding:13px 18px;display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.focal .pill{font-size:10px;letter-spacing:.14em;border:1px solid #666;border-radius:999px;padding:2px 8px}
+.focal b{font-size:19px}
+.focal span.cat{color:#cfcfcf}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+.card h2{margin:0 0 4px;font-size:16px}
+.card .lead{color:var(--muted);margin:0 0 12px}
+.cardhead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.acts{display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.tile{border:1px solid var(--line);border-left:4px solid #000;border-radius:10px;padding:12px 14px}
+:root[data-theme="dark"] .tile{border-left-color:#e7e9ee}
+.tile .t{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile .v{font-size:28px;font-weight:700;line-height:1.2;margin:4px 0}
+.tile .c{font-size:12px;color:var(--muted)}
+.tile .c b{color:var(--ink)}
+.tile .r{font-size:11.5px;color:var(--muted)}
+.tile.up .v{color:var(--committed)}
+.note{color:var(--muted);font-size:12px;margin:8px 0 0}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:8px;padding:8px 12px;margin-top:10px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--navy);color:#fff;text-transform:lowercase;font-weight:600;font-size:12px;padding:8px;text-align:left}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td small,.rng{display:block;font-size:11px;color:var(--muted)}
+tr.unclear td{color:var(--faint)}
+.tag{display:inline-block;font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 5px;margin-left:6px;color:var(--muted)}
+.gapbar{position:relative;height:12px;min-width:120px;background:var(--soft);border-radius:3px}
+.gapbar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.gapbar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:4px 26px;margin:10px 0 4px}
+.grid label{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:5px 0}
+.grid label span{color:var(--muted);flex:1;min-width:0}
+.grid label select{flex:none;width:170px}
+.grp{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:14px 0 0}
+.checks{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0}
+.checks label{display:flex;gap:6px;align-items:center}
+.scenres{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:14px}
+.scenres b{font-size:24px}
+.pline{position:relative;height:58px;margin:30px 14px 2px}
+.pline .track{position:absolute;top:27px;left:0;right:0;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--avoid),var(--cond) 45%,var(--committed))}
+.pline .tick{position:absolute;top:44px;font-size:10.5px;color:var(--faint);transform:translateX(-50%)}
+.pline .band{position:absolute;top:21px;height:16px;border-radius:8px;background:rgba(26,39,68,.16)}
+.pline .dotv{position:absolute;top:11px;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700}
+.pline .dotv.fill{background:var(--navy);color:#fff;z-index:2;box-shadow:0 0 0 3px var(--card)}
+:root[data-theme="dark"] .pline .dotv.fill{background:#8f93e0}
+.pline .dotv.hollow{background:var(--card);border:2px solid var(--ink);width:18px;height:18px;top:20px}
+.pline .cap{position:absolute;top:-14px;transform:translateX(-50%);font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap}
+.legend{display:flex;gap:16px;justify-content:center;font-size:12px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.sentence{font-size:16px;line-height:2.4}
+.sentence select{font-size:15px;font-weight:700;border:0;border-bottom:2px solid var(--ink);border-radius:0;background:transparent;padding:0 2px}
+.headline{font-size:18px;font-weight:700;text-align:center;margin:14px 0 0}
+.center{text-align:center}
+.btnrow{display:flex;gap:10px;justify-content:center;margin-top:12px}
+.btn.outline{border:2px solid var(--ink);font-weight:700;padding:6px 16px}
+details summary{cursor:pointer;font-weight:700;font-size:14px}
+ul.tight{margin:6px 0 0;padding-left:18px;color:var(--muted)}
+ul.tight li{margin-bottom:4px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:12.5px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (max-width:640px){header{padding:14px 16px}main{padding:14px}.grid{grid-template-columns:1fr}.grid label select{width:140px}.hide-s{display:none}}
+</style>
+</head>
+<body>
+<div class="mockbar"><b>MOCKUP</b> of a "What if" sub-tab in the Turas brand report. Only this sub-tab works. Anonymous panel sample, so open mode only.</div>
+<header>
+  <div class="kicker">Turas Brand Health</div>
+  <h1 id="hTitle"></h1>
+  <div class="metaline" id="hMeta"></div>
+</header>
+<nav class="tabs"><button class="inert">Portfolio</button><button class="inert">Summary</button><button class="on" id="catTab"></button><button class="inert">Pasta sauces</button><button class="inert">Pour Over Sauces</button><button class="inert">Dry Seasoning and Spices</button><button class="inert">Pinned Views</button><button class="inert">About</button></nav>
+<main>
+  <div class="catbar"><span class="lbl">Category</span><select disabled id="catSel"></select><span class="lbl">Focal brand</span><select id="brandSel" aria-label="Focal brand"></select></div>
+  <div class="subtabs"><button class="inert">Mental Availability</button><button class="inert">Brand and Buying</button><button class="inert">Brand Meaning</button><button class="inert">Audience</button><button class="on">What if<span class="new">NEW</span></button></div>
+  <div class="aud"><span class="lbl">Among</span><span id="audSels"></span><span class="n" id="audN"></span></div>
+  <div class="focal"><span class="pill">FOCAL</span><b id="focalName"></b><span class="cat" id="focalCat"></span></div>
+  <div id="audWarn"></div>
+
+  <div class="card">
+    <div class="cardhead"><div><h2 id="liftTitle"></h2><p class="lead" id="liftLead"></p></div><div class="acts"><button class="btn inert-p">📌 Pin</button><button class="btn inert-x">🖼 PNG</button></div></div>
+    <div class="tiles" id="nowTiles"></div>
+    <div class="grp" style="margin-top:18px">What if</div>
+    <div class="tiles" id="liftTiles" style="margin-top:8px"></div>
+    <p class="note" id="liftNote"></p>
+  </div>
+
+  <div class="card">
+    <div class="cardhead"><div><h2>Link by link</h2><p class="lead" id="linkLead"></p></div><div class="acts"><button class="btn inert-p">📌 Pin</button><button class="btn inert-x">📥 Excel</button></div></div>
+    <div class="tablewrap"><table id="linkTable"><thead><tr><th>link</th><th class="num" id="thBrand"></th><th class="num">category average</th><th class="hide-s" style="width:16%">gap</th><th class="num">if 10 in 100 more (or fewer) see it</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">Change in committed share, percentage points, with the 90% range across 100 refits that resample people. Greyed rows point the wrong way in more than 1 refit in 10: the data cannot pin them down.</p>
+  </div>
+
+  <div class="card">
+    <div class="cardhead"><div><h2>Build a scenario</h2><p class="lead">Combine changes and see the committed share move. Worked out person by person, for the audience above.</p></div><div class="acts"><button class="btn inert-p">📌 Pin</button></div></div>
+    <div class="checks"><label><input type="checkbox" id="mCep"> One more entry-point link for everyone</label><label><input type="checkbox" id="mAttr"> One more image link for everyone</label><label><input type="checkbox" id="mGap"> Match the category average on every link where the brand trails</label></div>
+    <div class="grp">Entry points</div><div class="grid" id="scenCep"></div>
+    <div class="grp">Image attributes</div><div class="grid" id="scenAttr"></div>
+    <div class="scenres"><span class="lbl">Committed share</span><b id="sFrom"></b><span>→</span><b id="sTo"></b><span id="sDelta" class="note" style="margin:0"></span></div>
+    <div class="pline" id="sLine"></div>
+    <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i>Now</span><span><i class="dot" style="background:var(--navy)"></i>Under this scenario</span><span><i class="dot" style="background:rgba(26,39,68,.25)"></i>90% range</span></div>
+  </div>
+
+  <div class="card">
+    <div class="cardhead"><div><h2>Build a shopper</h2><p class="lead" id="shopLead"></p></div><div class="acts"><button class="btn inert-p">📌 Pin</button></div></div>
+    <div class="sentence" id="shopSentence"></div>
+    <div class="headline" id="shopHead"></div>
+    <div class="pline" id="shopLine"></div>
+    <div class="legend"><span><i class="dot" style="border:2px solid var(--ink)"></i><span id="shopLegAll"></span></span><span><i class="dot" style="background:var(--navy)"></i>This shopper</span><span><i class="dot" style="background:rgba(26,39,68,.25)"></i>90% range</span></div>
+    <p class="note center" id="shopMatch"></p>
+    <div class="btnrow"><button class="btn outline" id="shopRandom">Show a random shopper</button><button class="btn outline" id="shopReset">Reset</button></div>
+  </div>
+
+  <details class="card">
+    <summary>Diagnostics and method</summary>
+    <ul class="tight" id="diag"></ul>
+    <div class="tablewrap" style="margin-top:10px"><table id="cvTable"><thead><tr><th>model (all with a baseline per brand)</th><th class="num">held-out pseudo r squared</th></tr></thead><tbody></tbody></table></div>
+  </details>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+"use strict";
+var D = %%DATA%%;
+var B = D.brands, LV = D.levers, NL = LV.length, F = D.fits.length, NBD = D.n_brand_cols;
+var RW = D.rows, NR = RW.r.length, NP = D.meta.n_people, MINN = 5, FLOOR = 30;
+var CEPJ = [], ATTJ = []; LV.forEach(function(l, j){ (l.kind === "cep" ? CEPJ : ATTJ).push(j); });
+var UNCLEAR = {}; LV.forEach(function(l, j){ if (D.sign[l.key] > 0.10) UNCLEAR[j] = D.sign[l.key]; });
+var focal = B.findIndex(function(b){ return b.code === D.meta.focal; });
+var aud = { region: "", age: "", race: "", income: "", buys: "" };
+
+function $(id){ return document.getElementById(id); }
+function el(tag, attrs, text){ var e = document.createElement(tag); for (var a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+function f1(x){ var r = Math.round(x * 10) / 10; if (r === 0) return "0.0"; return (r > 0 ? "+" : "−") + Math.abs(r).toFixed(1); }
+function pct(a, q){ var b = a.slice().sort(function(x, y){ return x - y; }); var k = (b.length - 1) * q, lo = Math.floor(k), hi = Math.ceil(k); return b[lo] + (b[hi] - b[lo]) * (k - lo); }
+function summ(d){ return { pt: d[0], lo: pct(d.slice(1), 0.05), hi: pct(d.slice(1), 0.95) }; }
+function sig(z){ return 1 / (1 + Math.exp(-z)); }
+function linkOf(i, j){ return (RW.links[i] >>> j) & 1; }
+var toastT; function toast(m){ var t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove("show"); }, 2600); }
+document.querySelectorAll(".inert").forEach(function(b){ b.addEventListener("click", function(){ toast("Mockup: only the What if sub-tab is built."); }); });
+document.querySelectorAll(".inert-p").forEach(function(b){ b.addEventListener("click", function(){ toast("In the report this pins the panel to Pinned Views."); }); });
+document.querySelectorAll(".inert-x").forEach(function(b){ b.addEventListener("click", function(){ toast("In the report this downloads the panel."); }); });
+
+// ---------------------------------------------------------------- header and pickers
+$("hTitle").textContent = D.meta.category; $("catTab").textContent = D.meta.category;
+["Client: " + D.meta.client, "Focal Brand: " + D.meta.focal, "Wave 1", "Generated September 2026 (mockup)"].forEach(function(t){ $("hMeta").appendChild(el("span", {}, t)); });
+$("catSel").appendChild(el("option", {}, D.meta.category));
+B.forEach(function(b, i){ $("brandSel").appendChild(el("option", {value: i}, b.label)); });
+$("brandSel").value = focal;
+$("brandSel").addEventListener("change", function(){ focal = +$("brandSel").value; renderAll(); });
+var PK = D.profile_keys, PKI = {}; PK.forEach(function(k){ PKI[k.key] = k; });
+(function(){
+  var host = $("audSels");
+  PK.forEach(function(k){
+    var s = el("select", {"aria-label": k.label}); s.appendChild(el("option", {value: ""}, "any " + k.label.toLowerCase()));
+    k.levels.forEach(function(v){ s.appendChild(el("option", {value: v}, v)); });
+    s.addEventListener("change", function(){ aud[k.key] = s.value; renderAll(); }); host.appendChild(s); host.appendChild(document.createTextNode(" "));
+  });
+  var s = el("select", {"aria-label": "Buying"}); s.id = "buySel";
+  [["", "buyers and non-buyers"], ["1", "people who bought it (12m)"], ["0", "people who have not bought it"]].forEach(function(o){ s.appendChild(el("option", {value: o[0]}, o[1])); });
+  s.addEventListener("change", function(){ aud.buys = s.value; renderAll(); }); host.appendChild(s);
+})();
+function personIn(p){ for (var q = 0; q < PK.length; q++){ var k = PK[q].key; if (aud[k] && PK[q].levels[D.people[k][p]] !== aud[k]) return false; } return true; }
+function rowsOf(bi, modelled){
+  var out = [];
+  for (var i = 0; i < NR; i++){
+    if (RW.b[i] !== bi || !personIn(RW.r[i])) continue;
+    if (aud.buys !== "" && String(RW.bought[focalRowOf(RW.r[i])]) !== aud.buys) continue;   // buying is about the FOCAL brand
+    if (modelled && RW.y[i] < 0) continue;
+    out.push(i);
+  }
+  return out;
+}
+var FROW = {}; for (var i = 0; i < NR; i++) FROW[RW.b[i] + ":" + RW.r[i]] = i;
+function focalRowOf(p){ return FROW[focal + ":" + p]; }
+
+// ---------------------------------------------------------------- model
+function base(f, i){ var b = D.fits[f].b, e = RW.b[i] ? b[RW.b[i] - 1] : 0; for (var j = 0; j < NL; j++) if (linkOf(i, j)) e += b[NBD + j]; return e + b[NBD + NL] * RW.bought[i]; }
+function pc(f, eta){ return 1 - sig(D.fits[f].c2 - eta); }
+function hash(p, j){ var h = Math.imul(p + 1, 2654435761) ^ Math.imul(j + 7, 40503); h ^= h >>> 15; h = Math.imul(h, 2246822519); h ^= h >>> 13; return h >>> 0; }
+// A plan: {shift: {j: per-100 change}, cep: bool, attr: bool}. Returns committed-share change draws, in points.
+function run(rows, plan){
+  var n = rows.length, flip = {};
+  Object.keys(plan.shift || {}).forEach(function(js){
+    var j = +js, s = plan.shift[j]; if (!s) return;
+    var cand = rows.filter(function(i){ return s > 0 ? !linkOf(i, j) : linkOf(i, j); });
+    cand.sort(function(a, b){ return hash(RW.r[a], j) - hash(RW.r[b], j); });
+    var k = Math.min(cand.length, Math.round(Math.abs(s) / 100 * n));
+    for (var q = 0; q < k; q++){ (flip[cand[q]] = flip[cand[q]] || []).push([j, s > 0 ? 1 : -1]); }
+  });
+  var out = [];
+  for (var f = 0; f < F; f++){
+    var b = D.fits[f].b, acc = 0;
+    for (var q = 0; q < n; q++){
+      var i = rows[q], e0 = base(f, i), e = e0, have = {};
+      (flip[i] || []).forEach(function(m){ e += m[1] * b[NBD + m[0]]; have[m[0]] = m[1] > 0 ? 1 : 0; });
+      var hasJ = function(j){ return have[j] !== undefined ? have[j] : linkOf(i, j); };
+      var lackC = plan.cep ? CEPJ.filter(function(j){ return !hasJ(j); }) : [null];
+      var lackA = plan.attr ? ATTJ.filter(function(j){ return !hasJ(j); }) : [null];
+      if (!lackC.length) lackC = [null]; if (!lackA.length) lackA = [null];
+      var sp = 0;
+      lackC.forEach(function(jc){ lackA.forEach(function(ja){ sp += pc(f, e + (jc === null ? 0 : b[NBD + jc]) + (ja === null ? 0 : b[NBD + ja])); }); });
+      acc += sp / (lackC.length * lackA.length) - pc(f, e0);
+    }
+    out.push(100 * acc / n);
+  }
+  return out;
+}
+function share(rows, fn){ if (!rows.length) return NaN; var c = 0; rows.forEach(function(i){ if (fn(i)) c++; }); return c / rows.length; }
+function gapPlan(rows){
+  var shift = {};
+  LV.forEach(function(l, j){
+    if (l.dir < 0) return;
+    var mine = 100 * share(rows, function(i){ return linkOf(i, j); }), avg = 0, nb = 0;
+    B.forEach(function(_, bi){ var r = rowsOf(bi, true); if (r.length){ avg += 100 * share(r, function(i){ return linkOf(i, j); }); nb++; } });
+    avg /= nb; if (avg > mine) shift[j] = avg - mine;
+  });
+  return shift;
+}
+
+// ---------------------------------------------------------------- percent line
+function pline(host, hollow, filled, band, hl){
+  host.innerHTML = ""; function pos(v){ return Math.max(0, Math.min(100, v)) + "%"; }
+  host.appendChild(el("div", {"class": "track"}));
+  if (band){ var bd = el("div", {"class": "band"}); bd.style.left = pos(band[0]); bd.style.width = "calc(" + pos(band[1]) + " - " + pos(band[0]) + ")"; host.appendChild(bd); }
+  [0, 25, 50, 75, 100].forEach(function(v){ var t = el("div", {"class": "tick"}, v + "%"); t.style.left = pos(v); host.appendChild(t); });
+  if (hollow != null){ var h = el("div", {"class": "dotv hollow"}); h.style.left = pos(hollow); host.appendChild(h); var c = el("div", {"class": "cap"}, hl + " " + Math.round(hollow) + "%"); c.style.left = pos(hollow); host.appendChild(c); }
+  if (filled != null){ var fl = el("div", {"class": "dotv fill"}, Math.round(filled) + "%"); fl.style.left = pos(filled); host.appendChild(fl); }
+}
+
+// ---------------------------------------------------------------- render: headline
+var ROWS = [];
+function tile(host, t, v, c, r, cls){ var d = el("div", {"class": "tile" + (cls ? " " + cls : "")}); d.appendChild(el("div", {"class": "t"}, t)); d.appendChild(el("div", {"class": "v"}, v)); if (c){ var cc = el("div", {"class": "c"}); cc.innerHTML = c; d.appendChild(cc); } if (r) d.appendChild(el("div", {"class": "r"}, r)); host.appendChild(d); }
+function catAvg(fn){ var s = 0, n = 0; B.forEach(function(_, bi){ var v = fn(bi); if (!isNaN(v)){ s += v; n++; } }); return s / n; }
+function committed(bi){ return 100 * share(rowsOf(bi, true), function(i){ return RW.y[i] === 2; }); }
+function mpen(bi){ var r = rowsOf(bi, false); return 100 * share(r, function(i){ return CEPJ.some(function(j){ return linkOf(i, j); }); }); }
+function ns(bi){ var r = rowsOf(bi, false), s = 0, n = 0; r.forEach(function(i){ var k = CEPJ.filter(function(j){ return linkOf(i, j); }).length; if (k){ s += k; n++; } }); return n ? s / n : NaN; }
+function imageLinks(bi){ var r = rowsOf(bi, false), s = 0; r.forEach(function(i){ s += ATTJ.filter(function(j){ return linkOf(i, j) && LV[j].dir > 0; }).length; }); return r.length ? s / r.length : NaN; }
+function renderHeadline(){
+  var b = B[focal];
+  $("focalName").textContent = b.label; $("focalCat").textContent = "· " + D.meta.category;
+  $("liftTitle").textContent = "What would lift " + b.label + "?";
+  $("liftLead").textContent = "How many category buyers are committed to the brand now, how much of the category's memory it holds, and what more links would do. The biggest lever in this data is the number of links a brand has, not any single one.";
+  var nt = $("nowTiles"); nt.innerHTML = "";
+  var cf = function(v, fmt){ return "Category average <b>" + fmt(v) + "</b>"; }, pc0 = function(v){ return Math.round(v) + "%"; }, d2 = function(v){ return v.toFixed(2); };
+  tile(nt, "Committed now", pc0(committed(focal)), cf(catAvg(committed), pc0), "love it or one of my preferred, of " + ROWS.length + " with an opinion");
+  tile(nt, "Mental penetration", pc0(mpen(focal)), cf(catAvg(mpen), pc0), "link the brand to at least one entry point");
+  // the brand report averages each brand's network size after rounding it to 2 decimals; match it
+  tile(nt, "Network size", d2(ns(focal)), cf(catAvg(function(bi){ return Math.round(100 * ns(bi)) / 100; }), d2), "entry points linked, among those who link any");
+  tile(nt, "Image links", imageLinks(focal).toFixed(1), cf(catAvg(imageLinks), function(v){ return v.toFixed(1); }), "positive attributes linked, per person");
+  var lt = $("liftTiles"); lt.innerHTML = "";
+  if (ROWS.length < MINN){ return; }
+  [["One more entry-point link each", {cep: true}], ["One more image link each", {attr: true}], ["Match the category where it trails", {shift: gapPlan(ROWS)}]].forEach(function(x){
+    var s = summ(run(ROWS, x[1]));
+    tile(lt, x[0], f1(s.pt) + " pts", "committed share, from <b>" + Math.round(committed(focal)) + "%</b>", "90% range " + f1(s.lo) + " to " + f1(s.hi), "up");
+  });
+  $("liftNote").textContent = "Links are added to people who do not already have them. \"Match the category\" lifts each link where the brand trails the average brand to that average. Effects allow for past purchase, so buyers praising what they already buy is taken out.";
+}
+
+// ---------------------------------------------------------------- render: link table
+function renderLinks(){
+  var b = B[focal]; $("thBrand").textContent = b.label.toLowerCase();
+  $("linkLead").textContent = "Where " + b.label + " sits on each link against the average brand, and what 10 more people in every 100 linking it would do. Single links are weak levers and their order is not dependable; the totals above are.";
+  var tb = $("linkTable").querySelector("tbody"); tb.innerHTML = "";
+  if (ROWS.length < MINN) return;
+  var rows = LV.map(function(l, j){
+    var mine = 100 * share(ROWS, function(i){ return linkOf(i, j); });
+    var avg = catAvg(function(bi){ var r = rowsOf(bi, true); return r.length ? 100 * share(r, function(i){ return linkOf(i, j); }) : NaN; });
+    var sh = {}; sh[j] = 10 * l.dir;
+    return { l: l, j: j, mine: mine, avg: avg, g: summ(run(ROWS, {shift: sh})), unclear: UNCLEAR[j] !== undefined };
+  }).sort(function(a, b){ return (a.unclear - b.unclear) || (b.g.pt - a.g.pt); });
+  rows.forEach(function(r){
+    var tr = el("tr", r.unclear ? {"class": "unclear"} : {});
+    var td = el("td", {}, r.l.label); td.appendChild(el("span", {"class": "tag"}, r.l.kind === "cep" ? "entry point" : "attribute"));
+    if (r.l.dir < 0) td.appendChild(el("small", {}, "counts against a brand: the change shown is 10 in 100 FEWER seeing it this way"));
+    if (r.unclear) td.appendChild(el("small", {}, "not dependable: wrong way in " + Math.round(100 * UNCLEAR[r.j]) + "% of refits"));
+    tr.appendChild(td);
+    tr.appendChild(el("td", {"class": "num"}, Math.round(r.mine) + "%"));
+    tr.appendChild(el("td", {"class": "num"}, Math.round(r.avg) + "%"));
+    var gt = el("td", {"class": "hide-s"}), gb = el("div", {"class": "gapbar"}), fill = el("i"), gap = r.mine - r.avg, wdt = Math.min(50, Math.abs(gap) * 2);
+    fill.style.left = gap >= 0 ? "50%" : (50 - wdt) + "%"; fill.style.width = wdt + "%";
+    fill.style.background = (gap >= 0) === (r.l.dir > 0) ? "var(--committed)" : "var(--avoid)";
+    gb.appendChild(fill); gb.appendChild(el("div", {"class": "mid"})); gt.appendChild(gb); gt.appendChild(el("small", {}, (gap >= 0 ? "+" : "−") + Math.abs(Math.round(gap)) + " points")); tr.appendChild(gt);
+    var c = el("td", {"class": "num"}, r.unclear ? "~0" : f1(r.g.pt)); if (!r.unclear) c.appendChild(el("span", {"class": "rng"}, f1(r.g.lo) + " to " + f1(r.g.hi))); tr.appendChild(c);
+    tb.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------- scenario
+var shift = {};
+(function(){
+  LV.forEach(function(l, j){
+    var lab = el("label"), t = el("span", {}, l.label); lab.appendChild(t);
+    var s = el("select", {"aria-label": l.label + " scenario"});
+    var steps = l.dir > 0 ? [0, 5, 10, 20] : [0, -5, -10, -20];
+    steps.forEach(function(v){ s.appendChild(el("option", {value: v}, v === 0 ? "No change" : (v > 0 ? "+" + v : "−" + Math.abs(v)) + " in 100 " + (v > 0 ? "link it" : "fewer see it"))); });
+    s.addEventListener("change", function(){ shift[j] = +s.value; renderScen(); });
+    lab.appendChild(s); $(l.kind === "cep" ? "scenCep" : "scenAttr").appendChild(lab);
+  });
+  ["mCep", "mAttr", "mGap"].forEach(function(id){ $(id).addEventListener("change", renderScen); });
+})();
+function renderScen(){
+  if (ROWS.length < MINN){ $("sFrom").textContent = "n/a"; $("sTo").textContent = "n/a"; $("sDelta").textContent = ""; $("sLine").innerHTML = ""; return; }
+  var now = committed(focal), sh = {};
+  Object.keys(shift).forEach(function(j){ if (shift[j]) sh[j] = shift[j]; });
+  if ($("mGap").checked){ var g = gapPlan(ROWS); Object.keys(g).forEach(function(j){ sh[j] = (sh[j] || 0) + g[j]; }); }
+  var plan = {shift: sh, cep: $("mCep").checked, attr: $("mAttr").checked};
+  $("sFrom").textContent = Math.round(now) + "%";
+  if (!Object.keys(sh).length && !plan.cep && !plan.attr){ $("sTo").textContent = "n/a"; $("sDelta").textContent = "Choose a change above."; pline($("sLine"), now, null, null, "Now"); return; }
+  var s = summ(run(ROWS, plan));
+  $("sTo").textContent = Math.round(now + s.pt) + "%"; $("sDelta").textContent = f1(s.pt) + " points (90% range " + f1(s.lo) + " to " + f1(s.hi) + ")";
+  pline($("sLine"), now, now + s.pt, [now + s.lo, now + s.hi], "Now");
+}
+
+// ---------------------------------------------------------------- build a shopper
+var shop = {};
+function shopReset(){ PK.forEach(function(k){ shop[k.key] = k.levels[0]; }); shop.bought = 0; }
+shopReset();
+var shopSel = {};
+(function(){
+  var h = $("shopSentence");
+  function sel(key, opts, lower){ var s = el("select", {"aria-label": key}); opts.forEach(function(o){ s.appendChild(el("option", {value: o[0]}, lower ? o[1].toLowerCase() : o[1])); }); s.value = String(shop[key]); s.addEventListener("change", function(){ shop[key] = key === "bought" ? +s.value : s.value; renderShop(); }); shopSel[key] = s; h.appendChild(s); }
+  var lv = function(k){ var L = PKI[k].levels.slice(); if (k === "age") L.sort(); return L.map(function(v){ return [v, v]; }); };
+  h.appendChild(document.createTextNode("A category buyer aged ")); sel("age", lv("age"));
+  h.appendChild(document.createTextNode(", ")); sel("race", lv("race"));
+  h.appendChild(document.createTextNode(", living in ")); sel("region", lv("region"));
+  h.appendChild(document.createTextNode(", household income ")); sel("income", lv("income"));
+  h.appendChild(document.createTextNode(", who ")); sel("bought", [["1", "has"], ["0", "has not"]]);
+  h.appendChild(el("span", {id: "shopBrandTxt"}));
+})();
+function shopProb(f){ var fb = D.profile[B[focal].code].fits[f], e = 0; PK.forEach(function(k){ e += fb.b[k.key][PKI[k.key].levels.indexOf(shop[k.key])]; }); e += fb.b.bought[shop.bought]; return 1 - sig(fb.c2 - e); }
+function renderShop(){
+  var b = B[focal], P = D.profile[b.code];
+  $("shopBrandTxt").textContent = " bought " + b.label + " in the last 12 months.";
+  $("shopLead").textContent = "Choose who the shopper is. The model gives the chance they are committed to " + b.label + ", against all category buyers with an opinion of it. The audience filter does not apply here.";
+  var m = 100 * shopProb(0), dr = []; for (var f = 1; f < P.fits.length; f++) dr.push(100 * shopProb(f));
+  var all = 100 * share((function(){ var r = []; for (var i = 0; i < NR; i++) if (RW.b[i] === focal && RW.y[i] >= 0) r.push(i); return r; })(), function(i){ return RW.y[i] === 2; });
+  $("shopHead").textContent = Math.round(m) + "% chance of being committed to " + b.label;
+  $("shopLegAll").textContent = "All with an opinion";
+  pline($("shopLine"), all, m, [pct(dr, 0.05), pct(dr, 0.95)], "All");
+  var n = 0, c = 0;
+  for (var i = 0; i < NR; i++){
+    if (RW.b[i] !== focal || RW.y[i] < 0) continue;
+    var p = RW.r[i], ok = PK.every(function(k){ return PKI[k.key].levels[D.people[k.key][p]] === shop[k.key]; }) && RW.bought[i] === shop.bought;
+    if (ok){ n++; if (RW.y[i] === 2) c++; }
+  }
+  $("shopMatch").textContent = n >= MINN ? n + " real shoppers match exactly; " + Math.round(100 * c / n) + "% of them are committed" + (n < FLOOR ? ", from too few to lean on." : ".") : (n ? "Fewer than " + MINN : "No") + " real shoppers match exactly, so the estimate adds up each characteristic's effect (" + P.n + " people rated " + b.label + ").";
+}
+$("shopReset").addEventListener("click", function(){ shopReset(); Object.keys(shopSel).forEach(function(k){ shopSel[k].value = String(shop[k]); }); renderShop(); });
+$("shopRandom").addEventListener("click", function(){ var p = Math.floor(Math.random() * NP); PK.forEach(function(k){ shop[k.key] = PKI[k.key].levels[D.people[k.key][p]]; }); shop.bought = RW.bought[focalRowOf(p)]; Object.keys(shopSel).forEach(function(k){ shopSel[k].value = String(shop[k]); }); renderShop(); });
+
+// ---------------------------------------------------------------- diagnostics
+function renderDiag(){
+  var d = $("diag"); d.innerHTML = "";
+  var unc = LV.filter(function(_, j){ return UNCLEAR[j] !== undefined; }).length;
+  [
+    "Unit: a person and a brand. " + NP + " category buyers whose focal category is " + D.meta.category + " rated all " + B.length + " brands; " + RW.y.filter(function(v){ return v >= 0; }).length + " ratings with an opinion. Outcome: committed (love it, one of my preferred) > conditional (only if the price is right, only if nothing else) > avoid. \"No opinion\" counts for mental availability but not in the model.",
+    "Model: ordinal logistic regression with a baseline per brand, every entry-point and attribute link, and past purchase (12 months) as a baseline, so the halo of buyers praising what they buy is taken out. 100 refits resample people, not ratings.",
+    D.evidence.halo,
+    "The model assumes a link is worth the same for every brand. That is not yet tested.",
+    unc + " of " + NL + " single links point the wrong way in more than 1 refit in 10 and are greyed. Totals (one more link each, matching the category) are the dependable levers.",
+    "\"Is an expensive brand\" is set to count against a brand, so its change is shown as fewer people seeing it that way.",
+    "Build a shopper uses a separate model per brand on age, race, region, income and whether the person bought the brand, with a penalty of " + D.profile_penalty + " so thin groups lean toward the average.",
+    "The sample is an anonymous panel, so this sub-tab runs on person-level data. It is not built for a client-safe file.",
+    "Checked against the brand report: mental penetration and network size for Ina Paarman's Kitchen match it exactly (60%, 5.42)."
+  ].forEach(function(t){ d.appendChild(el("li", {}, t)); });
+  var tb = $("cvTable").querySelector("tbody"); tb.innerHTML = "";
+  D.evidence.cv.forEach(function(r){ var tr = el("tr"); tr.appendChild(el("td", {}, r[0])); tr.appendChild(el("td", {"class": "num"}, r[1].toFixed(3))); tb.appendChild(tr); });
+}
+
+function renderAll(){
+  ROWS = rowsOf(focal, true);
+  var nPeople = 0; for (var p = 0; p < NP; p++) if (personIn(p) && (aud.buys === "" || String(RW.bought[focalRowOf(p)]) === aud.buys)) nPeople++;
+  $("audN").textContent = nPeople + " category buyers · " + ROWS.length + " with an opinion of " + B[focal].label;
+  $("buySel").options[1].textContent = "people who bought " + B[focal].label + " (12m)"; $("buySel").options[2].textContent = "people who have not bought " + B[focal].label;
+  var w = $("audWarn"); w.innerHTML = "";
+  if (ROWS.length < MINN) w.appendChild(el("div", {"class": "warn"}, "Fewer than " + MINN + " people with an opinion in this audience. Widen it."));
+  else if (ROWS.length < FLOOR) w.appendChild(el("div", {"class": "warn"}, "Only " + ROWS.length + " people with an opinion in this audience. Results under " + FLOOR + " are thin: a pointer, not a finding."));
+  renderHeadline(); renderLinks(); renderScen(); renderShop();
+}
+renderDiag(); renderAll();
+})();
+</script>
+</body>
+</html>

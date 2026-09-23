@@ -19,6 +19,10 @@ Files:
   per study, with an Open / Client-safe switch. Built mockups carry respondent
   rows for the open view, so they are INTERNAL ONLY.
 - `access_ccpb.py`, `stability_ccpb.py`: the analyses behind PLAN.md.
+- `ipk_feasibility.py`: IPK Baking Mixes feasibility check for a brand What if.
+- `whatif_brand.py`, `template_whatif_brand.html`: the brand What if sub-tab for IPK
+  Baking Mixes, styled after the brand report. Person-level data (anonymous panel):
+  INTERNAL ONLY.
 - `robustness.py`: the robustness checks in PLAN.md (needs R with `ordinal`).
 - `build.py`: injects `build/model_*.json` into each template.
 
