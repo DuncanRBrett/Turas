@@ -1,6 +1,7 @@
 # What-if driver simulator: planning notes
 
-Planning session, 23 Sep 2026. Nothing here is built into Turas. Prototypes and
+Planning session, 23 Sep 2026. Nothing here is built into Turas.
+BUILD BRIEF: docs/v2_lift/BRIEF_WHATIF_SIMULATOR.md (five sessions, SACAP first). Prototypes and
 fit scripts live in this folder; see README.md for how to run them.
 
 ## The idea in one paragraph
