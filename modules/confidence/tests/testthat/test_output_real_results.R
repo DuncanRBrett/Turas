@@ -88,3 +88,21 @@ test_that("HTML mean detail keeps a whole df whole", {
   res <- process_mean_question(rr_q_row("x"), d, NULL, rr_config())$result
   expect_true(grepl("df = 29,", build_mean_detail_table(res, 0.95), fixed = TRUE))
 })
+
+test_that("NPS_Detail and the HTML show the NPS posterior mean", {
+  # The NPS dispatcher stored the posterior mean as `posterior_mean`, the
+  # writer read `post_mean` (the name the proportion and mean calculators
+  # use), so NPS_Detail never had a Bayesian_Mean column (review 2026-09-24).
+  d <- rr_data()
+  res <- process_nps_question(
+    rr_q_row("nps", run_credible = "Y", promoters = "9,10", detractors = "0,1,2,3,4,5,6"),
+    d, NULL, rr_config())$result
+  # 20/20/20 split: NPS 0, so the posterior mean under the N(0, 50^2) prior is 0
+  expect_equal(res$bayesian$post_mean, 0, tolerance = 1e-12)
+  sheet <- rr_write_and_read(nps = list(nps = res), sheet = "NPS_Detail")
+  row <- sheet[sheet$Question_ID %in% "nps", ]
+  expect_true("Bayesian_Mean" %in% names(sheet))
+  expect_equal(row$Bayesian_Mean, res$bayesian$post_mean, tolerance = 1e-9)
+  expect_equal(row$Bayesian_Lower, res$bayesian$lower, tolerance = 1e-9)
+  expect_true(grepl("Posterior: mean=+0.0", build_nps_detail_table(res, 0.95), fixed = TRUE))
+})

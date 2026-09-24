@@ -408,8 +408,11 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
     result$bayesian <- list(
       lower = qnorm(alpha / 2, mean = mean_post, sd = sd_post),
       upper = qnorm(1 - alpha / 2, mean = mean_post, sd = sd_post),
-      posterior_mean = mean_post,
-      posterior_sd = sd_post
+      # post_mean / post_sd: the names the proportion and mean calculators
+      # use and the writers read. `posterior_mean` never reached NPS_Detail
+      # (review 2026-09-24).
+      post_mean = mean_post,
+      post_sd = sd_post
     )
   }
 

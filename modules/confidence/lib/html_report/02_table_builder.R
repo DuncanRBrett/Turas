@@ -350,7 +350,7 @@ build_nps_detail_table <- function(result, conf_level, labels = NULL) {
       </tr>',
       result$bayesian$lower, result$bayesian$upper,
       (result$bayesian$upper - result$bayesian$lower) / 2,
-      result$bayesian$posterior_mean %||% NA
+      result$bayesian$post_mean %||% NA
     ))
   }
 
