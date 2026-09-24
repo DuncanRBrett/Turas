@@ -59,8 +59,8 @@ run_whatif_impl <- function(config_file, verbose = TRUE) {
       "A published crossing is a filter combination; its variables must be filters.",
       "Set Filter = Y for those variables or remove the crossing.")
   }
-  publish <- disclosure_publish_groups(lapply(prep$spec$context[filter_keys], function(cx) {
-    cx$values <- as.character(cx$values); cx }), crossings, s$min_group, paste("All", s$units_noun))
+  safe_context <- lapply(prep$spec$context[filter_keys], function(cx) { cx$values <- as.character(cx$values); cx })
+  publish <- disclosure_publish_groups(safe_context, crossings, s$min_group, paste("All", s$units_noun))
   masks <- lapply(seq_len(ncol(publish$members)), function(j) publish$members[, j])
   names(masks) <- colnames(publish$members)
   whatif_say(sprintf("client-safe: %d groups published at a minimum of %d (%d crossing cells hidden; %d hidden by the nesting check, %d by the recoverability check)",
@@ -80,15 +80,25 @@ run_whatif_impl <- function(config_file, verbose = TRUE) {
   names(variants) <- names(specs)
   primary <- if ("weighted" %in% names(variants)) "weighted" else "unweighted"
 
+  # Which need counts and effects the client-safe block may show. Decided
+  # once, on counts, so both versions hide the same cells.
+  suppress <- whatif_safe_suppression(variants$unweighted$model, publish, safe_context, s$min_group)
+  whatif_say(sprintf("client-safe: %d need counts and %d effects hidden (%d and %d of them so that nothing under %d can be worked out across groups)",
+                     suppress$need_hidden, suppress$effects_hidden, suppress$need_hidden_by_recovery,
+                     suppress$effects_hidden_by_recovery, s$min_group), verbose = verbose)
+
   log <- rbind(pf$log, variants[[primary]]$after)
   warnings <- c(variants[[primary]]$model$warnings,
                 log$Message[log$Severity == "Warning" & log$Check != "Sign check" & log$Check != "Model"])
+  warnings_safe <- whatif_safe_warnings(variants[[primary]]$model$warnings, log, s, variants[[primary]]$model$spec)
   run_status <- if (length(warnings)) "PARTIAL" else "PASS"
   runs <- lapply(variants, function(fv) {
     list(cfg = cfg, prep = prep, model = fv$model, calibration = fv$cal, calibration_ratings_only = fv$cal_ratings,
          symptoms = fv$symptoms, publish = publish, safe_results = fv$safe_results, safe_profile = fv$safe_profile,
-         filter_keys = filter_keys, crossings = crossings, run_status = run_status, warnings = warnings,
-         notes = whatif_notes(fv$model, prep, s), sentence = fv$sentence, scale_labels = whatif_scale_labels(prep))
+         suppress = suppress, filter_keys = filter_keys, crossings = crossings, run_status = run_status,
+         warnings = warnings, warnings_safe = warnings_safe,
+         notes = whatif_notes(fv$model, prep, s), notes_safe = whatif_notes(fv$model, prep, s, safe = TRUE),
+         sentence = fv$sentence, scale_labels = whatif_scale_labels(prep))
   })
 
   out_dir <- whatif_resolve(cfg$project_root, s$output_folder)
@@ -114,7 +124,7 @@ run_whatif_impl <- function(config_file, verbose = TRUE) {
   list(status = run_status, warnings = warnings,
        files = list(excel = excel_path, island = island_path),
        model = pv$model, preflight = log, proposed_structure = pf$proposed_structure,
-       publish = publish, calibration = pv$cal, calibration_ratings_only = pv$cal_ratings,
+       publish = publish, suppress = suppress, calibration = pv$cal, calibration_ratings_only = pv$cal_ratings,
        prep = prep, payload = payload, variants = variants, primary = primary)
 }
 
@@ -193,8 +203,17 @@ whatif_safe_profile <- function(model, k, prep, sentence = NULL, verbose = TRUE)
   if (!length(keys)) return(NULL)
   s2 <- spec
   s2$context <- ctx
-  s2$profile <- list(keys = keys, structural = intersect(pm$structural, keys),
-                     rules = pm$rules[pm$rules$key1 %in% keys & pm$rules$key2 %in% keys, , drop = FALSE])
+  # A rule naming a pooled level would tell a reader that level had fewer
+  # than k respondents, so only rules on levels still offered are kept.
+  offered <- function(key, level) key %in% keys & level %in% unique(ctx[[key]]$values)
+  rules <- pm$rules
+  if (NROW(rules)) {
+    keep_rule <- vapply(seq_len(nrow(rules)), function(i) {
+      offered(rules$key1[i], rules$level1[i]) && offered(rules$key2[i], rules$level2[i])
+    }, logical(1))
+    rules <- rules[keep_rule, , drop = FALSE]
+  }
+  s2$profile <- list(keys = keys, structural = intersect(pm$structural, keys), rules = rules)
   spm <- whatif_fit_profile(s2, model$folds, verbose = FALSE)
   combo <- do.call(paste, c(lapply(keys, function(key) ctx[[key]]$values), sep = "\r"))
   tab <- table(combo)
@@ -224,12 +243,15 @@ whatif_safe_profile <- function(model, k, prep, sentence = NULL, verbose = TRUE)
 
 
 #' Notes Shown in the Tab's Diagnostics
+#'
+#' The client-safe part (safe = TRUE) leaves out the "Don't know" sentence,
+#' which counts respondents per lever.
 #' @keywords internal
-whatif_notes <- function(model, prep, s) {
+whatif_notes <- function(model, prep, s, safe = FALSE) {
   dk <- vapply(model$spec$levers, function(lv) lv$missing %||% 0L, numeric(1))
   labs <- vapply(model$spec$levers, `[[`, "", "label")
   notes <- character(0)
-  if (any(dk > 0)) {
+  if (any(dk > 0) && !safe) {
     notes <- c(notes, sprintf("\"Don't know\" answers were set to the %s rating for that question: %s.",
                               if (s$dont_know == "centre") "middle" else "median",
                               paste(sprintf("%s %d", labs[dk > 0], dk[dk > 0]), collapse = ", ")))

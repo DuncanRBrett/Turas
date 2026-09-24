@@ -43,6 +43,9 @@
     return r === 0 ? "0" : (r > 0 ? "+" : "−") + Math.abs(r);
   }
   function r0(x) { return (x === null || x === undefined || isNaN(x)) ? "n/a" : String(Math.round(x)); }
+  /** A result the R build withheld (null in a client-safe island): it would
+   *  rest on fewer than the minimum group, alone or against another group. */
+  function withheld(s) { return !s || s.pt === null || s.pt === undefined || isNaN(s.pt); }
   function pct(a, q) {
     var b = a.filter(function (v) { return v !== null && !isNaN(v); }).sort(function (x, y) { return x - y; });
     if (!b.length) return NaN;
@@ -276,17 +279,18 @@
       // Adding single-area results; the range combines each part's half-width
       // as if independent. Approximate, and labelled so.
       scenario: function (movesByKey) {
-        var pt = 0, lo2 = 0, hi2 = 0, any = false;
+        var pt = 0, lo2 = 0, hi2 = 0, any = false, hidden = false;
         M.levers.forEach(function (lv, l) {
           var m = movesByKey[lv.key];
           if (!m) return;
           var s = at(l, m);
-          if (s.pt === null || s.pt === undefined) return;
+          if (withheld(s)) { hidden = true; return; }
           any = true;
           pt += s.pt;
           lo2 += Math.pow(s.pt - s.lo, 2);
           hi2 += Math.pow(s.hi - s.pt, 2);
         });
+        if (hidden) return { pt: NaN, lo: NaN, hi: NaN, hidden: true };
         return any ? { pt: pt, lo: pt - Math.sqrt(lo2), hi: pt + Math.sqrt(hi2) } : { pt: NaN, lo: NaN, hi: NaN };
       },
       bundle: function (b, bi) {
@@ -409,8 +413,8 @@
     var rows = md.levers.map(function (lv, j) {
       var cnt = G.need[j], fix = G.fix[j];
       return { lv: lv, j: j, slip: G.slip[j], fix: fix, cnt: cnt,
-               per100: (cnt && fix && !isNaN(fix.pt)) ? fix.pt * G.n / cnt : null, unclear: unclear(lv.key) };
-    }).sort(function (a, b) { return (a.unclear - b.unclear) || ((b.fix.pt || 0) - (a.fix.pt || 0)); });
+               per100: (cnt && !withheld(fix)) ? fix.pt * G.n / cnt : null, unclear: unclear(lv.key) };
+    }).sort(function (a, b) { return (a.unclear - b.unclear) || ((withheld(b.fix) ? 0 : b.fix.pt) - (withheld(a.fix) ? 0 : a.fix.pt)); });
     var mx = Math.max.apply(null, rows.filter(function (r) { return !r.unclear && r.per100 !== null; })
       .map(function (r) { return r.per100; }).concat([1]));
     var h = '<div class="wi-panel" data-snap-card><div class="wi-cardhead"><h3>Where to direct effort</h3>' +
@@ -428,8 +432,8 @@
         (sub ? "<small>" + esc(sub) + "</small>" : "") + "</td>";
       h += '<td class="num">' + esc(needTxt) + "</td>";
       [r.slip, r.fix].forEach(function (s) {
-        h += '<td class="num">' + (r.unclear ? "~0" : f1(s.pt)) +
-          (r.unclear ? "" : '<span class="wi-rng">' + f1(s.lo) + " to " + f1(s.hi) + "</span>") + "</td>";
+        h += '<td class="num">' + (r.unclear ? "~0" : withheld(s) ? "not shown" :
+          f1(s.pt) + '<span class="wi-rng">' + f1(s.lo) + " to " + f1(s.hi) + "</span>") + "</td>";
       });
       h += '<td class="num">' + (r.unclear ? "~0" : r.per100 === null ? "n/a" : f0(r.per100)) + "</td>";
       var w = r.unclear || r.per100 === null ? 0 : Math.max(0, 100 * r.per100 / mx);
@@ -441,7 +445,8 @@
       esc(unit) + " below " + esc(good) + " up to " + esc(good) + ". Coverage: slipping withdraws it from every " + esc(unit) +
       " who has it; fixing extends it to everyone without it. Points of " + esc(M.score_label || "score") +
       ", with the " + rangeName() + " across the refits underneath. " +
-      (G.exact ? "" : "A count is not shown when it, or the rest of the group, is under " + esc(M.min_group) + ".") + "</p>";
+      (G.exact ? "" : "A count or an effect is not shown when it would rest on fewer than " + esc(M.min_group) + " " + esc(units) +
+        ", on its own or set against another published group.") + "</p>";
     return h + "</div>";
   }
 
@@ -468,9 +473,15 @@
         "</b>. Choose at least one move above.</p>" + lineHtml(G.actual, "Now", null, null);
     } else {
       var s = G.scenario(st.scen), to = G.actual + s.pt;
+      if (s.hidden) {
+        h += '<p class="wi-scenres">' + esc(cap(label)) + " for " + esc(G.who) + ": <b>" + r0(G.actual) +
+          "</b>. Not shown: one of the chosen moves is not published for this group, because it would rest on fewer than " +
+          esc(M.min_group) + " " + esc(M.units) + ".</p>" + lineHtml(G.actual, "Now", null, null);
+      } else {
       h += '<p class="wi-scenres">' + esc(cap(label)) + " for " + esc(G.who) + ": <b>" + r0(G.actual) + "</b> to <b>" + r0(to) +
         "</b> (" + f1(s.pt) + " points" + (G.exact ? "" : ", approximate") + "; " + rangeName() + " " + f1(s.lo) + " to " + f1(s.hi) + ").</p>";
       h += lineHtml(G.actual, "Now", to, [G.actual + s.lo, G.actual + s.hi]);
+      }
       var unc = md.levers.filter(function (lv) { return st.scen[lv.key] && unclear(lv.key); }).map(function (lv) { return lv.label; });
       if (unc.length) h += '<p class="wi-note">' + esc(unc.join(" and ")) + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise.</p>";
     }
@@ -480,13 +491,15 @@
       md.bundles.forEach(function (b, bi) {
         // "Sum of each part" adds single-area results, the client-safe
         // shortcut, so the reader sees how far it is from the exact answer.
-        var ex = G.bundle(b, bi), parts = { pt: 0 };
+        var ex = G.bundle(b, bi), parts = { pt: 0, hidden: false };
         md.levers.forEach(function (lv) {
-          if (b.moves[lv.key]) parts.pt += G.single(lv, b.moves[lv.key]).pt || 0;
+          if (!b.moves[lv.key]) return;
+          var s = G.single(lv, b.moves[lv.key]);
+          if (withheld(s)) parts.hidden = true; else parts.pt += s.pt;
         });
         h += "<tr><td>" + esc(b.name) + (b.text ? "<small>" + esc(b.text) + "</small>" : "") + "</td>" +
-          '<td class="num">' + f1(ex.pt) + '<span class="wi-rng">' + f1(ex.lo) + " to " + f1(ex.hi) + "</span></td>" +
-          '<td class="num">' + f1(parts.pt) + "</td></tr>";
+          '<td class="num">' + (withheld(ex) ? "not shown" : f1(ex.pt) + '<span class="wi-rng">' + f1(ex.lo) + " to " + f1(ex.hi) + "</span>") + "</td>" +
+          '<td class="num">' + (parts.hidden ? "not shown" : f1(parts.pt)) + "</td></tr>";
       });
       h += "</tbody></table>";
     }
@@ -736,10 +749,12 @@
     }
     if (!wi.live() && W0.safe) {
       var a = W0.safe.audit || {}, ok = a.recoverable_failures === 0 && a.differencing_failures === 0 &&
+        a.exact === true && a.need_checked === true && a.effects_checked === true &&
         W0.safe.groups.every(function (g) { return g.n >= W0.safe.min_group; });
       h += "<h4>Privacy</h4><p class=\"" + (ok ? "wi-ok" : "wi-warn") + "\">" + (ok
         ? "Prepared so that every published group has at least " + W0.safe.min_group + " " + units +
           " and no smaller group, single or crossed, can be worked out by adding or subtracting published ones. " +
+          "A count or an effect that would rest on fewer than " + W0.safe.min_group + " is not shown, for the same reason. " +
           "Checked when this file was built; this browser confirms the " + W0.safe.groups.length +
           " groups it holds each have at least " + W0.safe.min_group + ". No individual answers are in the file."
         : "Privacy check failed. Do not send this file.") + "</p>";

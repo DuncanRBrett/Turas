@@ -348,3 +348,102 @@ test_that("a cell missing from a slice the cube DID publish is also unpriceable"
   expect_length(a$qual$violations, 0)
   expect_equal(a$qual$unverifiable, 1L)
 })
+
+
+# ==============================================================================
+# THE WHAT IF ISLAND
+# ==============================================================================
+# The review of 24 Sep 2026 found the audit trusting a hard-coded 0, missing
+# need counts that difference across groups, missing whole-sample counts, and
+# refusing a clean study of about 106 or fewer on its refit lists. Bodies here
+# are the client-safe cut, as .read_whatif_contribution embeds it.
+
+wi_body <- function(n = 100, k = 5, n_fits = 101, groups = NULL, audit = NULL, meta_extra = list(),
+                    model_extra = list(), safe_extra = list()) {
+  arr <- function(x) I(unname(x))
+  if (is.null(groups)) groups <- list(
+    list(id = "all", def = list(), n = n, need = arr(c(40, 30)), est = list(arr(c(1, 2)), arr(c(1, 2)))),
+    list(id = "campus=North", def = list(campus = "North"), n = 60, need = arr(c(25, 20)), est = list(arr(c(1, 2)), arr(c(1, 2)))),
+    list(id = "campus=South", def = list(campus = "South"), n = 40, need = arr(c(15, 10)), est = list(arr(c(1, 2)), arr(c(1, 2)))))
+  if (is.null(audit)) audit <- list(k = k, line_failures = 0, differencing_failures = 0, recoverable_failures = 0,
+                                    exact = TRUE, need_checked = TRUE, effects_checked = TRUE)
+  meta <- utils::modifyList(list(kind = "whatif", mode = "safe", n = n, min_group = k,
+                                 warnings = arr("Sign check: admin points the wrong way in more than 10% of refits.")),
+                            meta_extra)
+  model <- utils::modifyList(list(
+    levers = list(list(key = "teach", label = "Teaching"), list(key = "admin", label = "Admin")),
+    design = list(list(lever = "teach", part = "value", context = FALSE)),
+    fits = lapply(seq_len(n_fits), function(i) list(b = arr(0.5), theta = arr(c(-1, 1)))),
+    ctx_offset = arr(rep(0, n_fits)),
+    notes = arr("Who the student is enters the model as a baseline.")), model_extra)
+  for (nm in names(model_extra)) model[[nm]] <- model_extra[[nm]]   # replace, never merge, unnamed lists
+  safe <- utils::modifyList(list(min_group = k, groups = groups, audit = audit,
+                                 profile = list(keys = list(list(key = "campus", levels = arr(c("North", "South")))),
+                                                fits = lapply(seq_len(n_fits), function(i) list(theta = arr(0))))),
+                            safe_extra)
+  as.character(jsonlite::toJSON(list(meta = meta, model = model, safe = safe), auto_unbox = TRUE, null = "null", na = "null", digits = NA))
+}
+
+test_that("a clean client-safe What if island of 100 respondents with 101 refits passes", {
+  a <- release_audit_whatif(wi_body())
+  expect_true(a$present)
+  expect_equal(a$groups, 3L)
+  expect_length(a$violations, 0)
+})
+
+test_that("the refit lists are not mistaken for respondent lists, but a respondent-length list still is", {
+  a <- release_audit_whatif(wi_body(n = 100, n_fits = 101, safe_extra = list(extra = I(seq_len(97)))))
+  expect_true(any(grepl("about as long as the study", a$violations)))
+  b <- release_audit_whatif(wi_body(n = 100, n_fits = 96))
+  expect_length(b$violations, 0)
+})
+
+test_that("the island must say its need counts and effects were checked, and that the group check was exact", {
+  audit <- list(k = 5, line_failures = 0, differencing_failures = 0, recoverable_failures = 0, exact = TRUE)
+  a <- release_audit_whatif(wi_body(audit = audit))
+  expect_true(any(grepl("need counts and effects were checked", a$violations)))
+  audit2 <- list(k = 5, line_failures = 0, differencing_failures = 0, recoverable_failures = 0,
+                 need_checked = TRUE, effects_checked = TRUE)
+  b <- release_audit_whatif(wi_body(audit = audit2))
+  expect_true(any(grepl("did not check exactly", b$violations)))
+  audit3 <- c(audit2, list(exact = TRUE, recovery_hidden = 3, nesting_hidden = 1, candidates_checked = 40))
+  d <- release_audit_whatif(wi_body(audit = audit3))
+  expect_true(any(grepl("counts the small cells", d$violations)))
+})
+
+test_that("need counts that difference across nested definitions are caught", {
+  arr <- function(x) I(unname(x))
+  groups <- list(
+    list(id = "all", def = list(), n = 100, need = arr(c(40, 30)), est = list()),
+    list(id = "course=MSc", def = list(course = "MSc"), n = 28, need = arr(c(9, 14)), est = list()),
+    list(id = "course=MSc|year=Masters", def = list(course = "MSc", year = "Masters"), n = 17, need = arr(c(5, 9)), est = list()))
+  a <- release_audit_whatif(wi_body(groups = groups))
+  expect_true(any(grepl("differ between nested groups by fewer than 5", a$violations)))
+  groups[[3]]$need <- arr(c(NA, 9))
+  b <- release_audit_whatif(wi_body(groups = groups))
+  expect_false(any(grepl("differ between nested groups", b$violations)))
+  # The complement leaks too: 28 minus 9 need is 19 not needing; 17 minus 5 is 12; 19 minus 12 is 7, fine;
+  # but 14 and 9 not needing on the second lever leave 14 and 8 needing, a difference of 6, fine, while
+  # the second lever's complements 14 - 8 = 6 pass. Make one small.
+  groups[[3]]$need <- arr(c(NA, 12))
+  d <- release_audit_whatif(wi_body(groups = groups))
+  expect_true(any(grepl("differ between nested groups", d$violations)))
+})
+
+test_that("whole-sample counts under the minimum are caught in meta, the levers and the text", {
+  a <- release_audit_whatif(wi_body(meta_extra = list(n_by_outcome = I(c(2, 49, 49)))))
+  expect_true(any(grepl("outcome category has fewer than 5", a$violations)))
+  b <- release_audit_whatif(wi_body(model_extra = list(levers = list(list(key = "admin", missing = 1)))))
+  expect_true(any(grepl("Don't know", b$violations)))
+  d <- release_audit_whatif(wi_body(meta_extra = list(warnings = I("Only 2 respondents are Detractor."))))
+  expect_true(any(grepl("count from 1 to 4", d$violations)))
+  e <- release_audit_whatif(wi_body(model_extra = list(notes = I("\"Don't know\" answers were set to the median rating: Admin 1."))))
+  expect_true(any(grepl("count from 1 to 4", e$violations)))
+  # Percentages, decimals and numbers at or above k are not counts under k.
+  f <- release_audit_whatif(wi_body(meta_extra = list(warnings = I(c(
+    "Sign check: admin points the wrong way in more than 10% of refits.",
+    "They correlate at 0.82. Consider averaging them.",
+    "The chosen baseline penalty (100) is at the edge of the grid.",
+    "Few students are Detractor. Effects at that end rest on very few people.")))))
+  expect_length(f$violations, 0)
+})

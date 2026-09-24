@@ -230,3 +230,182 @@ test_that("the audit finds a recoverable group the publisher would have hidden",
   expect_false(a$ok)
   expect_equal(a$recoverable, "g=tiny")
 })
+
+# ---------------------------------------------------------- exact recoverability
+# The independent review of 24 Sep 2026 (docs/v2_lift/REVIEW_WHATIF_DISCLOSURE_
+# 2026_09_24.md) broke the single-level and two-way candidate list: a union of
+# small cells across rows and columns, and a three-way cell reached through a
+# nested level, were both recoverable. Its study generator is reproduced here.
+review_gen <- function(seed) {
+  set.seed(seed)
+  n <- sample(60:300, 1); nv <- sample(3:4, 1)
+  ctx <- list()
+  for (v in seq_len(nv)) {
+    L <- sample(2:5, 1); p <- rgamma(L, 0.8); p <- p / sum(p)
+    vals <- sample(paste0("L", seq_len(L)), n, TRUE, p)
+    if (v == 2 && runif(1) < 0.5) {
+      only <- ctx[[1]]$values == ctx[[1]]$values[1]
+      vals[!only & vals == "L1"] <- "L2"
+    }
+    ctx[[paste0("v", v)]] <- list(label = paste0("V", v), values = vals)
+  }
+  pairs <- combn(names(ctx), 2, simplify = FALSE)
+  cr <- pairs[sample(length(pairs), sample(1:min(3, length(pairs)), 1))]
+  list(ctx = ctx, cr = cr)
+}
+review_gen2 <- function(seed) {
+  set.seed(seed); st <- review_gen(seed); n <- length(st$ctx[[1]]$values)
+  L <- sample(2:4, 1)
+  st$ctx$v5 <- list(label = "V5", values = sample(paste0("L", 1:L), n, TRUE, {p <- rgamma(L, .8); p / sum(p)}))
+  pairs <- combn(names(st$ctx), 2, simplify = FALSE)
+  st$cr <- pairs[sample(length(pairs), sample(2:5, 1))]
+  st
+}
+defs_of <- function(groups) lapply(seq_len(nrow(groups)), function(i) {
+  g <- groups[i, ]; d <- character(0)
+  if (!is.na(g$key1)) d[g$key1] <- g$level1
+  if (!is.na(g$key2)) d[g$key2] <- g$level2
+  d
+})
+
+# A brute force that shares nothing with the engine: explicit candidate sets
+# tested one by one against the published groups' span by least squares, over
+# atoms. Every atom, every three-way cell, every union of two small atoms, and
+# every union of three or four small atoms when there are at most `budget` of
+# them (the count is returned so a test can say what it covered).
+brute_force <- function(context, defs, k, budget = 150000) {
+  keys <- names(context)
+  combo <- do.call(paste, c(lapply(keys, function(kk) context[[kk]]$values), sep = "\r"))
+  atoms <- unique(combo)
+  atom_n <- as.integer(table(combo)[atoms])
+  parts <- do.call(rbind, strsplit(atoms, "\r", fixed = TRUE))
+  colnames(parts) <- keys
+  ind <- function(def) {
+    m <- rep(TRUE, length(atoms))
+    for (kk in names(def)) m <- m & parts[, kk] == def[[kk]]
+    as.numeric(m)
+  }
+  A <- vapply(defs, ind, numeric(length(atoms)))
+  if (!is.matrix(A)) A <- matrix(A, ncol = length(defs))
+  q <- qr(A, tol = 1e-10)
+  in_span <- function(M) {
+    res <- qr.resid(q, M)
+    if (!is.matrix(res)) res <- matrix(res, ncol = ncol(M))
+    apply(abs(res), 2, max) < 1e-8
+  }
+  cands <- list()
+  small <- which(atom_n < k)
+  for (i in small) cands[[length(cands) + 1]] <- i
+  if (length(keys) >= 3) for (trip in combn(keys, 3, simplify = FALSE)) {
+    cell <- do.call(paste, c(lapply(trip, function(kk) parts[, kk]), sep = "\r"))
+    for (cl in unique(cell)) {
+      idx <- which(cell == cl)
+      if (sum(atom_n[idx]) < k && length(idx) > 1) cands[[length(cands) + 1]] <- idx
+    }
+  }
+  sizes <- 2
+  if (length(small) >= 2) for (pr in combn(small, 2, simplify = FALSE)) {
+    if (sum(atom_n[pr]) < k) cands[[length(cands) + 1]] <- pr
+  }
+  for (sz in 3:(k - 1)) {
+    if (sz > length(small) || choose(length(small), sz) > budget) break
+    sizes <- sz
+    for (st in combn(small, sz, simplify = FALSE)) if (sum(atom_n[st]) < k) cands[[length(cands) + 1]] <- st
+  }
+  hits <- 0L
+  chunk <- 5000
+  for (from in seq(1, length(cands), by = chunk)) {
+    to <- min(from + chunk - 1, length(cands))
+    M <- vapply(cands[from:to], function(idx) { v <- numeric(length(atoms)); v[idx] <- 1; v }, numeric(length(atoms)))
+    if (!is.matrix(M)) M <- matrix(M, ncol = to - from + 1)
+    hits <- hits + sum(in_span(M))
+  }
+  list(hits = hits, candidates = length(cands), union_size = sizes, small_atoms = length(small))
+}
+
+test_that("a union of small cells across rows and columns cannot be worked out (review counterexample A)", {
+  st <- review_gen(1035)
+  p <- disclosure_publish_groups(st$ctx, st$cr, 5)
+  expect_equal(brute_force(st$ctx, defs_of(p$groups), 5)$hits, 0L)
+  expect_equal(p$audit$recoverable_failures, 0L)
+  expect_true(disclosure_audit_groups(p$members, 5, st$ctx, defs_of(p$groups))$ok)
+})
+
+test_that("a three-way cell reached through a nested level cannot be worked out (review counterexample B)", {
+  st <- review_gen2(5020)
+  p <- disclosure_publish_groups(st$ctx, st$cr, 5)
+  expect_equal(brute_force(st$ctx, defs_of(p$groups), 5)$hits, 0L)
+  expect_true(disclosure_audit_groups(p$members, 5, st$ctx, defs_of(p$groups))$ok)
+})
+
+test_that("the audit finds the review's two counterexamples in the groups the old rules published", {
+  # The group sets the single-level and two-way candidate list let through.
+  # Counterexample A: all minus v1=L2 minus v2=L3 minus v2=L5 plus (L2,L3)
+  # plus (L2,L5) leaves 2 people. B: (v1=L1,v3=L3) + (v2=L2,v3=L3) - (v3=L3)
+  # is one three-way cell of 2.
+  st <- review_gen(1035)
+  defs <- list(character(0), c(v1 = "L2"), c(v2 = "L3"), c(v2 = "L5"), c(v1 = "L2", v2 = "L3"), c(v1 = "L2", v2 = "L5"))
+  members <- vapply(defs, function(d) {
+    m <- rep(TRUE, length(st$ctx$v1$values))
+    for (kk in names(d)) m <- m & st$ctx[[kk]]$values == d[[kk]]
+    m
+  }, logical(length(st$ctx$v1$values)))
+  expect_equal(colSums(members), c(137, 114, 90, 28, 75, 22))
+  a <- disclosure_audit_groups(members, 5, st$ctx, defs)
+  expect_false(a$ok)
+  expect_true(length(a$recoverable) >= 1)
+  st2 <- review_gen2(5020)
+  defs2 <- list(character(0), c(v3 = "L3"), c(v1 = "L1", v3 = "L3"), c(v2 = "L2", v3 = "L3"))
+  members2 <- vapply(defs2, function(d) {
+    m <- rep(TRUE, 205)
+    for (kk in names(d)) m <- m & st2$ctx[[kk]]$values == d[[kk]]
+    m
+  }, logical(205))
+  a2 <- disclosure_audit_groups(members2, 5, st2$ctx, defs2)
+  expect_false(a2$ok)
+  expect_true(any(grepl("v1=L1", a2$recoverable) & grepl("v2=L2", a2$recoverable) & grepl("v3=L3", a2$recoverable)))
+})
+
+test_that("across the review's 250 random studies nothing under the minimum can be worked out", {
+  # Before the exact engine the review's own brute force (atoms, three-way
+  # cells, unions of two atoms) found 23 of 150 and 22 of 100. The brute force
+  # here is stronger where it can afford to be; the coverage it reached is
+  # reported so a shortfall is visible, never silent.
+  leaks <- 0L; runs <- 0L; full <- 0L
+  for (seed in c(1001:1150, 5001:5100)) {
+    st <- if (seed < 5000) review_gen(seed) else review_gen2(seed)
+    p <- disclosure_publish_groups(st$ctx, st$cr, 5)
+    expect_true(all(p$groups$n >= 5))
+    expect_equal(p$audit$recoverable_failures, 0L)
+    expect_true(isTRUE(p$audit$exact))
+    bf <- brute_force(st$ctx, defs_of(p$groups), 5)
+    runs <- runs + 1L
+    leaks <- leaks + (bf$hits > 0)
+    full <- full + (bf$union_size == 4 || bf$small_atoms < 4)
+    a <- disclosure_audit_groups(p$members, 5, st$ctx, defs_of(p$groups))
+    expect_true(a$ok, info = paste("seed", seed))
+  }
+  expect_equal(runs, 250L)
+  expect_equal(leaks, 0L)
+  cat(sprintf("\n[disclosure] brute force covered unions of up to four small atoms in %d of %d studies\n", full, runs))
+  expect_gte(full, 200L)
+})
+
+test_that("the engine reports what it found and refuses past its work cap rather than passing silently", {
+  # Four atoms of one each, published only as pairs {1,2} and {3,4} and the
+  # whole: the pairs themselves are recoverable sets of 2.
+  A <- cbind(all = c(1, 1, 1, 1), p12 = c(1, 1, 0, 0), p34 = c(0, 0, 1, 1))
+  r <- disclosure_small_recoverable(c(1L, 1L, 1L, 1L), A, 5)
+  expect_length(r$sets, 2)
+  expect_setequal(lapply(r$sets, `[[`, "atoms"), list(1:2, 3:4))
+  expect_true(all(vapply(r$sets, function(s) s$n, 0) == 2))
+  expect_equal(r$sets[[1]]$coef[abs(r$sets[[1]]$coef) > 1e-8], 1)
+  # Twenty singleton atoms, twelve published sets: the search has thousands
+  # of subsets, so a cap of 20 is passed.
+  set.seed(2)
+  A2 <- matrix(rbinom(20 * 12, 1, 0.5), 20, 12)
+  expect_error(disclosure_small_recoverable(rep(1L, 20), A2, 5, max_work = 20), class = "turas_refusal")
+  # Nothing published beyond the whole sample: nothing to combine.
+  r0 <- disclosure_small_recoverable(c(2L, 3L, 40L), matrix(1, 3, 1), 5)
+  expect_length(r0$sets, 0)
+})

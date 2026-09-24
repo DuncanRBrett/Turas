@@ -122,6 +122,38 @@ test_that("a client-safe report gets only the published groups and the client-sa
   }
 })
 
+test_that("a client-safe report takes the client-safe meta fields: warnings without counts, outcome counts only when all clear the minimum", {
+  wi <- read_wi("cube")
+  expect_null(wi$safe$meta)
+  expect_equal(unlist(wi$meta$warnings), unlist(fx$safe$meta$warnings))
+  expect_false(identical(unlist(wi$meta$warnings), unlist(fx$meta$warnings)))
+  expect_false(any(grepl("[0-9]+ answers", unlist(wi$meta$warnings))))
+  expect_true(all(vapply(wi$model$levers, function(lv) is.null(lv$missing), logical(1))))
+  expect_false(any(grepl("Don't know", unlist(wi$model$notes), fixed = TRUE)))
+  expect_true(any(grepl("Don't know", unlist(fx$model$notes), fixed = TRUE)))
+  # The fixture's outcome counts all clear the minimum, so they ship; cut one
+  # to three and the safe part says null, which the reader passes on.
+  small <- top
+  small$variants$weighted$safe$meta$n_by_outcome <- NULL
+  f <- tempfile(fileext = ".json")
+  writeLines(as.character(jsonlite::toJSON(small, auto_unbox = TRUE, null = "null", na = "null", digits = NA)), f)
+  wi2 <- read_wi("cube", cfg = modifyList(WEIGHTED, list(whatif_island = f)))
+  expect_null(wi2$meta$n_by_outcome)
+  expect_false(is.null(read_wi("records")$meta$n_by_outcome))
+  # A full report keeps the open meta.
+  expect_equal(unlist(read_wi("records")$meta$warnings), unlist(fx$meta$warnings))
+})
+
+test_that("a contribution file from before the client-safe meta block is not embedded", {
+  old <- top
+  old$variants$weighted$safe$meta <- NULL
+  f <- tempfile(fileext = ".json")
+  writeLines(as.character(jsonlite::toJSON(old, auto_unbox = TRUE, null = "null", na = "null", digits = NA)), f)
+  out <- capture.output(res <- .read_whatif_contribution(modifyList(WEIGHTED, list(whatif_island = f)), "cube", survey_data))
+  expect_null(res)
+  expect_true(any(grepl("not a complete", out)))
+})
+
 test_that("a contribution file from before the client-safe model block is not embedded", {
   old <- top
   old$variants$weighted$safe$model <- NULL
@@ -262,4 +294,30 @@ test_that("the release audit catches leaks it can see from the island alone", {
   w <- base
   w$safe$extra <- as.list(seq_len(w$meta$n - 1))
   expect_true(any(grepl("about as long as the study", audit_of(w))))
+  # The refit lists are as long as the fits, never mistaken for respondents.
+  expect_equal(length(base$model$ctx_offset), length(base$model$fits))
+  # An outcome category under the minimum, a "Don't know" count, a count in a
+  # warning, and an audit that does not record the need and effect checks.
+  w <- base
+  w$meta$n_by_outcome <- list(3, 80, 77)
+  expect_true(any(grepl("outcome category", audit_of(w))))
+  w <- base
+  w$model$levers[[1]]$missing <- 2
+  expect_true(any(grepl("Don't know", audit_of(w))))
+  w <- base
+  w$meta$warnings <- list("Only 2 respondents are Detractor.")
+  expect_true(any(grepl("count from 1 to", audit_of(w))))
+  w <- base
+  w$safe$audit$effects_checked <- FALSE
+  expect_true(any(grepl("need counts and effects were checked", audit_of(w))))
+  # Two nested definitions whose shown need counts differ by three.
+  w <- base
+  defs <- lapply(w$safe$groups, function(g) unlist(g$def))
+  outer <- which(lengths(defs) == 1)[1]
+  inner <- which(vapply(defs, function(d) length(d) == 2 && names(defs[[outer]]) %in% names(d) &&
+                          d[[names(defs[[outer]])]] == defs[[outer]][[1]], logical(1)))[1]
+  expect_false(is.na(inner))
+  w$safe$groups[[outer]]$need[[1]] <- 40
+  w$safe$groups[[inner]]$need[[1]] <- 37
+  expect_true(any(grepl("differ between nested groups", audit_of(w))))
 })

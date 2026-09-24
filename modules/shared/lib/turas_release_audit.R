@@ -68,16 +68,25 @@ if (!exists("%||%", mode = "function")) {
 #' (.read_whatif_contribution). This checks the file that was actually built:
 #'   1. no open block, and no open profile model (its level counts can be under k);
 #'   2. no list as long as the study, or nearly (n - k or more), outside the
-#'      model's refits;
+#'      model's refits (the fits, ctx_offset, the profile's fits, and any list
+#'      exactly as long as the fits);
 #'   3. every published group at or above the island's own minimum, which is 2 or more;
-#'   4. the island's own audit reports no nesting or recoverability failure;
-#'   5. no named list of refused or hidden groups;
+#'   4. the island's own audit reports no nesting or recoverability failure,
+#'      says the recoverability check was exact, and records that need counts
+#'      and effects were checked too;
+#'   5. no named list of refused or hidden groups, and no count of small cells
+#'      in the shipped audit;
 #'   6. arithmetic a reader can do from the island itself: the whole sample
 #'      minus a variable's published levels, and a published level minus its
-#'      published cells in a crossing, is 0 or at least k;
-#'   7. no context-baseline coefficient (it names a level and estimates it), no
-#'      per-level counts in Build a ..., no need count or its complement under
-#'      k, no symptom whose flagged or unflagged side is under k.
+#'      published cells in a crossing, is 0 or at least k; and two groups
+#'      whose definitions nest do not differ by 1 to k-1 in a shown need count
+#'      or its complement (a backstop: the full test needs the respondents);
+#'   7. fields that describe fewer than k people: no context-baseline
+#'      coefficient (it names a level and estimates it), no per-level counts
+#'      in Build a ..., no need count or its complement under k, no symptom
+#'      whose flagged or unflagged side is under k, no outcome count under k,
+#'      no per-lever "Don't know" count, and no whole number from 1 to k-1 in
+#'      the warnings or notes.
 #'
 #' @param body The data-wi island body, already extracted.
 #' @return list(present, mode, groups, violations)
@@ -95,13 +104,15 @@ release_audit_whatif <- function(body) {
   n <- suppressWarnings(as.integer(wi$meta$n %||% NA))
   if (!is.null(wi$open)) out$violations <- c(out$violations, "the What if island carries one row per respondent (its open part)")
   if (!is.null(wi$profile)) out$violations <- c(out$violations, "the What if island carries the open Build a ... model")
-  # Every unnamed list's length, except the model's refits (101 of them, more
-  # than a small study's respondents) and the published groups (checked on
-  # their own below). A list within k of the study's size is one value per
-  # respondent, or nearly.
+  # Every unnamed list's length, except the refit lists (one value per fit,
+  # 101 by default, more than a small study's respondents) and the published
+  # groups (checked on their own below). A list within k of the study's size
+  # is one value per respondent, or nearly.
+  n_fits <- length((wi$model %||% list())$fits %||% list())
+  refit_paths <- c("model$fits", "model$ctx_offset", "profile$fits", "safe$profile$fits", "safe$groups")
   lengths_of <- function(o, path = "") {
     if (!is.list(o)) return(integer(0))
-    here <- if (is.null(names(o)) && !path %in% c("model$fits", "safe$groups")) length(o) else integer(0)
+    here <- if (is.null(names(o)) && !path %in% refit_paths && !(n_fits > 1 && length(o) == n_fits)) length(o) else integer(0)
     kids <- if (is.null(names(o))) lapply(o, lengths_of, path = paste0(path, "[]"))
             else lapply(names(o), function(nm) lengths_of(o[[nm]], if (nzchar(path)) paste0(path, "$", nm) else nm))
     c(here, unlist(kids))
@@ -124,8 +135,14 @@ release_audit_whatif <- function(body) {
   }
   a <- safe$audit %||% list()
   if (!identical(as.numeric(a$differencing_failures %||% NA), 0) ||
-      !identical(as.numeric(a$recoverable_failures %||% NA), 0)) {
-    out$violations <- c(out$violations, "the What if island's own audit reports groups that could be worked out by subtraction")
+      !identical(as.numeric(a$recoverable_failures %||% NA), 0) || !isTRUE(a$exact)) {
+    out$violations <- c(out$violations, "the What if island's own audit reports groups that could be worked out by subtraction, or did not check exactly")
+  }
+  if (!isTRUE(a$need_checked) || !isTRUE(a$effects_checked)) {
+    out$violations <- c(out$violations, "the What if island does not record that its need counts and effects were checked for differencing")
+  }
+  if (any(c("candidates_checked", "nesting_hidden", "recovery_hidden", "small_atoms") %in% names(a))) {
+    out$violations <- c(out$violations, "the What if island's audit counts the small cells it hid")
   }
   if (!is.null(safe$refused) || !is.null(safe$hidden)) {
     out$violations <- c(out$violations, "the What if island names the groups it refused or hid")
@@ -162,6 +179,24 @@ release_audit_whatif <- function(body) {
       }
     }
   }
+  # Need counts across nested definitions: outer minus inner, on the count
+  # and on its complement. Nesting by definition is what the island shows;
+  # nesting by membership needs the respondents, which the build checks.
+  need_of <- function(g) vapply(g$need %||% list(), function(v) if (is.null(v)) NA_real_ else as.numeric(v), 0)
+  nested_need <- 0L
+  for (i in seq_along(defs)) for (j in seq_along(defs)) {
+    if (i == j || length(defs[[j]]) <= length(defs[[i]])) next
+    if (!all(names(defs[[i]]) %in% names(defs[[j]])) || !all(defs[[i]] == defs[[j]][names(defs[[i]])])) next
+    ni <- need_of(groups[[i]]); nj <- need_of(groups[[j]])
+    if (!length(ni) || length(ni) != length(nj)) next
+    both <- !is.na(ni) & !is.na(nj)
+    d_need <- ni[both] - nj[both]
+    d_not <- (ns[i] - ni[both]) - (ns[j] - nj[both])
+    nested_need <- nested_need + sum(small(d_need) | small(d_not))
+  }
+  if (nested_need) {
+    out$violations <- c(out$violations, sprintf("%d What if need count(s) differ between nested groups by fewer than %s", nested_need, k))
+  }
   # 7. fields that describe fewer than k people
   mdl <- wi$model %||% list()
   if (any(vapply(mdl$design %||% list(), function(c) isTRUE(c$context), logical(1)))) {
@@ -171,13 +206,29 @@ release_audit_whatif <- function(body) {
     out$violations <- c(out$violations, "the What if Build a ... model carries per-level counts")
   }
   bad_need <- sum(vapply(seq_along(groups), function(i) {
-    nd <- vapply(groups[[i]]$need %||% list(), function(v) if (is.null(v)) NA_real_ else as.numeric(v), 0)
+    nd <- need_of(groups[[i]])
     sum(small(nd) | small(ns[i] - nd))
   }, numeric(1)))
   if (bad_need) out$violations <- c(out$violations, sprintf("%d What if need count(s) describe fewer than %s people", bad_need, k))
   sym_n <- vapply(mdl$symptoms %||% list(), function(sm) as.numeric(sm$n %||% NA), 0)
   if (!is.na(n) && any(small(sym_n) | small(n - sym_n))) {
     out$violations <- c(out$violations, sprintf("a What if symptom effect rests on fewer than %s respondents", k))
+  }
+  by_outcome <- vapply(wi$meta$n_by_outcome %||% list(), function(v) if (is.null(v)) NA_real_ else as.numeric(v), 0)
+  if (any(small(by_outcome))) {
+    out$violations <- c(out$violations, sprintf("a What if outcome category has fewer than %s respondents", k))
+  }
+  if (any(vapply(mdl$levers %||% list(), function(lv) !is.null(lv$missing), logical(1)))) {
+    out$violations <- c(out$violations, "the What if model carries per-lever \"Don't know\" counts")
+  }
+  txt <- c(unlist(wi$meta$warnings), unlist(mdl$notes))
+  if (length(txt)) {
+    plain <- gsub("[0-9]+(\\.[0-9]+)?%", "", txt)
+    plain <- gsub("[0-9]+\\.[0-9]+", "", plain)
+    nums <- suppressWarnings(as.numeric(unlist(regmatches(plain, gregexpr("[0-9]+", plain)))))
+    if (any(small(nums))) {
+      out$violations <- c(out$violations, sprintf("a What if warning or note carries a count from 1 to %s", k - 1))
+    }
   }
   out
 }
