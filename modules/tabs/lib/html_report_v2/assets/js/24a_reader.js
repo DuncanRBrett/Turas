@@ -75,6 +75,14 @@
       if (p.wave) bits.push('<span class="aud-wave">' + fmt.escapeHtml(String(p.wave)) + "</span>");
       return '<span class="aud-label">Audience</span>' + bits.join('<span class="aud-sep">·</span>');
     }
+    // The What if tab in its client-safe form picks its own published groups,
+    // so the report's filter does not apply there. Live, it follows the filter
+    // like any other tab.
+    if (tab === "whatif" && !(TR.whatif && TR.whatif.live())) {
+      bits.push('<span class="aud-cut">This tab shows results prepared for published groups; ' +
+        "choose a group in the tab. The audience filter does not apply here</span>");
+      return '<span class="aud-label">Audience</span>' + bits.join('<span class="aud-sep">·</span>');
+    }
     if (tab === "takeout" || tab === "moved") {
       // Patterns + Tracking deliberately ignore the live filter. They read the
       // full published sample (prior waves have no microdata to filter).

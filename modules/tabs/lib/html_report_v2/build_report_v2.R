@@ -139,6 +139,7 @@ build_report_v2_html <- function(data_json, config_obj,
                                   cj_json = NULL, md_json = NULL, pr_json = NULL,
                                   kd_json = NULL,
                                   cd_json = NULL,
+                                  wi_json = NULL,
                                   cube_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
@@ -235,6 +236,13 @@ build_report_v2_html <- function(data_json, config_obj,
   cd_inlined <- if (!is.null(cd_json) && nzchar(cd_json) && cd_json != "null") {
     escape_island(cd_json)
   } else "null"
+  # A What if contribution, already cut to this report's delivery mode by
+  # .read_whatif_contribution (open rows for a full report, published groups
+  # only for a client-safe one). The What if tab only appears when TR.WI has
+  # content.
+  wi_inlined <- if (!is.null(wi_json) && nzchar(wi_json) && wi_json != "null") {
+    escape_island(wi_json)
+  } else "null"
 
   .report_v2_load_text_layer(assets_dir)
 
@@ -247,6 +255,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "27z_pricing.js"     = has_island(pr_inlined),
     "27k_keydriver.js"   = has_island(kd_inlined),
     "27j_catdriver.js"   = has_island(cd_inlined),
+    "27w_whatif.js"      = has_island(wi_inlined),
     "27q_qualitative.js" = has_island(qual_inlined)
   )
   exclude <- names(renderer_for)[!vapply(renderer_for, isTRUE, logical(1))]
@@ -295,6 +304,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "{{DATA_PR}}"     = pr_inlined,
     "{{DATA_KD}}"     = kd_inlined,
     "{{DATA_CD}}"     = cd_inlined,
+    "{{DATA_WI}}"     = wi_inlined,
     "{{JS}}"          = js_bundle
   ))
 
@@ -327,7 +337,7 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
                                  assets_dir = report_v2_assets_dir(),
                                  prev_json = NULL, micro_json = NULL, qual_json = NULL,
                                  cj_json = NULL, md_json = NULL, pr_json = NULL,
-                                 kd_json = NULL, cd_json = NULL,
+                                 kd_json = NULL, cd_json = NULL, wi_json = NULL,
                                  cube_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
@@ -351,6 +361,7 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
                          md_json = md_json, pr_json = pr_json,
                          kd_json = kd_json,
                          cd_json = cd_json,
+                         wi_json = wi_json,
                          cube_json = cube_json),
     error = function(e) e)
   if (inherits(html, "error")) {

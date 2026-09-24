@@ -37,6 +37,8 @@
     if (TR.keydriver && TR.keydriver.available()) read.push(["keydriver", "Key drivers"]);
     // Categorical drivers, the same way again.
     if (TR.catdriver && TR.catdriver.available()) read.push(["catdriver", "Categorical drivers"]);
+    // What if, the same way again.
+    if (TR.whatif && TR.whatif.available()) read.push(["whatif", "What if"]);
     read.push(["story", "Story"]);
     var analyse = [["crosstabs", "Crosstabs"]];
     if (on("differences")) analyse.push(["findings", "Differences"]);
@@ -80,6 +82,7 @@
     TR.PR = parseIsland("data-pr");              // pricing contribution (null when absent)
     TR.KD = parseIsland("data-kd");              // keydriver contribution (null when absent)
     TR.CD = parseIsland("data-cd");              // catdriver contribution (null when absent)
+    TR.WI = parseIsland("data-wi");              // What if contribution (null when absent)
     TR.userState = parseIsland("user-state");   // saved-copy annotations
     // The report's authored prose, keyed. Installed before anything renders,
     // because every explainer on every tab reads from it (see 02_text.js).
@@ -200,7 +203,7 @@
    * analyst's own pinned collection (empty in a fresh report), Conjoint is a
    * sub-study. Dashboard, Group overview and Tracking ARE overviews and stay
    * eligible. */
-  var NOT_A_LANDING_TAB = ["qualitative", "story", "conjoint"];
+  var NOT_A_LANDING_TAB = ["qualitative", "story", "conjoint", "whatif"];
 
   /**
    * The tab the report should actually SHOW.
@@ -285,6 +288,7 @@
       ["pricing",     TR.PR,   TR.pricing],
       ["keydriver",   TR.KD,   TR.keydriver],
       ["catdriver",   TR.CD,   TR.catdriver],
+      ["whatif",      TR.WI,   TR.whatif],
       ["qualitative", TR.QUAL, TR.qual]
     ].filter(function (r) { return r[1] && !r[2]; })
      .map(function (r) { return r[0]; });
@@ -403,6 +407,7 @@
     else if (d2.state.tab === "pricing") TR.pricing.render(host);
     else if (d2.state.tab === "keydriver") TR.keydriver.render(host);
     else if (d2.state.tab === "catdriver") TR.catdriver.render(host);
+    else if (d2.state.tab === "whatif") TR.whatif.render(host);
     else if (d2.state.tab === "story") TR.story2.renderTab(host);
     else TR.report.renderTab(host);
     // The audience filter recomputes from this wave's microdata; prior waves
@@ -415,6 +420,9 @@
       d2.state.tab === "pricing" ||
       d2.state.tab === "keydriver" ||
       d2.state.tab === "catdriver" ||
+      // What if follows the filter bar only when it is live on respondent
+      // records. Its client-safe form has its own published-groups picker.
+      (d2.state.tab === "whatif" && !(TR.whatif && TR.whatif.live())) ||
       d2.state.tab === "cover" || d2.state.tab === "conjoint";
     if (TR.reader) TR.reader.renderStrip();
     shell.returnPoint.renderBar();

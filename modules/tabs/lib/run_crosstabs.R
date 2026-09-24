@@ -785,6 +785,159 @@ format_output_value <- function(value, type = "frequency",
 }
 
 
+#' Read a What if Contribution, Shaped for This Report's Delivery Mode
+#'
+#' The whatif module writes `{output_name}_whatif_island.json` holding one
+#' version per weighting it fitted (always unweighted; weighted too when its
+#' config names a weight column). This picks the version matching this report's
+#' own weighting (apply_weighting, weight_variable), so the What if tab follows
+#' however the tabs are run. Each version has an OPEN part (one row per
+#' respondent, with respondent IDs) and a CLIENT-SAFE part (precomputed results
+#' for published groups only). The delivery choice is made here, when the
+#' report is built, from the mode this run resolved
+#' (tabs_delivery_interactivity):
+#'
+#'   records   open: the model plus the respondents' lever values, lined up by
+#'             respondent ID with this report's own records so the tab follows
+#'             the filter bar. The IDs are dropped before embedding.
+#'   cube/none client-safe: the model plus the published groups. No respondent
+#'             rows, no open profile model.
+#'
+#' Every failure prints to the console and returns NULL (no What if tab), as
+#' the other contribution readers do. An open part that cannot be lined up
+#' falls back to the client-safe part, which is always safe to show.
+#'
+#' @param config_obj The tabs config object.
+#' @param interactivity The resolved mode: "records", "cube" or "none".
+#' @param survey_data This run's survey data. Its row order is the microdata's
+#'   row order (build_microdata iterates nrow(survey_data)), which is what lets
+#'   the open rows be lined up with the report's filter masks.
+#' @return A single JSON string, or NULL.
+#' @keywords internal
+.read_whatif_contribution <- function(config_obj, interactivity, survey_data) {
+  path <- config_obj$whatif_island
+  if (is.null(path) || !nzchar(trimws(as.character(path)))) return(NULL)
+  path <- as.character(path)
+  say <- function(...) cat(sprintf(...), "\n", sep = "")
+  if (!file.exists(path)) {
+    say("\n[WARNING] whatif_island points at a file that is not there: %s\n  The report is built without the What if tab.\n", path)
+    return(NULL)
+  }
+  top <- tryCatch(jsonlite::fromJSON(paste(readLines(path, warn = FALSE), collapse = ""),
+                                     simplifyVector = FALSE), error = function(e) NULL)
+  if (is.null(top) || !identical(top$meta$kind, "whatif")) {
+    say("\n[WARNING] %s is not a What if contribution file.\n  The report is built without the What if tab.\n",
+        basename(path))
+    return(NULL)
+  }
+  if (is.null(top$variants)) {
+    say("\n[WARNING] %s was written by an earlier What if version.\n  Run the What if module again. The report is built without the What if tab.\n",
+        basename(path))
+    return(NULL)
+  }
+  # The version fitted the way this report is weighted, so the tab's actual
+  # score and every effect agree with the report's own numbers.
+  report_weighted <- isTRUE(config_obj$apply_weighting)
+  report_wv <- as.character(config_obj$weight_variable %||% "")
+  wi <- if (report_weighted) top$variants$weighted else top$variants$unweighted
+  wi_wv <- as.character(wi$meta$weight_variable %||% "")
+  if (is.null(wi) || (report_weighted && !identical(wi_wv, report_wv))) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────────┐\n")
+    cat(sprintf("│ This report is %s, but the What if file has no version\n",
+                if (report_weighted) sprintf("weighted by '%s'", report_wv) else "unweighted"))
+    cat(sprintf("│ fitted that way (it has: %s%s). The What if tab is left out.\n",
+                paste(names(top$variants), collapse = ", "),
+                if (nzchar(as.character(top$meta$weight_variable %||% "")))
+                  sprintf(", weighted by '%s'", top$meta$weight_variable) else ""))
+    cat("│ Fix: set weight_variable on the What if config to the report's\n")
+    cat("│ weight column and run the What if module again.\n")
+    cat("└───────────────────────────────────────────────────────────┘\n\n")
+    return(NULL)
+  }
+  if (is.null(wi$model) || is.null(wi$safe) || is.null(wi$safe$model)) {
+    say("\n[WARNING] %s is not a complete What if contribution file.\n  The report is built without the What if tab.\n",
+        basename(path))
+    return(NULL)
+  }
+  k_report <- suppressWarnings(as.numeric(config_obj$min_reporting_base %||% 0))
+  if (!identical(interactivity, "records") && !is.na(k_report) &&
+      k_report > as.numeric(wi$safe$min_group %||% 0)) {
+    cat("\n┌─── TURAS DISCLOSURE WARNING ───────────────────────────────┐\n")
+    cat(sprintf("│ The What if file publishes groups of %s or more, but this\n", wi$safe$min_group))
+    cat(sprintf("│ report's min_reporting_base is %s. The What if tab is left out.\n", k_report))
+    cat("│ Fix: set min_group on the What if config to at least the\n")
+    cat("│ report's minimum and run the What if module again.\n")
+    cat("└────────────────────────────────────────────────────────────┘\n\n")
+    return(NULL)
+  }
+
+  safe_payload <- function(note) {
+    wi$meta$mode <- "safe"
+    wi$meta$id_variable <- NULL
+    say("  What if tab: client-safe, %d published groups%s.", length(wi$safe$groups), note)
+    # The client-safe model block (no context baselines) replaces the full one.
+    model <- wi$safe$model
+    wi$safe$model <- NULL
+    list(meta = wi$meta, model = model, safe = wi$safe)
+  }
+  payload <- NULL
+  if (identical(interactivity, "records")) {
+    payload <- .whatif_open_payload(wi, survey_data, say)
+    if (is.null(payload)) payload <- safe_payload(" (the open part could not be lined up with this report)")
+  } else {
+    payload <- safe_payload("")
+  }
+  txt <- jsonlite::toJSON(payload, auto_unbox = TRUE, null = "null", na = "null", digits = NA)
+  as.character(txt)
+}
+
+
+#' Line the Open What if Rows Up With This Report's Respondents
+#'
+#' @return The open payload, or NULL (with a console note) when it cannot be
+#'   lined up: no ID column in this report's data, repeated IDs, or a What if
+#'   respondent this report does not have.
+#' @keywords internal
+.whatif_open_payload <- function(wi, survey_data, say) {
+  op <- wi$open
+  id_var <- wi$meta$id_variable
+  if (is.null(op) || is.null(id_var) || is.null(survey_data)) return(NULL)
+  cols <- trimws(sub("^﻿", "", names(survey_data)))
+  j <- match(id_var, cols)
+  if (is.na(j)) {
+    say("  What if: this report's data has no '%s' column to line respondents up by.", id_var)
+    return(NULL)
+  }
+  tabs_ids <- trimws(as.character(survey_data[[j]]))
+  wi_ids <- vapply(op$ids, as.character, "")
+  if (anyDuplicated(tabs_ids) || anyNA(tabs_ids)) {
+    say("  What if: '%s' is missing or repeated in this report's data.", id_var)
+    return(NULL)
+  }
+  missing <- sum(!wi_ids %in% tabs_ids)
+  if (missing > 0) {
+    say("  What if: %d What if respondents are not in this report's data (different file or filter).", missing)
+    return(NULL)
+  }
+  idx <- match(tabs_ids, wi_ids)
+  num <- function(x) vapply(x, function(v) if (is.null(v)) NA_real_ else as.numeric(v), numeric(1))
+  pick <- function(x) I(num(x)[idx])
+  open <- list(
+    n = length(tabs_ids),
+    modelled = sum(!is.na(idx)),
+    y = pick(op$y),
+    w = pick(op$w),
+    val = lapply(op$val, pick),
+    ctx_levels = op$ctx_levels,
+    ctx = lapply(op$ctx, pick)
+  )
+  wi$meta$mode <- "open"
+  wi$meta$id_variable <- NULL
+  say("  What if tab: open (follows the filter), %d of %d respondents in the model.", open$modelled, open$n)
+  list(meta = wi$meta, model = wi$model, profile = wi$profile, open = open)
+}
+
+
 #' Read a Conjoint Contribution For This Project
 #'
 #' The conjoint module writes `{output}_cj_island.json` when it runs. A tabs run
@@ -1369,6 +1522,10 @@ if (.html_report_v2_on) {
       kd_json_main <- .read_keydriver_contribution(config_result$config_obj)
       # And a categorical driver study's, the same way again (13_v2_island.R).
       cd_json_main <- .read_catdriver_contribution(config_result$config_obj)
+      # And a What if study's. Unlike the others it has two forms, and which
+      # one this report may carry depends on the delivery mode resolved above.
+      wi_json_main <- .read_whatif_contribution(config_result$config_obj, .interactivity,
+                                                data_result$survey_data)
 
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
                            sub("\\.xlsx$", "_report.html", v2_out),
@@ -1380,7 +1537,8 @@ if (.html_report_v2_on) {
                            md_json = md_json_main,
                            pr_json = pr_json_main,
                            kd_json = kd_json_main,
-                           cd_json = cd_json_main)
+                           cd_json = cd_json_main,
+                           wi_json = wi_json_main)
     }, error = function(e) {
       cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
       cat("  The Excel and HTML outputs were not affected.\n\n")

@@ -60,6 +60,129 @@ if (!exists("%||%", mode = "function")) {
 .RELEASE_AGGREGATE_ISLANDS <- c("data-agg", "data-cube")
 
 
+#' Audit a WHAT IF island against a client-safe build's promises
+#'
+#' The What if contribution file (modules/whatif) carries an open part, one row
+#' per respondent, and a client-safe part, results for published groups only.
+#' The tabs build keeps the open part only for a full report
+#' (.read_whatif_contribution). This checks the file that was actually built:
+#'   1. no open block, and no open profile model (its level counts can be under k);
+#'   2. no list as long as the study, or nearly (n - k or more), outside the
+#'      model's refits;
+#'   3. every published group at or above the island's own minimum, which is 2 or more;
+#'   4. the island's own audit reports no nesting or recoverability failure;
+#'   5. no named list of refused or hidden groups;
+#'   6. arithmetic a reader can do from the island itself: the whole sample
+#'      minus a variable's published levels, and a published level minus its
+#'      published cells in a crossing, is 0 or at least k;
+#'   7. no context-baseline coefficient (it names a level and estimates it), no
+#'      per-level counts in Build a ..., no need count or its complement under
+#'      k, no symptom whose flagged or unflagged side is under k.
+#'
+#' @param body The data-wi island body, already extracted.
+#' @return list(present, mode, groups, violations)
+#' @keywords internal
+release_audit_whatif <- function(body) {
+  out <- list(present = FALSE, mode = NA_character_, groups = 0L, violations = character(0))
+  if (is.na(body) || !nzchar(trimws(body)) || identical(trimws(body), "null")) return(out)
+  out$present <- TRUE
+  wi <- tryCatch(jsonlite::fromJSON(body, simplifyVector = FALSE), error = function(e) NULL)
+  if (is.null(wi)) {
+    out$violations <- "the What if island cannot be read, so it cannot be checked"
+    return(out)
+  }
+  out$mode <- as.character(wi$meta$mode %||% NA_character_)
+  n <- suppressWarnings(as.integer(wi$meta$n %||% NA))
+  if (!is.null(wi$open)) out$violations <- c(out$violations, "the What if island carries one row per respondent (its open part)")
+  if (!is.null(wi$profile)) out$violations <- c(out$violations, "the What if island carries the open Build a ... model")
+  # Every unnamed list's length, except the model's refits (101 of them, more
+  # than a small study's respondents) and the published groups (checked on
+  # their own below). A list within k of the study's size is one value per
+  # respondent, or nearly.
+  lengths_of <- function(o, path = "") {
+    if (!is.list(o)) return(integer(0))
+    here <- if (is.null(names(o)) && !path %in% c("model$fits", "safe$groups")) length(o) else integer(0)
+    kids <- if (is.null(names(o))) lapply(o, lengths_of, path = paste0(path, "[]"))
+            else lapply(names(o), function(nm) lengths_of(o[[nm]], if (nzchar(path)) paste0(path, "$", nm) else nm))
+    c(here, unlist(kids))
+  }
+  safe <- wi$safe
+  k <- suppressWarnings(as.numeric((safe %||% list())$min_group %||% NA))
+  if (!is.na(n) && !is.na(k) && any(lengths_of(wi) >= n - k)) {
+    out$violations <- c(out$violations, sprintf("the What if island holds a list about as long as the study (%d)", n))
+  }
+  if (is.null(safe)) {
+    out$violations <- c(out$violations, "the What if island has no client-safe part")
+    return(out)
+  }
+  if (is.na(k) || k < 2) out$violations <- c(out$violations, "the What if island states no minimum group above 1")
+  groups <- safe$groups %||% list()
+  ns <- vapply(groups, function(g) as.numeric(g$n %||% NA), numeric(1))
+  out$groups <- length(ns)
+  if (!is.na(k) && any(is.na(ns) | ns < k)) {
+    out$violations <- c(out$violations, sprintf("%d What if group(s) under the minimum of %s", sum(is.na(ns) | ns < k), k))
+  }
+  a <- safe$audit %||% list()
+  if (!identical(as.numeric(a$differencing_failures %||% NA), 0) ||
+      !identical(as.numeric(a$recoverable_failures %||% NA), 0)) {
+    out$violations <- c(out$violations, "the What if island's own audit reports groups that could be worked out by subtraction")
+  }
+  if (!is.null(safe$refused) || !is.null(safe$hidden)) {
+    out$violations <- c(out$violations, "the What if island names the groups it refused or hid")
+  }
+  if (is.na(k)) return(out)
+  small <- function(x) !is.na(x) & x > 0 & x < k
+  # 6. subtraction a reader can do with the island alone
+  defs <- lapply(groups, function(g) unlist(g$def %||% list()))
+  all_n <- ns[vapply(defs, length, 0) == 0][1]
+  singles <- list(); cells <- list()
+  for (i in seq_along(defs)) {
+    d <- defs[[i]]
+    if (length(d) == 1) singles[[names(d)]][[d[[1]]]] <- ns[i]
+    if (length(d) == 2) {
+      ks <- sort(names(d)); fam <- paste(ks, collapse = "|")
+      cells[[fam]] <- rbind(cells[[fam]], data.frame(l1 = d[[ks[1]]], l2 = d[[ks[2]]], n = ns[i], stringsAsFactors = FALSE))
+    }
+  }
+  if (!is.na(all_n)) for (key in names(singles)) {
+    if (small(all_n - sum(unlist(singles[[key]])))) {
+      out$violations <- c(out$violations, sprintf("the whole sample minus the published %s levels leaves fewer than %s", key, k))
+    }
+  }
+  for (fam in names(cells)) {
+    ks <- strsplit(fam, "|", fixed = TRUE)[[1]]; tab <- cells[[fam]]
+    for (side in 1:2) {
+      key <- ks[side]; col <- if (side == 1) "l1" else "l2"
+      for (lv in names(singles[[key]] %||% list())) {
+        rest <- singles[[key]][[lv]] - sum(tab$n[tab[[col]] == lv])
+        if (small(rest)) {
+          out$violations <- c(out$violations, sprintf("%s = %s minus its published cells in %s leaves fewer than %s",
+                                                      key, lv, gsub("|", " by ", fam, fixed = TRUE), k))
+        }
+      }
+    }
+  }
+  # 7. fields that describe fewer than k people
+  mdl <- wi$model %||% list()
+  if (any(vapply(mdl$design %||% list(), function(c) isTRUE(c$context), logical(1)))) {
+    out$violations <- c(out$violations, "the What if model carries context-baseline coefficients (one per level, named)")
+  }
+  if (any(vapply((safe$profile %||% list())$keys %||% list(), function(kk) !is.null(kk$n), logical(1)))) {
+    out$violations <- c(out$violations, "the What if Build a ... model carries per-level counts")
+  }
+  bad_need <- sum(vapply(seq_along(groups), function(i) {
+    nd <- vapply(groups[[i]]$need %||% list(), function(v) if (is.null(v)) NA_real_ else as.numeric(v), 0)
+    sum(small(nd) | small(ns[i] - nd))
+  }, numeric(1)))
+  if (bad_need) out$violations <- c(out$violations, sprintf("%d What if need count(s) describe fewer than %s people", bad_need, k))
+  sym_n <- vapply(mdl$symptoms %||% list(), function(sm) as.numeric(sm$n %||% NA), 0)
+  if (!is.na(n) && any(small(sym_n) | small(n - sym_n))) {
+    out$violations <- c(out$violations, sprintf("a What if symptom effect rests on fewer than %s respondents", k))
+  }
+  out
+}
+
+
 #' Audit a COMMENT island against a client-safe build's promises
 #'
 #' The cube audit above asks whether the quantitative payload keeps its word.
@@ -360,6 +483,7 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
   cube_body <- release_island_body(html, "data-cube")
   cube_audit <- release_audit_cube(cube_body)
   qual_audit <- release_audit_qual(release_island_body(html, "data-qual"), cube_body)
+  whatif_audit <- release_audit_whatif(release_island_body(html, "data-wi"))
 
   micro_body <- release_island_body(html, "data-micro")
   micro_present <- !is.na(micro_body) && nzchar(micro_body) &&
@@ -395,7 +519,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
 
   cube_violation <- isTRUE(client_safe) && length(cube_audit$violations) > 0
   qual_violation <- isTRUE(client_safe) && length(qual_audit$violations) > 0
-  violation <- isTRUE(client_safe) && (micro_present || cube_violation || qual_violation)
+  whatif_violation <- isTRUE(client_safe) && length(whatif_audit$violations) > 0
+  violation <- isTRUE(client_safe) && (micro_present || cube_violation || qual_violation || whatif_violation)
 
   pad <- function(x) formatC(x, width = 32, flag = "-")
   lines <- c(
@@ -418,6 +543,11 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
            else sprintf("present (%s comments, keyed by %s, tags %s, text %s)",
                         format(qual_audit$records), qual_audit$comment_key,
                         qual_audit$cuts, qual_audit$text_mode)),
+    paste0("│ ", pad("What if island"), ": ",
+           if (!whatif_audit$present) "absent"
+           else sprintf("present (%s, %d published groups)",
+                        if (identical(whatif_audit$mode, "open")) "open: follows the filter" else "client-safe",
+                        whatif_audit$groups)),
     # Said out loud, because a check that could not run is not a check that passed.
     if (qual_audit$present && qual_audit$unverifiable > 0)
       paste0("│ ", pad("Comment tags not priceable"), ": ",
@@ -434,6 +564,11 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
   if (length(qual_audit$violations)) {
     lines <- c(lines, "│", "│ The comment island does not keep its own promises:")
     for (v in qual_audit$violations) lines <- c(lines, paste0("│   ", v))
+  }
+
+  if (isTRUE(client_safe) && length(whatif_audit$violations)) {
+    lines <- c(lines, "│", "│ The What if island does not keep a client-safe file's promises:")
+    for (v in whatif_audit$violations) lines <- c(lines, paste0("│   ", v))
   }
 
   if (length(ip_hits)) {
@@ -453,10 +588,12 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
   out <- list(
     status = if (!micro_present && !length(identifiers) && !length(ip_hits) &&
                  !length(cube_audit$violations) &&
-                 !length(qual_audit$violations)) "PASS" else "FLAGGED",
+                 !length(qual_audit$violations) &&
+                 !(isTRUE(client_safe) && length(whatif_audit$violations))) "PASS" else "FLAGGED",
     microdata = list(present = micro_present, n = micro_n, weights = micro_weights),
     cube = cube_audit,
     qual = qual_audit,
+    whatif = whatif_audit,
     identifiers = identifiers,
     ip = ip_hits,
     lines = lines,
@@ -470,6 +607,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
         title = if (micro_present) "Client-safe build still contains respondent-level data"
                 else if (cube_violation)
                   "Client-safe build carries an aggregate cube that breaks its own rule"
+                else if (whatif_violation)
+                  "Client-safe build carries What if data it should not"
                 else "Client-safe build carries comments that identify their authors",
         problem = if (micro_present) sprintf(
           "This build was declared client-safe, but the file carries a populated data-micro island (%s de-identified records).",
@@ -477,6 +616,9 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
         else if (cube_violation) paste0(
           "This build was declared client-safe, and its aggregate cube does not keep ",
           "its own promises: ", paste(cube_audit$violations, collapse = "; "), ".")
+        else if (whatif_violation) paste0(
+          "This build was declared client-safe, and its What if tab does not keep ",
+          "a client-safe file's promises: ", paste(whatif_audit$violations, collapse = "; "), ".")
         else paste0(
           "This build was declared client-safe, and its comment island does not keep ",
           "its own promises: ", paste(qual_audit$violations, collapse = "; "), "."),
@@ -494,6 +636,10 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
           "Raise min_reporting_base and rebuild: the cube then withholds the cuts that are too small.",
           "Or set html_report_v2_interactivity = none for published tables with no live views.",
           "The cube is decided when the report is built, so it cannot be repaired afterwards.")
+        else if (whatif_violation) c(
+          "Rebuild through the tabs GUI with the client-safe choice: the build keeps only the What if file's client-safe part.",
+          "Run the What if module again if its file predates this check, then rebuild the report.",
+          "Or clear whatif_island on the Settings sheet to build without the What if tab.")
         else c(
           "Choose a client-safe delivery mode in the tabs GUI and rebuild: it raises the comment dials itself.",
           "Running outside the GUI: set qual_comment_key = question and qual_demographic_cuts = safe on the Settings sheet.",
