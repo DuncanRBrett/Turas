@@ -91,9 +91,13 @@ test_that("the console block is written with cat, so a sink captures it", {
 
   # The GUI's own capture: sink to a file, unsplit, exactly as run_segment_gui
   # opens it. What the block prints has to land in the file.
+  # Close only the sink this test opens. `sink.number() > 0` also closed the
+  # test runner's own log sink (tools/run_all_tests.R), which then crashed the
+  # rest of the file with "invalid connection" (review 2026-09-24).
   f <- tempfile()
+  sinks_before <- sink.number()
   sink(f, type = "output")
-  on.exit({ if (sink.number() > 0) sink(type = "output") }, add = TRUE)
+  on.exit({ if (sink.number() > sinks_before) sink(type = "output") }, add = TRUE)
   segment_gui_console_block(outcome)
   sink(type = "output")
 
