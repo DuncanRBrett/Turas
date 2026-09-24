@@ -341,3 +341,41 @@ test_that("a small study passes the release audit when clean, and a pooled level
   named <- unlist(lapply(cut$safe$profile$rules, unlist))
   expect_false("Masters" %in% named)
 })
+
+test_that("the open part flags don't-know respondents, and the need count leaves them out", {
+  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)$variants$weighted
+  dk <- unlist(j$open$dk$admin)
+  expect_length(dk, 500)
+  expect_equal(sum(dk), 20)
+  admin <- res$model$spec$levers[[2]]
+  expect_equal(admin$key, "admin")
+  expect_equal(which(dk == 1), which(admin$dk))
+  expect_false(any(unlist(j$open$dk$teach) == 1))
+  # The whole-sample need count is those below the target with a rating of their own.
+  keys <- vapply(j$model$levers, `[[`, "", "key")
+  all_g <- Filter(function(g) g$id == "all", j$safe$groups)[[1]]
+  need_admin <- unlist(all_g$need)[keys == "admin"]
+  if (!is.null(need_admin) && !is.na(need_admin)) {
+    expect_equal(need_admin, sum(admin$values < admin$target & !admin$dk))
+  }
+  lv_all <- res$variants[[res$primary]]$safe_results$all$levers
+  expect_equal(lv_all$need[lv_all$key == "admin"][1], sum(admin$values < admin$target & !admin$dk))
+})
+
+test_that("the halo check ships in both model blocks, and the workbook carries it with the relative importance", {
+  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)$variants$weighted
+  keys <- vapply(j$model$levers, `[[`, "", "key")
+  expect_equal(names(j$model$halo), keys)
+  expect_equal(j$model$halo_ratio, 1 / 3)
+  h <- j$model$halo$teach
+  expect_true(all(c("single", "partial", "flag") %in% names(h)))
+  expect_true(is.logical(h$flag))
+  expect_equal(names(j$safe$model$halo), keys)
+  expect_equal(j$safe$model$halo$teach$single, h$single)
+  eff <- openxlsx::read.xlsx(res$files$excel, sheet = "Effort", skipEmptyRows = FALSE)
+  expect_true(all(c("Fixed_alone", "Halo_ratio", "Halo") %in% names(eff)))
+  expect_false(any(is.na(eff$Fixed_alone)))
+  ri <- openxlsx::read.xlsx(res$files$excel, sheet = "Relative_importance", skipEmptyRows = FALSE)
+  expect_equal(nrow(ri), length(keys))
+  expect_equal(sum(ri$LMG_share_of_R2), 100, tolerance = 0.5)
+})

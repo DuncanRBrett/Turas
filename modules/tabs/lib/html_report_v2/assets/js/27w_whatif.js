@@ -18,6 +18,10 @@
  * (who the respondent is), Rate as one (how they rate), diagnostics.
  *
  * Association, not cause: nothing here says fixing an area WILL add points.
+ * A respondent flagged dk in the open rows gave no rating for that lever: the
+ * live view leaves them out of the need count and the moves, as R does. The
+ * model block's halo check marks an area whose effect collapses when the other
+ * areas are held (shown under the area, never greyed to zero).
  * Literal strings only (no TR.txt keys), no em dashes.
  */
 (function (global) {
@@ -97,15 +101,17 @@
   }
 
   /** Change in a lever's model column for one respondent under a move.
-   *  The JavaScript twin of whatif_move_delta() in modules/whatif/R/04_moves.R. */
-  function delta(lv, move, v) {
+   *  The JavaScript twin of whatif_move_delta() in modules/whatif/R/04_moves.R.
+   *  dk: the respondent gave no rating for this lever (the value is a fill),
+   *  so no rating move touches them. */
+  function delta(lv, move, v, dk) {
     var sc = scaleOf();
     if (lv.kind === "coverage") {
       if (move === "extend") return v ? 0 : 1;
       if (move === "withdraw") return v ? -1 : 0;
       return 0;
     }
-    if (v === null || v === undefined) return 0;
+    if (v === null || v === undefined || dk) return 0;
     if (move === "floor") return Math.max(v, goodOf(lv)) - v;
     var s = { slip2: -2, slip1: -1, up1: 1, up2: 2 }[move];
     if (s === undefined) return 0;
@@ -126,6 +132,24 @@
   function unclear(key) {
     var s = (model().sign || {})[key];
     return s !== undefined && s !== null && s > (model().unclear_share || 0.1);
+  }
+  /** The halo check from the R engine: the lever's fix effect fitted alone
+   *  against its partial effect (the other areas held where they are), for
+   *  everyone. Flagged when the partial effect is under the ratio. */
+  function halo(key) {
+    var h = (model().halo || {})[key];
+    return h && h.flag === true ? h : null;
+  }
+  function haloText(key) {
+    var h = halo(key);
+    if (!h) return "";
+    return "Caught in the halo: fixed on its own this area is worth " + f1(h.single) + " points for everyone, " +
+      f1(h.partial) + " with the other areas held where they are. The data cannot separate it from the areas it moves with.";
+  }
+  /** Whether respondent i gave no rating of their own for the lever. */
+  function dkOf(O, key, i) {
+    var d = O.dk && O.dk[key];
+    return !!(d && d[i]);
   }
 
   // ---------------------------------------------------------------- mode
@@ -206,7 +230,7 @@
         var i = idx[q], base = e[i], e2 = base;
         for (var l = 0; l < levers.length; l++) {
           var mv = moves[levers[l].key];
-          if (mv) e2 += fit.b[levers[l].col] * delta(levers[l], mv, O.val[levers[l].key][i]);
+          if (mv) e2 += fit.b[levers[l].col] * delta(levers[l], mv, O.val[levers[l].key][i], dkOf(O, levers[l].key, i));
         }
         if (e2 !== base) d += O.w[i] * (scoreAt(fit, e2, scores) - scoreAt(fit, base, scores));
         sw += O.w[i];
@@ -229,7 +253,7 @@
         var c = 0, vals = O.val[lv.key];
         idx.forEach(function (i) {
           var v = vals[i];
-          if (lv.kind === "coverage" ? !v : (v !== null && v !== undefined && v < goodOf(lv))) c++;
+          if (lv.kind === "coverage" ? !v : (v !== null && v !== undefined && !dkOf(O, lv.key, i) && v < goodOf(lv))) c++;
         });
         return c;
       }),
@@ -425,9 +449,10 @@
       '<th class="num">If it slips</th><th class="num">If fixed</th><th class="num">Net gain per 100 ' + esc(units) +
       ' reached</th><th class="wi-barcol"></th></tr></thead><tbody>';
     rows.forEach(function (r) {
-      var lv = r.lv, sub = r.unclear ? "Effect unclear: points the wrong way in " + Math.round(100 * md.sign[lv.key]) + "% of refits" : lv.sub;
+      var lv = r.lv, sub = r.unclear ? "Effect unclear: points the wrong way in " + Math.round(100 * md.sign[lv.key]) + "% of refits"
+        : halo(lv.key) ? haloText(lv.key) + (lv.sub ? " " + lv.sub : "") : lv.sub;
       var needTxt = r.cnt === null || r.cnt === undefined ? "not shown" : String(r.cnt);
-      h += "<tr" + (r.unclear ? ' class="wi-unclear"' : "") + "><td>" + esc(lv.label) +
+      h += "<tr" + (r.unclear ? ' class="wi-unclear"' : halo(lv.key) ? ' class="wi-halo"' : "") + "><td>" + esc(lv.label) +
         '<span class="wi-tag">' + (lv.kind === "coverage" ? "coverage" : "rating") + "</span>" +
         (sub ? "<small>" + esc(sub) + "</small>" : "") + "</td>";
       h += '<td class="num">' + esc(needTxt) + "</td>";
@@ -737,6 +762,12 @@
     items.push(unc.length ? "Sign check: " + unc.map(function (lv) { return lv.label + " points the wrong way in " +
       Math.round(100 * md.sign[lv.key]) + "% of refits"; }).join("; ") + ". Shown greyed; the data cannot separate its effect from the areas it overlaps."
       : "Sign check: every area points the expected way.");
+    var hl = md.levers.filter(function (lv) { return halo(lv.key); });
+    items.push("Every effect holds the other areas where they are, which is right for what is unique to an area and a floor for what fixing it would do, because ratings move together. " +
+      (hl.length ? "Caught in the halo (fixed alone worth more than " + Math.round(1 / (md.halo_ratio || (1 / 3))) + " times its own effect): " +
+        hl.map(function (lv) { return lv.label + " (" + f1(md.halo[lv.key].single) + " alone, " + f1(md.halo[lv.key].partial) + " held); "; }).join("").replace(/; $/, ".") +
+        " The data cannot separate those areas from the areas they move with; read their effect as a floor."
+        : "Halo check: no area's effect collapses when the others are held where they are."));
     items.push("This is association, not cause. " + cap(units) + " who like " + (M.brand || "the organisation") +
       " rate everything higher, so real gains are probably smaller than shown.");
     (md.notes || []).forEach(function (t) { items.push(t); });

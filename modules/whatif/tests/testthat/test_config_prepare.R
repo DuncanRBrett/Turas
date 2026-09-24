@@ -68,6 +68,21 @@ test_that("don't-know answers take the median and are counted", {
   expect_true(all(admin$values %in% 1:5))
 })
 
+test_that("a respondent whose only answer was don't-know is flagged dk, out of the need count and the moves", {
+  admin <- prep$spec$levers[[2]]
+  expect_equal(sum(admin$dk), 20)
+  expect_equal(which(admin$dk), which(d$A1 == "DK"))
+  # The teaching lever averages T1 and T2; a DK on T2 alone still leaves a
+  # rating from T1, so nobody is flagged.
+  expect_false(any(prep$spec$levers[[1]]$dk))
+  # A dk respondent sitting below the target (the centre fill) is not in need
+  # and the floor move leaves them where they are.
+  g <- quietly(whatif_guard_spec(prep$spec))
+  a <- g$levers[[2]]
+  expect_false(any(whatif_need_mask(a)[a$dk]))
+  expect_true(all(whatif_move_delta(a, "floor", g$scale)[a$dk] == 0))
+})
+
 test_that("an either/or pair averages only the question each respondent was asked", {
   L5 <- c("Terrible", "Not very good", "About average", "Good", "Excellent")
   reg <- prep$spec$levers[[4]]
@@ -142,4 +157,17 @@ test_that("config mistakes are refused with their own codes", {
   expect_equal(code_for(list(min_group = 1)), "CFG_SETTING_NOT_NUMBER")
   expect_equal(code_for(list(weight_variable = "NPS")), "DATA_WEIGHTS_INVALID")
   expect_equal(code_for(list(base_filter_values = "Complete; Partial")), "NO_REFUSAL")
+})
+
+test_that("with the centre rule a don't-know fill sits below the target and is still out of the need count", {
+  p2 <- test_project(config = list(dont_know = "centre"))
+  prep2 <- whatif_prepare(whatif_read_config(p2$config), verbose = FALSE)
+  g <- quietly(whatif_guard_spec(prep2$spec))
+  a <- g$levers[[2]]
+  expect_equal(a$key, "admin")
+  expect_equal(sum(a$dk), 20)
+  expect_true(all(a$values[a$dk] == 3))
+  # The fill is below Good, so without the flag these 20 would count as needing the fix.
+  expect_equal(sum(a$values < a$target), sum(whatif_need_mask(a)) + 20)
+  expect_true(all(whatif_move_delta(a, "floor", g$scale)[a$dk] == 0))
 })

@@ -934,6 +934,7 @@ format_output_value <- function(value, type = "frequency",
     y = pick(op$y),
     w = pick(op$w),
     val = lapply(op$val, pick),
+    dk = lapply(op$dk %||% list(), pick),
     ctx_levels = op$ctx_levels,
     ctx = lapply(op$ctx, pick)
   )

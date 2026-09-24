@@ -91,3 +91,128 @@ whatif_symptom_effects <- function(model, symptoms) {
   })
   do.call(rbind, rows)
 }
+
+
+#' Partial Effect Below This Share of the Single-Lever Effect Flags a Halo
+#'
+#' Every move holds the other levers fixed, which is right for "what is unique
+#' to this area" and a floor for "what happens if this area is fixed", because
+#' ratings move together. An area whose effect fitted on its own is large but
+#' whose partial effect is small is caught in that shared variance (a halo,
+#' or real spillover; the data cannot separate the two). Chosen from the
+#' SACAP 2025 probe of 24 Sep 2026 (docs/v2_lift/BLINDSPOT_WHATIF_RESULTS_2026_09_24.md):
+#' assessment feedback and email responsiveness sat near a tenth of their
+#' single-lever effect, the areas the tab was right about near a half.
+WHATIF_HALO_RATIO <- 1 / 3
+
+
+#' Levers Larger Than This Skip the Relative-Importance Decomposition
+#'
+#' The LMG shares need a fit for every subset of levers (2 to the power p).
+WHATIF_LMG_MAX_LEVERS <- 12L
+
+
+#' Halo Check: Each Lever's Fix Effect Alone Against Its Partial Effect
+#'
+#' For every lever, the fix move (floor for a rating or nested lever, extend
+#' for coverage) is evaluated for the whole sample twice: from a model with
+#' that lever alone (no other levers, no baselines) and from the main fit,
+#' where the other levers are held where they are. The ratio partial over
+#' single, and the flag when it falls under WHATIF_HALO_RATIO.
+#'
+#' @param spec Guarded spec
+#' @param design Design from whatif_build_design()
+#' @param main Main fit
+#' @param deltas Per-lever move deltas (from whatif_run_engine())
+#' @return Data frame: key, single, partial, ratio, halo
+#' @keywords internal
+whatif_halo_check <- function(spec, design, main, deltas) {
+  y <- spec$y
+  w <- spec$weights
+  score <- spec$outcome$score
+  X <- design$X
+  eta_main <- drop(X %*% main$b)
+  base_main <- stats::weighted.mean(whatif_score_vec(main, eta_main, score), w)
+  rows <- lapply(spec$levers, function(lv) {
+    key <- lv$key
+    mv <- if (lv$kind == "coverage") "extend" else "floor"
+    dx <- deltas[[key]][[mv]]
+    col <- design$lever_col[[key]]
+    partial <- stats::weighted.mean(whatif_score_vec(main, eta_main + main$b[[col]] * dx, score), w) - base_main
+    own <- which(design$cols$lever == key & !design$cols$is_context)
+    Xj <- X[, own, drop = FALSE]
+    fj <- whatif_fit_ordinal(Xj, y, w, spec$n_cat, spec$penalty_levers)
+    eta_j <- drop(Xj %*% fj$b)
+    bj <- fj$b[[match(col, own)]]
+    single <- stats::weighted.mean(whatif_score_vec(fj, eta_j + bj * dx, score), w) -
+      stats::weighted.mean(whatif_score_vec(fj, eta_j, score), w)
+    ratio <- if (abs(single) > 1e-9) partial / single else NA_real_
+    data.frame(key = key, single = single, partial = partial, ratio = ratio,
+               halo = !is.na(ratio) && abs(single) >= 1 && ratio < WHATIF_HALO_RATIO,
+               stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows)
+}
+
+
+#' Relative Importance of the Levers (LMG, the Shapley Decomposition of R2)
+#'
+#' A conventional key driver analysis on the same levers, for the stats pack:
+#' a weighted linear regression of the respondent's outcome score on the lever
+#' columns, with the explained variance shared out over every order the levers
+#' could enter (Lindeman, Merenda and Gold). Correlated levers share credit
+#' here, where the effort table gives each its partial effect; the two rankings
+#' are shown side by side so a reader can reconcile them. Returns NULL with
+#' more than WHATIF_LMG_MAX_LEVERS levers.
+#'
+#' @param spec Guarded spec
+#' @param design Design from whatif_build_design()
+#' @return Data frame key, lmg_share (percent of the linear R2), marginal_r
+#'   (weighted correlation of the lever's moved column with the score), and
+#'   attribute r2 (the full linear R2); or NULL
+#' @keywords internal
+whatif_lmg <- function(spec, design) {
+  keys <- vapply(spec$levers, `[[`, character(1), "key")
+  p <- length(keys)
+  if (p > WHATIF_LMG_MAX_LEVERS) return(NULL)
+  w <- spec$weights
+  ys <- spec$outcome$score[spec$y]
+  X <- design$X
+  own <- lapply(keys, function(k) which(design$cols$lever == k & !design$cols$is_context))
+  wm <- stats::weighted.mean(ys, w)
+  tss <- sum(w * (ys - wm)^2)
+  r2_of <- function(members) {
+    if (!length(members)) return(0)
+    cols <- unlist(own[members])
+    fit <- stats::lm.wfit(cbind(1, X[, cols, drop = FALSE]), ys, w)
+    1 - sum(w * fit$residuals^2) / tss
+  }
+  r2 <- numeric(2^p)
+  for (b in seq_len(2^p) - 1L) {
+    members <- which(bitwAnd(b, bitwShiftL(1L, seq_len(p) - 1L)) > 0)
+    r2[b + 1L] <- r2_of(members)
+  }
+  code <- function(members) sum(bitwShiftL(1L, members - 1L)) + 1L
+  lmg <- vapply(seq_len(p), function(j) {
+    total <- 0
+    for (b in seq_len(2^p) - 1L) {
+      members <- which(bitwAnd(b, bitwShiftL(1L, seq_len(p) - 1L)) > 0)
+      if (j %in% members) next
+      k <- length(members)
+      wgt <- factorial(k) * factorial(p - k - 1) / factorial(p)
+      total <- total + wgt * (r2[code(c(members, j))] - r2[b + 1L])
+    }
+    total
+  }, numeric(1))
+  marginal <- vapply(seq_len(p), function(j) {
+    xj <- X[, design$lever_col[[keys[j]]]]
+    cv <- stats::cov.wt(cbind(xj, ys), wt = w / sum(w), cor = TRUE)$cor
+    cv[1, 2]
+  }, numeric(1))
+  full <- r2[2^p]
+  out <- data.frame(key = keys,
+                    lmg_share = if (full > 0) 100 * lmg / full else NA_real_,
+                    marginal_r = marginal, stringsAsFactors = FALSE)
+  attr(out, "r2") <- full
+  out
+}

@@ -14,7 +14,10 @@
 #     withdraw       take the service away from everyone who has it
 #     extend         give it to everyone who lacks it
 #
-# A nested lever's moves touch only respondents who have the service.
+# A nested lever's moves touch only respondents who have the service. A
+# respondent flagged dk (no rating of their own; the value is a fill) is never
+# moved and never counted as needing the fix: there is no rating to lift or to
+# let slip.
 # Move names match the prototype and its mockup page.
 #
 # ==============================================================================
@@ -53,6 +56,7 @@ whatif_move_delta <- function(lv, move, scale) {
     pmin(pmax(vv + step, scale$min), scale$max) - vv
   }
   if (lv$kind == "nested") out <- ifelse(lv$has, out, 0)
+  if (!is.null(lv$dk)) out[lv$dk] <- 0
   out
 }
 
@@ -60,13 +64,15 @@ whatif_move_delta <- function(lv, move, scale) {
 #' Respondents a Lever's Fix Would Reach
 #'
 #' Rating: below the fix target. Nested: has the service and below the target.
-#' Coverage: does not have the service.
+#' Coverage: does not have the service. A respondent flagged dk gave no rating,
+#' so they are not counted whatever fill their value carries.
 #'
 #' @param lv Guarded lever
 #' @return Logical vector
 #' @keywords internal
 whatif_need_mask <- function(lv) {
   if (lv$kind == "coverage") return(lv$values == 0)
-  if (lv$kind == "nested") return(lv$has & !is.na(lv$values) & lv$values < lv$target)
-  lv$values < lv$target
+  not_dk <- if (is.null(lv$dk)) TRUE else !lv$dk
+  if (lv$kind == "nested") return(lv$has & !is.na(lv$values) & lv$values < lv$target & not_dk)
+  lv$values < lv$target & not_dk
 }

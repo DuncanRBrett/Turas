@@ -13,7 +13,10 @@
 #   weights     NULL or positive numbers, one per respondent
 #   scale       list(min, max, centre, good) for rating and nested levers
 #   levers      list of levers: key, label, kind (rating | nested | coverage),
-#               values, has (nested only), optional target and expected (+1/-1)
+#               values, has (nested only), optional target and expected (+1/-1),
+#               optional dk (logical: the respondent gave no rating for this
+#               lever and its value is a fill; such a respondent is never
+#               counted as needing the fix and no move touches them)
 #   context     named list: key -> list(label, values), one value per respondent
 #   baselines   context keys entered in the lever model as ridge-penalised
 #               baselines (empty = ratings only)
@@ -179,7 +182,17 @@ whatif_guard_one_lever <- function(lv, n, sc) {
       "The sign check counts refits that point against the expected direction.",
       "Use +1 when a higher value should raise the outcome, -1 when it should lower it.")
   }
+  dk <- lv$dk %||% rep(FALSE, n)
+  if (!is.logical(dk) || length(dk) != n || any(is.na(dk))) {
+    whatif_refuse("DATA_LEVER_DK", "Don't-know flags do not match the respondents",
+      sprintf("Lever '%s' has a dk flag of length %d (%d NA); it needs TRUE/FALSE for all %d respondents.",
+              key, length(dk), sum(is.na(dk)), n),
+      "The flag decides who is left out of the need count and the moves; a wrong length would misplace it.",
+      "Build dk from the same respondent rows as the values, or leave it out.")
+  }
   if (lv$kind == "coverage") {
+    # A coverage answer is has or has not; there is no rating to not know.
+    lv$dk <- rep(FALSE, n)
     if (any(is.na(v)) || any(!v %in% c(0, 1))) {
       whatif_refuse("DATA_COVERAGE_NOT_BINARY", "Coverage lever is not 0 or 1",
         sprintf("Coverage lever '%s' must be 1 (has the service) or 0 (does not), with no missing values.", key),
@@ -225,6 +238,7 @@ whatif_guard_one_lever <- function(lv, n, sc) {
         "Use kind = rating when everyone was asked, or drop the lever.")
     }
   }
+  lv$dk <- if (lv$kind == "nested") dk & lv$has else dk
   vv <- if (lv$kind == "nested") v[lv$has] else v
   if (any(vv < sc$min | vv > sc$max)) {
     whatif_refuse("DATA_LEVER_OFF_SCALE", "Lever values outside the scale",

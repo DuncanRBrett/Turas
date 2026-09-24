@@ -61,3 +61,14 @@ test_that("need counts those a fix would reach", {
   expect_equal(whatif_need_mask(nested), c(TRUE, FALSE, TRUE, FALSE, FALSE))
   expect_equal(whatif_need_mask(coverage), c(TRUE, FALSE, TRUE, FALSE, FALSE))
 })
+
+test_that("a respondent flagged dk is never moved and never counted as needing the fix", {
+  r_dk <- modifyList(rating, list(dk = c(FALSE, TRUE, FALSE, FALSE, FALSE)))
+  expect_equal(whatif_move_delta(r_dk, "floor", sc), c(3, 0, 1, 0, 0))
+  expect_equal(whatif_move_delta(r_dk, "slip1", sc), c(0, 0, -1, -1, -1))
+  expect_equal(whatif_move_delta(r_dk, "up2", sc), c(2, 0, 2, 1, 0))
+  expect_equal(whatif_need_mask(r_dk), c(TRUE, FALSE, TRUE, FALSE, FALSE))
+  n_dk <- modifyList(nested, list(dk = c(TRUE, FALSE, FALSE, FALSE, FALSE)))
+  expect_equal(whatif_move_delta(n_dk, "floor", sc), c(0, 0, 1, 0, 0))
+  expect_equal(whatif_need_mask(n_dk), c(FALSE, FALSE, TRUE, FALSE, FALSE))
+})
