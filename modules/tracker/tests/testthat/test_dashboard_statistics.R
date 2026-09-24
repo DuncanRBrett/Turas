@@ -329,20 +329,25 @@ test_that("pairwise_significance: non-significant when means are close", {
   expect_equal(result$sig_code, 0)
 })
 
-test_that("pairwise_significance: Welch's t-test uses correct degrees of freedom", {
-  # Verify with manual calculation for unequal variances
+test_that("pairwise_significance: means use the trend path's pooled t-test", {
+  # The Dashboard used Welch's test while the trend chart (trend_significance.R)
+  # uses a pooled t-test, so the two could disagree about the same movement on
+  # a borderline mean. The Dashboard now calls the trend path's own
+  # t_test_for_means() (review follow-up, 24 Sep 2026). Known answer with
+  # unequal SDs, where the two tests differ:
   from <- make_mean_result(mean_val = 3.0, sd_val = 1.0, n_weighted = 50)
   to <- make_mean_result(mean_val = 4.0, sd_val = 2.0, n_weighted = 80)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
 
-  # Manual Welch-Satterthwaite df
-  sd1 <- 1.0; sd2 <- 2.0; n1 <- 50; n2 <- 80
-  se <- sqrt(sd1^2/n1 + sd2^2/n2)
-  t_stat <- (4.0 - 3.0) / se
-  df <- (sd1^2/n1 + sd2^2/n2)^2 / ((sd1^2/n1)^2/(n1-1) + (sd2^2/n2)^2/(n2-1))
-  p_expected <- 2 * pt(-abs(t_stat), df)
+  # Pooled: sp^2 = (49 x 1 + 79 x 4) / 128 = 2.8516, SE = sp x sqrt(1/50 + 1/80),
+  # t = 1 / SE, df = 128
+  sp <- sqrt((49 * 1 + 79 * 4) / 128)
+  t_stat <- 1 / (sp * sqrt(1 / 50 + 1 / 80))
+  p_expected <- 2 * pt(-abs(t_stat), 128)
+  expect_equal(result$p_value, p_expected, tolerance = 1e-10)
 
-  expect_equal(result$p_value, p_expected, tolerance = 0.001)
+  trend <- t_test_for_means(3.0, 1.0, 50, 4.0, 2.0, 80)
+  expect_equal(result$p_value, trend$p_value)
 })
 
 test_that("pairwise_significance: rating_enhanced uses t-test", {
@@ -638,7 +643,7 @@ test_that("pairwise_significance: means are sized on eff_n", {
   from$eff_n <- 50
   to$eff_n <- 50
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  # Welch on n = 50 each: SE = sqrt(2 / 50) = .2, t = 1.5, df = 98
+  # n = 50 each, equal SDs: SE = sqrt(2 / 50) = .2, t = 1.5, df = 98
   expect_equal(result$p_value, 2 * pt(-1.5, 98), tolerance = 1e-6)
   expect_equal(result$sig_code, 0)
 })

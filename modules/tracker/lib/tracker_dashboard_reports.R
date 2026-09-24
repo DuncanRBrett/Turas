@@ -295,7 +295,7 @@ dashboard_comparison_test <- function(from_result, to_result, metric_type, n1, n
     return(list(p_value = z$p_value, direction = p2 - p1))
   }
   if (is_numeric_metric(metric_type)) {
-    return(dashboard_welch_test(from_result, to_result, n1, n2))
+    return(dashboard_mean_test(from_result, to_result, n1, n2))
   }
   if (is_nps_metric(metric_type)) {
     return(dashboard_nps_test(from_result, to_result, n1, n2))
@@ -304,25 +304,25 @@ dashboard_comparison_test <- function(from_result, to_result, metric_type, n1, n
 }
 
 
-#' Welch t-Test For Two Wave Means, Sized On Effective n
+#' t-Test For Two Wave Means, Sized On Effective n
+#'
+#' Calls the trend path's own t_test_for_means() (statistical_core.R), a
+#' pooled t-test, so the Dashboard and the trend chart cannot disagree about
+#' the same movement. The Dashboard used Welch's test until the review
+#' follow-up of 24 Sep 2026.
 #'
 #' @param from_result,to_result Lists carrying $mean and $sd
 #' @param n1,n2 Numeric. Effective bases
 #' @return List with $p_value and $direction, or NULL when untestable
 #' @keywords internal
-dashboard_welch_test <- function(from_result, to_result, n1, n2) {
+dashboard_mean_test <- function(from_result, to_result, n1, n2) {
   m1 <- from_result[["mean"]]; m2 <- to_result[["mean"]]
   sd1 <- from_result[["sd"]]; sd2 <- to_result[["sd"]]
   if (any(vapply(list(m1, m2, sd1, sd2), is.null, logical(1)))) return(NULL)
   if (any(is.na(c(m1, m2, sd1, sd2))) || n1 <= 1 || n2 <= 1) return(NULL)
-  v1 <- sd1^2 / n1
-  v2 <- sd2^2 / n2
-  se <- sqrt(v1 + v2)
-  if (is.na(se) || se == 0) return(NULL)
-  df <- (v1 + v2)^2 / (v1^2 / (n1 - 1) + v2^2 / (n2 - 1))
-  if (is.na(df) || df <= 0) return(NULL)
-  t_stat <- (m2 - m1) / se
-  list(p_value = 2 * pt(-abs(t_stat), df), direction = m2 - m1)
+  t <- t_test_for_means(m1, sd1, n1, m2, sd2, n2)
+  if (is.na(t$p_value)) return(NULL)
+  list(p_value = t$p_value, direction = m2 - m1)
 }
 
 
@@ -361,7 +361,7 @@ dashboard_nps_test <- function(from_result, to_result, n1, n2) {
 #' effective base (dashboard_test_base()), and a comparison where either
 #' base is under `min_base` is not tested, the same gate the trend path uses:
 #'   - Proportions: two-proportion z-test on the first tracked code
-#'   - Means: Welch's t-test
+#'   - Means: pooled t-test, the trend path's t_test_for_means()
 #'   - NPS: z-test with the closed-form multinomial variance
 #'
 #' @param from_result List. Wave result for "from" wave
