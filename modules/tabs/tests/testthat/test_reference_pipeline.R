@@ -86,65 +86,8 @@ skip_if_not_installed("openxlsx")
   res
 }
 
-# The Crosstabs sheet as blocks: code -> data frame(label, type, owner, v1..vk).
-# Frequency and Column % rows share the label printed on the Frequency row; a
-# Sig row belongs to the last row above it that is not a Standard Deviation
-# row (the writer appends a mean's Sig row after its SD row).
-.rp_read_workbook <- function(path) {
-  x <- openxlsx::read.xlsx(path, sheet = "Crosstabs", colNames = FALSE,
-                           skipEmptyRows = FALSE, skipEmptyCols = FALSE)
-  ncols <- ncol(x) - 2
-  blocks <- list()
-  code <- NULL; label <- NULL; owner <- NULL
-  for (i in seq_len(nrow(x))) {
-    c1 <- x[i, 1]; c2 <- x[i, 2]
-    c1 <- if (is.na(c1)) "" else trimws(as.character(c1))
-    c2 <- if (is.na(c2)) "" else trimws(as.character(c2))
-    if (!nzchar(c2)) {
-      m <- regmatches(c1, regexec("^([A-Za-z0-9_]+) - ", c1))[[1]]
-      if (length(m) == 2) { code <- m[2]; label <- NULL; owner <- NULL }
-      next
-    }
-    if (is.null(code)) next
-    vals <- vapply(seq_len(ncols), function(j) {
-      v <- x[i, 2 + j]; if (is.na(v)) "" else trimws(as.character(v))
-    }, character(1))
-    if (grepl("^(Base|Effective base)", c2)) {
-      row_label <- ""
-    } else if (c2 %in% c("Sig.", "Sig.2")) {
-      row_label <- owner
-    } else {
-      if (nzchar(c1)) label <- c1
-      row_label <- label
-      if (c2 != "StdDev") owner <- paste0(label, "\u001f", c2)
-    }
-    blocks[[code]] <- rbind(blocks[[code]], data.frame(
-      label = if (c2 %in% c("Sig.", "Sig.2")) NA_character_ else row_label,
-      type = c2, owner = if (c2 %in% c("Sig.", "Sig.2")) row_label else NA_character_,
-      t(vals), stringsAsFactors = FALSE))
-  }
-  blocks
-}
-
-.rp_cells <- function(block, label, type) {
-  hit <- block[!is.na(block$label) & block$label == label & block$type == type, , drop = FALSE]
-  if (nrow(hit) != 1) return(NULL)
-  unname(unlist(hit[1, grep("^X", names(hit))]))
-}
-
-.rp_sig <- function(block, label, type, sig_type = "Sig.") {
-  own <- paste0(label, "\u001f", type)
-  hit <- block[!is.na(block$owner) & block$owner == own & block$type == sig_type, , drop = FALSE]
-  if (nrow(hit) != 1) return(NULL)
-  unname(unlist(hit[1, grep("^X", names(hit))]))
-}
-
-.rp_read_island <- function(path) {
-  html <- paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
-  m <- regmatches(html, regexec('<script[^>]*id="data-agg"[^>]*>(.*?)</script>', html))[[1]]
-  if (length(m) != 2) return(NULL)
-  jsonlite::fromJSON(m[2], simplifyVector = FALSE)
-}
+# Workbook and island readers, shared with test_adversarial_pipeline.R.
+source(file.path(.rp_fixture, "pipeline_readers.R"))
 
 .rp_data <- function() {
   if (is.null(.rp_env$data)) {
@@ -256,7 +199,6 @@ skip_if_not_installed("openxlsx")
   nopop      = list(file = "Parity_Crosstab_Config_NoPop.xlsx",    weighted = FALSE, pop = FALSE)
 )
 
-.rp_blank <- function(v) ifelse(is.na(v) | v == "-", "", v)
 
 # ==============================================================================
 # PIPELINE: each config runs end to end and writes a workbook and a report
