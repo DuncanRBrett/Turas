@@ -320,6 +320,43 @@ round_to_psychological <- function(price) {
 }
 
 
+# Each pricing METHOD and the entry of method_prices that stands for it.
+# Van Westendorp contributes OPP, IDP and their midpoint, and Monadic a revenue
+# and a profit optimum from one model. Counted entry by entry they made one
+# question set look like three methods agreeing (review 2026-09-24).
+RECOMMENDATION_METHOD_FAMILIES <- list(
+  van_westendorp = c("vw_midpoint", "vw_opp", "vw_idp"),
+  nms            = "nms_revenue",
+  gabor_granger  = "gg_optimal",
+  monadic        = c("monadic_optimal", "monadic_profit")
+)
+
+
+#' One Price Per Pricing Method
+#'
+#' Collapses method_prices to one usable price per method family
+#' (RECOMMENDATION_METHOD_FAMILIES), taking the first entry of each family that
+#' carries a finite price: the VW midpoint and the Monadic revenue optimum when
+#' present. The method-agreement spread and the method count both use this, so
+#' neither can be inflated by one method's several prices.
+#'
+#' @param method_prices Named list of list(price = ...) entries
+#' @return Named numeric vector, one price per method present
+#' @keywords internal
+method_family_prices <- function(method_prices) {
+  entry_price <- function(key) {
+    p <- method_prices[[key]]$price
+    if (is.null(p) || length(p) != 1 || !is.finite(p)) NA_real_ else as.numeric(p)
+  }
+  prices <- vapply(RECOMMENDATION_METHOD_FAMILIES, function(keys) {
+    found <- vapply(keys, entry_price, numeric(1))
+    found <- found[!is.na(found)]
+    if (length(found) == 0) NA_real_ else found[[1]]
+  }, numeric(1))
+  prices[!is.na(prices)]
+}
+
+
 #' Assess Recommendation Confidence
 #'
 #' @param method_prices List of prices from each method
@@ -335,9 +372,8 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
   factors <- list()
   scores <- numeric(0)
 
-  # Factor 1: Method agreement
-  prices <- sapply(method_prices, function(x) x$price)
-  prices <- prices[!is.na(prices) & is.finite(prices)]
+  # Factor 1: Method agreement, one price per method (method_family_prices)
+  prices <- method_family_prices(method_prices)
   cv <- if (length(prices) > 1) sd(prices) / mean(prices) else 0
   if (is.na(cv) || !is.finite(cv)) cv <- 0
 
@@ -435,12 +471,12 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
     }
   }
 
-  # Factor 5: Method coverage
-  n_methods <- length(method_prices)
-  if (n_methods >= 4) {
-    factors$method_coverage <- "Multiple methods provide triangulation"
+  # Factor 5: Method coverage, counted in methods, not in prices
+  n_methods <- length(prices)
+  if (n_methods >= 3) {
+    factors$method_coverage <- "Three or more methods provide triangulation"
     scores <- c(scores, 1.0)
-  } else if (n_methods >= 2) {
+  } else if (n_methods == 2) {
     factors$method_coverage <- "Two methods available for comparison"
     scores <- c(scores, 0.7)
   } else {

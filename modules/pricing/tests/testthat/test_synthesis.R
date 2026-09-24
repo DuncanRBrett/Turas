@@ -163,6 +163,52 @@ test_that("assess_recommendation_confidence gives higher scores for agreement", 
   expect_true(high_result$score >= low_result$score)
 })
 
+test_that("Van Westendorp counts as one method, however many of its prices are listed", {
+  # Review 2026-09-24: OPP, IDP and their midpoint came from one question set
+  # but counted as three methods, so VW plus Gabor-Granger scored as "Multiple
+  # methods provide triangulation" and the three clustered VW prices pulled the
+  # spread down. Known answer: one price per method, VW midpoint 45 and GG 70,
+  # CV = sd(45, 70) / 57.5 = 17.678 / 57.5 = 0.3074.
+  method_prices <- list(
+    vw_opp = list(price = 40), vw_idp = list(price = 50),
+    vw_midpoint = list(price = 45), gg_optimal = list(price = 70))
+  vw <- list(price_points = list(PMC = 30, OPP = 40, IDP = 50, PME = 75),
+             diagnostics = list(n_valid = 250, violation_rate = 0.02))
+
+  result <- assess_recommendation_confidence(
+    method_prices = method_prices, recommended_price = 69.99, vw_results = vw,
+    gg_results = list(diagnostics = list(n_respondents = 250)))
+
+  expect_equal(result$method_price_cv, 17.67767 / 57.5, tolerance = 1e-5)
+  expect_equal(result$factors$method_coverage, "Two methods available for comparison")
+})
+
+test_that("Monadic's revenue and profit optima count as one method", {
+  method_prices <- list(
+    monadic_optimal = list(price = 40), monadic_profit = list(price = 48))
+
+  result <- assess_recommendation_confidence(
+    method_prices = method_prices, recommended_price = 39.99, vw_results = NULL,
+    gg_results = NULL,
+    monadic_results = list(diagnostics = list(n_valid = 250)))
+
+  expect_equal(result$method_price_cv, 0)
+  expect_equal(result$factors$method_coverage, "Single method only - no triangulation")
+})
+
+test_that("three independent methods are triangulation", {
+  method_prices <- list(
+    vw_opp = list(price = 40), vw_idp = list(price = 50), vw_midpoint = list(price = 45),
+    nms_revenue = list(price = 44), gg_optimal = list(price = 46))
+
+  result <- assess_recommendation_confidence(
+    method_prices = method_prices, recommended_price = 44.99,
+    vw_results = mock_vw_results(),
+    gg_results = list(diagnostics = list(n_respondents = 250)))
+
+  expect_equal(result$factors$method_coverage, "Three or more methods provide triangulation")
+})
+
 test_that("build_evidence_table includes all methods", {
   skip_if(!exists("build_evidence_table", mode = "function"),
           "build_evidence_table not available")
