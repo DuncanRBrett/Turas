@@ -393,3 +393,17 @@ test_that("HTML report contains question reduction analysis", {
   expect_true(grepl("segment discrimination", html_text, ignore.case = TRUE),
               info = "Reduction analysis should mention segment discrimination")
 })
+
+test_that("loading the HTML report leaves no `ofile` behind in the caller", {
+  # Review 2026-09-24: the folder search ran at the top level of
+  # 99_html_report_main.R, so its loop variable `ofile` became a global when the
+  # file was sourced into the global environment. What If's loader then read
+  # that stray path as its own and could not find the shared library.
+  main_file <- file.path(Sys.getenv("TURAS_ROOT"), "modules", "segment", "lib",
+                         "html_report", "99_html_report_main.R")
+  skip_if_not(file.exists(main_file), "99_html_report_main.R not found")
+  target <- new.env(parent = globalenv())
+  sys.source(main_file, envir = target)
+  expect_false(exists("ofile", envir = target, inherits = FALSE))
+  expect_false(exists("found_dir", envir = target, inherits = FALSE))
+})

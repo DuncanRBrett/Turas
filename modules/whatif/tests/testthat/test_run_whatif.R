@@ -422,3 +422,23 @@ test_that("a lever with fewer than the minimum below the target ships no halo nu
     expect_true(any(grepl("halo numbers", release_audit_whatif(body(cut(bad)))$violations)))
   }
 })
+
+test_that("the module loads even when another file left a global `ofile` behind", {
+  # Review 2026-09-24: source_whatif.R took the LAST `ofile` on the call stack,
+  # which included a stray global one (Segment's HTML report leaked its loop
+  # variable), and then looked for the shared library in the wrong folder.
+  # Checked in a fresh R process so this session's state cannot help it.
+  src <- normalizePath(file.path(testthat::test_path(), "..", "..", "source_whatif.R"))
+  script <- tempfile(fileext = ".R")
+  writeLines(c(
+    'ofile <- "/nowhere/modules/segment/lib/html_report/99_html_report_main.R"',
+    sprintf('source("%s")', src),
+    'cat(if (exists("run_whatif", mode = "function")) "LOADED" else "MISSING", "\\n")'),
+    script)
+  # Hand the child this session's library path: under renv the child starts in
+  # tests/testthat, away from the project's .Rprofile, and would find no packages.
+  out <- suppressWarnings(system2(file.path(R.home("bin"), "Rscript"), script,
+                                  stdout = TRUE, stderr = TRUE,
+                                  env = paste0("R_LIBS=", paste(.libPaths(), collapse = .Platform$path.sep))))
+  expect_true(any(grepl("LOADED", out)), info = paste(tail(out, 5), collapse = "\n"))
+})

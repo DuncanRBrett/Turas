@@ -23,7 +23,11 @@
 # Determine report directory
 # Strategy: walk the source stack to find this file's own directory,
 # fall back to .seg_html_dir (set by 00_main.R) or TURAS_ROOT.
-.seg_html_report_dir <- tryCatch({
+# local(): the search's working variables (`ofile`, `found_dir`, `i`) stay
+# inside it. At top level they became globals when this file was sourced into
+# the global environment, and What If's loader read the stray `ofile` as its
+# own path (review 2026-09-24).
+.seg_html_report_dir <- local(tryCatch({
   # Walk frames from innermost to outermost to find this file's ofile
   found_dir <- NULL
   for (i in rev(seq_len(sys.nframe()))) {
@@ -51,7 +55,7 @@
   # Final fallback: construct from TURAS_ROOT
   turas_root <- Sys.getenv("TURAS_ROOT", getwd())
   file.path(turas_root, "modules/segment/lib/html_report")
-})
+}))
 
 # Source required submodules
 .seg_html_required_files <- c(

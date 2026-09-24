@@ -14,10 +14,15 @@
 # ==============================================================================
 
 .whatif_module_dir <- local({
+  # Only source()'s record of THIS file counts. Taking the last `ofile` on the
+  # stack also took a stray global one another module had leaked (Segment's
+  # HTML report did), and the shared library was then looked for in that
+  # module's folder (review 2026-09-24).
   from_stack <- NULL
   for (i in seq_len(sys.nframe())) {
     ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
-    if (!is.null(ofile) && nzchar(ofile)) from_stack <- ofile
+    if (is.character(ofile) && length(ofile) == 1 &&
+        grepl("source_whatif\\.R$", ofile)) from_stack <- ofile
   }
   if (!is.null(from_stack)) {
     normalizePath(dirname(from_stack), winslash = "/", mustWork = FALSE)
