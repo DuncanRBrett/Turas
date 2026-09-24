@@ -436,83 +436,90 @@ calculate_distribution <- function(values, weights) {
   )
 }
 
+#' Refuse a Top / Bottom Box With No Defined Scale
+#'
+#' @keywords internal
+refuse_box_without_scale <- function(which_box) {
+  tracker_refuse(
+    code = "CFG_BOX_SCALE_UNKNOWN",
+    title = "Top / Bottom Box Has No Scale",
+    problem = paste0(which_box, " needs the question's scale, and none is defined."),
+    why_it_matters = paste0(
+      "Reading the scale from the answers makes 'top box' mean the highest ",
+      "point anyone chose in that wave, so two waves can compare different points."),
+    how_to_fix = c(
+      "Add a StructureFile to the Waves sheet whose Options give each scale point an Index_Weight",
+      "Or name the box directly, for example range:4-5 for top 2 of a 1-5 scale"
+    )
+  )
+}
+
+
 #' Calculate Top Box
 #'
-#' Calculates percentage of responses in top N values of scale.
+#' Calculates percentage of responses in the top N points of the question's
+#' scale. The scale comes from the Survey_Structure (Index_Weight), never from
+#' the answers: a wave where nobody chose the top point reports 0%.
 #'
 #' @param values Numeric vector of response values
 #' @param weights Numeric vector of weights
-#' @param n_boxes Integer, number of top values (1, 2, or 3)
+#' @param n_boxes Integer, number of top scale points (1, 2, or 3)
+#' @param scale_values Numeric vector. Every point on the question's scale.
+#'   Refused (CFG_BOX_SCALE_UNKNOWN) when missing.
 #' @return List with proportion, scale_detected, top_values, n_*
 #' @keywords internal
-calculate_top_box <- function(values, weights, n_boxes = 1) {
-  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
-  values_valid <- values[valid_idx]
-  weights_valid <- weights[valid_idx]
-
-  if (length(values_valid) == 0) {
-    return(list(proportion = NA, scale_detected = NA, top_values = NA,
-                n_unweighted = 0, n_weighted = 0))
-  }
-
-  unique_values <- sort(unique(values_valid))
-  scale_min <- min(unique_values)
-  scale_max <- max(unique_values)
-  n_boxes <- min(n_boxes, length(unique_values))
-  top_values <- tail(unique_values, n_boxes)
-
-  in_top_box <- values_valid %in% top_values
-  top_weight <- sum(weights_valid[which(in_top_box)])
-  total_weight <- sum(weights_valid)
-  proportion <- (top_weight / total_weight) * 100
-
-  list(
-    proportion = proportion,
-    scale_detected = paste0(scale_min, "-", scale_max),
-    top_values = top_values,
-    n_unweighted = length(values_valid),
-    n_weighted = total_weight
-  )
+calculate_top_box <- function(values, weights, n_boxes = 1, scale_values = NULL) {
+  calculate_scale_box(values, weights, n_boxes, scale_values, top = TRUE)
 }
+
 
 #' Calculate Bottom Box
 #'
-#' Calculates percentage of responses in bottom N values of scale.
+#' Bottom N points of the question's scale; see calculate_top_box().
 #'
-#' @param values Numeric vector of response values
-#' @param weights Numeric vector of weights
-#' @param n_boxes Integer, number of bottom values (1, 2, or 3)
+#' @inheritParams calculate_top_box
 #' @return List with proportion, scale_detected, bottom_values, n_*
 #' @keywords internal
-calculate_bottom_box <- function(values, weights, n_boxes = 1) {
+calculate_bottom_box <- function(values, weights, n_boxes = 1, scale_values = NULL) {
+  calculate_scale_box(values, weights, n_boxes, scale_values, top = FALSE)
+}
+
+
+#' Shared Top / Bottom Box Calculation
+#'
+#' The base is every non-missing answer, the same base as a single-choice
+#' share; answers off the scale (a "don't know" code) stay in the base.
+#'
+#' @keywords internal
+calculate_scale_box <- function(values, weights, n_boxes, scale_values, top) {
+  box_label <- paste0(if (top) "top" else "bottom", if (n_boxes > 1) n_boxes else "", "_box")
+  scale_points <- sort(unique(suppressWarnings(as.numeric(scale_values))))
+  scale_points <- scale_points[!is.na(scale_points)]
+  if (length(scale_points) == 0) refuse_box_without_scale(box_label)
+
+  n_boxes <- min(n_boxes, length(scale_points))
+  box_values <- if (top) tail(scale_points, n_boxes) else head(scale_points, n_boxes)
+  scale_text <- paste0(min(scale_points), "-", max(scale_points))
+  values_name <- if (top) "top_values" else "bottom_values"
+
   valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
 
-  if (length(values_valid) == 0) {
-    return(list(proportion = NA, scale_detected = NA, bottom_values = NA,
-                n_unweighted = 0, n_weighted = 0))
-  }
-
-  unique_values <- sort(unique(values_valid))
-  scale_min <- min(unique_values)
-  scale_max <- max(unique_values)
-  n_boxes <- min(n_boxes, length(unique_values))
-  bottom_values <- head(unique_values, n_boxes)
-
-  in_bottom_box <- values_valid %in% bottom_values
-  bottom_weight <- sum(weights_valid[which(in_bottom_box)])
   total_weight <- sum(weights_valid)
-  proportion <- (bottom_weight / total_weight) * 100
+  proportion <- if (length(values_valid) == 0) NA else
+    sum(weights_valid[which(values_valid %in% box_values)]) / total_weight * 100
 
-  list(
+  result <- list(
     proportion = proportion,
-    scale_detected = paste0(scale_min, "-", scale_max),
-    bottom_values = bottom_values,
+    scale_detected = scale_text,
     n_unweighted = length(values_valid),
     n_weighted = total_weight
   )
+  result[[values_name]] <- box_values
+  result
 }
+
 
 #' Calculate Custom Range
 #'

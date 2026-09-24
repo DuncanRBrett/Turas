@@ -1244,6 +1244,25 @@ get_box_options <- function(wave_structure, q_code, box_name) {
 }
 
 
+#' Get a Question's Scale Points From the Survey Structure
+#'
+#' The scale is every Index_Weight defined for the question's options.
+#' Options without an Index_Weight (don't know, not applicable) are not scale
+#' points. Used to define top and bottom boxes.
+#'
+#' @param wave_structure Data frame. Options metadata from load_wave_structure(), or NULL
+#' @param q_code Character. The question's code in this wave
+#' @return Sorted numeric vector of scale points, or NULL when none is defined
+#'
+#' @keywords internal
+get_question_scale <- function(wave_structure, q_code) {
+  if (is.null(wave_structure) || is.null(q_code) || is.na(q_code)) return(NULL)
+  points <- wave_structure$Index_Weight[wave_structure$QuestionCode == q_code]
+  points <- sort(unique(points[!is.na(points)]))
+  if (length(points) == 0) NULL else points
+}
+
+
 #' Resolve Structure/Config File Path
 #'
 #' Resolves a StructureFile or ConfigFile path, trying multiple candidate

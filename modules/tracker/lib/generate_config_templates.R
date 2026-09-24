@@ -370,7 +370,7 @@ generate_tracking_config_template <- function(output_path) {
           required = FALSE,
           default = "",
           description = "Default TrackingSpecs for Composite/Index questions (used when TrackingSpecs is blank)",
-          valid_values_text = "Comma-separated: mean, top_box, top2_box, top3_box, distribution, range:X-Y"
+          valid_values_text = "Comma-separated: mean, distribution, range:X-Y (top/bottom boxes need scale points, which a composite does not have)"
         )
       )
     ),

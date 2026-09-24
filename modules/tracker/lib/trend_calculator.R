@@ -571,6 +571,13 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
                                           alpha = DEFAULT_ALPHA) {
   metrics <- list()
 
+  # Top / bottom boxes are defined on the question's scale (Index_Weight in
+  # the StructureFile), never on the answers seen in this wave.
+  box_specs <- c("top_box", "top2_box", "top3_box", "bottom_box", "bottom2_box")
+  scale_values <- if (any(tolower(trimws(specs_list)) %in% box_specs)) {
+    get_question_scale(wave_struct, wave_col)
+  } else NULL
+
   for (spec in specs_list) {
     spec_lower <- tolower(trimws(spec))
 
@@ -583,23 +590,23 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
       # Not propagated to metrics$ for now to keep the metrics contract stable.
 
     } else if (spec_lower == "top_box") {
-      result <- calculate_top_box(values, weights, n_boxes = 1)
+      result <- calculate_top_box(values, weights, n_boxes = 1, scale_values)
       metrics$top_box <- result$proportion
 
     } else if (spec_lower == "top2_box") {
-      result <- calculate_top_box(values, weights, n_boxes = 2)
+      result <- calculate_top_box(values, weights, n_boxes = 2, scale_values)
       metrics$top2_box <- result$proportion
 
     } else if (spec_lower == "top3_box") {
-      result <- calculate_top_box(values, weights, n_boxes = 3)
+      result <- calculate_top_box(values, weights, n_boxes = 3, scale_values)
       metrics$top3_box <- result$proportion
 
     } else if (spec_lower == "bottom_box") {
-      result <- calculate_bottom_box(values, weights, n_boxes = 1)
+      result <- calculate_bottom_box(values, weights, n_boxes = 1, scale_values)
       metrics$bottom_box <- result$proportion
 
     } else if (spec_lower == "bottom2_box") {
-      result <- calculate_bottom_box(values, weights, n_boxes = 2)
+      result <- calculate_bottom_box(values, weights, n_boxes = 2, scale_values)
       metrics$bottom2_box <- result$proportion
 
     } else if (grepl("^range:", spec_lower)) {

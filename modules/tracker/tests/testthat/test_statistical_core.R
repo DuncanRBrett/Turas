@@ -730,38 +730,38 @@ test_that("calculate_distribution empty data returns empty list", {
 # ==============================================================================
 
 test_that("calculate_top_box returns correct structure", {
-  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5))
+  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5), scale_values = 1:5)
   expect_true(is.list(result))
   expect_true(all(c("proportion", "scale_detected", "top_values", "n_unweighted", "n_weighted") %in% names(result)))
 })
 
 test_that("calculate_top_box top-1 box for 1-5 scale", {
   # Values: 1,2,3,4,5 with equal weight. Top 1 = value 5 = 20%
-  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 1)
+  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 1, scale_values = 1:5)
   expect_equal(result$proportion, 20)
   expect_equal(result$top_values, 5)
 })
 
 test_that("calculate_top_box top-2 box for 1-5 scale", {
-  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 2)
+  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 2, scale_values = 1:5)
   expect_equal(result$proportion, 40)  # values 4 and 5 = 2/5 = 40%
   expect_equal(result$top_values, c(4, 5))
 })
 
 test_that("calculate_top_box with weighted data", {
   # Value 5 has weight 4, values 1-4 have weight 1 each. Total = 8
-  result <- calculate_top_box(c(1, 2, 3, 4, 5), c(1, 1, 1, 1, 4), n_boxes = 1)
+  result <- calculate_top_box(c(1, 2, 3, 4, 5), c(1, 1, 1, 1, 4), n_boxes = 1, scale_values = 1:5)
   expect_equal(result$proportion, 4 / 8 * 100)  # 50%
 })
 
 test_that("calculate_top_box handles empty data", {
-  result <- calculate_top_box(c(NA, NA), c(1, 1))
+  result <- calculate_top_box(c(NA, NA), c(1, 1), scale_values = 1:5)
   expect_true(is.na(result$proportion))
   expect_equal(result$n_unweighted, 0)
 })
 
-test_that("calculate_top_box detects scale", {
-  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5))
+test_that("calculate_top_box reports the scale it was given", {
+  result <- calculate_top_box(c(1, 2, 3, 4, 5), rep(1, 5), scale_values = 1:5)
   expect_equal(result$scale_detected, "1-5")
 })
 
@@ -771,25 +771,25 @@ test_that("calculate_top_box detects scale", {
 # ==============================================================================
 
 test_that("calculate_bottom_box bottom-1 box for 1-5 scale", {
-  result <- calculate_bottom_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 1)
+  result <- calculate_bottom_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 1, scale_values = 1:5)
   expect_equal(result$proportion, 20)
   expect_equal(result$bottom_values, 1)
 })
 
 test_that("calculate_bottom_box bottom-2 box for 1-5 scale", {
-  result <- calculate_bottom_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 2)
+  result <- calculate_bottom_box(c(1, 2, 3, 4, 5), rep(1, 5), n_boxes = 2, scale_values = 1:5)
   expect_equal(result$proportion, 40)
   expect_equal(result$bottom_values, c(1, 2))
 })
 
 test_that("calculate_bottom_box handles empty data", {
-  result <- calculate_bottom_box(c(NA, NA), c(1, 1))
+  result <- calculate_bottom_box(c(NA, NA), c(1, 1), scale_values = 1:5)
   expect_true(is.na(result$proportion))
   expect_equal(result$n_unweighted, 0)
 })
 
-test_that("calculate_bottom_box detects scale", {
-  result <- calculate_bottom_box(c(1, 2, 3, 4, 5), rep(1, 5))
+test_that("calculate_bottom_box reports the scale it was given", {
+  result <- calculate_bottom_box(c(1, 2, 3, 4, 5), rep(1, 5), scale_values = 1:5)
   expect_equal(result$scale_detected, "1-5")
 })
 

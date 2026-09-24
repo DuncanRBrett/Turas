@@ -187,13 +187,21 @@ TrackingSpecs: mean,top2_box,range:9-10
 | Spec           | Description               | Example Output    |
 |----------------|---------------------------|-------------------|
 | `mean`         | Average rating            | Mean: 8.2         |
-| `top_box`      | \% giving highest value   | Top Box: 45%      |
-| `top2_box`     | \% giving top 2 values    | Top 2 Box: 72%    |
-| `top3_box`     | \% giving top 3 values    | Top 3 Box: 85%    |
-| `bottom_box`   | \% giving lowest value    | Bottom Box: 5%    |
-| `bottom2_box`  | \% giving bottom 2 values | Bottom 2 Box: 8%  |
+| `top_box`      | \% at the top scale point | Top Box: 45%     |
+| `top2_box`     | \% at the top 2 points    | Top 2 Box: 72%    |
+| `top3_box`     | \% at the top 3 points    | Top 3 Box: 85%    |
+| `bottom_box`   | \% at the bottom point    | Bottom Box: 5%    |
+| `bottom2_box`  | \% at the bottom 2 points | Bottom 2 Box: 8%  |
 | `range:X-Y`    | \% in custom range        | \% 9-10: 52%      |
 | `distribution` | \% for each value         | Full distribution |
+
+The top and bottom boxes are points on the question's scale, read from the
+Index_Weight column of the wave's StructureFile. They are never read from
+the answers, so a wave where nobody chose the top point shows 0%. A question
+with a box spec and no scale in its StructureFile is refused with
+`CFG_BOX_SCALE_UNKNOWN`; name the box with `range:X-Y` instead. Composites
+have no scale points (a composite score is a row mean), so use `range:X-Y`
+for them.
 
 #### Multi-Mention Questions
 
@@ -380,7 +388,7 @@ comparisons - Color-coded significance
 | Banner               | Demographic breakout variable (Gender, Age, etc.)   |
 | TrackingSpecs        | Custom metric specifications per question           |
 | Design Effect (DEFF) | Weight variance impact on effective sample size     |
-| Top Box              | Percentage giving highest rating value(s)           |
+| Top Box              | Percentage at the top point(s) of the scale         |
 | NPS                  | Net Promoter Score (% Promoters - % Detractors)     |
 | Composite            | Derived metric combining multiple questions         |
 | Multi-Mention        | Select-all-that-apply question type                 |

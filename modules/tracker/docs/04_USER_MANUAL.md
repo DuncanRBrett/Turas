@@ -364,11 +364,11 @@ Composite question types.
 | Spec | Description | Example Output |
 |-----------------|--------------------------|------------------------------|
 | `mean` | Weighted mean score | 7.8 |
-| `top_box` | \% giving the highest value | 15.2% |
-| `top2_box` | \% giving the top 2 values | 28.4% |
-| `top3_box` | \% giving the top 3 values | 45.1% |
-| `bottom_box` | \% giving the lowest value | 3.1% |
-| `bottom2_box` | \% giving the bottom 2 values | 8.7% |
+| `top_box` | \% at the top point of the scale (requires StructureFile) | 15.2% |
+| `top2_box` | \% at the top 2 scale points (requires StructureFile) | 28.4% |
+| `top3_box` | \% at the top 3 scale points (requires StructureFile) | 45.1% |
+| `bottom_box` | \% at the bottom point of the scale (requires StructureFile) | 3.1% |
+| `bottom2_box` | \% at the bottom 2 scale points (requires StructureFile) | 8.7% |
 | `distribution` | \% for every value | *(full breakdown)* |
 | `range:X-Y` | \% giving values from X to Y (inclusive) | 35.6% |
 | `box:CategoryName` | \% of values in a BoxCategory group (requires StructureFile) | 42.3% |

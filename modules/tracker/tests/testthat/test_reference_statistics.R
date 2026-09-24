@@ -533,3 +533,109 @@ test_that("text-coded multi-mention (category:) uses the answered base, by hand"
   expect_equal(r$wave_results$W1$mention_proportions$Email, 40)
   expect_equal(r$wave_results$W1$n_unweighted, 50)
 })
+
+
+# ==============================================================================
+# TOP / BOTTOM BOX: the scale comes from the Survey_Structure, not the data
+# ==============================================================================
+# Duncan, 24 Sep 2026: top box is the top of the SCALE, taken from the
+# StructureFile's Index_Weight. With no scale defined the question is refused
+# (range:4-5 is the way to name a box without a structure). A wave where
+# nobody chose the top point must show 0%, not the share at the highest point
+# anyone happened to choose.
+
+rating_structure <- function(code = "Q7") {
+  data.frame(QuestionCode = code,
+             OptionText = c("1", "2", "3", "4", "5", "Don't know"),
+             DisplayText = c("1", "2", "3", "4", "5", "Don't know"),
+             Index_Weight = c(1, 2, 3, 4, 5, NA),
+             BoxCategory = NA_character_, stringsAsFactors = FALSE)
+}
+
+test_that("top box counts the top of the scale even when nobody chose it", {
+  # 10 answered 4, 10 answered 3, nobody 5, on a 1-5 scale.
+  #   top box   (5)    = 0 / 20  = 0%
+  #   top-2 box (4, 5) = 10 / 20 = 50%
+  #   bottom-2  (1, 2) = 0 / 20  = 0%
+  v <- c(rep(4, 10), rep(3, 10))
+  w <- rep(1, 20)
+  expect_equal(calculate_top_box(v, w, 1, scale_values = 1:5)$proportion, 0)
+  expect_equal(calculate_top_box(v, w, 2, scale_values = 1:5)$proportion, 50)
+  expect_equal(calculate_bottom_box(v, w, 2, scale_values = 1:5)$proportion, 0)
+})
+
+test_that("top box is refused when no scale is given", {
+  expect_error(calculate_top_box(c(4, 5), c(1, 1), 1), class = "turas_refusal")
+  expect_error(calculate_bottom_box(c(4, 5), c(1, 1), 1), class = "turas_refusal")
+})
+
+rating_two_wave <- function(specs, with_structure = TRUE) {
+  frames <- list(
+    W1 = data.frame(Q7 = c(rep(5, 12), rep(4, 18), rep(3, 10)), weight_var = 1),
+    W2 = data.frame(Q7 = c(rep(4, 25), rep(3, 15)), weight_var = 1)  # no 5s
+  )
+  mapping <- data.frame(QuestionCode = "SAT", QuestionText = "Satisfaction",
+                        QuestionType = "Rating", TrackingSpecs = specs,
+                        W1 = "Q7", W2 = "Q7", stringsAsFactors = FALSE)
+  s <- ref_setup(frames, mapping)
+  s$wave_structures <- if (with_structure) {
+    list(W1 = rating_structure(), W2 = rating_structure())
+  } else NULL
+  s
+}
+
+test_that("rating trend: top box uses the structure's scale in every wave", {
+  # W1: 12 of 40 chose 5 -> 30%; top-2 = (12 + 18) / 40 = 75%
+  # W2: nobody chose 5  -> 0%;  top-2 = 25 / 40 = 62.5%
+  # The change in top box is -30 points, tested as 0.30 vs 0.00 on n = 40.
+  s <- rating_two_wave("top_box,top2_box")
+  capture.output(r <- calculate_rating_trend_enhanced("SAT", s$question_map, s$wave_data,
+                                                      s$config, s$wave_structures))
+  expect_equal(r$wave_results$W1$metrics$top_box, 30)
+  expect_equal(r$wave_results$W2$metrics$top_box, 0)
+  expect_equal(r$wave_results$W1$metrics$top2_box, 75)
+  expect_equal(r$wave_results$W2$metrics$top2_box, 62.5)
+  expect_equal(r$significance$top_box$W1_vs_W2$p_value,
+               z_test_for_proportions(0.30, 40, 0, 40)$p_value)
+})
+
+test_that("rating trend: top box with no StructureFile is refused, not guessed", {
+  s <- rating_two_wave("mean,top_box", with_structure = FALSE)
+  capture.output(res <- dispatch_single_trend("SAT", s$question_map, s$wave_data,
+                                              s$config, NULL))
+  expect_null(res$result)
+  expect_match(res$skipped$reason, "top_box")
+  expect_match(res$skipped$reason, "range:")
+})
+
+test_that("rating trend: mean alone needs no structure", {
+  s <- rating_two_wave("mean", with_structure = FALSE)
+  capture.output(r <- calculate_rating_trend_enhanced("SAT", s$question_map, s$wave_data,
+                                                      s$config, NULL))
+  expect_equal(r$wave_results$W2$metrics$mean, (25 * 4 + 15 * 3) / 40)
+})
+
+test_that("bottom box through the calculator uses the scale's bottom points", {
+  # W1 answers are 3, 4, 5 only. On the 1-5 scale bottom-2 is {1, 2}: 0%.
+  # Read from the data it would be {3, 4}: 70%.
+  s <- rating_two_wave("bottom2_box")
+  capture.output(r <- calculate_rating_trend_enhanced("SAT", s$question_map, s$wave_data,
+                                                      s$config, s$wave_structures))
+  expect_equal(r$wave_results$W1$metrics$bottom2_box, 0)
+})
+
+test_that("top box on a composite is refused: a row mean has no scale points", {
+  df <- data.frame(Q7 = c(5, 4, 3, 4), Q8 = c(4, 4, 2, 5), weight_var = 1)
+  mapping <- data.frame(
+    QuestionCode = c("SAT", "VAL", "IDX"), QuestionText = c("Sat", "Value", "Index"),
+    QuestionType = c("Rating", "Rating", "Composite"),
+    TrackingSpecs = c("mean", "mean", "mean,top_box"),
+    SourceQuestions = c(NA, NA, "SAT,VAL"),
+    W1 = c("Q7", "Q8", "IDX"), W2 = c("Q7", "Q8", "IDX"), stringsAsFactors = FALSE)
+  s <- ref_setup(list(W1 = df, W2 = df), mapping)
+  structs <- list(W1 = rating_structure("Q7"), W2 = rating_structure("Q7"))
+  capture.output(res <- dispatch_single_trend("IDX", s$question_map, s$wave_data,
+                                              s$config, structs))
+  expect_null(res$result)
+  expect_match(res$skipped$reason, "CFG_BOX_SCALE_UNKNOWN")
+})
