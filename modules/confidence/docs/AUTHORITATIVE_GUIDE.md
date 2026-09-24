@@ -76,7 +76,8 @@ Where: - `p` = sample proportion - `n_eff` = effective sample size - `z`
 **Strengths:** - Fast computation - Easy to explain to stakeholders -
 Widely recognized in industry
 
-**Weaknesses:** - Can produce intervals outside [0, 1] - Poor coverage
+**Weaknesses:** - Raw bounds can fall outside [0, 1]; the module cuts
+them at 0 and 1, and at p = 0 or 1 the interval has zero width - Poor coverage
 for extreme proportions (p \< 0.1 or p \> 0.9) - Poor coverage for small
 samples (n \< 30)
 
@@ -114,9 +115,9 @@ results
 
 ```         
 For i = 1 to B:
-  1. Resample data with replacement (size = n)
-  2. If weighted: sample with probability proportional to weights
-  3. Calculate proportion p_i
+  1. Resample n respondents uniformly with replacement
+  2. Each resampled respondent keeps their own weight
+  3. Calculate the (weighted) proportion p_i
   4. Store p_i
 
 CI_lower = percentile(p*, α/2)
@@ -124,8 +125,12 @@ CI_upper = percentile(p*, 1 - α/2)
 ```
 
 **Implementation Details:** - Default iterations: B = 5,000 -
-Recommended range: 1,000 to 10,000 - Uses percentile method (not BCa or
-studentized)
+Allowed range: 1,000 to 10,000 - Uses percentile method (not BCa or
+studentized) - Resampling is uniform, not weight-proportional: the
+weights enter through the weighted statistic, so sampling in proportion
+to the weights as well would count them twice - Study_Settings
+`random_seed` makes the result reproducible; each question's bootstrap
+is reseeded with it
 
 **Strengths:** - No distributional assumptions - Correctly handles
 complex weighting - Robust to outliers - Applicable to any statistic
@@ -149,16 +154,19 @@ Prior: Beta(α₀, β₀)
 Likelihood: Binomial(n, p)
 Posterior: Beta(α₀ + x, β₀ + n - x)
 
-Where x = number of successes
+Where x = number of successes. For weighted data n is the Kish n_eff
+and x = p * n_eff, both usually fractional and not rounded.
 ```
 
 **Prior Options:**
 
 | Prior Type | α₀ | β₀ | Use Case |
 |------------------|------------------|------------------|------------------|
-| Uniform (uninformative) | 1 | 1 | No prior knowledge |
-| Jeffrey's | 0.5 | 0.5 | Default recommendation |
+| Uniform (the default) | 1 | 1 | No Prior_Mean set |
 | Informed | from prior_mean, prior_n | from prior_mean, prior_n | Previous wave data |
+
+There is no Jeffreys option. Prior_N defaults to 100 when Prior_Mean is
+set without it.
 
 **Informed Prior Calculation:**
 
@@ -196,8 +204,17 @@ CI = [mean - t*SE, mean + t*SE]
 
 ```         
 weighted_mean = Σ(w_i * x_i) / Σ(w_i)
-weighted_var = Σ(w_i * (x_i - weighted_mean)²) / Σ(w_i)
-SE = sqrt(weighted_var / n_eff)
+weighted_var = Σ(w_i * (x_i - weighted_mean)²) / (Σw_i - Σw_i² / Σw_i)
+             = [Σ(w_i * (x_i - weighted_mean)²) / Σw_i] * n_eff / (n_eff - 1)
+SE = sqrt(weighted_var / n_eff),  df = n_eff - 1
+```
+
+The variance is the unbiased reliability-weight form, the same as
+`cov.wt(method = "unbiased")` and the tracker and tabs modules. When n_eff
+is below 2 (df below 1) no t interval is given and the question carries a
+warning.
+
+```
 ```
 
 **Strengths:** - Standard method for means - Accounts for sample size
@@ -252,6 +269,11 @@ Where:
 τ' = τ₀ + τ_data
 μ' = (τ₀*μ₀ + τ_data*x̄) / τ'
 ```
+
+In the code σ² is the sample (weighted, unbiased) variance treated as
+known, n is n_eff, τ₀ = prior_n / prior_sd², and the interval uses a z
+critical value. With no prior set the interval is x̄ ± z * s / sqrt(n_eff),
+slightly narrower than the t interval on small samples.
 
 **Prior Specification:**
 
@@ -345,8 +367,12 @@ proportions. The SE for the observed NPS is calculated using the delta
 method from the promoter and detractor proportions.
 
 **Prior Specification:**
-- `prior_mean`: Expected NPS (e.g., from previous wave)
+- `prior_mean`: Expected NPS (e.g., from previous wave; default 0)
 - `prior_sd`: Uncertainty around prior (default = 50 for wide/uninformative)
+
+When every respondent falls in one group (all promoters, all detractors
+or all passives) the SE is zero. The normal and Bayesian intervals are
+then both the observed score, and the question carries a warning.
 
 ------------------------------------------------------------------------
 
@@ -371,7 +397,10 @@ unweighted sample size" - Larger weight variation → smaller n_eff
 DEFF = n_actual / n_eff
      = 1 + CV²(weights)
 
-Where CV = SD(weights) / mean(weights)
+Where CV = SD(weights) / mean(weights), with the population SD (divisor
+n). n_actual counts respondents with a usable (positive, non-missing)
+weight, so DEFF = Actual_n / Effective_n on the Study_Level row. The code
+computes DEFF as n / n_eff.
 ```
 
 **Interpretation:**
@@ -536,7 +565,8 @@ The callout language follows these principles:
 7.  **Representativeness:** Built-in quota checking
 8.  **NPS Support:** Full Net Promoter Score analysis
 9.  **Bayesian Option:** Prior incorporation for tracking
-10. **Tested:** 596-test suite with unit, integration, and HTML tests
+10. **Tested:** unit, reference, adversarial, pipeline (config to
+    files) and HTML tests
 
 ### Limitations
 
@@ -548,7 +578,11 @@ The callout language follows these principles:
     (configurable, but consistent)
 5.  **No Cluster Sampling:** DEFF accounts for weights only, not cluster
     design
-6.  **R Dependency:** Requires R installation
+6.  **No Finite Population Correction:** intervals are not narrowed for
+    a sample that is a large share of its population (a census)
+7.  **No "Don't Know" Exclusion:** a code such as 99 in a mean question
+    is averaged in unless the data is recoded first
+8.  **R Dependency:** Requires R installation
 
 ### Known Issues
 
@@ -623,7 +657,7 @@ modules/confidence/
 │   ├── 04_html_writer.R        # File output
 │   ├── 05_chart_builder.R      # SVG charts
 │   └── js/confidence_navigation.js
-├── tests/testthat/             # Test suite (596 tests)
+├── tests/testthat/             # Test suite
 └── docs/                       # This documentation
 ```
 
@@ -636,7 +670,7 @@ Config (Excel) → load_confidence_config()
                         ↓
               calculate_study_level_stats()
                         ↓
-                process_questions()
+              process_all_questions()
                    ├── Proportions
                    ├── Means
                    └── NPS
@@ -662,7 +696,7 @@ if (!is.null(weights)) {
 
 ``` r
 for (i in 1:B) {
-  idx <- sample(1:n, size = n, replace = TRUE, prob = weights)
+  idx <- sample(1:n, size = n, replace = TRUE)   # uniform, not prob = weights
   boot_sample <- values[idx]
   boot_weights <- weights[idx]
   boot_stats[i] <- weighted_stat(boot_sample, boot_weights)
@@ -691,8 +725,9 @@ for (i in 1:B) {
 
 The statistical calculations use only base R functions: - `qnorm()` -
 Normal quantiles - `qt()` - t-distribution quantiles - `qbeta()` - Beta
-distribution quantiles - `sample()` - Random sampling for bootstrap -
-`weighted.mean()` - Weighted means
+distribution quantiles - `sample()` - Random sampling for bootstrap.
+Weighted means are computed as Σwx / Σw. The tests check these against
+`prop.test()`, `t.test()`, `cov.wt()` and the survey package.
 
 ------------------------------------------------------------------------
 
@@ -737,7 +772,7 @@ statistical computing. R Foundation for Statistical Computing.
 **Normal (Wald):**
 
 ```         
-CI = p ± z * sqrt(p(1-p)/n)
+CI = p ± z * sqrt(p(1-p)/n_eff), cut at 0 and 1
 ```
 
 **Wilson:**
@@ -750,6 +785,14 @@ CI = (p + z²/2n ± z*sqrt(p(1-p)/n + z²/4n²)) / (1 + z²/n)
 
 ```         
 CI = [qbeta(α/2, a+x, b+n-x), qbeta(1-α/2, a+x, b+n-x)]
+a = b = 1 unless a prior is set; weighted: n = n_eff, x = p * n_eff
+```
+
+**NPS normal:**
+
+```
+SE = 100 * sqrt((p_p + p_d - (p_p - p_d)²) / n_eff)
+CI = NPS ± z * SE
 ```
 
 ### Mean CI Formulas
@@ -777,7 +820,7 @@ n_eff = (Σw)² / Σw²
 **DEFF:**
 
 ```         
-DEFF = 1 + CV²(w) = n/n_eff
+DEFF = n/n_eff = 1 + CV²(w), CV with the population SD
 ```
 
 ------------------------------------------------------------------------

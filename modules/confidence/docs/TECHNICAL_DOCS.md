@@ -569,7 +569,9 @@ bootstrap_proportion_ci <- function(data, categories, weights, B, conf_level) {
 
   for (i in 1:B) {
     if (!is.null(weights)) {
-      idx <- sample(1:n, size = n, replace = TRUE, prob = weights)
+      # Uniform resampling: the weights enter through the weighted
+      # proportion, so prob = weights here would count them twice
+      idx <- sample(1:n, size = n, replace = TRUE)
       boot_sample <- data[idx]
       boot_weights <- weights[idx]
       boot_props[i] <- weighted_proportion(boot_sample, categories, boot_weights)
@@ -594,7 +596,8 @@ bootstrap_proportion_ci <- function(data, categories, weights, B, conf_level) {
 # Prior: Beta(α, β)
 # Posterior: Beta(α + x, β + n - x)
 
-# Default: Jeffrey's prior (α=0.5, β=0.5)
+# Default: uniform prior (α=1, β=1); there is no Jeffreys option
+# Weighted: n = n_eff and x = p * n_eff, not rounded
 # Informed: α = prior_mean * prior_n, β = (1 - prior_mean) * prior_n
 
 # Credible interval from posterior quantiles
