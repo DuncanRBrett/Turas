@@ -303,13 +303,22 @@ test_that("Sig Matrix cells match the Dashboard and the hand-computed tests", {
   }
 })
 
-# Row labels are matched case-insensitively: the crosstab writes option
-# labels in lower case ("yes"), a display issue logged for Duncan
+# Row labels are matched exactly: the crosstab writes answers as the data
+# spells them ("Yes", "Caf\u00e9", "- None of these", "Q30_1")
 crosstab_row <- function(ct, question, label) {
   q <- which(ct[[1]] == question)[1]
-  q + which(tolower(ct[[2]][(q + 1):nrow(ct)]) == tolower(label))[1]
+  q + which(ct[[2]][(q + 1):nrow(ct)] == label)[1]
 }
 crosstab_cell <- function(ct, question, label, col) ct[crosstab_row(ct, question, label), col]
+
+test_that("tracking crosstab labels keep the answers' own spelling", {
+  runs <- pipeline_runs()
+  ct <- read_sheet(output_file(runs$flat$dir, "TrackingCrosstab"), "Tracking Crosstab")
+  for (label in c("Yes", "No", "Caf\u00e9", "- None of these", "Q30_1")) {
+    expect_true(label %in% ct[[2]], info = label)
+  }
+  expect_false(any(c("yes", "caf\u00e9", "q30_1") %in% ct[[2]]))
+})
 
 test_that("tracking crosstab values and significance marks match the reference", {
   runs <- pipeline_runs()

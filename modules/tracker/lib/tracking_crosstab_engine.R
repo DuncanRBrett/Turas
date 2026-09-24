@@ -304,6 +304,9 @@ build_metric_rows_for_question <- function(q_code, q_trend, metric_type,
       question_code = q_code,
       metric_label = label,
       metric_name = spec_lower,
+      # The answer as the data spells it ("Yes", "Caf\u00e9", "Q30_1"), for
+      # row labels; metric_name is the lower-case key used for lookups
+      metric_display = trimws(sub("^(category|option):", "", spec, ignore.case = TRUE)),
       section = if (is.na(section)) "" else section,
       sort_order = if (is.na(sort_order)) spec_idx else sort_order + (spec_idx - 1) * 0.01,
       question_type = metric_type,

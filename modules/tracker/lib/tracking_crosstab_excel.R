@@ -414,7 +414,7 @@ write_summary_data_sheet <- function(wb, crosstab_data, config, styles) {
     sorted_metrics <- sort_metrics_traditional(q_group)
 
     for (metric_row in sorted_metrics) {
-      metric_suffix <- get_metric_suffix(metric_row$metric_name)
+      metric_suffix <- get_metric_suffix(metric_row$metric_name, metric_row$metric_display)
 
       # Write fixed columns: Section, Question, Metric (repeated per row for filtering)
       openxlsx::writeData(wb, sheet_name, q_section, startRow = row, startCol = 1)
@@ -605,7 +605,7 @@ write_crosstab_data_sheet <- function(wb, crosstab_data, config, styles) {
 
     # ---- Metric rows ----
     for (metric_row in sorted_metrics) {
-      metric_suffix <- get_metric_suffix(metric_row$metric_name)
+      metric_suffix <- get_metric_suffix(metric_row$metric_name, metric_row$metric_display)
 
       # Value row
       openxlsx::writeData(wb, sheet_name, "", startRow = row, startCol = 1)
@@ -777,7 +777,10 @@ sort_metrics_traditional <- function(q_group) {
 #' Returns a short label for the metric column based on metric name.
 #'
 #' @keywords internal
-get_metric_suffix <- function(metric_name) {
+get_metric_suffix <- function(metric_name, display = NULL) {
+  # An answer or option label keeps the data's own spelling; metric_name is a
+  # lower-cased key, so "yes" / "caf\u00e9" / "q30_1" must not reach the sheet
+  has_display <- !is.null(display) && length(display) == 1 && !is.na(display) && nzchar(display)
   if (metric_name == "mean") return("Mean")
   if (metric_name == "top_box") return("Top Box %")
   if (metric_name == "top2_box") return("Top 2 Box %")
@@ -793,11 +796,13 @@ get_metric_suffix <- function(metric_name) {
 
   # Pattern-based
   if (grepl("^box_", metric_name)) {
+    if (has_display) return(paste0("% ", trimws(sub("^box:", "", display, ignore.case = TRUE))))
     label <- sub("^box_", "", metric_name)
     label <- gsub("_", " ", label)
     return(paste0("% ", tools::toTitleCase(label)))
   }
   if (grepl("^category_", metric_name)) {
+    if (has_display) return(paste0("% ", display))
     label <- sub("^category_", "", metric_name)
     label <- gsub("_", " ", label)
     return(paste0("% ", tools::toTitleCase(label)))
@@ -807,8 +812,8 @@ get_metric_suffix <- function(metric_name) {
     return(paste0("Range ", range_part, " %"))
   }
 
-  # Fallback
-  metric_name
+  # Fallback: an answer code or option column, as the data spells it
+  if (has_display) display else metric_name
 }
 
 
