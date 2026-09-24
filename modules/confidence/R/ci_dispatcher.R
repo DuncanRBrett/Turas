@@ -247,6 +247,29 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
 # NPS CI DISPATCH
 # ==============================================================================
 
+#' Standard Error of an NPS Score (NPS points)
+#'
+#' NPS = 100 x (p_p - p_d), two shares of the SAME respondents, so their
+#' covariance is -p_p p_d / n and
+#'   Var(NPS / 100) = [p_p(1 - p_p) + p_d(1 - p_d) + 2 p_p p_d] / n
+#'                  = [(p_p + p_d) - (p_p - p_d)^2] / n.
+#' This is the formula docs/AUTHORITATIVE_GUIDE.md gives and the tracker uses.
+#' The code used to drop the covariance ("assuming independence"), which made
+#' every normal and Bayesian NPS interval too narrow: 18% at 50% promoters and
+#' 20% detractors (review 2026-09-24).
+#'
+#' @param pct_promoters Numeric. Promoter share, 0-100
+#' @param pct_detractors Numeric. Detractor share, 0-100
+#' @param n_eff Numeric. Effective sample size (may be fractional)
+#' @return Numeric. Standard error on the NPS scale (-100 to 100)
+#' @keywords internal
+nps_standard_error <- function(pct_promoters, pct_detractors, n_eff) {
+  p_prom <- pct_promoters / 100
+  p_detr <- pct_detractors / 100
+  sqrt(((p_prom + p_detr) - (p_prom - p_detr)^2) / n_eff) * 100
+}
+
+
 #' Dispatch NPS CI calculations based on config flags
 #'
 #' Calculates confidence intervals for NPS score based on the flags
@@ -288,14 +311,7 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
   run_moe_flag <- q_row$Run_MOE
   if (!is.null(run_moe_flag) && !is.na(run_moe_flag) && toupper(run_moe_flag) == "Y") {
     if (!is.na(n_eff) && n_eff > 0) {
-      # Convert percentages to proportions for variance calculation
-      p_prom <- pct_promoters / 100
-      p_detr <- pct_detractors / 100
-
-      # Variance of difference (assuming independence)
-      var_prom <- p_prom * (1 - p_prom) / n_eff
-      var_detr <- p_detr * (1 - p_detr) / n_eff
-      se_nps <- sqrt(var_prom + var_detr) * 100  # Convert back to percentage scale
+      se_nps <- nps_standard_error(pct_promoters, pct_detractors, n_eff)
 
       z <- qnorm(1 - (1 - conf_level) / 2)
       moe <- z * se_nps
@@ -377,12 +393,7 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
     prior_sd   <- safe_extract_numeric(q_row$Prior_SD)
     if (is.null(prior_sd)) prior_sd <- 50  # Wide prior
 
-    # Calculate SE for NPS
-    p_prom <- pct_promoters / 100
-    p_detr <- pct_detractors / 100
-    var_prom <- p_prom * (1 - p_prom) / n_eff
-    var_detr <- p_detr * (1 - p_detr) / n_eff
-    se_nps <- sqrt(var_prom + var_detr) * 100
+    se_nps <- nps_standard_error(pct_promoters, pct_detractors, n_eff)
 
     # Posterior (normal-normal conjugate)
     precision_prior <- 1 / (prior_sd^2)

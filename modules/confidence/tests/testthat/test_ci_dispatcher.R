@@ -229,7 +229,43 @@ test_that("a weighted proportion question shows n_eff 19 and sizes its MOE on 18
 })
 
 # ==============================================================================
-# END TO END: the mean question through the real pipeline
+# NPS STANDARD ERROR: promoters and detractors are NOT independent
+# ==============================================================================
+# Review 2026-09-24. The normal and Bayesian NPS intervals used
+# Var = p_p(1 - p_p)/n + p_d(1 - p_d)/n, "assuming independence". Promoters and
+# detractors are shares of the same respondents, so Cov = -p_p p_d / n and
+# Var(NPS) = [p_p(1 - p_p) + p_d(1 - p_d) + 2 p_p p_d] / n
+#          = [(p_p + p_d) - (p_p - p_d)^2] / n,
+# the formula docs/AUTHORITATIVE_GUIDE.md states and the tracker uses. Known
+# answer: 50% promoters, 20% detractors, n = 100:
+# Var = (0.70 - 0.09) / 100 = 0.0061, SE = 7.8102 NPS points (the old code
+# gave 6.4031, an interval 18% too narrow).
+
+nps_stats_fixture <- function(n_eff = 100) {
+  list(nps_score = 30, pct_promoters = 50, pct_detractors = 20, pct_passives = 30,
+       n_eff = n_eff, n_eff_exact = n_eff)
+}
+
+test_that("the NPS normal interval includes the promoter-detractor covariance", {
+  result <- dispatch_nps_ci(nps_stats_fixture(), values = NULL, promoter_codes = 9:10,
+                            detractor_codes = 0:6, weights = NULL,
+                            q_row = make_q_row(run_moe = "Y"), config = make_config())
+  expect_equal(result$moe_normal$se, 7.810250, tolerance = 1e-6)
+  expect_equal(result$moe_normal$upper - 30, qnorm(0.975) * 7.810250, tolerance = 1e-6)
+})
+
+test_that("the NPS Bayesian interval uses the same standard error", {
+  # A prior this wide leaves the posterior SD equal to the data SE.
+  q_row <- make_q_row(run_moe = "N", run_credible = "Y", prior_mean = 0, prior_sd = 1e6)
+  result <- dispatch_nps_ci(nps_stats_fixture(), values = NULL, promoter_codes = 9:10,
+                            detractor_codes = 0:6, weights = NULL,
+                            q_row = q_row, config = make_config())
+  implied_sd <- (result$bayesian$upper - result$bayesian$lower) / (2 * qnorm(0.975))
+  expect_equal(implied_sd, 7.810250, tolerance = 1e-5)
+})
+
+# ==============================================================================
+# END TO END: mean and NPS questions through the real pipeline
 # ==============================================================================
 # 00_main.R now loads under testthat (setup.R sets script_dir_override), so
 # the per-question processors are tested directly. Weights: 20 respondents at 1
@@ -245,4 +281,22 @@ test_that("a weighted mean question sizes its t interval on the exact n_eff", {
   expect_equal(out$result$n_eff, 19)
   expect_equal(out$result$t_dist$df, 35^2 / 65 - 1)
   expect_equal(out$result$t_dist$se, out$result$t_dist$sd / sqrt(35^2 / 65))
+})
+
+test_that("a weighted NPS question sizes its interval on the exact n_eff", {
+  # Respondents 1-20 (weight 1): 10 promoters (10), 5 detractors (3), 5 passives (8).
+  # Respondents 21-25 (weight 3): 2 promoters, 3 detractors.
+  # Weighted: promoters 10 + 6 = 16, detractors 5 + 9 = 14, of 35.
+  survey_data <- data.frame(
+    Q3 = c(rep(10, 10), rep(3, 5), rep(8, 5), 10, 10, 0, 0, 0),
+    wt = fractional_weights)
+  q_row <- make_q_row(q_id = "Q3", run_moe = "Y")
+  q_row$Promoter_Codes <- "9,10"
+  q_row$Detractor_Codes <- "0,1,2,3,4,5,6"
+  out <- process_nps_question(q_row, survey_data, "wt", make_config())
+
+  pp <- 16 / 35; pd <- 14 / 35; n_eff <- 35^2 / 65
+  expect_equal(out$result$n_eff, 19)
+  expect_equal(out$result$moe_normal$se,
+               100 * sqrt(((pp + pd) - (pp - pd)^2) / n_eff), tolerance = 1e-10)
 })
