@@ -21,6 +21,7 @@ that shipped months ago. Start here rather than opening files at random.
 | [`11_DATA_CENTRIC_REPORT_V2.md`](11_DATA_CENTRIC_REPORT_V2.md) | The interactive report: architecture, data island, authored text. **The most accurate doc in the set** |
 | [`AGGREGATE_TRACKING_GUIDE.md`](AGGREGATE_TRACKING_GUIDE.md) | Bringing historical waves in as aggregates |
 | [`NARRATIVE_WORD_GUIDE.md`](NARRATIVE_WORD_GUIDE.md) | Writing the report narrative in Word: user manual and style guide |
+| [`MODULE_TABS_GUIDE.md`](MODULE_TABS_GUIDE.md) | Bringing conjoint, maxdiff, pricing, key driver, categorical driver, What if and segment results into the report |
 | [`AI_INSIGHTS_USER_GUIDE.md`](AI_INSIGHTS_USER_GUIDE.md) / [`AI_PROMPT_TUNING_GUIDE.md`](AI_PROMPT_TUNING_GUIDE.md) | The AI layer |
 | [`PATTERNS_KEY_SHARE_GUIDE.md`](PATTERNS_KEY_SHARE_GUIDE.md) | Configuring Pattern Recognition |
 

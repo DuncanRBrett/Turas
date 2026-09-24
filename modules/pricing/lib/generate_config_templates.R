@@ -201,7 +201,7 @@ build_settings_def <- function() {
           name = "Export_WTP",
           required = FALSE,
           default = "N",
-          description = "Also export a per-respondent willingness-to-pay column (midpoint of the Van Westendorp cheap and expensive answers), stamped as derived on the METHOD sheet. Not built yet: Y refuses until the pricing v2 session lands.",
+          description = "Also export a per-respondent willingness-to-pay column as a Numeric question: the highest Gabor-Granger price accepted when the ladder ran (capped at the top of the ladder), otherwise the midpoint of the Van Westendorp cheap and expensive answers, stamped as derived on the METHOD sheet. Written to the same {output}_tabs_pricing.xlsx. Needs ID_Variable.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),
           numeric_range = NULL, integer_range = NULL

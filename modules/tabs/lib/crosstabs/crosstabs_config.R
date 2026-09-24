@@ -1948,6 +1948,51 @@ TABS_KNOWN_SETTINGS <- c(
 )
 
 
+# The Settings keys that name another module's contribution file. Each one,
+# when set, adds that module's tab to the v2 report (run_crosstabs.R readers).
+TABS_ISLAND_SETTINGS <- c("conjoint_island", "maxdiff_island", "pricing_island",
+                          "keydriver_island", "catdriver_island", "whatif_island")
+
+
+#' Resolve the module contribution file paths against the config's folder
+#'
+#' The six *_island settings were read as raw text and handed to
+#' \code{file.exists()} after the launcher had changed the working directory
+#' to modules/tabs/lib, so a relative path such as
+#' \code{04 Whatif/Study_whatif_island.json} was looked for inside the engine
+#' and the tab was left out with only a console warning. A relative path now
+#' means relative to the config file's folder, the same rule as
+#' \code{narrative_file} and \code{qual_workbook}. An absolute path is used as
+#' given. Wrapping quotes (Windows "Copy as path") are stripped. A path that
+#' still does not exist is left resolved, so the reader's warning names the
+#' place that was actually searched.
+#'
+#' @param config_obj The built config object.
+#' @param project_root The config file's folder (\code{get_project_root()}).
+#'
+#' @return \code{config_obj} with each non-blank *_island setting replaced by
+#'   an absolute path.
+#'
+#' @examples
+#' \dontrun{
+#'   cfg <- resolve_island_paths(list(whatif_island = "04 Whatif/x.json"),
+#'                               "/Users/me/Project")
+#'   cfg$whatif_island  # "/Users/me/Project/04 Whatif/x.json"
+#' }
+#'
+#' @export
+resolve_island_paths <- function(config_obj, project_root) {
+  for (key in TABS_ISLAND_SETTINGS) {
+    raw <- config_obj[[key]]
+    if (is.null(raw) || length(raw) == 0L || is.na(raw[1])) next
+    given <- gsub("^['\"]+|['\"]+$", "", trimws(as.character(raw[1])))
+    if (!nzchar(given)) next
+    config_obj[[key]] <- resolve_path(project_root, path.expand(given))
+  }
+  config_obj
+}
+
+
 #'
 #' Main entry point for loading all configuration.
 #' Loads settings, builds config object, and returns all needed paths.
@@ -2028,6 +2073,10 @@ load_crosstabs_config <- function(config_file) {
   # Load optional Population sheet (finite population correction): per-subgroup
   # universe sizes; the study total lives in the population_size setting.
   config_obj$population_frame <- load_population_sheet(config_file)
+
+  # Module contribution files (conjoint_island ... whatif_island): a relative
+  # path means relative to this config, as narrative_file and qual_workbook do.
+  config_obj <- resolve_island_paths(config_obj, project_root)
 
   # Resolve logo paths against project root so HTML report gets absolute paths
   # Helper: resolve a single logo path, trying multiple candidate locations

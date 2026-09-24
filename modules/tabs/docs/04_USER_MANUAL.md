@@ -488,6 +488,7 @@ The tab bar is split into two groups:
 - **Group overview**. How each banner group compares to its peers across every question
 - **Tracking** *(appears when wave history is configured)*. Wave-on-wave trends
 - **Qualitative** *(appears when a comment workbook is configured)*. Coded comment themes and a verbatim quote drawer
+- **Conjoint**, **MaxDiff**, **Pricing**, **Key drivers**, **Categorical drivers**, **What if** *(each appears only when the project contributed one)*. Results from another Turas module, carried into this report. See [Module Tabs Guide](MODULE_TABS_GUIDE.md)
 - **Story**. Your ordered, annotated narrative of pinned questions and exhibits, presentable full-screen or exportable to editable PowerPoint
 
 **Analyse**
@@ -498,8 +499,29 @@ The tab bar is split into two groups:
 
 Any tab can be switched off per-report from Settings
 (`show_dashboard`, `show_patterns`, `show_tracking`, `show_qualitative`,
-`show_differences`). See
+`show_differences`). `show_save_copy = FALSE` removes the *Save copy*
+button, for a copy that must stay the one version of record. A module tab
+has no switch: leave its `*_island` setting blank and it is not there. See
 [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for the full picture.
+
+### Who Is This File For?
+
+The tabs GUI asks this on every build, and the answer decides what the
+report file carries:
+
+- **Full report.** De-identified respondent-level records, so every view
+  works. For you, or for a client who has been told.
+- **Client safe, interactive.** No respondent records. Live filters,
+  custom banners, Differences and Group overview still work on the
+  declared variables, and any cut below `min_reporting_base` is withheld.
+  Needs `min_reporting_base` set.
+- **Client safe, frozen.** Published tables, dashboard, tracking and
+  comments, with no live filtering.
+
+The config's `html_report_v2_interactivity` sets what the project normally
+ships, and the GUI choice can only add protection to it. Settings and
+rules: [Template Reference](06_TEMPLATE_REFERENCE.md), "Who Is This File
+For?".
 
 ### Using Charts and Tables
 

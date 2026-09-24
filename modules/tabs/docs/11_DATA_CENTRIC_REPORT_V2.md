@@ -411,12 +411,18 @@ GUI tick-box for option 2):
 |-----|---------|---------|
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
 | `html_report_v2_microdata` | `Y` | Embed the anonymised per-respondent microdata island. `N` = the **confidentiality ship**: an aggregates-only file for insider populations (see Anonymisation & governance): the live filter, custom banners and COMPUTED views switch off for that build. **The Tracking tab survives**: the current wave is built from the published figures instead of from records (`published_wave_contribution()`), and that build writes no `*_wave.json`. Only an explicit `N`/`FALSE` disables; blank keeps the island. |
+| `html_report_v2_interactivity` | `records` | What powers the live views: `records` (the microdata island), `cube` (precomputed group statistics, no respondent records, cuts below `min_reporting_base` withheld) or `none` (published tables). Blank inherits from `html_report_v2_microdata`. The GUI's *Who is this file for?* choice can raise it, never lower it. See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md), "Who Is This File For?". |
+| `html_report_v2_filter_vars` | *(blank)* | `cube` only: extra single-response questions the page may filter and cut by, beyond the banner groups. |
+| `html_report_v2_cube_order` | `2` | `cube` only: how many declared variables one live view may combine (1, 2 or 3). |
 | `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. Weighted studies are supported (the wave trend is weighted to match the crosstab). |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
 | `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…), robust to renames, and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
 | `wave` | *(blank)* | Wave label shown in the header and used as the trend label. |
 | `wave_order` | *(blank)* | Numeric x-axis order key for this wave (e.g. `2025.5`). Blank → a 4-digit year is parsed from the `wave` label. |
+| `conjoint_island` / `maxdiff_island` / `pricing_island` / `keydriver_island` | *(blank)* | Path to that module's `{output}_cj/_md/_pr/_kd_island.json`, written on every run of the module. Named → the report gains a **Conjoint**, **MaxDiff**, **Pricing** or **Key drivers** tab. Blank → no tab, and the report is unchanged. |
 | `catdriver_island` | *(blank)* | Path to a categorical driver study's `{output}_cd_island.json` (written by catdriver when its own `v2_island` setting is on). Named → the report gains a **Categorical drivers** tab. Blank → no tab, and the report is unchanged. |
+| `whatif_island` | *(blank)* | Path to a What if study's `{output_name}_whatif_island.json`. Named → the report gains a **What if** tab: live in a `records` build, published groups only in a client-safe build, and left out when no version in the file matches the report's weighting. |
+| *(all six)* | | A relative path is read from the config file's folder. Full guide: [MODULE_TABS_GUIDE.md](MODULE_TABS_GUIDE.md). |
 | `researcher_logo_path` / `client_logo_path` | *(blank)* | Logos embedded (base64) into the v2 header. |
 | `sampling_method` | `Not_Specified` | Drives honest CI vocabulary (probability → CI/MOE; otherwise stability/PE). |
 

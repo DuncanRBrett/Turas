@@ -151,35 +151,56 @@ Set `sampling_method = Census` as well, so the report speaks "confidence interva
 ## Confidentiality Ship (Disclosure Control)
 
 For anonymity-sensitive studies (staff climate surveys, small insider
-populations) the tabs config has two dials that work together:
+populations) two things work together: the threshold `min_reporting_base`,
+and the delivery mode, which decides whether respondent-level records ship
+in the file at all.
 
 | Setting | What it does |
 |---------|--------------|
 | `min_reporting_base` | Hides identifying detail on screen for any cut smaller than k (crosstab columns, comment demographic tags). 1 = off; ~10 for a sensitive sample. |
-| `html_report_v2_microdata` | TRUE embeds the anonymised per-respondent island that powers live filters and computed views. **FALSE is the confidential ship**: the file carries published aggregates only. |
+| `html_report_v2_interactivity` | What powers the live views. `records` embeds the anonymised per-respondent island (every view works). `cube` embeds precomputed group statistics instead: no respondent records, and the live filter, custom banners, Differences and Group overview still work on the declared variables, withholding any cut below k. `none` is published tables only. |
+| `html_report_v2_filter_vars` | For a `cube` build: extra single-response questions the client may filter and cut by, beyond the banners. |
+| `html_report_v2_microdata` | The older switch. `FALSE` means `none`. Leave it blank on new configs and use `html_report_v2_interactivity`. |
+
+The tabs GUI asks **Who is this file for?** on every build. *Full report*
+builds what the config says. *Client safe, interactive* builds at least a
+`cube`, and *Client safe, frozen* builds `none`. The choice only ever adds
+protection: a config set to `cube` or `none` is never turned back into a
+respondent-level file by picking *Full report*. A client-safe choice also
+floors the comment settings (verbatim text off `full` becomes `redacted`,
+tags become `safe` or `block`). Full reference:
+[06_TEMPLATE_REFERENCE.md](modules/tabs/docs/06_TEMPLATE_REFERENCE.md),
+"Who Is This File For?".
 
 **The rule:** the on-screen gate is a viewing convenience. Wherever the
 k-gate is a *promise* to respondents, the copy that leaves your hands must be
-built with `html_report_v2_microdata = FALSE` — with the island present, the
-withheld numbers and per-comment demographics are reconstructable from the
-page source (View Source), whatever the screen shows. The build prints a
+a client-safe build (`cube` or `none`). With the respondent island present,
+the withheld numbers and per-comment demographics are reconstructable from
+the page source (View Source), whatever the screen shows. The build prints a
 boxed DISCLOSURE WARNING whenever `min_reporting_base > 1` and the island
-still ships, so you cannot send the wrong copy unwarned.
+still ships, so you cannot send the wrong copy unwarned. A `cube` needs
+`min_reporting_base` above 1: a config asking for one without it is refused,
+and a GUI choice without it drops to `none` and says so.
 
-The confidential copy keeps its Tracking tab. It has no per-respondent scores
+Module tabs follow the same mode. The What if tab ships its live,
+respondent-level version only in a `records` build; a client-safe build
+gets precomputed results for published groups only. See
+[MODULE_TABS_GUIDE.md](modules/tabs/docs/MODULE_TABS_GUIDE.md).
+
+A client-safe copy keeps its Tracking tab. It has no per-respondent scores
 to recompute from, so the current wave is built from the published figures
 instead, and the wave-on-wave significance test takes the current wave's spread
 from its published category distribution. The trend and the history are the
 same as the analyst's own copy; only the live filter and the computed views are
 gone. A question that publishes only its mean, with every category hidden, is
 the exception: it has no distribution to take a spread from, so it plots
-untested. That build writes no `*_wave.json`, so keep the one your microdata run
-produced — it is this wave's contribution to next year's history.
+untested. That build writes no `*_wave.json`, so keep the one your records run
+produced. It is this wave's contribution to next year's history.
 
-Typical setup: your own working config keeps microdata TRUE (full
-interactivity); a second config for the client copy sets it FALSE. The Excel
-workbook applies the same k-gate on every sheet (Crosstabs, Index_Summary,
-Sample Composition, Summary) in all cases.
+Typical setup: your own working copy is a `records` build (full
+interactivity); the client copy is the same config built with a client-safe
+choice in the GUI. The Excel workbook applies the same k-gate on every sheet
+(Crosstabs, Index_Summary, Sample Composition, Summary) in all cases.
 
 ---
 
