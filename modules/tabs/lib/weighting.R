@@ -431,12 +431,11 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
 #' Uses population variance estimator: Var = Σw(x - x̄)² / Σw
 #' NOT Bessel-corrected (unbiased) estimator
 #' 
-#' RATIONALE:
-#' - This is appropriate because effective-n is used in SE calculations
-#' - Combining population variance with effective-n gives correct SE
-#' - If you need unbiased variance, divide by (Σw - 1) instead
-#'
-#' USAGE: Called by weighted t-tests for means
+#' USAGE: ranking variance (ranking_metrics.R). The significance test for
+#' means and the Standard Deviation row do NOT use it: they use
+#' weighted_variance_unbiased() below, the population variance times
+#' n_eff/(n_eff - 1), so that an unweighted test is exactly
+#' t.test(var.equal = FALSE) (review 24 Sep 2026).
 #'
 #' @param values Numeric vector, values
 #' @param weights Numeric vector, weights
@@ -1101,7 +1100,7 @@ calculate_t_test_stats <- function(mean1, mean2, var1, var2, eff_n1, eff_n2) {
 #' - min_base must be ≥ 1
 #'
 #' STATISTICAL METHODOLOGY:
-#' - Uses weighted_variance() for population variance
+#' - Uses weighted_variance_unbiased(): population variance times n_eff/(n_eff - 1)
 #' - Uses effective-n for degrees of freedom and SE
 #' - Welch-Satterthwaite approximation for unequal variances
 #'
@@ -1201,8 +1200,12 @@ weighted_t_test_means <- function(values1, values2,
       return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
     }
 
-    var1 <- weighted_variance(values1, weights1)
-    var2 <- weighted_variance(values2, weights2)
+    # Unbiased reliability-weighted variance: the printed SD squared. With unit
+    # weights this test is then exactly t.test(var.equal = FALSE). It used the
+    # population variance (divided by sum w), which made every p-value a
+    # little too small (review 24 Sep 2026).
+    var1 <- weighted_variance_unbiased(values1, weights1)
+    var2 <- weighted_variance_unbiased(values2, weights2)
 
     # Calculate t-test statistics (delegated to helper)
     test_result <- calculate_t_test_stats(mean1, mean2, var1, var2, eff_n1, eff_n2)
@@ -1682,13 +1685,13 @@ summarize_weights <- function(weights, label = "Weight Summary") {
 # - weighted_z_test_proportions(): Used extensively in significance testing
 # - calculate_weighted_base(): Return structure MUST match V9.9
 # - calculate_effective_n(): Used throughout for sample size adjustments
-# - weighted_variance(): Core calculation for t-tests
+# - weighted_variance_unbiased(): the variance behind the t-test and SD row
 # - get_weight_vector(): Weight repair policy critical for correctness
 #
 # STATISTICAL ASSUMPTIONS:
 # 1. Weights represent sampling probabilities (design weights)
 # 2. Effective-n formula assumes simple random sampling within strata
-# 3. Population variance estimator appropriate given effective-n usage
+# 3. Unbiased reliability-weighted variance (n_eff/(n_eff - 1)) with effective-n
 # 4. Pooled proportion uses design-weighted counts (standard practice)
 # 5. Welch approximation for unequal variances (conservative)
 # 6. Zero weights mean exclusion (not re-inclusion)

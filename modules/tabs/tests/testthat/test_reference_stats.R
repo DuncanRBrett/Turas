@@ -89,3 +89,45 @@ test_that("reference: unweighted SD row is the ordinary sample SD", {
   expect_equal(.rs_sd_row(v, rep(1, 8)), round(sd(v), 6), tolerance = 1e-9)
   expect_equal(.rs_numeric_sd(v, rep(1, 8), weighted = FALSE), sd(v), tolerance = 1e-12)
 })
+
+# ==============================================================================
+# MEAN SIGNIFICANCE: Welch's t-test
+# ==============================================================================
+#
+# Unweighted, weighted_t_test_means() must BE stats::t.test(var.equal = FALSE):
+# the Welch statistic on the sample variances with Welch-Satterthwaite df.
+# Weighted, the same test on the unbiased reliability-weighted variance (the
+# printed SD, squared) and the Kish effective base, written out below.
+
+.rs_q2 <- function(dist) rep(1:5, times = dist)
+
+test_that("reference: unweighted mean test equals stats::t.test(var.equal = FALSE)", {
+  # Parity fixture Q2, Alpha vs Gamma, and two other pairs of spreads.
+  pairs <- list(
+    list(.rs_q2(c(2, 4, 10, 14, 10)), .rs_q2(c(8, 12, 10, 12, 8))),
+    list(.rs_q2(c(2, 6, 13, 24, 15)), .rs_q2(c(4, 6, 10, 18, 12))),
+    list(c(rep(3, 30), rep(4, 5)), .rs_q2(c(10, 0, 0, 0, 25)))
+  )
+  for (p in pairs) {
+    got <- weighted_t_test_means(p[[1]], p[[2]], min_base = 2, alpha = 0.05)
+    ref <- stats::t.test(p[[1]], p[[2]], var.equal = FALSE)
+    expect_equal(got$p_value, ref$p.value, tolerance = 1e-10)
+    expect_equal(got$higher, mean(p[[1]]) > mean(p[[2]]))
+  }
+})
+
+test_that("reference: weighted mean test is Welch on the unbiased variance and Kish n_eff", {
+  x <- .rs_q2(c(2, 4, 10, 14, 10)); y <- .rs_q2(c(8, 12, 10, 12, 8))
+  wx <- rep(c(1.6, 1.6, 2.8), length.out = length(x))
+  wy <- rep(c(1.2, 1.2, 2.1), length.out = length(y))
+  welch <- function(x, w, y, v) {
+    ref_var <- function(a, b) stats::cov.wt(matrix(a, ncol = 1), wt = b / sum(b), method = "unbiased")$cov[1, 1]
+    n1 <- sum(w)^2 / sum(w^2); n2 <- sum(v)^2 / sum(v^2)
+    s1 <- ref_var(x, w) / n1; s2 <- ref_var(y, v) / n2
+    t <- (weighted.mean(x, w) - weighted.mean(y, v)) / sqrt(s1 + s2)
+    df <- (s1 + s2)^2 / (s1^2 / (n1 - 1) + s2^2 / (n2 - 1))
+    2 * stats::pt(-abs(t), df)
+  }
+  got <- weighted_t_test_means(x, y, wx, wy, min_base = 2, alpha = 0.05)
+  expect_equal(got$p_value, welch(x, wx, y, wy), tolerance = 1e-10)
+})

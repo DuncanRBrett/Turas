@@ -450,6 +450,77 @@ test_that("reference (unweighted): the FPC puts C on Q1 Yes Beta at 95%", {
 })
 
 # ==============================================================================
+# REFERENCE: mean letters (Mean, NPS Score, NET POSITIVE, allocation items)
+# ==============================================================================
+#
+# Welch's t: each column's variance is the unbiased reliability-weighted
+# variance (stats::cov.wt, method "unbiased"), sized on the base the test
+# rides (Kish n_eff, times the FPC multiplier when a population is set), with
+# Welch-Satterthwaite df. Bonferroni over choose(4, 2); a column under 30 on
+# its corrected base, or a census column, takes and gives no letters. With no
+# weights and no population this is stats::t.test(var.equal = FALSE), which
+# the nopop run is checked against directly.
+
+.rp_mean_letters <- function(d, score, answered, cfg, alpha) {
+  a <- alpha / choose(4, 2)
+  st <- lapply(.rp_cols, function(col) {
+    rows <- answered & .rp_in_col(d, col)
+    w <- if (cfg$weighted) d$Weight[rows] else rep(1, sum(rows))
+    y <- score[rows]
+    n <- .rp_kish(w)
+    if (cfg$pop) n <- n * .rp_fpc_mul(sum(rows), .rp_population[[col]])
+    v <- stats::cov.wt(matrix(y, ncol = 1), wt = w / sum(w), method = "unbiased")$cov[1, 1]
+    list(y = y, m = sum(w * y) / sum(w), v = v, n = n)
+  })
+  out <- rep("", 5)
+  for (i in 2:5) for (j in 2:5) {
+    if (i == j) next
+    s1 <- st[[i]]; s2 <- st[[j]]
+    if (!is.finite(s1$n) || !is.finite(s2$n) || s1$n < 30 || s2$n < 30) next
+    if (!cfg$weighted && !cfg$pop) {
+      p <- stats::t.test(s1$y, s2$y, var.equal = FALSE)$p.value
+    } else {
+      e1 <- s1$v / s1$n; e2 <- s2$v / s2$n
+      t <- (s1$m - s2$m) / sqrt(e1 + e2)
+      df <- (e1 + e2)^2 / (e1^2 / (s1$n - 1) + e2^2 / (s2$n - 1))
+      p <- 2 * stats::pt(-abs(t), df)
+    }
+    if (p < a && s1$m > s2$m) out[i] <- paste0(out[i], LETTERS[j - 1])
+  }
+  out
+}
+
+.rp_mean_rows <- function(d) {
+  all <- rep(TRUE, nrow(d))
+  list(
+    list(q = "Q2", label = "Mean", type = "Average", score = d$Q2, answered = !is.na(d$Q2)),
+    list(q = "Q4", label = "NPS Score", type = "Score", answered = all,
+         score = ifelse(d$Q4 >= 9, 100, ifelse(d$Q4 >= 7, 0, -100))),
+    list(q = "Q5", label = "NET POSITIVE (Top 2 Box - Bottom 2 Box)", type = "Column %",
+         answered = all, score = ifelse(d$Q5 %in% 4:5, 100, ifelse(d$Q5 %in% 1:2, -100, 0))),
+    list(q = "Q6", label = "Bank", type = "Average", score = d$Q6_1, answered = all),
+    list(q = "Q6", label = "Retailer", type = "Average", score = d$Q6_2, answered = all),
+    list(q = "Q6", label = "Other", type = "Average", score = d$Q6_3, answered = all)
+  )
+}
+
+for (nm in names(.rp_configs)) local({
+  cfg <- .rp_configs[[nm]]
+  test_that(sprintf("reference (%s): mean, NPS, NET POSITIVE and allocation letters are Welch t", nm), {
+    run <- .rp_run(cfg$file)
+    d <- .rp_data()
+    wb <- .rp_read_workbook(run$xlsx)
+    for (r in .rp_mean_rows(d)) {
+      for (lv in list(c("Sig.", 0.05), c("Sig.2", 0.20))) {
+        ref <- .rp_mean_letters(d, r$score, r$answered, cfg, as.numeric(lv[2]))
+        got <- .rp_blank(.rp_sig(wb[[r$q]], r$label, r$type, lv[1]))
+        expect_equal(got, ref, info = sprintf("%s %s %s", r$q, r$label, lv[1]))
+      }
+    }
+  })
+})
+
+# ==============================================================================
 # CONSISTENCY: the v2 island against the workbook, cell by cell
 # ==============================================================================
 
