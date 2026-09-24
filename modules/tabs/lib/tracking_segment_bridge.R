@@ -9,7 +9,9 @@
 #   trend_results[[question_code]][[segment_name]] = list(
 #     metric_type, question_text,
 #     wave_results = list(<wave_id> = c(<calculator output>, available = TRUE)))
-#   where a mean wave_result carries $mean + $n_unweighted, an NPS one $nps + …
+#   where a mean wave_result carries $mean + $n_unweighted (the tracker's
+#   rating / composite calculators nest mean and sd under $metrics; both are
+#   read), an NPS one $nps + …
 #   Segments come from get_banner_segments(): "Total" (is_total) + one per banner
 #   value, each list(name, variable, value, is_total).
 #
@@ -140,7 +142,9 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
         stat_field <- if (identical(mtype, "nps")) "nps" else "mean"
         is_mean <- identical(stat_field, "mean")
         mk_stat <- function(wr) {
-          v <- num_or_null(if (is_mean) wr$mean else wr$nps)
+          # The tracker's rating / composite calculators keep mean and sd
+          # under $metrics; compute_segment_trends() puts them at the top
+          v <- num_or_null(if (is_mean) (wr$mean %||% wr$metrics$mean) else wr$nps)
           if (is.null(v)) return(NULL)
           s <- .tsb_stat(stat_field, v)
           if (is_mean) {
@@ -148,7 +152,7 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
             # "Mean"; the renderer reads stats.index for the former and stats.mean
             # for the latter. Carry both (same value) so either label resolves.
             s$index <- v
-            sd <- num_or_null(wr$sd)
+            sd <- num_or_null(wr$sd %||% wr$metrics$sd)
             if (!is.null(sd)) s$sd <- sd
           }
           s

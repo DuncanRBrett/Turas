@@ -200,3 +200,34 @@ test_that("an unweighted tracker output adds no effective-base fields", {
   expect_null(res[[1]]$questions[[1]]$eff_bases)
   expect_null(res[[1]]$questions[[1]]$eff_base)
 })
+
+
+# ==============================================================================
+# Real tracker output (calculate_trends_with_banners) through the bridge
+# ==============================================================================
+# The rating and composite calculators store mean and sd under $metrics. The
+# bridge read them at the top level, so a real tracker rating came back NULL
+# and was dropped from the sidecar without a word (robustness review
+# 24 Sep 2026). Only tabs' own compute_segment_trends() feeds the bridge in
+# production today, and it builds top-level fields, so no live number was
+# wrong; this guards the tracker path the header documents.
+
+test_that("a real tracker rating result reaches the sidecar with mean, sd and bases", {
+  wr <- function(m, s) list(available = TRUE, n_unweighted = 120, n_weighted = 2.4e6,
+                            eff_n = 88.9, metrics = list(mean = m, sd = s, top2_box = 60))
+  rating <- function(m1, m2) list(metric_type = "rating_enhanced", question_text = "Satisfaction",
+                                  tracking_specs = c("mean", "top2_box"),
+                                  wave_results = list(W1 = wr(m1, 1.1), W2 = wr(m2, 1.2)))
+  trend_results <- list(SAT = list(Total = rating(3.5, 3.9), Region_North = rating(3.4, 3.8)))
+  segments_meta <- list(Total = list(is_total = TRUE),
+                        Region_North = list(value = "North", variable = "Region", is_total = FALSE))
+  out <- tracker_segment_contributions(trend_results, segments_meta,
+                                       list(list(id = "W1", label = "Wave 1", year = 2025)))
+  expect_length(out, 1)
+  q <- out[[1]]$questions[[1]]
+  expect_equal(q$stats$mean, 3.5)
+  expect_equal(q$stats$sd, 1.1)
+  expect_equal(q$base, 120)
+  expect_equal(q$eff_base, 88.9)
+  expect_equal(q$seg_stats$north$mean, 3.4)
+})
