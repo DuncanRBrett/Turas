@@ -44,11 +44,13 @@ if (!requireNamespace("ordinal", quietly = TRUE)) {
   cat("  ordinal is not installed: the clm agreement tests will be skipped\n")
 }
 
-source(file.path(turas_root, "modules", "shared", "lib", "trs_refusal.R"))
-for (f in sort(list.files(file.path(module_root, "R"), pattern = "\\.R$", full.names = TRUE))) {
+source(file.path(module_root, "source_whatif.R"))
+source(file.path(module_root, "lib", "generate_config_template.R"))
+source(file.path(turas_root, "modules", "shared", "template_styles.R"))
+for (f in list.files(file.path(module_root, "tests", "fixtures", "synthetic_data"), pattern = "\\.R$",
+                     full.names = TRUE)) {
   source(f)
 }
-source(file.path(module_root, "tests", "fixtures", "synthetic_data", "generate_test_data.R"))
 
 library(testthat)
 results <- test_dir(file.path(module_root, "tests", "testthat"),

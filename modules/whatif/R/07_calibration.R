@@ -60,3 +60,34 @@ whatif_calibration <- function(model, min_n = 30) {
        n_groups = nrow(tab),
        median_abs_error = if (nrow(tab)) stats::median(abs(tab$predicted - tab$actual)) else NA_real_)
 }
+
+
+#' Effect of Each Symptom, Fitted Only to Explain Why It Is Not a Lever
+#'
+#' A symptom (called the company, shops around) moves with the outcome because
+#' it is a sign of the outcome, not a cause the client can pull. Its apparent
+#' effect is shown so the reader sees it was considered: the lever model plus
+#' the flag, and the average change in score between everyone flagged and
+#' nobody flagged. Ported from the prototype's symptom block.
+#'
+#' @param model A model from whatif_run_engine()
+#' @param symptoms List of list(key, label, flag, why)
+#' @return Data frame label, n, effect, why (empty when there are none)
+#' @keywords internal
+whatif_symptom_effects <- function(model, symptoms) {
+  if (!length(symptoms)) {
+    return(data.frame(label = character(0), n = integer(0), effect = numeric(0), why = character(0)))
+  }
+  spec <- model$spec
+  rows <- lapply(symptoms, function(sm) {
+    Xs <- cbind(model$design$X, sm$flag)
+    fs <- whatif_fit_ordinal(Xs, spec$y, spec$weights, spec$n_cat, c(model$penalty, spec$penalty_levers))
+    X1 <- Xs; X1[, ncol(Xs)] <- 1
+    X0 <- Xs; X0[, ncol(Xs)] <- 0
+    eff <- stats::weighted.mean(whatif_score_vec(fs, drop(X1 %*% fs$b), spec$outcome$score) -
+                                  whatif_score_vec(fs, drop(X0 %*% fs$b), spec$outcome$score), spec$weights)
+    data.frame(label = sm$label, n = as.integer(sum(sm$flag)), effect = eff, why = sm$why %||% "",
+               stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows)
+}
