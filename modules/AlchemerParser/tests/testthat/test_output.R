@@ -632,4 +632,33 @@ test_that("generate_output_files handles verbose output", {
 })
 
 
+test_that("option labels starting with - or + reach the Options sheet exactly as typed", {
+  # Review 2026-09-24: the formula-injection escape prefixed an apostrophe to
+  # OptionText and DisplayText, so "-2" was stored as "'-2", tabs matched it to
+  # no data value, and the row read 0%. Question text keeps the escape.
+  skip_if_not_installed("openxlsx")
+
+  tmp_dir <- tempdir()
+  on.exit(unlink(list.files(tmp_dir, pattern = "SignedLabels_.*_parsed\\.xlsx$",
+                            full.names = TRUE)))
+
+  questions <- list("1" = make_single_response("Q01", "=SUM(1,1)", options = list(
+    list(code = "1", text = "-2"),
+    list(code = "2", text = "+2"),
+    list(code = "3", text = "- None -"),
+    list(code = "4", text = "Agree")
+  )))
+
+  result <- generate_output_files(questions, "SignedLabels", tmp_dir, verbose = FALSE)
+
+  ss_o <- openxlsx::read.xlsx(result$survey_structure, sheet = "Options",
+                              skipEmptyRows = FALSE)
+  expect_equal(ss_o$OptionText, c("-2", "+2", "- None -", "Agree"))
+  expect_equal(ss_o$DisplayText, c("-2", "+2", "- None -", "Agree"))
+
+  ss_q <- openxlsx::read.xlsx(result$survey_structure, sheet = "Questions",
+                              skipEmptyRows = FALSE)
+  expect_equal(ss_q$QuestionText[ss_q$QuestionCode == "Q01"], "'=SUM(1,1)")
+})
+
 cat("\n=== AlchemerParser Output Tests Complete ===\n")

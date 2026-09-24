@@ -94,14 +94,20 @@ generate_output_files <- function(questions, project_name, output_dir,
     }
   }
 
-  alchemer_escape_df <- function(df) {
+  # `keep_exact` names columns that must round-trip exactly. Tabs matches
+  # OptionText to the data values, so an escaped "-2" became "'-2", matched
+  # nothing, and its row read 0% (review 2026-09-24). DisplayText is the label
+  # a report prints. openxlsx writes both as string cells, which Excel never
+  # evaluates, so leaving them as typed carries no formula risk in this file.
+  alchemer_escape_df <- function(df, keep_exact = character(0)) {
     if (is.null(df) || nrow(df) == 0) return(df)
-    char_cols <- which(vapply(df, is.character, logical(1)))
-    for (col in char_cols) {
+    char_cols <- names(df)[vapply(df, is.character, logical(1))]
+    for (col in setdiff(char_cols, keep_exact)) {
       df[[col]] <- alchemer_escape_cell(df[[col]])
     }
     df
   }
+  OPTION_COLUMNS_KEPT_EXACT <- c("OptionText", "DisplayText")
 
   # Generate file paths with "_parsed" suffix to distinguish from templates
   crosstab_file <- file.path(output_dir,
@@ -156,7 +162,8 @@ generate_output_files <- function(questions, project_name, output_dir,
                     gridExpand = TRUE)
 
   # Options sheet
-  survey_data$options <- alchemer_escape_df(survey_data$options)
+  survey_data$options <- alchemer_escape_df(survey_data$options,
+                                            keep_exact = OPTION_COLUMNS_KEPT_EXACT)
   openxlsx::addWorksheet(wb_survey, "Options")
   openxlsx::writeData(wb_survey, "Options", survey_data$options,
                      startRow = 1, startCol = 1, colNames = TRUE)
