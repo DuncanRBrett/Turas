@@ -821,10 +821,19 @@ generate_stats_pack_step <- function(config, survey_data, weight_var,
   n_analysed <- length(proportion_results) + length(mean_results) + length(nps_results)
   n_skipped  <- max(0L, length(question_ids) - n_analysed)
 
-  # Data used — what was actually fed into the analysis
+  # Data used: what was actually fed into the analysis. A zero or missing
+  # weight drops the respondent from every question (prepare_question_data)
+  # and from Study_Level Actual_n; this said "no respondents excluded"
+  # regardless (review 2026-09-24).
+  n_usable <- if (!is.null(weight_var) && weight_var %in% names(survey_data)) {
+    w_all <- survey_data[[weight_var]]
+    sum(!is.na(w_all) & is.finite(w_all) & w_all > 0)
+  } else {
+    nrow(survey_data)
+  }
   data_used <- list(
-    n_respondents      = nrow(survey_data),
-    n_excluded         = 0L,  # confidence processes per-question; no whole-row exclusions
+    n_respondents      = n_usable,
+    n_excluded         = nrow(survey_data) - n_usable,
     weight_variable    = weight_var,
     weighted           = !is.null(weight_var) && nzchar(weight_var %||% ""),
     questions_analysed = n_analysed,

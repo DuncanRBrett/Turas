@@ -31,7 +31,9 @@ read_detail <- function(sheet) {
 }
 row_for <- function(df, id) df[df$Question_ID %in% id, , drop = FALSE]
 
-d <- fx$data
+# References use the 90 rows with a usable weight; rows 91 and 92 (weight 0
+# and missing) are excluded by every analysis.
+d <- fx$data[!is.na(fx$data$w) & fx$data$w > 0, ]
 z <- qnorm(0.975)
 kish <- function(w) sum(w)^2 / sum(w^2)
 
@@ -225,4 +227,20 @@ test_that("client-facing method text states the formulas the code uses", {
   expect_true(grepl("DEFF = n / n_eff = 1 + CV^2", meth, fixed = TRUE))
   expect_true(grepl("SE = 100 * sqrt((p_p + p_d - (p_p - p_d)^2) / n_eff)", meth, fixed = TRUE))
   expect_false(grepl("Can produce impossible results", meth, fixed = TRUE))
+})
+
+test_that("the stats pack counts the respondents analysed and excluded", {
+  # 92 rows arrive; the zero and missing weights are excluded, as the loader
+  # announces (CONF_WEIGHT_ZEROS, CONF_WEIGHT_NAS). The stats pack said
+  # "92 (no respondents excluded)" beside a Study_Level Actual_n of 90
+  # (review 2026-09-24).
+  dec <- openxlsx::read.xlsx(file.path(fx$dir, "out_stats_pack.xlsx"), sheet = "Declaration",
+                             colNames = FALSE, skipEmptyRows = FALSE)
+  cells <- apply(dec, 1, function(r) paste(r[!is.na(r)], collapse = " | "))
+  resp <- cells[grepl("^Respondents Analysed", cells)]
+  expect_length(resp, 1)
+  expect_match(resp, "Respondents Analysed | 90  (2 excluded", fixed = TRUE)
+  st <- openxlsx::read.xlsx(file.path(fx$dir, "out.xlsx"), sheet = "Study_Level",
+                            startRow = 3, skipEmptyRows = FALSE)[1, ]
+  expect_equal(st$Actual_n, 90)
 })

@@ -17,8 +17,10 @@
 #   nps     10,9,8,7,6,3,0,10,9,5          NPS (9-10 promoters, 0-6 detractors)
 #   allna   all missing                    skipped -> run must be PARTIAL
 #   region  1,2 repeating                  filter and margin variable
-#   w       0.5,1,1.5,2,3.7 repeating      Kish n_eff = 90 x 8.7^2 / 5 / 20.19
-#                                          = 67.48, fractional on purpose
+#   w       0.5,1,1.5,2,3.7 repeating      fractional Kish n_eff on purpose
+# Plus two rows (91, 92) whose weight is 0 and missing. Every analysis drops
+# them, so each reference is computed on the 90 rows with a usable weight,
+# and the stats pack must report 90 respondents and 2 excluded.
 # ==============================================================================
 
 confidence_pipeline_data <- function() {
@@ -26,7 +28,7 @@ confidence_pipeline_data <- function() {
   sat <- rep(c(3, 4, 5, 5, 2, 1), 15)
   sat[c(5, 50)] <- NA
   aware <- rep(c(1, 1, 2), 30)
-  data.frame(
+  d <- data.frame(
     id = seq_len(n),
     aware = aware,
     aware2 = aware,
@@ -36,6 +38,8 @@ confidence_pipeline_data <- function() {
     region = rep(c(1, 2), 45),
     w = rep(c(0.5, 1, 1.5, 2, 3.7), 18)
   )
+  rbind(d, data.frame(id = 91:92, aware = 1, aware2 = 1, sat = 5, nps = 10,
+                      allna = NA_real_, region = 1, w = c(0, NA)))
 }
 
 build_confidence_pipeline_fixture <- function(dir, seed = "42") {
