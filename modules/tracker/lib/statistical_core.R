@@ -245,8 +245,6 @@ calculate_weighted_mean <- function(values, weights, alpha = DEFAULT_ALPHA) {
   }
 
   w_mean <- sum(values_valid * weights_valid) / n_weighted
-  w_var <- sum(weights_valid * (values_valid - w_mean)^2) / n_weighted
-  w_sd <- sqrt(w_var)
 
   # Effective N (design-effect adjusted sample size)
   sum_weights_squared <- sum(weights_valid^2)
@@ -255,6 +253,14 @@ calculate_weighted_mean <- function(values, weights, alpha = DEFAULT_ALPHA) {
   } else {
     0
   }
+
+  # Unbiased SD for reliability (survey) weights: the weighted variance times
+  # n_eff / (n_eff - 1). Equals sd() when every weight is 1, is unchanged by
+  # grossing, matches stats::cov.wt(method = "unbiased") and the tabs v2
+  # renderer's sdOfScores(). Undefined when one respondent carries all the
+  # weight (n_eff = 1).
+  w_var <- sum(weights_valid * (values_valid - w_mean)^2) / n_weighted
+  w_sd <- if (eff_n > 1) sqrt(w_var * eff_n / (eff_n - 1)) else NA_real_
 
   # Use effective sample size for SE to correctly account for weighting design effect
   se <- if (eff_n > 0) w_sd / sqrt(eff_n) else NA

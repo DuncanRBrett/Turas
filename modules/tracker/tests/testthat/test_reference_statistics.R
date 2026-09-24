@@ -164,6 +164,44 @@ test_that("weighted mean matches survey::svymean on every weight set", {
   }
 })
 
+test_that("weighted SD is the unbiased reliability-weight SD (stats::cov.wt)", {
+  # Chosen 24 Sep 2026 as the most defensible to a statistician: the weighted
+  # variance times n_eff / (n_eff - 1), with n_eff the Kish effective base.
+  # It is the unbiased estimator for reliability (survey) weights, equals
+  # sd() when every weight is 1, is unchanged by grossing, and is the formula
+  # the tabs v2 Tracking tab uses (sdOfScores in 22w_waves.js).
+  # Hand case: values 1, 3 with weights 1, 3. Mean = 10 / 4 = 2.5.
+  #   sum w (x - m)^2 / sum w = (1 * 2.25 + 3 * 0.25) / 4 = 0.75
+  #   n_eff = 16 / 10 = 1.6, so variance = 0.75 * 1.6 / 0.6 = 2
+  expect_equal(calculate_weighted_mean(c(1, 3), c(1, 3))$sd, sqrt(2))
+
+  v <- ref_rating()
+  ok <- !is.na(v)
+  expect_equal(calculate_weighted_mean(v, ref_weight_sets()$unit)$sd, stats::sd(v[ok]))
+  for (set_name in c("deff2", "grossed")) {
+    w <- ref_weight_sets()[[set_name]]
+    ref <- stats::cov.wt(matrix(v[ok]), wt = w[ok] / sum(w[ok]), method = "unbiased")$cov
+    expect_equal(calculate_weighted_mean(v, w)$sd, sqrt(ref[1, 1]),
+                 tolerance = 1e-12, info = set_name)
+  }
+})
+
+test_that("mean trend t-test on unit weights equals t.test(var.equal = TRUE)", {
+  # End to end through the calculator: SD, effective n and the pooled test
+  # together must reproduce base R on the raw vectors.
+  set.seed(5)
+  x1 <- sample(1:5, 36, replace = TRUE)
+  x2 <- sample(1:5, 33, replace = TRUE, prob = c(1, 1, 2, 3, 3))
+  m1 <- calculate_weighted_mean(x1, rep(1, 36))
+  m2 <- calculate_weighted_mean(x2, rep(1, 33))
+  waves <- list(A = list(available = TRUE, mean = m1$mean, sd = m1$sd, eff_n = m1$eff_n),
+                B = list(available = TRUE, mean = m2$mean, sd = m2$sd, eff_n = m2$eff_n))
+  sig <- perform_significance_tests_means(waves, c("A", "B"),
+                                          list(settings = list(minimum_base = 30)))
+  ref <- stats::t.test(x2, x1, var.equal = TRUE)
+  expect_equal(sig$A_vs_B$p_value, ref$p.value, tolerance = 1e-10)
+})
+
 test_that("the mean's CI is mean +/- z * sd / sqrt(effective n)", {
   # Documented method (Kish approximation): the standard error of a weighted
   # mean is its SD over the square root of the Kish effective base. This is
