@@ -65,8 +65,14 @@ if (!is.null(icon_block)) eval(parse(text = icon_block), envir = launcher_env)
 # TEST: Module Registry Structure
 # ==============================================================================
 
-test_that("module registry contains all 14 modules", {
-  expect_equal(length(launcher_env$modules), 14)
+test_that("module registry contains every launchable module", {
+  # Named, not counted: the bare count said 14 long after the launcher grew to
+  # 18, and a count cannot say which module went missing (review 2026-09-24).
+  ids <- vapply(launcher_env$modules, `[[`, character(1), "id")
+  expect_setequal(ids, c(
+    "callout_editor", "alchemerparser", "alchemerexport", "weighting", "tabs",
+    "tracker", "conjoint", "maxdiff", "pricing", "brand", "segment", "keydriver",
+    "catdriver", "whatif", "confidence", "report_hub", "hub_app", "steps"))
 })
 
 test_that("every module has required fields", {

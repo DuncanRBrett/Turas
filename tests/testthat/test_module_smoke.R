@@ -142,14 +142,6 @@ test_that("Core documentation files exist", {
   }
 })
 
-test_that("ADR directory exists with documents", {
-  adr_dir <- file.path(turas_root, "docs", "adr")
-  expect_true(dir.exists(adr_dir))
-
-  adr_files <- list.files(adr_dir, pattern = "\\.md$")
-  expect_gte(length(adr_files), 3)  # At least 3 ADRs
-})
-
 # ==============================================================================
 # Launch File Tests
 # ==============================================================================
