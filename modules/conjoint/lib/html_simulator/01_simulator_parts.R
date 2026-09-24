@@ -722,7 +722,7 @@ build_simulator_panel <- function(html_data, brand) {
 
   # Mode-switched callouts
   sim_callout_shares <- .build_callout("Market Shares",
-    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels. Configure products on the left and see predicted shares update on the right.</p><p><strong>No-Purchase Option:</strong> The \u2018Include No-Purchase\u2019 checkbox adds a \u2018do nothing\u2019 alternative.</p>
+    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels. Configure products on the left and see predicted shares update on the right.</p><p><strong>No-Purchase Option:</strong> When the study estimated a \u2018None\u2019 (no-purchase) utility, an \u2018Include No-Purchase\u2019 checkbox adds a \u2018do nothing\u2019 alternative. Without one the option is not shown, and shares are among the configured products only.</p>
 <details style=\"margin-top:10px;\"><summary style=\"cursor:pointer;font-weight:600;font-size:12px;color:#323367;\">How does share calculation work?</summary>
 <div style=\"margin-top:8px;font-size:12px;line-height:1.7;\">
 <p>Each product\u2019s <strong>total utility</strong> is the sum of its part-worth utilities across all attributes. For example, if Brand=PremiumX has utility +0.30 and Price=$199 has utility +0.50, the product\u2019s total utility is 0.80.</p>

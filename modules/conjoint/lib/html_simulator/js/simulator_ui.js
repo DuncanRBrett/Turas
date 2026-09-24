@@ -250,11 +250,14 @@ var SimUI = (function() {
 
     var html = '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:12px;">Predicted Market Shares</h3>';
 
-    // None option toggle
-    html += '<div style="margin-bottom:10px;">';
-    html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
-    html += '<input type="checkbox" id="cj-sim-none-cb" ' + (includeNone ? 'checked' : '') + ' onchange="SimUI.toggleNone(this.checked)" style="accent-color:#323367;" />';
-    html += 'Include No-Purchase Option</label></div>';
+    // None option toggle, only when the study carries an estimated None
+    // utility. Without one there is nothing to put behind it.
+    if (SimEngine.getNoneUtility() !== null) {
+      html += '<div style="margin-bottom:10px;">';
+      html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
+      html += '<input type="checkbox" id="cj-sim-none-cb" ' + (includeNone ? 'checked' : '') + ' onchange="SimUI.toggleNone(this.checked)" style="accent-color:#323367;" />';
+      html += 'Include No-Purchase Option</label></div>';
+    }
 
     // Method selector with info tooltip
     html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
@@ -317,8 +320,8 @@ var SimUI = (function() {
     var displayProducts = products.slice();
     var shares;
 
-    if (includeNone) {
-      var noneU = SimEngine.getNoneUtility();
+    var noneU = SimEngine.getNoneUtility();
+    if (includeNone && noneU !== null) {
       shares = SimEngine.predictSharesWithNone(configs, noneU, method);
       displayProducts = displayProducts.concat([{ name: "None (No Purchase)", config: {} }]);
     } else {

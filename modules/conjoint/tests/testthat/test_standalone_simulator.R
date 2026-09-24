@@ -143,6 +143,28 @@ test_that("no utilities means no simulator, and it says so", {
   expect_equal(res$code, "DATA_SIMULATOR_NO_UTILITIES")
 })
 
+test_that("the simulator data carries no None utility, so No-Purchase is not offered", {
+  # Review 2026-09-24: the module refuses a None alternative before estimation
+  # (03_estimation.R), so no None utility exists to embed. The simulator used to
+  # offer "Include No-Purchase" anyway and score None at 0; it now offers the
+  # option only when the data carries a finite noneUtility, and this pins the R
+  # side of that contract: the island has no such key.
+  skip_if(!file.exists(sim_main), "simulator module not present")
+  source(sim_main, local = TRUE)
+
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(out), add = TRUE)
+  res <- generate_conjoint_simulator(make_sim_results(), out, verbose = FALSE)
+  expect_equal(res$status, "PASS")
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  island <- regmatches(html, regexpr('id="cj-simulator-data">.*?</script>', html))
+  body <- sub("</script>$", "", sub('^id="cj-simulator-data">', "", island))
+  sim_data <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  expect_null(sim_data$noneUtility)
+  expect_true(length(sim_data$attributes) > 0)
+})
+
 test_that("an attribute name cannot break the data island open", {
   skip_if(!file.exists(sim_main), "simulator module not present")
   source(sim_main, local = TRUE)

@@ -147,10 +147,16 @@ var SimEngine = (function() {
     return sensitivitySweep(baseProduct, priceAttribute, otherProducts, method);
   }
 
-  // Predict shares including a None/no-purchase alternative
+  // Predict shares including a None/no-purchase alternative.
+  // Fails closed: without a finite None utility there is no None alternative,
+  // so the shares are the plain product shares. It used to score None at 0,
+  // which on zero-centred utilities is roughly an average product and invented
+  // a no-purchase share (review 2026-09-24). The None utility is scaled with
+  // the products (productUtility), so the scale factor moves both alike.
   function predictSharesWithNone(products, noneUtility, method) {
     if (!products || products.length === 0) return [];
-    var noneU = (noneUtility !== undefined && noneUtility !== null) ? noneUtility : 0;
+    if (!isFiniteNumber(noneUtility)) return predictShares(products, method);
+    var noneU = noneUtility * scaleFactor;
     if (method === "purchase_likelihood") {
       // Purchase likelihood is independent per product; none is 1-max(probs)
       var probs = predictSharesPurchaseLikelihood(products);
@@ -192,9 +198,15 @@ var SimEngine = (function() {
     return expU.map(function(e) { return (e / sumExp) * 100; });
   }
 
-  // Get the none utility from the simulator data JSON
+  function isFiniteNumber(x) {
+    return typeof x === "number" && isFinite(x);
+  }
+
+  // The None utility from the simulator data JSON, or null when the study has
+  // none. Null, never 0: the UI offers the No-Purchase option only for a real
+  // estimated value.
   function getNoneUtility() {
-    return (data && data.noneUtility !== undefined) ? data.noneUtility : 0;
+    return (data && isFiniteNumber(data.noneUtility)) ? data.noneUtility : null;
   }
 
   // Calculate point price elasticity from demand curve data
