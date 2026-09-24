@@ -479,6 +479,39 @@ weighted_variance <- function(values, weights) {
   return(weighted_var)
 }
 
+#' Unbiased reliability-weighted variance
+#'
+#' The population variance \eqn{\sum w (x - \bar{x})^2 / \sum w} scaled by
+#' \eqn{n_{eff} / (n_{eff} - 1)}, where \eqn{n_{eff}} is the Kish effective base
+#' \eqn{(\sum w)^2 / \sum w^2}. Equals \code{stats::cov.wt(method = "unbiased")}
+#' and, for unit weights, \code{var()}. It does not change when every weight is
+#' multiplied by a constant, so grossed and normalised weights give the same
+#' answer as mean-1 weights. The same rule the tracker (statistical_core.R) and
+#' the v2 report (21_stats.js weightedMeanColumn) use.
+#'
+#' It replaced a divisor of \eqn{\sum w - 1}, which treated weights as
+#' frequencies: grossed weights fell back to the population variance, and
+#' weights summing to 1 or less left the SD blank or 0 (robustness review
+#' 24 Sep 2026).
+#'
+#' @param values Numeric vector
+#' @param weights Numeric vector, same length
+#' @return Numeric variance, or NA when fewer than two valid values or
+#'   \eqn{n_{eff} \le 1}
+#' @export
+weighted_variance_unbiased <- function(values, weights) {
+  ok <- !is.na(values) & !is.na(weights) & is.finite(weights) & weights > 0
+  values <- values[ok]
+  weights <- weights[ok]
+  if (length(values) < 2) return(NA_real_)
+  sum_w <- sum(weights)
+  n_eff <- sum_w^2 / sum(weights^2)
+  if (!is.finite(n_eff) || n_eff <= 1) return(NA_real_)
+  mean_val <- sum(values * weights) / sum_w
+  pop_var <- sum(weights * (values - mean_val)^2) / sum_w
+  pop_var * n_eff / (n_eff - 1)
+}
+
 # ==============================================================================
 # WEIGHTED COUNTS & BASES (V9.9.2)
 # ==============================================================================

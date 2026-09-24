@@ -371,6 +371,25 @@ test_that("reference (weighted): Q2 mean, Q4 NPS and Q5 NET POSITIVE match surve
   }
 })
 
+# Standard deviation rows against stats::cov.wt(method = "unbiased"), the
+# reliability-weighted SD: population variance times n_eff / (n_eff - 1).
+test_that("reference (weighted): Standard Deviation rows match stats::cov.wt unbiased", {
+  run <- .rp_run(.rp_configs$weighted$file)
+  d <- .rp_data()
+  wb <- .rp_read_workbook(run$xlsx)
+  sd_ref <- function(rows, y) {
+    w <- d$Weight[rows]
+    sqrt(stats::cov.wt(matrix(y[rows], ncol = 1), wt = w / sum(w), method = "unbiased")$cov[1, 1])
+  }
+  q2 <- vapply(.rp_cols, function(col) sd_ref(.rp_in_col(d, col), d$Q2), numeric(1))
+  expect_equal(as.numeric(.rp_cells(wb$Q2, "Standard Deviation", "StdDev")),
+               round(unname(q2), 3), tolerance = 1e-9)
+  bucket <- ifelse(d$Q4 >= 9, 100, ifelse(d$Q4 >= 7, 0, -100))
+  q4 <- vapply(.rp_cols, function(col) sd_ref(.rp_in_col(d, col), bucket), numeric(1))
+  expect_equal(as.numeric(.rp_cells(wb$Q4, "Standard Deviation", "StdDev")),
+               round(unname(q4), 3), tolerance = 1e-9)
+})
+
 # ==============================================================================
 # REFERENCE: proportion letters
 # ==============================================================================

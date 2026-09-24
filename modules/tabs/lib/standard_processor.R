@@ -571,17 +571,11 @@ create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
         v <- values[valid_idx]
         w <- weights[valid_idx]
 
-        if (all(w == 1)) {
-          sd_values[key] <- sd(v)
-        } else {
-          mean_val <- sum(v * w) / sum(w)
-          # V10.8: Bessel-corrected weighted variance (sample, not population).
-          # A non-positive denominator (total weight <= 1) leaves the variance
-          # undefined. NA, not 0, for the same reason as the initialiser (M-A).
-          denom <- sum(w) - 1
-          var_val <- if (denom > 0) sum(w * (v - mean_val)^2) / denom else NA_real_
-          sd_values[key] <- sqrt(var_val)
-        }
+        # Unbiased reliability-weighted variance (weighting.R). Reduces to
+        # sd() for unit weights. It replaced a sum(w) - 1 divisor that moved
+        # when the weights were grossed or normalised (review 24 Sep 2026).
+        # NA when n_eff <= 1, for the same reason as the initialiser (M-A).
+        sd_values[key] <- sqrt(weighted_variance_unbiased(v, w))
       }
     }
   }
