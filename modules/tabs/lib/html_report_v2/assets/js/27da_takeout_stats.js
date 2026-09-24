@@ -62,59 +62,13 @@
   }
   takeout._bhFDR = bhFDR;
 
-  /** Natural log of the gamma function (Lanczos g=7), for exact binomial terms
-   *  and the incomplete-beta used by the Student-t tail. */
-  function logGamma(x) {
-    var c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
-      771.32342877765313, -176.61502916214059, 12.507343278686905,
-      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
-    var g = 7;
-    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - logGamma(1 - x);
-    x -= 1;
-    var a = c[0], tt = x + g + 0.5;
-    for (var i = 1; i < g + 2; i++) a += c[i] / (x + i);
-    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(tt) - tt + Math.log(a);
-  }
+  // The Student-t tail and its gamma / incomplete-beta machinery moved to
+  // 21_stats.js (review 24 Sep 2026), so the crosstab, Tracking, composite and
+  // Differences mean tests share it without depending on this file, which a
+  // bundle with no Executive Takeout may leave out. Same functions, aliased.
+  var logGamma = TR.stats._logGamma;
+  var studentT = TR.stats.studentT;
   takeout._logGamma = logGamma;
-
-  /** Regularised incomplete beta I_x(a,b) via the Lentz continued fraction
-   *  (Numerical Recipes betacf). Underpins the Student-t tail. */
-  function betacf(a, b, x) {
-    var qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
-    if (Math.abs(d) < 1e-30) d = 1e-30;
-    d = 1 / d; var h = d;
-    for (var m = 1; m <= 200; m++) {
-      var m2 = 2 * m, aa = m * (b - m) * x / ((qam + m2) * (a + m2));
-      d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
-      c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
-      d = 1 / d; h *= d * c;
-      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
-      d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
-      c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
-      d = 1 / d; var del = d * c; h *= del;
-      if (Math.abs(del - 1) < 1e-12) break;
-    }
-    return h;
-  }
-  function ibeta(x, a, b) {
-    if (x <= 0) return 0;
-    if (x >= 1) return 1;
-    var lbeta = logGamma(a + b) - logGamma(a) - logGamma(b);
-    var front = Math.exp(lbeta + a * Math.log(x) + b * Math.log(1 - x));
-    return x < (a + 1) / (a + b + 2) ? front * betacf(a, b, x) / a
-      : 1 - front * betacf(b, a, 1 - x) / b;
-  }
-
-  /** Two-sided Student-t tail P(|T_df| >= |t|). A degenerate SE (non-finite t)
-   *  must read as p=1, never p=0; df<=0 likewise. The t-tail (not just the
-   *  variance floor) is load-bearing: it demotes tiny-base cells whose normal-
-   *  approx p would otherwise survive multiplicity correction. */
-  function studentT(t, df) {
-    if (!isFinite(t)) return 1;
-    if (df <= 0) return 1;
-    var tc = Math.min(1e6, Math.abs(t));
-    return ibeta(df / (df + tc * tc), df / 2, 0.5);
-  }
   takeout._studentT = studentT;
 
   /** Weighted Welch two-sample mean test of a group arm vs the rest, with a

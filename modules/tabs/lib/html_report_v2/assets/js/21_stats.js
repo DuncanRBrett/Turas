@@ -881,15 +881,99 @@
     return z !== null && z > stats.zPrimary(1);
   };
 
-  /** Welch t statistic of mean1 vs mean2, or null when undefined. */
-  stats.meanZ = function (m1, sd1, n1, m2, sd2, n2) {
+  // --- Student-t tail (moved from 27da_takeout_stats.js, 24 Sep 2026) --------
+  /** Natural log of the gamma function (Lanczos g=7), for exact binomial terms
+   *  and the incomplete-beta used by the Student-t tail. */
+  function logGamma(x) {
+    var c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+      771.32342877765313, -176.61502916214059, 12.507343278686905,
+      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    var g = 7;
+    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - logGamma(1 - x);
+    x -= 1;
+    var a = c[0], tt = x + g + 0.5;
+    for (var i = 1; i < g + 2; i++) a += c[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(tt) - tt + Math.log(a);
+  }
+  stats._logGamma = logGamma;
+
+  /** Regularised incomplete beta I_x(a,b) via the Lentz continued fraction
+   *  (Numerical Recipes betacf). Underpins the Student-t tail. */
+  function betacf(a, b, x) {
+    var qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < 1e-30) d = 1e-30;
+    d = 1 / d; var h = d;
+    for (var m = 1; m <= 200; m++) {
+      var m2 = 2 * m, aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+      c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+      d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+      c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+      d = 1 / d; var del = d * c; h *= del;
+      if (Math.abs(del - 1) < 1e-12) break;
+    }
+    return h;
+  }
+  function ibeta(x, a, b) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    var lbeta = logGamma(a + b) - logGamma(a) - logGamma(b);
+    var front = Math.exp(lbeta + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2) ? front * betacf(a, b, x) / a
+      : 1 - front * betacf(b, a, 1 - x) / b;
+  }
+
+  /** Two-sided Student-t tail P(|T_df| >= |t|). A degenerate SE (non-finite t)
+   *  must read as p=1, never p=0; df<=0 likewise. The t-tail (not just the
+   *  variance floor) is load-bearing: it demotes tiny-base cells whose normal-
+   *  approx p would otherwise survive multiplicity correction. */
+  function studentT(t, df) {
+    if (!isFinite(t)) return 1;
+    if (df <= 0) return 1;
+    var tc = Math.min(1e6, Math.abs(t));
+    return ibeta(df / (df + tc * tc), df / 2, 0.5);
+  }
+  stats.studentT = studentT;
+
+  /**
+   * Welch's two-sample t-test from summary statistics: each side keeps its own
+   * variance, sized on its (effective) base, with Welch-Satterthwaite degrees
+   * of freedom. The test R runs (weighting.R calculate_t_test_stats) and the
+   * tracker runs (statistical_core.R t_test_for_means). Returns {t, df, p}
+   * with p two-sided, or null when the test is undefined.
+   */
+  stats.welch = function (m1, sd1, n1, m2, sd2, n2) {
     if (n1 < 2 || n2 < 2 || m1 === null || m2 === null) return null;
-    var se = Math.sqrt(sd1 * sd1 / n1 + sd2 * sd2 / n2);
-    if (se === 0) return null;
-    return (m1 - m2) / se;
+    var v1 = sd1 * sd1 / n1, v2 = sd2 * sd2 / n2;
+    var se = Math.sqrt(v1 + v2);
+    if (!(se > 0)) return null;
+    var t = (m1 - m2) / se;
+    var df = (v1 + v2) * (v1 + v2) / (v1 * v1 / (n1 - 1) + v2 * v2 / (n2 - 1));
+    if (!(df > 0)) return null;
+    return { t: t, df: df, p: studentT(t, df) };
   };
 
-  /** Welch t-test; true when mean1 is significantly higher. */
+  /**
+   * The Welch t of mean1 vs mean2 as its NORMAL EQUIVALENT: the z with the same
+   * two-sided p-value, signed like the difference. Every caller compares |z|
+   * with zCrit(alpha), which is then exactly "Welch p < alpha". It used to
+   * return the raw Welch statistic, which those callers judged against the
+   * normal curve: a pair at t = 1.98 on 60 df (p = 0.052) was lettered at 95%
+   * (review 24 Sep 2026). null when the test is undefined.
+   */
+  stats.meanZ = function (m1, sd1, n1, m2, sd2, n2) {
+    var w = stats.welch(m1, sd1, n1, m2, sd2, n2);
+    if (!w) return null;
+    // Past double precision the tail underflows to 0; the raw t is then the
+    // better (finite, larger) evidence figure and every threshold is passed.
+    if (!(w.p > 1e-300)) return w.t;
+    var z = w.p >= 1 ? 0 : -qnorm(w.p / 2);
+    return w.t < 0 ? -z : z;
+  };
+
+  /** Welch t-test; true when mean1 is significantly higher at the primary level. */
   stats.meanHigher = function (m1, sd1, n1, m2, sd2, n2) {
     var z = stats.meanZ(m1, sd1, n1, m2, sd2, n2);
     return z !== null && z > stats.zPrimary(1);
