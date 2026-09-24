@@ -13,8 +13,8 @@
 #
 # STATISTICAL METHODOLOGY:
 # - Effective sample size: n_eff = (Σw)² / Σw² (Kish 1965)
-# - Design effect: DEFF = 1 + CV²  where CV = σ_w / μ_w
-# - Alternative DEFF: DEFF = n_actual / n_eff
+# - Design effect: DEFF = n_actual / n_eff = 1 + CV²,  CV = σ_w / μ_w with
+#   the population SD (divisor n)
 #
 # REFERENCES:
 # - Kish, L. (1965). Survey Sampling. Wiley.
@@ -140,8 +140,8 @@ if (!exists("apply_fpc", mode = "function")) {
 
 #' Calculate design effect (DEFF)
 #'
-#' Calculates design effect using Kish approximation: DEFF = 1 + CV²
-#' where CV is the coefficient of variation of weights.
+#' Calculates the Kish design effect DEFF = n / n_eff, equal to 1 + CV² with
+#' the population coefficient of variation of the weights.
 #'
 #' INTERPRETATION:
 #' - DEFF = 1.00: No loss of precision from weighting
@@ -160,7 +160,7 @@ if (!exists("apply_fpc", mode = "function")) {
 #' @examples
 #' weights <- c(1.2, 0.8, 1.5, 1.0, 0.9, 2.0)
 #' deff <- calculate_deff(weights)
-#' # Returns: ~1.15 (modest design effect)
+#' # Returns: 6 / (7.4^2 / 10.14) = 1.111 (modest design effect)
 #'
 #' @references
 #' Kish, L. (1965). Survey Sampling. Wiley.
@@ -176,18 +176,11 @@ calculate_deff <- function(weights) {
     return(NA_real_)
   }
 
-  # If all weights are 1, DEFF = 1 (no design effect)
-  if (all(weights == 1)) {
-    return(1.0)
-  }
-
-  # Calculate CV of weights
-  cv_weights <- sd(weights) / mean(weights)
-
-  # Kish approximation: DEFF = 1 + CV²
-  deff <- 1 + cv_weights^2
-
-  return(deff)
+  # Kish: DEFF = n / n_eff, which equals 1 + CV^2 when CV uses the
+  # POPULATION standard deviation. The n - 1 SD made DEFF disagree with the
+  # Effective_n printed beside it (1.23 against 8 / 6.67 = 1.20; review
+  # 2026-09-24). Defined from n_eff so the two can never drift apart.
+  length(weights) / calculate_effective_n(weights)
 }
 
 
@@ -303,14 +296,18 @@ calculate_weight_stats_single <- function(group_name, weights, actual_n) {
     ))
   }
 
-  # Calculate statistics
+  # Calculate statistics. Actual_n, DEFF, CV and Effective_n all describe the
+  # respondents with a usable weight, so DEFF = Actual_n / Effective_n on the
+  # row. Actual_n used to count zero and missing weights too (review
+  # 2026-09-24).
+  actual_n <- length(valid_weights)
   sum_weights <- sum(valid_weights)
   mean_weight <- mean(valid_weights)
   min_weight <- min(valid_weights)
   max_weight <- max(valid_weights)
-  cv_weights <- sd(valid_weights) / mean_weight
-  deff <- calculate_deff(weights)
-  n_eff <- calculate_effective_n_int(weights)
+  cv_weights <- sqrt(mean((valid_weights - mean_weight)^2)) / mean_weight  # population SD
+  deff <- calculate_deff(valid_weights)
+  n_eff <- calculate_effective_n_int(valid_weights)
 
   # Generate warnings
   warning_msgs <- character()

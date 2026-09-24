@@ -354,6 +354,23 @@ test_that("study-level effective n is Kish by hand and equals the per-question n
   expect_equal(q$result$n_eff, st$Effective_n)
 })
 
+test_that("study-level DEFF is Actual_n / Effective_n on the same row (Kish)", {
+  # Weights 0.5, 1, 1.5, 2 twice, plus one zero and one missing weight.
+  # Valid n = 8, sum w = 10, sum w^2 = 15, n_eff = 100/15 = 6.667,
+  # DEFF = 8 / 6.667 = 1.2 = 1 + CV^2 with the population CV:
+  # mean 1.25, population variance 1.875 - 1.5625 = 0.3125, CV^2 = 0.2.
+  # The code used the n-1 SD, giving DEFF 1.23 beside n_eff 6.67
+  # (review 2026-09-24, decided by Duncan: DEFF = n / n_eff).
+  d <- data.frame(w = c(rep(c(0.5, 1, 1.5, 2), 2), 0, NA))
+  st <- calculate_study_level_stats(d, weight_variable = "w")
+  expect_equal(st$Actual_n, 8)                         # rows with a usable weight
+  expect_equal(st$DEFF, 1.20)
+  expect_equal(st$Weight_CV, round(sqrt(0.2), 3))      # 0.447
+  expect_equal(calculate_deff(d$w), 1.2, tolerance = 1e-12)
+  # Weights 1..5: n_eff = 15^2 / 55 = 4.0909, DEFF = 5 / 4.0909 = 1.2222
+  expect_equal(calculate_deff(1:5), 55 * 5 / 225, tolerance = 1e-12)
+})
+
 test_that("weight concentration shares match a hand count", {
   w <- c(10, rep(1, 19))                               # n = 20, total 29
   wc <- compute_weight_concentration(w)

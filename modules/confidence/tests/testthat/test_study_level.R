@@ -116,10 +116,11 @@ test_that("calculate_deff: equal weights give DEFF = 1", {
   expect_equal(result, 1.0)
 })
 
-test_that("calculate_deff: DEFF = 1 + CV^2", {
+test_that("calculate_deff: DEFF = n / n_eff = 1 + CV^2 (population CV)", {
   weights <- c(1, 2, 3, 4, 5)
-  cv <- sd(weights) / mean(weights)
-  expected_deff <- 1 + cv^2
+  # n_eff = 15^2 / 55; DEFF = 5 x 55 / 225 = 1.2222. The population CV^2 is
+  # 2 / 9, so 1 + CV^2 agrees. (The n - 1 SD gave 1.2778.)
+  expected_deff <- 5 * 55 / 225
 
   result <- calculate_deff(weights)
   expect_equal(result, expected_deff, tolerance = 1e-10)
