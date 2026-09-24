@@ -528,7 +528,7 @@ calculate_scale_box <- function(values, weights, n_boxes, scale_values, top) {
 #' @param values Numeric vector of response values
 #' @param weights Numeric vector of weights
 #' @param range_spec Character, range specification (e.g., "1-3", "4-5")
-#' @return List with proportion, range_values, n_*
+#' @return List with proportion, range_values (the inclusive bounds), n_*
 #' @keywords internal
 calculate_custom_range <- function(values, weights, range_spec) {
   # Strip optional "range:" prefix (supports both "4-5" and "range:4-5")
@@ -551,7 +551,9 @@ calculate_custom_range <- function(values, weights, range_spec) {
                 n_unweighted = 0, n_weighted = 0))
   }
 
-  range_values <- seq(range_min, range_max)
+  # Inclusive interval, not a list of integers: a composite score of 4.5 and
+  # a half-point bound such as 3.5-5 both count correctly.
+  range_values <- c(range_min, range_max)
 
   valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
@@ -562,7 +564,7 @@ calculate_custom_range <- function(values, weights, range_spec) {
                 n_unweighted = 0, n_weighted = 0))
   }
 
-  in_range <- values_valid %in% range_values
+  in_range <- values_valid >= range_min & values_valid <= range_max
   range_weight <- sum(weights_valid[which(in_range)])
   total_weight <- sum(weights_valid)
   proportion <- (range_weight / total_weight) * 100

@@ -639,3 +639,19 @@ test_that("top box on a composite is refused: a row mean has no scale points", {
   expect_null(res$result)
   expect_match(res$skipped$reason, "CFG_BOX_SCALE_UNKNOWN")
 })
+
+
+# ==============================================================================
+# RANGE: an interval, so it holds for composite scores and half points
+# ==============================================================================
+
+test_that("range:4-5 counts every score from 4 to 5 inclusive, by hand", {
+  # Composite scores (row means) 4, 4.5, 3.667, 5, 2 with equal weight.
+  # In 4-5: 4, 4.5, 5 -> 3 / 5 = 60%. Integer matching would give 2 / 5.
+  v <- c(4, 4.5, 11 / 3, 5, 2)
+  expect_equal(calculate_custom_range(v, rep(1, 5), "4-5")$proportion, 60)
+  # Integer data is unchanged: 1-5 answers 2, 4, 5, 5 -> 3 / 4 in 4-5.
+  expect_equal(calculate_custom_range(c(2, 4, 5, 5), rep(1, 4), "range:4-5")$proportion, 75)
+  # A half-point bound: 3.5-5 on 3, 3.5, 4, 5 -> 3 / 4.
+  expect_equal(calculate_custom_range(c(3, 3.5, 4, 5), rep(1, 4), "3.5-5")$proportion, 75)
+})

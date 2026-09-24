@@ -300,7 +300,7 @@ QuestionCode | QuestionType | TrackingSpecs | W1  | W2  | W3  | SourceQuestions
 Q_SAT        | Rating       | mean          | Q10 | Q10 | Q10 |
 Q_SERVICE    | Rating       | mean          | Q11 | Q11 | Q11 |
 Q_VALUE      | Rating       | mean          | Q12 | Q12 | Q12 |
-COMP_CX      | Composite    | mean,top2_box | NA  | NA  | NA  | Q_SAT,Q_SERVICE,Q_VALUE
+COMP_CX      | Composite    | mean,range:4-5 | NA  | NA  | NA  | Q_SAT,Q_SERVICE,Q_VALUE
 ```
 
 ### Step 2: How Composite Calculation Works
@@ -506,7 +506,7 @@ Q##          | Rating       | mean,top2_box,range:9-10
 
 ```         
 QuestionCode | QuestionType | TrackingSpecs | Wave cols | SourceQuestions
-COMP_XX      | Composite    | mean,top2_box | NA | NA   | Q_A,Q_B,Q_C
+COMP_XX      | Composite    | mean,range:4-5 | NA | NA   | Q_A,Q_B,Q_C
 ```
 
 ------------------------------------------------------------------------
