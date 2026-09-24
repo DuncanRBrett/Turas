@@ -176,10 +176,11 @@
   // ---------------------------------------------------------------- open mode
   var etaCache = null;
   /** Linear predictor per respondent for every fit, from the open rows.
-   *  null for respondents outside the model. */
+   *  null for respondents outside the model. Also caches each respondent's
+   *  baseline expected score per fit (etaCache.s), which every move needs. */
   function etas() {
     if (etaCache && etaCache.src === TR.WI) return etaCache.e;
-    var M = model(), O = W().open, n = O.n, C = scaleOf().centre, out = [];
+    var M = model(), O = W().open, n = O.n, C = scaleOf().centre, out = [], base = [], scores = meta().scores;
     var lvByKey = {};
     M.levers.forEach(function (lv) { lvByKey[lv.key] = lv; });
     var cols = M.design.map(function (c) {
@@ -206,11 +207,15 @@
         }
         e[i] = s;
       }
+      var bs = new Float64Array(n);
+      for (var k = 0; k < n; k++) bs[k] = e[k] === null ? NaN : scoreAt(fit, e[k], scores);
       out.push(e);
+      base.push(bs);
     });
-    etaCache = { src: TR.WI, e: out };
+    etaCache = { src: TR.WI, e: out, s: base };
     return out;
   }
+  function baseScores() { etas(); return etaCache.s; }
 
   /** Respondents in the current audience who are in the model. */
   function openIdx(mask) {
@@ -223,24 +228,41 @@
     return idx;
   }
 
-  /** Change in the group's expected score under a set of moves, per fit. */
+  /** Change in the group's expected score under a set of moves, per fit.
+   *  A move's change to a respondent's lever column does not depend on the
+   *  fit, so it is worked out once; each fit then visits only the respondents
+   *  a move touches, against their cached baseline score. The arithmetic and
+   *  its order are the same as scoring every respondent in every fit. */
   function openChange(idx, moves) {
-    var M = model(), O = W().open, E = etas(), scores = meta().scores, out = [];
-    var levers = M.levers;
+    var M = model(), O = W().open, E = etas(), B = baseScores(), scores = meta().scores, out = [];
+    var moved = M.levers.filter(function (lv) { return moves[lv.key]; }), nm = moved.length;
+    var who = [], dl = [], sw = 0;
+    for (var q = 0; q < idx.length; q++) {
+      var i = idx[q], any = false, row = new Array(nm);
+      for (var l = 0; l < nm; l++) {
+        var lv = moved[l];
+        row[l] = delta(lv, moves[lv.key], O.val[lv.key][i], dkOf(O, lv.key, i));
+        if (row[l] !== 0) any = true;
+      }
+      if (any) { who.push(i); for (l = 0; l < nm; l++) dl.push(row[l]); }
+      sw += O.w[i];
+    }
     for (var f = 0; f < M.fits.length; f++) {
-      var fit = M.fits[f], e = E[f], sw = 0, d = 0;
-      for (var q = 0; q < idx.length; q++) {
-        var i = idx[q], base = e[i], e2 = base;
-        for (var l = 0; l < levers.length; l++) {
-          var mv = moves[levers[l].key];
-          if (mv) e2 += fit.b[levers[l].col] * delta(levers[l], mv, O.val[levers[l].key][i], dkOf(O, levers[l].key, i));
-        }
-        if (e2 !== base) d += O.w[i] * (scoreAt(fit, e2, scores) - scoreAt(fit, base, scores));
-        sw += O.w[i];
+      var fit = M.fits[f], e = E[f], bs = B[f], d = 0;
+      var b = moved.map(function (lv) { return fit.b[lv.col]; });
+      for (var k = 0; k < who.length; k++) {
+        var r = who[k], base = e[r], e2 = base;
+        for (l = 0; l < nm; l++) e2 += b[l] * dl[k * nm + l];
+        if (e2 !== base) d += O.w[r] * (scoreAt(fit, e2, scores) - bs[r]);
       }
       out.push(sw ? d / sw : NaN);
     }
     return out;
+  }
+  /** A stable key for a set of moves: chosen levers only, in sorted order. */
+  function movesKey(moves) {
+    return JSON.stringify(Object.keys(moves).filter(function (k) { return moves[k]; }).sort()
+      .map(function (k) { return [k, moves[k]]; }));
   }
 
   /** A live group: actual score, who needs each fix, and the draws. */
@@ -249,7 +271,15 @@
     if (!idx.length) return { n: 0 };
     var sw = 0, sc = 0;
     idx.forEach(function (i) { sw += O.w[i]; sc += O.w[i] * scores[O.y[i] - 1]; });
-    var one = function (lv, m) { var mv = {}; mv[lv.key] = m; return openChange(idx, mv); };
+    // Results for this audience, kept by their moves: a scenario pick or a
+    // re-render works out only what it has not seen for this group.
+    var memo = {};
+    var run = function (moves) {
+      var k = movesKey(moves);
+      if (!Object.prototype.hasOwnProperty.call(memo, k)) memo[k] = summ(openChange(idx, moves));
+      return memo[k];
+    };
+    var one = function (lv, m) { var mv = {}; mv[lv.key] = m; return run(mv); };
     return {
       n: idx.length, actual: sc / sw, exact: true,
       need: M.levers.map(function (lv) {
@@ -260,11 +290,11 @@
         });
         return c;
       }),
-      slip: M.levers.map(function (lv) { return summ(one(lv, slipMove(lv))); }),
-      fix: M.levers.map(function (lv) { return summ(one(lv, fixMove(lv))); }),
-      scenario: function (moves) { return summ(openChange(idx, moves)); },
-      bundle: function (b) { return summ(openChange(idx, b.moves)); },
-      single: function (lv, m) { return summ(one(lv, m)); }
+      slip: M.levers.map(function (lv) { return one(lv, slipMove(lv)); }),
+      fix: M.levers.map(function (lv) { return one(lv, fixMove(lv)); }),
+      scenario: function (moves) { return run(moves); },
+      bundle: function (b) { return run(b.moves); },
+      single: function (lv, m) { return one(lv, m); }
     };
   }
   wi._openGroup = openGroup;
@@ -329,16 +359,23 @@
   wi._safeGroup = safeGroup;
 
   // ---------------------------------------------------------------- the group shown now
+  var AUDIENCES_KEPT = 6;
   function currentGroup() {
     if (wi.live()) {
       var filters = (TR.d2 && TR.d2.state && TR.d2.state.filters) || [];
       var mask = filters.length ? TR.stats.mask(filters) : null;
       var who = filters.length && TR.d2.filterDescription ? TR.d2.filterDescription() : "all " + (meta().units || "respondents");
+      // The last few audiences are kept, so filtering back to one already seen
+      // (everyone, most often) costs nothing.
       var key = JSON.stringify(filters);
-      if (!wi._cache || wi._cache.key !== key || wi._cache.src !== TR.WI) {
-        wi._cache = { key: key, src: TR.WI, g: openGroup(mask) };
+      if (!wi._cache || wi._cache.src !== TR.WI) wi._cache = { src: TR.WI, keys: [], groups: {} };
+      var C = wi._cache;
+      if (!Object.prototype.hasOwnProperty.call(C.groups, key)) {
+        C.groups[key] = openGroup(mask);
+        C.keys.push(key);
+        if (C.keys.length > AUDIENCES_KEPT) delete C.groups[C.keys.shift()];
       }
-      var g = wi._cache.g;
+      var g = C.groups[key];
       g.who = who;
       return g;
     }

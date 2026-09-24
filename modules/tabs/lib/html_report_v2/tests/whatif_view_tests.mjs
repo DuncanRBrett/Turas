@@ -351,5 +351,41 @@ run("an area caught in the halo says so under its name, keeps its number, and is
   lacks(html2, "Caught in the halo");
 });
 
+run("the kept audiences and moves give the same page as a fresh start, and a new island starts afresh", () => {
+  const key = Object.keys(FX.open.ctx)[0];
+  const mask = FX.open.ctx[key].map((c) => (c === 0 ? 1 : 0));
+  const filtered = [{ q: "X", rows: [0] }];
+  const lv0 = FX.model.levers[0], lv1 = FX.model.levers[1];
+  const pick = (sb) => {
+    sb.TR.whatif.state.scen[lv0.key] = lv0.kind === "coverage" ? "extend" : "up1";
+    sb.TR.whatif.state.scen[lv1.key] = lv1.kind === "coverage" ? "withdraw" : "floor";
+  };
+  const fresh = (filters, withPick) => {
+    const sb = sandbox(openIsland(), { micro: true, filters: filters, mask: (f) => (f.length ? mask : null) });
+    if (withPick) pick(sb);
+    return render(sb);
+  };
+  // One sandbox walks everyone, a filter, a scenario, and back again.
+  const sb = sandbox(openIsland(), { micro: true, mask: (f) => (f.length ? mask : null) });
+  const all1 = render(sb);
+  sb.TR.d2.state.filters = filtered;
+  assert(render(sb) === fresh(filtered, false), "filtered group matches a fresh one");
+  pick(sb);
+  assert(render(sb) === fresh(filtered, true), "scenario on the filtered group matches a fresh one");
+  sb.TR.d2.state.filters = [];
+  assert(render(sb) === fresh([], true), "back to everyone, with the scenario, matches a fresh one");
+  sb.TR.whatif.state.scen = {};
+  assert(render(sb) === all1, "back to everyone with no scenario is the first page again");
+  // A different island (another report's) must not reuse the kept results.
+  const w = openIsland();
+  const i = w.open.y.findIndex((y) => y !== null && y !== undefined && y < w.meta.scores.length);
+  w.open.y[i] = w.open.y[i] + 1;
+  sb.TR.WI = w;
+  const swapped = render(sb);
+  const sbW = sandbox(w, { micro: true, mask: (f) => (f.length ? mask : null) });
+  assert(swapped === render(sbW), "a new island is worked out afresh");
+  assert(swapped !== all1, "the changed answer shows");
+});
+
 console.log((failed ? "\n✗ " : "\n✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
