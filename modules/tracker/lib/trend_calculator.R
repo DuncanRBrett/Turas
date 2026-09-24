@@ -228,8 +228,11 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
 
   cat(paste0("\nCompleted trend calculation for ", length(trend_results), " questions\n"))
 
+  # Box specs refused for want of a scale: the question ships, the run is PARTIAL
+  refused_metrics <- collect_refused_metrics(trend_results)
+
   # TRS v1.0: Determine run status and return with metadata
-  run_status <- if (length(skipped_questions) > 0) "PARTIAL" else "PASS"
+  run_status <- if (length(skipped_questions) > 0 || length(refused_metrics) > 0) "PARTIAL" else "PASS"
 
   if (run_status == "PARTIAL") {
     message(sprintf("[TRS] Trend calculation completed with PARTIAL status: %d questions skipped",
@@ -239,8 +242,29 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
   return(list(
     trends = trend_results,
     skipped_questions = skipped_questions,
+    refused_metrics = refused_metrics,
     run_status = run_status
   ))
+}
+
+
+#' Refused Box Specs by Question
+#'
+#' Works on flat trend results (question -> result) and banner results
+#' (question -> segment -> result); a spec refused in any segment is listed.
+#'
+#' @param trend_results List of trend results
+#' @return Named list: question code -> character vector of refused specs
+#' @keywords internal
+collect_refused_metrics <- function(trend_results) {
+  out <- list()
+  for (q_code in names(trend_results)) {
+    entry <- trend_results[[q_code]]
+    parts <- if (!is.null(entry$wave_results)) list(entry) else entry
+    specs <- unique(unlist(lapply(parts, function(p) if (is.list(p)) p$refused_specs)))
+    if (length(specs) > 0) out[[q_code]] <- specs
+  }
+  out
 }
 
 
@@ -577,6 +601,16 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
   scale_values <- if (any(tolower(trimws(specs_list)) %in% box_specs)) {
     get_question_scale(wave_struct, wave_col)
   } else NULL
+  # With no scale the box is refused on its own (Duncan, 24 Sep 2026): its
+  # value is NA and the spec is named, the other metrics still ship.
+  refused <- character(0)
+  box_or_refuse <- function(spec_lower, fn, n_boxes) {
+    if (is.null(scale_values)) {
+      refused <<- c(refused, spec_lower)
+      return(NA_real_)
+    }
+    fn(values, weights, n_boxes = n_boxes, scale_values)$proportion
+  }
 
   for (spec in specs_list) {
     spec_lower <- tolower(trimws(spec))
@@ -590,24 +624,19 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
       # Not propagated to metrics$ for now to keep the metrics contract stable.
 
     } else if (spec_lower == "top_box") {
-      result <- calculate_top_box(values, weights, n_boxes = 1, scale_values)
-      metrics$top_box <- result$proportion
+      metrics$top_box <- box_or_refuse("top_box", calculate_top_box, 1)
 
     } else if (spec_lower == "top2_box") {
-      result <- calculate_top_box(values, weights, n_boxes = 2, scale_values)
-      metrics$top2_box <- result$proportion
+      metrics$top2_box <- box_or_refuse("top2_box", calculate_top_box, 2)
 
     } else if (spec_lower == "top3_box") {
-      result <- calculate_top_box(values, weights, n_boxes = 3, scale_values)
-      metrics$top3_box <- result$proportion
+      metrics$top3_box <- box_or_refuse("top3_box", calculate_top_box, 3)
 
     } else if (spec_lower == "bottom_box") {
-      result <- calculate_bottom_box(values, weights, n_boxes = 1, scale_values)
-      metrics$bottom_box <- result$proportion
+      metrics$bottom_box <- box_or_refuse("bottom_box", calculate_bottom_box, 1)
 
     } else if (spec_lower == "bottom2_box") {
-      result <- calculate_bottom_box(values, weights, n_boxes = 2, scale_values)
-      metrics$bottom2_box <- result$proportion
+      metrics$bottom2_box <- box_or_refuse("bottom2_box", calculate_bottom_box, 2)
 
     } else if (grepl("^range:", spec_lower)) {
       # Strip "range:" prefix before passing to calculate_custom_range
@@ -640,7 +669,33 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
     }
   }
 
+  if (length(refused) > 0) attr(metrics, "refused_specs") <- unique(refused)
   return(metrics)
+}
+
+
+#' Report Box Specs Refused for Want of a Scale
+#'
+#' Prints one boxed console message per question (Turas runs under Shiny, so
+#' the console is where a user looks) and returns the refused specs, which the
+#' trend result carries so the run finishes PARTIAL.
+#'
+#' @param q_code Character. Question code
+#' @param refused Character vector. Refused specs, possibly repeated by wave
+#' @return Character vector of unique refused specs, or NULL when none
+#' @keywords internal
+report_refused_box_specs <- function(q_code, refused) {
+  refused <- unique(refused)
+  if (length(refused) == 0) return(NULL)
+  cat("\n\u250c\u2500\u2500\u2500 TURAS PARTIAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n")
+  cat("\u2502 Code: CFG_BOX_SCALE_UNKNOWN\n")
+  cat("\u2502 Question:", q_code, "\n")
+  cat("\u2502 Refused:", paste(refused, collapse = ", "),
+      "(no scale points in the StructureFile). Other metrics are reported.\n")
+  cat("\u2502 How to fix: give the options an Index_Weight in the StructureFile,",
+      "or name the box directly, e.g. range:4-5\n")
+  cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n")
+  refused
 }
 
 
@@ -716,6 +771,7 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
 
   # Calculate metrics for each wave
   wave_results <- list()
+  refused_specs <- character(0)
 
   for (wave_id in wave_ids) {
     # Aggregate wave: inject the stored mean. No dispersion is recorded, so sd is
@@ -754,6 +810,7 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
       wave_struct, wave_col,
       alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA)
     )
+    refused_specs <- c(refused_specs, attr(metrics, "refused_specs"))
 
     # Store basic counts (shared across all metrics)
     # Use which() to get numeric indices (avoids NA issues)
@@ -791,7 +848,8 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     tracking_specs_original = specs_original,
     wave_results = wave_results,
     changes = cs$changes,
-    significance = cs$significance
+    significance = cs$significance,
+    refused_specs = report_refused_box_specs(q_code, refused_specs)
   )
 
   validate_result_metric_type(result, context = "calculate_rating_trend_enhanced")
@@ -916,6 +974,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
 
   # Calculate composite values and metrics for each wave
   wave_results <- list()
+  refused_specs <- character(0)
 
   cat(paste0("  Calculating composite for ", length(wave_ids), " waves...\n"))
 
@@ -953,6 +1012,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
       wave_struct, composite_wave_col,
       alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA)
     )
+    refused_specs <- c(refused_specs, attr(metrics, "refused_specs"))
 
     # Compute effective N once at the wave level — see note in
     # calculate_rating_trend_enhanced. Avoids silently falling back to
@@ -988,7 +1048,8 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     source_questions = source_questions,
     wave_results = wave_results,
     changes = cs$changes,
-    significance = cs$significance
+    significance = cs$significance,
+    refused_specs = report_refused_box_specs(q_code, refused_specs)
   )
 
   validate_result_metric_type(result, context = "calculate_composite_trend_enhanced")

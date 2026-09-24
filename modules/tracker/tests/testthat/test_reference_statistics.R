@@ -604,13 +604,37 @@ test_that("rating trend: top box uses the structure's scale in every wave", {
                z_test_for_proportions(0.30, 40, 0, 40)$p_value)
 })
 
-test_that("rating trend: top box with no StructureFile is refused, not guessed", {
+test_that("rating trend: top box with no StructureFile is refused, the mean still ships", {
+  # Duncan, 24 Sep 2026: refuse the box, not the question. The mean is
+  # reported, the box is blank, and the result names the refused spec so the
+  # run finishes PARTIAL.
   s <- rating_two_wave("mean,top_box", with_structure = FALSE)
   capture.output(res <- dispatch_single_trend("SAT", s$question_map, s$wave_data,
                                               s$config, NULL))
-  expect_null(res$result)
-  expect_match(res$skipped$reason, "top_box")
-  expect_match(res$skipped$reason, "range:")
+  expect_null(res$skipped)
+  r <- res$result
+  expect_equal(r$wave_results$W2$metrics$mean, (25 * 4 + 15 * 3) / 40)
+  expect_true(is.na(r$wave_results$W2$metrics$top_box))
+  expect_identical(r$refused_specs, "top_box")
+})
+
+test_that("the refused box is named on the console with the fix", {
+  s <- rating_two_wave("mean,top2_box", with_structure = FALSE)
+  out <- capture.output(calculate_rating_trend_enhanced("SAT", s$question_map, s$wave_data,
+                                                        s$config, NULL))
+  expect_true(any(grepl("CFG_BOX_SCALE_UNKNOWN", out)))
+  expect_true(any(grepl("top2_box", out)))
+  expect_true(any(grepl("range:", out)))
+})
+
+test_that("calculate_all_trends finishes PARTIAL and lists the refused box", {
+  s <- rating_two_wave("mean,top_box", with_structure = FALSE)
+  s$config$tracked_questions <- data.frame(QuestionCode = "SAT", stringsAsFactors = FALSE)
+  capture.output(suppressMessages(
+    all <- calculate_all_trends(s$config, s$question_map, s$wave_data, wave_structures = NULL)))
+  expect_identical(all$run_status, "PARTIAL")
+  expect_identical(all$refused_metrics$SAT, "top_box")
+  expect_false(is.null(all$trends$SAT))
 })
 
 test_that("rating trend: mean alone needs no structure", {
@@ -641,8 +665,10 @@ test_that("top box on a composite is refused: a row mean has no scale points", {
   structs <- list(W1 = rating_structure("Q7"), W2 = rating_structure("Q7"))
   capture.output(res <- dispatch_single_trend("IDX", s$question_map, s$wave_data,
                                               s$config, structs))
-  expect_null(res$result)
-  expect_match(res$skipped$reason, "CFG_BOX_SCALE_UNKNOWN")
+  # Composite scores (4.5, 4, 2.5, 4.5) average 3.875; the box is refused
+  expect_equal(res$result$wave_results$W1$metrics$mean, 3.875)
+  expect_true(is.na(res$result$wave_results$W1$metrics$top_box))
+  expect_identical(res$result$refused_specs, "top_box")
 })
 
 

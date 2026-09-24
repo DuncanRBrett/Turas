@@ -14,6 +14,8 @@
 #   - a single-choice code present in W2 only, a label starting with "-",
 #     and a non-ASCII label
 #   - a question asked in W2 only
+#   - a rating (EASE, Q12) tracked "mean,top_box" with no scale in the
+#     structure: the box is refused, the mean ships, the run is PARTIAL
 #   - a Region banner whose South segment (every third respondent, n = 40)
 #     has an effective base under 30, so its pairs must not be tested
 # ==============================================================================
@@ -41,7 +43,7 @@ pipeline_fixture_write <- function(dir) {
     df <- data.frame(
       RespID = seq_len(n), wt = w,
       Region = ifelse(seq_len(n) %% 3 == 0, "South", "North"),
-      Q10 = sat, Q11 = val, Q15 = nps, Q20 = aware,
+      Q10 = sat, Q11 = val, Q12 = sample(1:5, n, replace = TRUE), Q15 = nps, Q20 = aware,
       Q30_1 = mm(0.45), Q30_2 = mm(0.35 + sat_shift / 20), Q30_3 = mm(0.2),
       stringsAsFactors = FALSE
     )
@@ -103,23 +105,25 @@ pipeline_fixture_write <- function(dir) {
     stringsAsFactors = FALSE))
   openxlsx::addWorksheet(wb, "TrackedQuestions")
   openxlsx::writeData(wb, "TrackedQuestions", data.frame(
-    QuestionCode = c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ"),
-    MetricLabel = c("Satisfaction", "Recommend", "Awareness", "Channels", "CX index", "New question"),
-    TrackingSpecs = c("mean,top2_box", "", "all", "auto,any", "mean,range:4-5", "mean"),
-    Section = "Fixture", SortOrder = 1:6, stringsAsFactors = FALSE))
+    QuestionCode = c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ", "EASE"),
+    MetricLabel = c("Satisfaction", "Recommend", "Awareness", "Channels", "CX index",
+                    "New question", "Ease"),
+    TrackingSpecs = c("mean,top2_box", "", "all", "auto,any", "mean,range:4-5", "mean",
+                      "mean,top_box"),
+    Section = "Fixture", SortOrder = 1:7, stringsAsFactors = FALSE))
   turas_saveWorkbook(wb, config_path, overwrite = TRUE)
 
   wb2 <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb2, "QuestionMap")
   openxlsx::writeData(wb2, "QuestionMap", data.frame(
-    QuestionCode = c("SAT", "VAL", "REC", "AWARE", "CHAN", "CX", "NEWQ"),
+    QuestionCode = c("SAT", "VAL", "REC", "AWARE", "CHAN", "CX", "NEWQ", "EASE"),
     QuestionText = c("Satisfaction", "Value", "Recommend", "Aware of us", "Channels used",
-                     "CX index", "New question"),
+                     "CX index", "New question", "Ease"),
     QuestionType = c("Rating", "Rating", "NPS", "Single_Response", "Multi_Mention",
-                     "Composite", "Rating"),
-    SourceQuestions = c(NA, NA, NA, NA, NA, "SAT,VAL", NA),
-    W1 = c("Q10", "Q11", "Q15", "Q20", "Q30", NA, NA),
-    W2 = c("Q10", "Q11", "Q15", "Q20", "Q30", NA, "Q40"),
+                     "Composite", "Rating", "Rating"),
+    SourceQuestions = c(NA, NA, NA, NA, NA, "SAT,VAL", NA, NA),
+    W1 = c("Q10", "Q11", "Q15", "Q20", "Q30", NA, NA, "Q12"),
+    W2 = c("Q10", "Q11", "Q15", "Q20", "Q30", NA, "Q40", "Q12"),
     stringsAsFactors = FALSE))
   turas_saveWorkbook(wb2, file.path(dir, "question_mapping.xlsx"), overwrite = TRUE)
 

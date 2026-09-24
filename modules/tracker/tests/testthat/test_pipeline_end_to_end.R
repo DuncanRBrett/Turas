@@ -164,6 +164,16 @@ hand_verdicts <- function(r) {
   )
 }
 
+# A sheet writes values rounded to 2 dp. A reference computed another way can
+# sit either side of a rounding tie (4.125 written as 4.12, recomputed as
+# 4.1250000000000009 and rounded to 4.13), so a written value must lie within
+# half a unit of the second decimal of the reference, no further.
+expect_2dp <- function(got, ref, info = NULL) {
+  expect_equal(length(got), length(ref), info = info)
+  ok <- (is.na(got) & is.na(ref)) | (!is.na(got) & !is.na(ref) & abs(got - ref) <= 0.005 + 1e-9)
+  expect_true(all(ok), info = paste(c(info, "got", format(got), "ref", format(ref)), collapse = " "))
+}
+
 row_values <- function(df, label, cols) {
   r <- which(df[[1]] == label)[1]
   if (is.na(r)) return(rep(NA_real_, length(cols)))
@@ -197,39 +207,39 @@ test_that("detailed sheets match survey::svymean and hand counts, wave by wave",
   r <- references(fx)
   f <- output_file(fx$dir, "Tracker")
   cols <- 2:3
-  ref2 <- function(get) round(c(get(r$W1), get(r$W2)), 2)
+  ref2 <- function(get) c(get(r$W1), get(r$W2))
 
   sat <- read_sheet(f, "SAT")
-  expect_equal(row_values(sat, "Mean", cols), ref2(function(x) x$sat$mean))
-  expect_equal(row_values(sat, "Top 2 Box %", cols), ref2(function(x) x$sat$top2))
+  expect_2dp(row_values(sat, "Mean", cols), ref2(function(x) x$sat$mean))
+  expect_2dp(row_values(sat, "Top 2 Box %", cols), ref2(function(x) x$sat$top2))
   expect_equal(row_values(sat, "Sample Size (n)", cols), c(r$W1$sat$n, r$W2$sat$n))
 
   rec <- read_sheet(f, "REC")
-  expect_equal(row_values(rec, "NPS Score", cols), ref2(function(x) x$rec$nps))
-  expect_equal(row_values(rec, "% Promoters (9-10)", cols), ref2(function(x) 100 * x$rec$pp))
-  expect_equal(row_values(rec, "% Passives (7-8)", cols), ref2(function(x) x$rec$pas))
-  expect_equal(row_values(rec, "% Detractors (0-6)", cols), ref2(function(x) 100 * x$rec$pd))
+  expect_2dp(row_values(rec, "NPS Score", cols), ref2(function(x) x$rec$nps))
+  expect_2dp(row_values(rec, "% Promoters (9-10)", cols), ref2(function(x) 100 * x$rec$pp))
+  expect_2dp(row_values(rec, "% Passives (7-8)", cols), ref2(function(x) x$rec$pas))
+  expect_2dp(row_values(rec, "% Detractors (0-6)", cols), ref2(function(x) 100 * x$rec$pd))
 
   aware <- read_sheet(f, "AWARE")
   for (code in c("Yes", "No", "Café", "- None of these")) {
-    expect_equal(row_values(aware, code, cols), ref2(function(x) x$aware[[code]]), info = code)
+    expect_2dp(row_values(aware, code, cols), ref2(function(x) x$aware[[code]]), info = code)
   }
 
   chan <- read_sheet(f, "CHAN")
-  expect_equal(row_values(chan, "Q30_1", cols), ref2(function(x) x$chan$q1))
-  expect_equal(row_values(chan, "Q30_2", cols), ref2(function(x) x$chan$q2))
-  expect_equal(row_values(chan, "Q30_3", cols), ref2(function(x) x$chan$q3))
-  expect_equal(row_values(chan, "% Mentioning Any", cols), ref2(function(x) x$chan$any))
+  expect_2dp(row_values(chan, "Q30_1", cols), ref2(function(x) x$chan$q1))
+  expect_2dp(row_values(chan, "Q30_2", cols), ref2(function(x) x$chan$q2))
+  expect_2dp(row_values(chan, "Q30_3", cols), ref2(function(x) x$chan$q3))
+  expect_2dp(row_values(chan, "% Mentioning Any", cols), ref2(function(x) x$chan$any))
   expect_equal(row_values(chan, "Sample Size (n)", cols), c(r$W1$chan$n, r$W2$chan$n))
 
   cx <- read_sheet(f, "CX")
-  expect_equal(row_values(cx, "Mean", cols), ref2(function(x) x$cx$mean))
-  expect_equal(row_values(cx, "% 4-5", cols), ref2(function(x) x$cx$r45))
+  expect_2dp(row_values(cx, "Mean", cols), ref2(function(x) x$cx$mean))
+  expect_2dp(row_values(cx, "% 4-5", cols), ref2(function(x) x$cx$r45))
 
   newq <- read_sheet(f, "NEWQ")
   vals <- row_values(newq, "Mean", cols)
   expect_true(is.na(vals[1]))
-  expect_equal(vals[2], round(r$W2$newq, 2))
+  expect_2dp(vals[2], r$W2$newq)
 })
 
 
@@ -246,11 +256,11 @@ test_that("wave history carries the same numbers as the detailed sheets", {
     i <- which(wh[[1]] == code & wh[[3]] == type)[1]
     suppressWarnings(as.numeric(unlist(wh[i, 4:5])))
   }
-  expect_equal(pick("SAT", "Mean"), round(c(r$W1$sat$mean, r$W2$sat$mean), 2))
-  expect_equal(pick("SAT", "Top 2 Box"), round(c(r$W1$sat$top2, r$W2$sat$top2), 2))
-  expect_equal(pick("REC", "NPS"), round(c(r$W1$rec$nps, r$W2$rec$nps), 2))
-  expect_equal(pick("CHAN", "% Q30_1"), round(c(r$W1$chan$q1, r$W2$chan$q1), 2))
-  expect_equal(pick("CX", "% 4-5"), round(c(r$W1$cx$r45, r$W2$cx$r45), 2))
+  expect_2dp(pick("SAT", "Mean"), c(r$W1$sat$mean, r$W2$sat$mean))
+  expect_2dp(pick("SAT", "Top 2 Box"), c(r$W1$sat$top2, r$W2$sat$top2))
+  expect_2dp(pick("REC", "NPS"), c(r$W1$rec$nps, r$W2$rec$nps))
+  expect_2dp(pick("CHAN", "% Q30_1"), c(r$W1$chan$q1, r$W2$chan$q1))
+  expect_2dp(pick("CX", "% 4-5"), c(r$W1$cx$r45, r$W2$cx$r45))
 })
 
 dashboard_body <- function(file) {
@@ -268,8 +278,8 @@ test_that("Trend Dashboard values and arrows match the hand-computed tests", {
   hv <- hand_verdicts(r)
   body <- dashboard_body(output_file(fx$dir, "Dashboard"))
   row <- function(q) body[body$Code == q, ]
-  expect_equal(as.numeric(row("SAT")$W2), round(r$W2$sat$mean, 2))
-  expect_equal(as.numeric(row("CHAN")$W2), round(r$W2$chan$q1, 2))
+  expect_2dp(as.numeric(row("SAT")$W2), r$W2$sat$mean)
+  expect_2dp(as.numeric(row("CHAN")$W2), r$W2$chan$q1)
   for (q in c("SAT", "REC", "CHAN", "CX")) {
     expect_identical(row(q)$Sig, hv[[q]], info = q)       # vs previous
     expect_identical(row(q)$Sig.1, hv[[q]], info = q)     # vs base (W1)
@@ -344,7 +354,7 @@ test_that("banner segments match the reference computed on each segment's rows",
     r <- sub_ref(region)
     got <- row_values(sat, "Mean", c(col_of(paste0("W1_Region_", region)),
                                      col_of(paste0("W2_Region_", region))))
-    expect_equal(got, round(c(r$W1$sat$mean, r$W2$sat$mean), 2), info = region)
+    expect_2dp(got, c(r$W1$sat$mean, r$W2$sat$mean), info = region)
   }
 })
 
@@ -362,22 +372,26 @@ test_that("a segment under the minimum effective base is never marked significan
   south_cols <- which(unlist(ct[1, ]) == "Region_South")[1] + 0:1
   prev_rows <- which(ct[[2]] == "vs Prev")
   expect_false(any(grepl("\\*", unlist(ct[prev_rows, south_cols]))))
-  # ...although on raw n = 40 South's "Yes" jump would be significant
-  # (26% to 68%, p about 0.0002), so a gate on raw n would star it
-  z_raw <- z_p(south$W1$aware$Yes / 100, 40, south$W2$aware$Yes / 100, 40)
-  expect_lt(z_raw, 0.05)
-  expect_match(ct[crosstab_row(ct, "Aware of us", "Yes") + 1, south_cols[2]], "^\\+")
+  # ...although on the raw n of 40 South's biggest awareness move is
+  # significant, so a gate on raw n would star it. The code is picked from
+  # the data so a change to the fixture cannot quietly remove the case.
+  raw_p <- vapply(names(south$W1$aware), function(code) {
+    z_p(south$W1$aware[[code]] / 100, 40, south$W2$aware[[code]] / 100, 40)
+  }, numeric(1))
+  worst <- names(which.min(raw_p))
+  expect_lt(min(raw_p), 0.05)
+  expect_match(ct[crosstab_row(ct, "Aware of us", worst) + 1, south_cols[2]], "^[-+]")
 })
 
 test_that("with banners the Dashboard and Sig Matrix report the Total segment", {
   runs <- pipeline_runs()
   flat_body <- dashboard_body(output_file(runs$flat$dir, "Dashboard"))
   banner_body <- dashboard_body(output_file(runs$banner$dir, "Dashboard"))
-  expect_setequal(banner_body$Code, c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ"))
+  expect_setequal(banner_body$Code, c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ", "EASE"))
   expect_identical(banner_body$W2, flat_body$W2)
   expect_identical(banner_body$Sig, flat_body$Sig)
   sheets <- openxlsx::getSheetNames(output_file(runs$banner$dir, "SigMatrix"))
-  expect_true(all(paste0(c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ"), "_SigMatrix") %in% sheets))
+  expect_true(all(paste0(c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ", "EASE"), "_SigMatrix") %in% sheets))
 })
 
 test_that("multi-mention reaches the crosstab and the banner sheet with its values", {
@@ -404,6 +418,21 @@ test_that("multi-mention reaches the crosstab and the banner sheet with its valu
   sheet <- read_sheet(output_file(fx$dir, "Tracker"), "CHAN")
   hdr <- which(sheet[[1]] == "Metric")[1]
   cols <- match(c("W1_Total", "W2_Total"), unlist(sheet[hdr, ]))
-  expect_equal(row_values(sheet, "Q30_2", cols), round(c(r$W1$chan$q2, r$W2$chan$q2), 2))
-  expect_equal(row_values(sheet, "% Mentioning Any", cols), round(c(r$W1$chan$any, r$W2$chan$any), 2))
+  expect_2dp(row_values(sheet, "Q30_2", cols), c(r$W1$chan$q2, r$W2$chan$q2))
+  expect_2dp(row_values(sheet, "% Mentioning Any", cols), c(r$W1$chan$any, r$W2$chan$any))
+})
+
+test_that("a box with no scale is refused alone: mean shipped, run PARTIAL, named", {
+  runs <- pipeline_runs()
+  fx <- runs$flat
+  w <- lapply(c(W1 = "W1", W2 = "W2"), function(wid) wave_csv(fx, wid))
+  f <- output_file(fx$dir, "Tracker")
+  ease <- read_sheet(f, "EASE")
+  expect_2dp(row_values(ease, "Mean", 2:3),
+             c(svy_mean(w$W1$Q12, w$W1$wt), svy_mean(w$W2$Q12, w$W2$wt)))
+  expect_true(all(is.na(row_values(ease, "Top Box %", 2:3))))
+  status <- unlist(read_sheet(f, "Run_Status"))
+  expect_true(any(grepl("PARTIAL", status)))
+  expect_true(any(grepl("EASE", status)))
+  expect_true(any(grepl("top_box", status)))
 })

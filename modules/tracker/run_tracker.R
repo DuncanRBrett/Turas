@@ -409,6 +409,26 @@ run_tracker <- function(tracking_config_path,
   }
 
 
+  # TRS v1.0: a skipped question or a refused box spec is a PARTIAL event, so
+  # the Run_Status sheet and the stats pack say so (they said PASS before)
+  if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+    for (q_code in names(skipped_questions)) {
+      turas_run_state_partial(trs_state, code = "DATA_QUESTION_SKIPPED",
+        title = "Question skipped",
+        problem = paste0(q_code, ": ", skipped_questions[[q_code]]$reason %||% "not calculated"),
+        question_code = q_code, stage = "trend_calculation")
+    }
+    refused_metrics <- collect_refused_metrics(trend_results)
+    for (q_code in names(refused_metrics)) {
+      turas_run_state_partial(trs_state, code = "CFG_BOX_SCALE_UNKNOWN",
+        title = "Box metric refused: no scale",
+        problem = paste0(q_code, ": ", paste(refused_metrics[[q_code]], collapse = ", "),
+                         " not calculated; the StructureFile gives no scale points"),
+        fix = "Give the options an Index_Weight in the StructureFile, or use range:X-Y",
+        question_code = q_code, stage = "trend_calculation")
+    }
+  }
+
   # ============================================================================
   # STEP 8: Write Excel Output
   # ============================================================================
