@@ -68,7 +68,7 @@ function makeEl(id) {
 }
 
 /** Load the simulator on one data island and return its handle and DOM. */
-function loadSimulator(pricingData) {
+function loadSimulator(pricingData, unitCost = 0) {
   const els = {};
   const byId = (id) => (els[id] = els[id] || makeEl(id));
   const sandbox = {
@@ -81,7 +81,7 @@ function loadSimulator(pricingData) {
       addEventListener() {}, activeElement: null,
     },
     PRICING_DATA: pricingData,
-    PRICING_CONFIG: { currency: "R", unit_cost: 0 },
+    PRICING_CONFIG: { currency: "R", unit_cost: unitCost },
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -182,6 +182,35 @@ const DATA = {
   env.sim._onPriceChange(0, "10");
   check("total view: the total's optimum still reads 100% (peak)",
     tableCell(env, "Revenue, % of optimum", 0), "100% (peak)");
+}
+
+// --- the profit row is compared with the PROFIT optimum ---------------------
+// Follow-up to the review: "Profit, % of optimum" divided by the profit at the
+// REVENUE-optimal price. With unit cost 8, total profit per price is
+// (10-8) x .9 = 1.8, (20-8) x .5 = 6, (30-8) x .2 = 4.4, so the profit optimum
+// is 20 while R's revenue optimum here is 10. At 20 the old row read
+// 6 / 1.8 = 333%.
+{
+  const env = loadSimulator(DATA, 8);
+  const profitOpt = env.sim._profitOptimalPriceFor || (() => undefined);
+  check("total profit optimum is the tested price with the highest (price - cost) x intent",
+    profitOpt("total"), 20);
+  // Young: 1.8, (12 x .6) = 7.2, 4.4 -> 20
+  check("a segment's profit optimum uses its own curve", profitOpt("Young"), 20);
+  env.sim.getState().scenarios.push({ price: 20 }, { price: 30 });
+  env.sim._onPriceChange(0, "20");
+  check("at the profit optimum the profit row reads 100%, not 333%",
+    tableCell(env, "Profit, % of optimum", 0), "100%");
+  check("another price reads its share of the peak profit (4.4 / 6)",
+    tableCell(env, "Profit, % of optimum", 1), "73%");
+}
+
+// Unit cost 0 means no profit analysis: the row is not shown.
+{
+  const env = loadSimulator(DATA, 0);
+  env.sim.getState().scenarios.push({ price: 20 });
+  env.sim._onPriceChange(0, "20");
+  check("no unit cost, no profit % row", tableCell(env, "Profit, % of optimum", 0), null);
 }
 
 console.log(failures === 0 ? "\nAll segment optimum checks passed." : `\n${failures} check(s) FAILED.`);

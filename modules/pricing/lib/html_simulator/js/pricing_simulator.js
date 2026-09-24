@@ -99,14 +99,41 @@ var PricingSimulator = (function() {
    */
   function optimalPriceFor(segment) {
     if (!segment || segment === "total") return data.optimal_price || null;
-    var s = data.segments && data.segments[segment];
-    if (!s || !s.price_range || !s.demand_curve) return null;
-    var best = null, bestRevenue = -Infinity;
-    var n = Math.min(s.price_range.length, s.demand_curve.length);
+    return bestTestedPrice(curveFor(segment), function(p, q) { return p * q; });
+  }
+
+  /**
+   * The price a view's PROFIT is compared against: the tested price with the
+   * highest (price - unit cost) x intent, first on a tie, as R's
+   * find_optimal_price(metric = "profit") takes it. Computed live because the
+   * unit cost is edited on the page. The profit row used to be divided by the
+   * profit at the REVENUE-optimal price, so it read 333% at the real profit
+   * peak (review follow-up, 24 Sep 2026). Null without a unit cost or a curve.
+   */
+  function profitOptimalPriceFor(segment) {
+    var cost = config.unit_cost;
+    if (!(cost > 0)) return null;
+    return bestTestedPrice(curveFor(segment), function(p, q) { return (p - cost) * q; });
+  }
+
+  /** The tested prices and intents behind a view, or null. */
+  function curveFor(segment) {
+    if (!segment || segment === "total") {
+      return { price_range: data.price_range, demand_curve: data.demand_curve };
+    }
+    return (data.segments && data.segments[segment]) || null;
+  }
+
+  /** The tested price maximising value(price, intent); the first on a tie. */
+  function bestTestedPrice(curve, value) {
+    if (!curve || !curve.price_range || !curve.demand_curve) return null;
+    var best = null, bestValue = -Infinity;
+    var n = Math.min(curve.price_range.length, curve.demand_curve.length);
     for (var i = 0; i < n; i++) {
-      var p = s.price_range[i], q = s.demand_curve[i];
+      var p = curve.price_range[i], q = curve.demand_curve[i];
       if (typeof p !== "number" || typeof q !== "number" || !isFinite(p) || !isFinite(q)) continue;
-      if (p * q > bestRevenue) { bestRevenue = p * q; best = p; }
+      var v = value(p, q);
+      if (v > bestValue) { bestValue = v; best = p; }
     }
     return best;
   }
@@ -428,7 +455,8 @@ var PricingSimulator = (function() {
     var optPrice = optimalPriceFor(seg) || 0;
     var optRevenue = optPrice > 0 ? calcRevenue(optPrice, seg) : 0;
     var hasProfit = config.unit_cost > 0;
-    var optProfit = hasProfit && optPrice > 0 ? calcProfit(optPrice, seg) : 0;
+    var profitOptPrice = hasProfit ? profitOptimalPriceFor(seg) : null;
+    var optProfit = profitOptPrice ? calcProfit(profitOptPrice, seg) : 0;
 
     var metrics = [];
     for (var i = 0; i < scenarios.length; i++) {
@@ -542,7 +570,7 @@ var PricingSimulator = (function() {
     }
     rows += "</tr>";
 
-    if (hasProfit && optPrice > 0) {
+    if (hasProfit && profitOptPrice) {
       rows += "<tr><td>Profit, % of optimum</td>";
       for (var cp = 0; cp < metrics.length; cp++) {
         var ppct = metrics[cp].profitPctOfOpt;
@@ -663,6 +691,7 @@ var PricingSimulator = (function() {
     _initialized: _initialized,
     _removeScenario: removeScenario,
     _optimalPriceFor: optimalPriceFor,
+    _profitOptimalPriceFor: profitOptimalPriceFor,
     _onPriceChange: onScenarioPriceChange
   };
 
