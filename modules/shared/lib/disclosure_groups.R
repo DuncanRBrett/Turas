@@ -208,7 +208,10 @@ disclosure_atom_sets <- function(atoms, masks) {
 #' @param atom_n Integer respondents per atom
 #' @param A Numeric 0/1 matrix, atoms by published sets
 #' @param k Minimum group
-#' @param max_work Cap on the subsets enumerated on either side of the search
+#' @param max_work Cap on the subsets enumerated on either side of the search.
+#'   4,000,000 finishes the largest of the fuzz test's studies (227
+#'   respondents, minimum 10, 65 small groups, 1,014,560 subsets a side) in
+#'   about five seconds; the old 500,000 refused it (24 Sep 2026)
 #' @return List with
 #'   \item{sets}{list of recoverable sets, each list(atoms, n, coef): atom
 #'     indices, respondents, and the combination of published sets (one
@@ -218,7 +221,7 @@ disclosure_atom_sets <- function(atoms, masks) {
 #'   \item{work}{subsets enumerated}
 #'   \item{exact}{TRUE: the search covered every candidate}
 #' @export
-disclosure_small_recoverable <- function(atom_n, A, k, max_work = 500000) {
+disclosure_small_recoverable <- function(atom_n, A, k, max_work = 4000000) {
   atom_n <- as.integer(atom_n)
   m <- length(atom_n)
   if (!is.matrix(A)) A <- matrix(A, nrow = m)
