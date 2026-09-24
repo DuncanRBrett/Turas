@@ -204,3 +204,25 @@ test_that("the same random_seed gives the same bootstrap intervals on a second r
   expect_identical(row_for(na, "nps")$Bootstrap_Upper, row_for(nb, "nps")$Bootstrap_Upper)
   unlink(dir_b, recursive = TRUE)
 })
+
+test_that("client-facing method text states the formulas the code uses", {
+  # Documentation gate (review 2026-09-24). The HTML notes said proportions
+  # used a Jeffreys Beta(0.5, 0.5) prior (the code uses Beta(1, 1)) and means
+  # a Normal-Inverse-Gamma model (the code is normal-normal with z); both
+  # the notes and the Methodology sheet said the Wald interval can go below
+  # 0% (the code cuts it at 0% and 100%); the sheet's DEFF line and MOE
+  # formula ignored n_eff, and it gave no NPS standard error.
+  html <- paste(readLines(file.path(fx$dir, "out.html"), warn = FALSE), collapse = "\n")
+  expect_false(grepl("Jeffreys", html, fixed = TRUE))
+  expect_false(grepl("Normal-Inverse-Gamma", html, fixed = TRUE))
+  expect_true(grepl("Beta(1,&nbsp;1)", html, fixed = TRUE))
+  expect_false(grepl("extend below 0%", html, fixed = TRUE))
+
+  meth <- openxlsx::read.xlsx(file.path(fx$dir, "out.xlsx"), sheet = "Methodology",
+                              colNames = FALSE, skipEmptyRows = FALSE)[[1]]
+  meth <- paste(meth[!is.na(meth)], collapse = "\n")
+  expect_true(grepl("MOE = z * sqrt(p*(1-p)/n_eff)", meth, fixed = TRUE))
+  expect_true(grepl("DEFF = n / n_eff = 1 + CV^2", meth, fixed = TRUE))
+  expect_true(grepl("SE = 100 * sqrt((p_p + p_d - (p_p - p_d)^2) / n_eff)", meth, fixed = TRUE))
+  expect_false(grepl("Can produce impossible results", meth, fixed = TRUE))
+})
