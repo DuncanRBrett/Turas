@@ -925,9 +925,17 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
     n_cols    = ncol(data)
   )
 
-  # Count unique respondents excluded (NA or zero weight in ANY weight column)
-  n_excluded <- if (length(weight_names) > 0) {
-    excluded_mask <- Reduce(`|`, lapply(weight_names, function(wn) {
+  # Only the weights this run calculated and wrote. A failed weight keeps a
+  # placeholder in weight_results (error = TRUE) but has no column in `data`,
+  # and OR-ing its zero-length NA test into the mask below collapsed the whole
+  # mask, so a PARTIAL run reported "no respondents excluded".
+  written_weights <- weight_names[vapply(weight_names, function(wn) {
+    !isTRUE(weight_results[[wn]]$error) && wn %in% names(data)
+  }, logical(1))]
+
+  # Count unique respondents excluded (NA or zero weight in ANY written weight)
+  n_excluded <- if (length(written_weights) > 0) {
+    excluded_mask <- Reduce(`|`, lapply(written_weights, function(wn) {
       w <- data[[wn]]
       is.na(w) | w == 0
     }))
@@ -935,8 +943,10 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
   } else 0L
 
   data_used <- list(
-    n_respondents = nrow(data),
-    n_excluded    = n_excluded
+    n_respondents   = nrow(data),
+    n_excluded      = n_excluded,
+    weighted        = length(written_weights) > 0,
+    weight_variable = paste(written_weights, collapse = ", ")
   )
 
   # Build per-weight assumption rows
@@ -945,6 +955,11 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
   for (wn in weight_names) {
     wr <- weight_results[[wn]]
     if (is.null(wr)) next
+    if (!wn %in% written_weights) {
+      weight_detail_parts <- c(weight_detail_parts,
+                               sprintf("%s (failed, not written)", wn))
+      next
+    }
     spec_row <- if (!is.null(weight_specs)) {
       weight_specs[tolower(weight_specs$weight_name) == tolower(wn), , drop = FALSE]
     } else NULL
@@ -969,16 +984,26 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
     )
   }
 
-  # Summary effective N and DEFF (from first weight with valid diagnostics)
+  # Summary effective N and DEFF (from first written weight with diagnostics).
+  # With several weights the headline names the weight it describes: the
+  # config's row order decides which one that is, and an unlabelled figure
+  # from a near-flat design weight read as the rim weight's.
   eff_n_val <- NA
   deff_val <- NA
-  for (wn in weight_names) {
+  headline_weight <- NA_character_
+  for (wn in written_weights) {
     wr <- weight_results[[wn]]
     if (!is.null(wr) && !is.null(wr$diagnostics)) {
       eff_n_val <- wr$diagnostics$effective_sample$effective_n %||% NA
       deff_val <- wr$diagnostics$effective_sample$design_effect %||% NA
+      headline_weight <- wn
       break
     }
+  }
+  name_headline <- function(txt) {
+    if (length(written_weights) > 1 && !is.na(headline_weight)) {
+      sprintf("%s (%s)", txt, headline_weight)
+    } else txt
   }
 
   # Convergence info (from first rim result if present)
@@ -1045,8 +1070,8 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
     "Convergence tolerance"       = if (!is.na(conv_tol)) as.character(conv_tol) else "—",
     "Iterations to convergence"   = if (!is.na(conv_iters)) as.character(conv_iters) else "—",
     "Trimming"                    = trim_str,
-    "Effective N after weighting" = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "—",
-    "DEFF"                        = if (!is.na(deff_val)) sprintf("%.3f", deff_val) else "—",
+    "Effective N after weighting" = if (!is.na(eff_n_val)) name_headline(format(round(eff_n_val), big.mark = ",")) else "—",
+    "DEFF"                        = if (!is.na(deff_val)) name_headline(sprintf("%.3f", deff_val)) else "—",
     "Per-weight diagnostics"      = paste(vapply(names(per_weight_details), function(wn) {
       d <- per_weight_details[[wn]]
       sprintf("%s: eff_n=%s, DEFF=%s, quality=%s",
