@@ -156,6 +156,13 @@ launch_turas <- function() {
          recent_file = ".recent_catdriver_projects.rds",
          recent_key = "project_dir"),
 
+    list(id = "whatif", name = "What If",
+         description = "Where to direct effort: link an outcome such as NPS to the areas that move it, for the tabs report",
+         category = "advanced",
+         script = "modules/whatif/run_whatif_gui.R",
+         recent_file = ".recent_whatif_projects.rds",
+         recent_key = "project_dir"),
+
     list(id = "confidence", name = "Confidence",
          description = "Confidence intervals for means and proportions with design effect adjustments",
          category = "advanced",
@@ -215,6 +222,8 @@ launch_turas <- function() {
     keydriver = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
 
     catdriver = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+
+    whatif = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>',
 
     confidence = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="20"/><line x1="8" y1="4" x2="16" y2="4"/><line x1="8" y1="20" x2="16" y2="20"/><circle cx="12" cy="12" r="2"/></svg>',
 
