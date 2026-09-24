@@ -299,13 +299,15 @@ process_numeric_question <- function(data, question_info, question_options,
         subset_data, question_info, subset_weights, config, is_weighted
       )
       
+      # Significance tests the values the printed mean was computed on: after
+      # Min_Value / Max_Value and, when switched on, outlier exclusion. It used
+      # every non-missing value, so an out-of-range 999 dropped from the mean
+      # could still put a letter under two identical means (review 24 Sep 2026).
+      stat_value_sets[[key]] <- stats$calc_values
+      stat_weight_sets[[key]] <- stats$calc_weights
+      stats$calc_values <- NULL
+      stats$calc_weights <- NULL
       stat_results[[key]] <- stats
-      
-      # Store for significance testing
-      numeric_values <- suppressWarnings(as.numeric(subset_data[[question_col]]))
-      valid_idx <- !is.na(numeric_values)
-      stat_value_sets[[key]] <- numeric_values[valid_idx]
-      stat_weight_sets[[key]] <- subset_weights[valid_idx]
     } else {
       stat_results[[key]] <- list(
         mean = NA_real_, median = NA_real_, mode = NA_real_,
@@ -530,7 +532,9 @@ process_numeric_question <- function(data, question_info, question_options,
 #' @param weights Numeric vector, weights for this subset
 #' @param config List, configuration object
 #' @param is_weighted Logical, whether weighting is applied
-#' @return List with statistics: mean, median, mode, sd, outlier_count
+#' @return List with statistics: mean, median, mode, sd, outlier_count, and
+#'   calc_values / calc_weights, the analytic set the mean was computed on (the
+#'   caller's significance test uses it, then drops it from the stored result)
 #' @export
 calculate_numeric_statistics <- function(data, question_info, weights,
                                         config, is_weighted) {
@@ -579,6 +583,8 @@ calculate_numeric_statistics <- function(data, question_info, weights,
   )
   
   if (length(valid_values) == 0) {
+    result$calc_values <- numeric(0)
+    result$calc_weights <- numeric(0)
     return(result)
   }
   
@@ -598,6 +604,10 @@ calculate_numeric_statistics <- function(data, question_info, weights,
     calc_values <- valid_values
     calc_weights <- valid_weights
   }
+  # The analytic set, for the caller's significance test (removed before the
+  # result is stored).
+  result$calc_values <- calc_values
+  result$calc_weights <- calc_weights
   
   if (length(calc_values) == 0) {
     return(result)

@@ -203,3 +203,49 @@ test_that("reference: an option flagged ExcludeFromIndex stays out of the Likert
   expect_equal(r$value, 50)
   expect_equal(length(r$values), 2)
 })
+
+# ==============================================================================
+# NUMERIC: the letters test the values the printed mean uses
+# ==============================================================================
+#
+# Max_Value = 100. Column A: 40 answers alternating 49 / 51 (mean 50). Column B:
+# 32 answers alternating 49 / 51 plus 8 answers of 999 (above Max_Value).
+# Printed means: A = 50, B = 50 (the 999s are dropped). With no difference to
+# see there must be no letter. The engine tested B on all 40 values, mean
+# (32 * 50 + 8 * 999) / 40 = 239.8: t.test(B40, A) p ~ 0.004, a letter "A" on
+# B under two identical printed means.
+
+test_that("reference: numeric letters test the same values as the printed mean", {
+  kt <- "TOTAL::Total"; ka <- "GRP::A"; kb <- "GRP::B"
+  a <- rep(c(49, 51), 20)
+  b <- c(rep(c(49, 51), 16), rep(999, 8))
+  d <- data.frame(NUM = c(a, b))
+  idx <- list(seq_len(80), 1:40, 41:80); names(idx) <- c(kt, ka, kb)
+  bases <- lapply(idx, function(i) list(unweighted = length(i), weighted = length(i),
+                                          effective = length(i)))
+  banner <- list(internal_keys = c(kt, ka, kb),
+                 columns = data.frame(BannerLabel = c("Total", "A", "B")),
+                 banner_info = list(GRP = list(internal_keys = c(ka, kb),
+                                               letters = setNames(c("A", "B"), c(ka, kb)))))
+  cfg <- list(enable_significance_testing = TRUE, alpha = 0.05,
+              bonferroni_correction = FALSE, significance_min_base = 30,
+              alpha_secondary = NULL, show_frequency = FALSE,
+              show_numeric_median = FALSE, show_numeric_mode = FALSE,
+              show_numeric_outliers = FALSE, exclude_outliers_from_stats = FALSE,
+              outlier_method = "IQR", decimal_places_numeric = 1,
+              show_numeric_sd = TRUE, show_percent_column = FALSE,
+              show_percent_row = FALSE, decimal_places_percent = 0)
+  qi <- data.frame(QuestionCode = "NUM", QuestionText = "Spend", Variable_Type = "Numeric",
+                   Columns = 1, Min_Value = 0, Max_Value = 100, stringsAsFactors = FALSE)
+  # The reference claim itself: with the 999s in, t.test says significant.
+  expect_lt(stats::t.test(b, a, var.equal = FALSE)$p.value, 0.05)
+  res <- process_numeric_question(d, qi, data.frame(), banner, idx, rep(1, 80), bases,
+                                  cfg, is_weighted = FALSE)
+  mean_row <- res[res$RowType == "Average", , drop = FALSE]
+  expect_equal(as.numeric(mean_row[[ka]][1]), 50)
+  expect_equal(as.numeric(mean_row[[kb]][1]), 50)
+  sig <- res[res$RowType == "Sig.", , drop = FALSE]
+  expect_equal(nrow(sig), 1)
+  expect_equal(sig[[kb]][1], "")
+  expect_equal(sig[[ka]][1], "")
+})
