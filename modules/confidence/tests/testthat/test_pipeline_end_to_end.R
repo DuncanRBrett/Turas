@@ -244,3 +244,17 @@ test_that("the stats pack counts the respondents analysed and excluded", {
                             startRow = 3, skipEmptyRows = FALSE)[1, ]
   expect_equal(st$Actual_n, 90)
 })
+
+test_that("small-base notes reach the Warnings sheet without changing the run status", {
+  # aware2 is region 1 only: 45 rows, n_eff = 45 x 8.7^2 / 5 / 21.19 = 32.1,
+  # under 50, so a "Small base" note. Notes are not run events: Run_Status
+  # carries only the real warnings.
+  ws <- openxlsx::read.xlsx(file.path(fx$dir, "out.xlsx"), sheet = "Warnings",
+                            colNames = FALSE, skipEmptyRows = FALSE)
+  cells <- unlist(ws, use.names = FALSE)
+  expect_true(any(grepl("^NOTES", cells)))
+  expect_true(any(grepl("Question aware2: Small base (n=32.1)", cells, fixed = TRUE)))
+  rs <- openxlsx::read.xlsx(file.path(fx$dir, "out.xlsx"), sheet = "Run_Status",
+                            colNames = FALSE, skipEmptyRows = FALSE)
+  expect_false(any(grepl("Small base", unlist(rs, use.names = FALSE), fixed = TRUE)))
+})

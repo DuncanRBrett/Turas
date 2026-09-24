@@ -258,7 +258,8 @@ write_confidence_output <- function(output_path,
                                     config = list(),
                                     warnings = character(),
                                     decimal_sep = ".",
-                                    run_result = NULL) {
+                                    run_result = NULL,
+                                    notes = character()) {
 
   # Validate inputs and output path
   validate_confidence_output_path(output_path, decimal_sep)
@@ -297,7 +298,7 @@ write_confidence_output <- function(output_path,
     add_nps_detail_sheet(wb, nps_results, decimal_sep, labels = labels)
   }
   add_methodology_sheet(wb)
-  add_warnings_sheet(wb, warnings)
+  add_warnings_sheet(wb, warnings, notes)
   add_inputs_sheet(wb, config, decimal_sep)
 
   # Save workbook with TRS run status
@@ -1477,7 +1478,7 @@ add_methodology_sheet <- function(wb) {
 
 #' Add warnings sheet (internal)
 #' @keywords internal
-add_warnings_sheet <- function(wb, warnings) {
+add_warnings_sheet <- function(wb, warnings, notes = character()) {
 
   openxlsx::addWorksheet(wb, "Warnings")
 
@@ -1530,6 +1531,23 @@ add_warnings_sheet <- function(wb, warnings) {
     openxlsx::setColWidths(wb, "Warnings", cols = 1, widths = 8)
     openxlsx::setColWidths(wb, "Warnings", cols = 2, widths = 60)
     openxlsx::setColWidths(wb, "Warnings", cols = 3, widths = 60)
+    row <- row + length(warnings) + 1
+  }
+
+  # Notes: small bases and Wald-only extreme proportions. Worth reading, not
+  # failures, so they do not change the run status (review 2026-09-24).
+  if (length(notes) > 0) {
+    row <- row + 2
+    openxlsx::writeData(wb, "Warnings",
+                        "NOTES (for the reader; these do not change the run status)",
+                        startCol = 1, startRow = row)
+    openxlsx::addStyle(wb, "Warnings",
+                       style = openxlsx::createStyle(fontSize = 12, textDecoration = "bold"),
+                       rows = row, cols = 1)
+    openxlsx::writeData(wb, "Warnings",
+                        data.frame(Number = seq_along(notes), Note = notes,
+                                   stringsAsFactors = FALSE),
+                        startCol = 1, startRow = row + 1, colNames = TRUE, rowNames = FALSE)
   }
 }
 

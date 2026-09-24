@@ -297,6 +297,7 @@ run_confidence_analysis_impl <- function(config_path,
   mean_results <- question_result$mean_results
   nps_results <- question_result$nps_results
   warnings_list <- c(warnings_list, question_result$warnings)
+  notes_list <- question_result$notes %||% character()
 
   if (verbose) {
     cat(sprintf("  + Processed: %d proportions, %d means, %d NPS\n",
@@ -319,7 +320,7 @@ run_confidence_analysis_impl <- function(config_path,
 
   generate_output_step(
     config, study_stats, proportion_results, mean_results, nps_results,
-    warnings_list, run_result
+    warnings_list, run_result, notes = notes_list
   )
 
   # ==========================================================================
@@ -391,6 +392,7 @@ run_confidence_analysis_impl <- function(config_path,
     mean_results       = mean_results,
     nps_results        = nps_results,
     warnings           = warnings_list,
+    notes              = notes_list,
     config             = config,
     elapsed_seconds    = elapsed,
     run_result         = run_result,
@@ -628,7 +630,8 @@ log_trs_events <- function(trs_state, warnings_list) {
 #' Generate output step
 #' @keywords internal
 generate_output_step <- function(config, study_stats, proportion_results,
-                                  mean_results, nps_results, warnings_list, run_result) {
+                                  mean_results, nps_results, warnings_list, run_result,
+                                  notes = character()) {
   output_path <- config$file_paths$Output_File
 
   tryCatch({
@@ -650,7 +653,8 @@ generate_output_step <- function(config, study_stats, proportion_results,
       ),
       warnings = warnings_list,
       decimal_sep = config$study_settings$Decimal_Separator,
-      run_result = run_result
+      run_result = run_result,
+      notes = notes
     )
   }, error = function(e) {
     confidence_refuse(
@@ -1026,6 +1030,7 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
   mean_results <- list()
   nps_results <- list()
   warnings_list <- character()
+  notes_list <- character()
 
   n_questions <- nrow(config$question_analysis)
 
@@ -1106,6 +1111,7 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
       }
       proportion_results[[q_id]] <- result$result
       warnings_list <- c(warnings_list, result$warnings)
+      notes_list <- c(notes_list, result$notes)
     } else if (stat_type == "mean") {
       result <- process_mean_question(q_row, q_data, weight_var, config)
       if (!is.null(result$result)) {
@@ -1118,6 +1124,7 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
       }
       mean_results[[q_id]] <- result$result
       warnings_list <- c(warnings_list, result$warnings)
+      notes_list <- c(notes_list, result$notes)
     } else if (stat_type == "nps") {
       result <- process_nps_question(q_row, q_data, weight_var, config)
       if (!is.null(result$result)) {
@@ -1130,6 +1137,7 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
       }
       nps_results[[q_id]] <- result$result
       warnings_list <- c(warnings_list, result$warnings)
+      notes_list <- c(notes_list, result$notes)
     } else {
       warnings_list <- c(warnings_list,
         sprintf("Question %s: Unknown statistic type '%s'", q_id, stat_type))
@@ -1140,7 +1148,8 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
     proportion_results = proportion_results,
     mean_results = mean_results,
     nps_results = nps_results,
-    warnings = warnings_list
+    warnings = warnings_list,
+    notes = notes_list
   )
 }
 
@@ -1206,7 +1215,9 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config) 
     if (!is.null(ci_results$bayesian)) result$bayesian <- ci_results$bayesian
     warnings_list <- c(warnings_list, ci_results$warnings)
 
-    return(list(result = result, warnings = warnings_list))
+    notes <- question_base_notes(q_id, stats$n_eff_exact, p = stats$proportion,
+                                 wilson_run = !is.null(ci_results$wilson))
+    return(list(result = result, warnings = warnings_list, notes = notes))
 
   }, error = function(e) {
     warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
@@ -1264,7 +1275,8 @@ process_mean_question <- function(q_row, survey_data, weight_var, config) {
     if (!is.null(ci_results$bayesian)) result$bayesian <- ci_results$bayesian
     warnings_list <- c(warnings_list, ci_results$warnings)
 
-    return(list(result = result, warnings = warnings_list))
+    notes <- question_base_notes(q_id, stats$n_eff_exact)
+    return(list(result = result, warnings = warnings_list, notes = notes))
 
   }, error = function(e) {
     warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
@@ -1339,7 +1351,8 @@ process_nps_question <- function(q_row, survey_data, weight_var, config) {
     if (!is.null(ci_results$bayesian)) result$bayesian <- ci_results$bayesian
     warnings_list <- c(warnings_list, ci_results$warnings)
 
-    return(list(result = result, warnings = warnings_list))
+    notes <- question_base_notes(q_id, stats$n_eff_exact)
+    return(list(result = result, warnings = warnings_list, notes = notes))
 
   }, error = function(e) {
     warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))

@@ -425,6 +425,38 @@ calculate_nps_stats <- function(values, promoter_codes, detractor_codes, weights
 
 
 # ==============================================================================
+# BASE NOTES
+# ==============================================================================
+
+#' Notes on a Question's Base, for the Warnings Sheet
+#'
+#' A small effective base, or an extreme proportion shown only with the Wald
+#' interval, is worth telling the reader but is not a failure, so these are
+#' NOTES: listed on the Warnings sheet, kept out of the run status. Until
+#' 2026-09-24 the calculators wrote them into each interval's own $warnings
+#' and nothing collected them; the mean's also tested the raw n.
+#'
+#' @param q_id Character. Question ID
+#' @param n_eff Numeric. Exact effective base (the raw n when unweighted)
+#' @param p Numeric or NULL. Proportion, for proportion questions
+#' @param wilson_run Logical. Whether the Wilson interval was produced
+#' @return Character vector of notes (possibly empty)
+#' @keywords internal
+question_base_notes <- function(q_id, n_eff, p = NULL, wilson_run = FALSE) {
+  notes <- character()
+  if (!is.null(n_eff) && !is.na(n_eff)) {
+    small <- check_small_sample(n_eff)
+    if (nzchar(small)) notes <- c(notes, sprintf("Question %s: %s", q_id, small))
+  }
+  if (!is.null(p) && !is.na(p) && !isTRUE(wilson_run)) {
+    extreme <- check_extreme_proportion(p)
+    if (nzchar(extreme)) notes <- c(notes, sprintf("Question %s: %s", q_id, extreme))
+  }
+  notes
+}
+
+
+# ==============================================================================
 # UNIFIED QUESTION PROCESSING
 # ==============================================================================
 
