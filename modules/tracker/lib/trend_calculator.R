@@ -1125,6 +1125,29 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
 }
 
 
+#' Rows That Answered a Multi-Mention Question
+#'
+#' A respondent answered when any of the question's option columns holds a
+#' value (a 0 / 1 code or an option text). Respondents routed past the
+#' question have every column missing or blank and are not in the base. This
+#' is the rule tabs uses for the same question (tracking_wave_values.R).
+#'
+#' @param wave_df Data frame. Wave data with weight_var column
+#' @param question_columns Character vector. ALL of the question's option
+#'   columns, not only the tracked ones
+#' @return Integer vector of row indices: answered and positively weighted
+#' @keywords internal
+multi_mention_base_rows <- function(wave_df, question_columns) {
+  question_columns <- intersect(question_columns, names(wave_df))
+  answered <- rep(FALSE, nrow(wave_df))
+  for (col in question_columns) {
+    x <- wave_df[[col]]
+    answered <- answered | (!is.na(x) & trimws(as.character(x)) != "")
+  }
+  which(answered & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+}
+
+
 #' Calculate Multi-Mention Trend with Category-Based Tracking
 #'
 #' For multi-mention questions where each column contains TEXT VALUES (not 0/1),
@@ -1221,8 +1244,8 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
     # Calculate mention proportions for each category
     mention_proportions <- list()
 
-    # Create valid row indices
-    valid_rows <- which(!is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+    # Base: respondents who answered the question
+    valid_rows <- multi_mention_base_rows(wave_df, mm_columns)
 
     for (category in categories_to_track) {
       # Search for this category text across ALL multi-mention columns
@@ -1519,8 +1542,11 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       next
     }
 
-    # Create valid row indices (use which() to ensure numeric indices)
-    valid_rows <- which(!is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+    # Base: respondents who answered the question, judged on ALL of its
+    # columns so tracking a single option does not shrink the base
+    question_columns <- unique(c(detect_multi_mention_columns(wave_df, wave_code),
+                                 option_columns))
+    valid_rows <- multi_mention_base_rows(wave_df, question_columns)
 
     # Calculate mention proportions for each option
     mention_proportions <- calculate_mention_proportions_for_wave(

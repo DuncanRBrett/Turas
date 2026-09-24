@@ -450,3 +450,86 @@ test_that("a wave without its weight column runs unweighted and says so", {
   expect_equal(res$weight_var, rep(1, 5))
   expect_true(any(grepl("wgt_typo", out) & grepl("W2", out) & grepl("unweighted", out)))
 })
+
+
+# ==============================================================================
+# MULTI-MENTION: base is the respondents who answered the question
+# ==============================================================================
+# Duncan, 24 Sep 2026: the base is "answered the question at all" (any of its
+# option columns non-missing), the rule tabs uses (tracking_wave_values.R).
+# Respondents routed past the question are NOT in the base.
+
+mm_frames <- function() {
+  # 100 respondents per wave. Rows 1-60 were asked (0 / 1 answers); rows
+  # 61-100 were routed past the question (NA in every option column).
+  # Option 2 was hidden from rows 1-10 (NA there), as when an option is
+  # masked: those 10 still answered, so they stay in the base.
+  mk <- function(n_opt1, n_opt2) {
+    asked <- 60
+    q_1 <- c(rep(1, n_opt1), rep(0, asked - n_opt1), rep(NA, 40))
+    q_2 <- c(rep(NA, 10), rep(0, asked - n_opt2 - 10), rep(1, n_opt2), rep(NA, 40))
+    q_3 <- c(rep(0, asked), rep(NA, 40))
+    data.frame(Q5_1 = q_1, Q5_2 = q_2, Q5_3 = q_3, weight_var = 1)
+  }
+  list(W1 = mk(30, 15), W2 = mk(42, 15))
+}
+
+mm_setup <- function(specs) {
+  mapping <- data.frame(QuestionCode = "CHANNELS", QuestionText = "Channels used",
+                        QuestionType = "Multi_Mention", TrackingSpecs = specs,
+                        W1 = "Q5", W2 = "Q5", stringsAsFactors = FALSE)
+  ref_setup(mm_frames(), mapping)
+}
+
+test_that("multi-mention option % is out of those who answered, by hand", {
+  # Wave 1: 30 of the 60 asked chose option 1 -> 50%   (not 30 / 100)
+  #         15 of 60 chose option 2           -> 25%
+  # Wave 2: 42 of 60 chose option 1           -> 70%
+  # Base 60 in both waves, so the z-test is 0.50 vs 0.70 on n = 60 each.
+  s <- mm_setup("auto,any,count_mean")
+  capture.output(r <- calculate_multi_mention_trend("CHANNELS", s$question_map,
+                                                    s$wave_data, s$config))
+  expect_equal(r$wave_results$W1$mention_proportions$Q5_1, 50)
+  expect_equal(r$wave_results$W1$mention_proportions$Q5_2, 25)
+  expect_equal(r$wave_results$W2$mention_proportions$Q5_1, 70)
+  expect_equal(r$wave_results$W1$n_unweighted, 60)
+  expect_equal(r$wave_results$W1$eff_n, 60)
+  z <- z_test_for_proportions(0.50, 60, 0.70, 60)
+  expect_equal(r$significance$Q5_1$W1_vs_W2$p_value, z$p_value)
+
+  # Any mention, wave 1: option 1 rows 1-30, option 2 rows 46-60 -> 45 of 60
+  # = 75%. Mean number of mentions: (30 + 15) / 60 = 0.75.
+  expect_equal(r$wave_results$W1$additional_metrics$any_mention_pct, 75)
+  expect_equal(r$wave_results$W1$additional_metrics$count_mean, 0.75)
+})
+
+test_that("tracking one option still uses the whole question to find the base", {
+  # option:Q5_2 only. Whether a respondent answered is read from ALL of the
+  # question's columns, so the base is still 60 and option 2 is 15 / 60 = 25%.
+  # Judged on Q5_2 alone the 10 who never saw option 2 would drop out: 15 / 50.
+  s <- mm_setup("option:Q5_2")
+  capture.output(r <- calculate_multi_mention_trend("CHANNELS", s$question_map,
+                                                    s$wave_data, s$config))
+  expect_equal(r$wave_results$W1$mention_proportions$Q5_2, 25)
+  expect_equal(r$wave_results$W1$n_unweighted, 60)
+})
+
+test_that("text-coded multi-mention (category:) uses the answered base, by hand", {
+  # Alchemer style: a column holds the option text when chosen, blank when
+  # not. read.csv gives "" for a blank cell, so blanks are "" or NA here.
+  # 50 respondents chose something; 30 were routed past (all blank).
+  #   "Email" chosen by 20 of the 50 who answered -> 40%
+  n_ans <- 50
+  df <- data.frame(
+    Q9_1 = c(rep("Email", 20), rep("", n_ans - 20), rep("", 30)),
+    Q9_2 = c(rep("", 20), rep("Phone", n_ans - 20), rep(NA, 30)),
+    weight_var = 1, stringsAsFactors = FALSE)
+  mapping <- data.frame(QuestionCode = "CONTACT", QuestionText = "Contact",
+                        QuestionType = "Multi_Mention", TrackingSpecs = "category:Email",
+                        W1 = "Q9", W2 = "Q9", stringsAsFactors = FALSE)
+  s <- ref_setup(list(W1 = df, W2 = df), mapping)
+  capture.output(r <- calculate_multi_mention_trend("CONTACT", s$question_map,
+                                                    s$wave_data, s$config))
+  expect_equal(r$wave_results$W1$mention_proportions$Email, 40)
+  expect_equal(r$wave_results$W1$n_unweighted, 50)
+})
