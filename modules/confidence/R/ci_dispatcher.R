@@ -410,13 +410,21 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
 
     se_nps <- nps_standard_error(pct_promoters, pct_detractors, n_eff)
 
-    # Posterior (normal-normal conjugate)
-    precision_prior <- 1 / (prior_sd^2)
-    precision_data  <- 1 / (se_nps^2)
-    precision_post  <- precision_prior + precision_data
+    if (isTRUE(se_nps == 0)) {
+      # Every respondent in one group: the data precision 1/SE^2 is infinite,
+      # the update below returned NaN (review 2026-09-24), and the posterior
+      # is a point mass on the observed score.
+      mean_post <- nps_score
+      sd_post   <- 0
+    } else {
+      # Posterior (normal-normal conjugate)
+      precision_prior <- 1 / (prior_sd^2)
+      precision_data  <- 1 / (se_nps^2)
+      precision_post  <- precision_prior + precision_data
 
-    mean_post <- (precision_prior * prior_mean + precision_data * nps_score) / precision_post
-    sd_post   <- sqrt(1 / precision_post)
+      mean_post <- (precision_prior * prior_mean + precision_data * nps_score) / precision_post
+      sd_post   <- sqrt(1 / precision_post)
+    }
 
     # Credible interval
     alpha <- 1 - conf_level
@@ -429,6 +437,16 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
       post_mean = mean_post,
       post_sd = sd_post
     )
+  }
+
+  # A zero standard error (every respondent a promoter, a detractor or a
+  # passive) gives zero-width normal and Bayesian intervals. Say so.
+  if (!is.na(n_eff) && n_eff > 0 &&
+      isTRUE(nps_standard_error(pct_promoters, pct_detractors, n_eff) == 0) &&
+      (!is.null(result$moe_normal) || !is.null(result$bayesian))) {
+    warnings_list <- c(warnings_list, sprintf(
+      "Question %s: NPS standard error is zero (every respondent falls in one group), so the normal and Bayesian intervals have zero width",
+      q_id))
   }
 
   result$warnings <- warnings_list

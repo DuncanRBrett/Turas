@@ -125,3 +125,19 @@ test_that("a filter that leaves nobody, and an all-missing question, are skipped
   expect_true(any(grepl("Question y: Filter 'region' in \\(2\\) yielded 0 respondents", res$warnings)))
   expect_true(any(grepl("Question gone: No valid", res$warnings)))
 })
+
+test_that("an NPS with every respondent in one group has finite bounds and a warning", {
+  # All promoters: p_p = 1, p_d = 0, so SE = sqrt((1 - 1) / n) = 0. The data
+  # precision 1/SE^2 is infinite and the Bayesian update returned NaN bounds,
+  # silently (review 2026-09-24). With zero data variance the posterior sits
+  # on the observed score: both bounds are 100, like the normal interval.
+  d <- data.frame(nps = rep(c(9, 10), 10))
+  out <- process_nps_question(
+    adv_q_row("nps", promoters = "9,10", detractors = "0,1,2,3,4,5,6"), d, NULL, adv_config())
+  r <- out$result
+  expect_equal(r$nps_score, 100)
+  expect_equal(c(r$moe_normal$lower, r$moe_normal$upper), c(100, 100))
+  expect_equal(c(r$bayesian$lower, r$bayesian$upper), c(100, 100))
+  expect_equal(r$bayesian$post_mean, 100)
+  expect_true(any(grepl("Question nps: .*standard error is zero", out$warnings)))
+})
