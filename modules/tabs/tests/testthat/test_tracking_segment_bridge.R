@@ -193,3 +193,10 @@ test_that("bridge output assembles + serialises into a valid tracking island", {
   expect_match(j, '"segments":\\[')                           # segment list is an array
   expect_match(j, '"rows":\\{"online"')                       # proportion rows survive
 })
+
+test_that("an unweighted tracker output adds no effective-base fields", {
+  # Old sidecars and unweighted studies keep exactly the fields above, so the
+  # renderer falls back to the plain base as before.
+  expect_null(res[[1]]$questions[[1]]$eff_bases)
+  expect_null(res[[1]]$questions[[1]]$eff_base)
+})

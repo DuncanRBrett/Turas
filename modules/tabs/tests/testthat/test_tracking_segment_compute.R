@@ -146,3 +146,34 @@ test_that("write_segment_wave_sidecars round-trips through the existing pipeline
   expect_match(j, '"seg_stats"')                # per-segment data survives the round-trip
   unlink(td, recursive = TRUE)
 })
+
+# ---- weighted waves carry the Kish effective base (review 2026-09-24) --------
+# Segment history used to carry only the raw respondent count, so the renderer
+# sized every weighted segment's wave-on-wave test on n and over-flagged
+# movements. The effective base now travels with each segment and the Total.
+
+test_that("a weighted wave carries each segment's Kish effective base into the island", {
+  # Cape Town 2024 has 4 respondents weighted 1, 1, 3, 3:
+  # n_eff = (1 + 1 + 3 + 3)^2 / (1 + 1 + 9 + 9) = 64 / 20 = 3.2
+  wt2024 <- transform(w2024, wt = c(1, 1, 2, 2, 3, 2, 3))
+  wt2025 <- transform(w2025, wt = 1)
+  wct <- compute_segment_trends(
+    list(list(id = "2024", data = wt2024), list(id = "2025", data = wt2025)),
+    metrics, segment_dims, weight_col = "wt")
+
+  cape_2024 <- wct$trend_results$ENG[["Campus_Cape Town"]]$wave_results[["2024"]]
+  expect_equal(cape_2024$eff_n, 3.2)
+  expect_equal(cape_2024$n_unweighted, 4)
+
+  contrib <- tracker_segment_contributions(wct$trend_results, wct$segments_meta,
+    list(list(id = "2024", label = "2024", year = 2024)))
+  mean_q <- contrib[[1]]$questions[[1]]
+  expect_equal(mean_q$bases[["cape town"]], 4)
+  expect_equal(mean_q$eff_bases[["cape town"]], 3.2)
+  # Total 2024: weights 1,1,2,2,3,2,3 -> 14^2 / 32 = 6.125
+  expect_equal(mean_q$eff_base, 6.125)
+
+  prop_q <- contrib[[1]]$questions[[3]]
+  expect_equal(prop_q$eff_bases[["cape town"]], 3.2)
+  expect_equal(prop_q$eff_base, 6.125)
+})

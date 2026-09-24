@@ -254,10 +254,13 @@
    * n_eff = (Σw)²/Σw², not its raw respondent count. Sizing the wave z-test on
    * the raw base (as it did) over-states precision and over-flags movements on a
    * weighted tracker. These size it on n_eff, mirroring the crosstab weighted
-   * z-test (22_model.js sigCell) and the R engine (weighting.R). Total path only:
-   * segments and computed-totals waves have no per-respondent weights, so they
-   * fall back to the plain base, and an unweighted study has n_eff === n, so
-   * every path below is byte-identical there. */
+   * z-test (22_model.js sigCell) and the R engine (weighting.R). A microdata
+   * Total computes it from its weights. Segments and computed-totals waves have
+   * no per-respondent weights; their contribution carries the tracker's n_eff
+   * as eff_bases[seg] / eff_base (tracking_segment_bridge.R, review
+   * 2026-09-24). A wave without those fields (an older sidecar) falls back to
+   * the plain base, and an unweighted study has n_eff === n, so every path
+   * below is byte-identical there. */
   function effNfromWeights(w, n) {
     if (!w || !w.length) return n;
     var wsum = 0, sumW2 = 0;
@@ -265,12 +268,18 @@
     return sumW2 > 0 ? Math.round((wsum * wsum) / sumW2) : n;   // rounded, as R does
   }
 
-  /** Effective base of a HISTORY wave point (Total only): the Kish n_eff when
-   *  the wave carries per-respondent weights, else undefined so the point falls
-   *  back to its plain base. */
+  /** Effective base of a HISTORY wave point: the Kish n_eff from the wave's
+   *  per-respondent weights (Total), else the n_eff its contribution carries
+   *  (eff_bases[seg] for a segment, eff_base for the Total), else undefined so
+   *  the point falls back to its plain base. */
   function effBaseOf(waveQ, seg) {
-    if (seg || !waveQ || !waveQ.weights || !waveQ.weights.length) return undefined;
-    return effNfromWeights(waveQ.weights, baseOf(waveQ, null));
+    if (!waveQ) return undefined;
+    var carried = seg ? (waveQ.eff_bases || {})[seg] : waveQ.eff_base;
+    if (!seg && waveQ.weights && waveQ.weights.length) {
+      return effNfromWeights(waveQ.weights, baseOf(waveQ, null));
+    }
+    return (typeof carried === "number" && isFinite(carried) && carried > 0)
+      ? carried : undefined;
   }
 
   /** The base significance is sized on: the effective base when a point carries

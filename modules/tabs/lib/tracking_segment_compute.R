@@ -80,24 +80,29 @@ tracking_reset_unweighted_notices <- function() {
 }
 
 # One wave_result (the tracker calculator output + available=TRUE), or NULL.
+# Each carries the calculator's Kish eff_n beside n_unweighted: a weighted
+# segment's wave-on-wave test must be sized on it, not on the respondent count
+# (review 2026-09-24). Unweighted, eff_n equals n_unweighted.
 .tsc_wave_result <- function(type, vals, weights) {
   if (identical(type, "proportions")) {
     if (all(is.na(vals))) return(NULL)
     r <- calculate_proportions(as.character(vals), weights)
     return(list(proportions = as.list(r$proportions),
-                n_unweighted = r$n_unweighted, available = TRUE))
+                n_unweighted = r$n_unweighted, eff_n = r$eff_n, available = TRUE))
   }
   v <- suppressWarnings(as.numeric(vals))
   if (all(is.na(v))) return(NULL)
   if (identical(type, "nps")) {
     r <- calculate_nps_score(v, weights)
     if (length(r$nps) == 1 && is.na(r$nps)) return(NULL)
-    return(list(nps = r$nps, n_unweighted = r$n_unweighted, available = TRUE))
+    return(list(nps = r$nps, n_unweighted = r$n_unweighted, eff_n = r$eff_n,
+                available = TRUE))
   }
   # default: mean-kind
   r <- calculate_weighted_mean(v, weights)
   if (length(r$mean) == 1 && is.na(r$mean)) return(NULL)
-  list(mean = r$mean, sd = r$sd, n_unweighted = r$n_unweighted, available = TRUE)
+  list(mean = r$mean, sd = r$sd, n_unweighted = r$n_unweighted, eff_n = r$eff_n,
+       available = TRUE)
 }
 
 #' Compute per-segment wave trends from per-respondent wave data

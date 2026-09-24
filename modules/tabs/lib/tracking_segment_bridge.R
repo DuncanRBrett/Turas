@@ -100,6 +100,20 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
       b <- wr$n_unweighted %||% NA
       if (length(b) == 1 && is.na(b)) NA else as.numeric(b)
     }
+    # The Kish effective base, or NULL when the calculator output has none
+    # (older tracker output). The renderer sizes a weighted wave-on-wave test
+    # on it and falls back to the plain base without it (22w_waves.js).
+    eff_of <- function(wr) {
+      e <- wr[["eff_n"]]
+      if (is.null(e) || length(e) != 1 || !is.finite(e) || e <= 0) NULL else as.numeric(e)
+    }
+    # Adds eff_base / eff_bases to a question only when some point carries one,
+    # so unweighted and older output keep exactly their locked fields.
+    with_eff_bases <- function(q, total_wr, eff_bases) {
+      if (!is.null(eff_of(total_wr))) q$eff_base <- eff_of(total_wr)
+      if (length(eff_bases)) q$eff_bases <- eff_bases
+      q
+    }
     num_or_null <- function(v) {
       if (is.null(v) || (length(v) == 1 && is.na(v))) NULL else as.numeric(v)
     }
@@ -141,17 +155,20 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
         }
         tot_stat <- mk_stat(tot_wr)
         if (is.null(tot_stat)) next
-        seg_stats <- list(); bases <- list()
+        seg_stats <- list(); bases <- list(); eff_bases <- list()
         for (bk in breakouts) {
           swr <- wr_of(q_segs[[bk$seg_name]]); if (is.null(swr)) next
           ss <- mk_stat(swr); if (is.null(ss)) next
           seg_stats[[bk$key]] <- ss
           bases[[bk$key]] <- base_of(swr)
+          eff_bases[[bk$key]] <- eff_of(swr)
           seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
         }
-        q <- list(match_key = mkey, title = title,
-                  base = base_of(tot_wr), stats = tot_stat,
-                  seg_stats = seg_stats, bases = bases)
+        q <- with_eff_bases(
+          list(match_key = mkey, title = title,
+               base = base_of(tot_wr), stats = tot_stat,
+               seg_stats = seg_stats, bases = bases),
+          tot_wr, eff_bases)
 
       } else if (identical(mtype, "proportions")) {
         # proportions: one published-distribution row per option, Total pct +
@@ -169,10 +186,11 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
             seg = list())
         }
         if (length(rows) == 0) next
-        bases <- list()
+        bases <- list(); eff_bases <- list()
         for (bk in breakouts) {
           swr <- wr_of(q_segs[[bk$seg_name]]); if (is.null(swr)) next
           bases[[bk$key]] <- base_of(swr)
+          eff_bases[[bk$key]] <- eff_of(swr)
           sprops <- swr$proportions
           if (!is.null(sprops)) {
             for (opt in opts) {
@@ -184,8 +202,10 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
           }
           seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
         }
-        q <- list(match_key = mkey, title = title,
-                  base = tbase, rows = rows, bases = bases)
+        q <- with_eff_bases(
+          list(match_key = mkey, title = title,
+               base = tbase, rows = rows, bases = bases),
+          tot_wr, eff_bases)
 
       } else {
         next                                             # multi_mention etc, later phase
