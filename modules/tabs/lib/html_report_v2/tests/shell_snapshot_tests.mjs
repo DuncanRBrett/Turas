@@ -80,7 +80,7 @@ let uid = 0;
 function node(tag, opts) {
   opts = opts || {};
   const n = { tag: tag, id: ++uid, kids: [], parent: null,
-    textContent: opts.text || "", contentEditable: opts.contentEditable };
+    textContent: opts.text || "", contentEditable: opts.contentEditable, hidden: !!opts.hidden };
   let cls = String(opts.cls || "").split(" ").filter(Boolean);
   Object.defineProperty(n, "className", {
     get: () => cls.join(" "),
@@ -111,10 +111,10 @@ function node(tag, opts) {
     n.parent.kids.splice(n.parent.kids.indexOf(n), 1, other);
     n.parent = null;
   };
-  n.removeAttribute = () => {};
+  n.removeAttribute = (a) => { if (a === "hidden") n.hidden = false; };
   n.cloneNode = () => {
     const c = node(n.tag, { cls: n.className, text: n.textContent,
-      contentEditable: n.contentEditable,
+      contentEditable: n.contentEditable, hidden: n.hidden,
       // per spec: the typed value travels with the clone; the raw text content
       // stays the markup default
       value: n.tag === "textarea" ? n.value : undefined });
@@ -122,7 +122,7 @@ function node(tag, opts) {
     return c;
   };
   Object.defineProperty(n, "outerHTML", { get: () =>
-    "<" + n.tag + (n.className ? ' class="' + n.className + '"' : "") + ">" +
+    "<" + n.tag + (n.className ? ' class="' + n.className + '"' : "") + (n.hidden ? " hidden" : "") + ">" +
     n.textContent + n.kids.map((k) => k.outerHTML).join("") + "</" + n.tag + ">" });
   (opts.kids || []).forEach((k) => n.append(k));
   return n;
@@ -156,6 +156,20 @@ run("the pin control and anything inside it leave the snapshot", () => {
   assert(html.indexOf("the real note") !== -1, "the real note froze correctly: " + html);
   assert(html.indexOf("pin-typed") === -1 && html.indexOf("pin-default") === -1,
     "the pin control and its contents left the snapshot: " + html);
+});
+
+run("a fold button leaves the snapshot and a folded body shows in it (What if panels)", () => {
+  const card = node("div", { cls: "wi-panel wi-folded", kids: [
+    node("div", { cls: "wi-cardhead", kids: [
+      node("button", { cls: "wi-toggle snap-skip", text: "FOLD-BUTTON" }),
+      node("h3", { text: "Where to direct effort" }) ] }),
+    node("div", { cls: "wi-body snap-show", hidden: true, text: "Value for money +40" })
+  ] });
+  const html = TR.shell.snapshotCard(card);
+  assert(html.indexOf("FOLD-BUTTON") === -1 && html.indexOf("snap-skip") === -1, "fold button dropped: " + html);
+  assert(html.indexOf("Value for money +40") !== -1, "body kept: " + html);
+  assert(html.indexOf(" hidden") === -1, "the folded body is shown in the pin: " + html);
+  assert(card.kids[1].hidden === true, "the live card stays folded");
 });
 
 run("snapshotLines carries the analyst note into the deck (it never did)", () => {

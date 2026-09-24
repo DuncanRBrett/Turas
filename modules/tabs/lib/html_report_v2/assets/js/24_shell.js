@@ -745,7 +745,13 @@
    */
   shell.snapshotCard = function (cardEl) {
     var clone = cardEl.cloneNode(true);
-    clone.querySelectorAll(".snap-pin").forEach(function (el) { el.remove(); });
+    // .snap-skip: a live-only control (a fold button) the pinned copy drops.
+    // .snap-show: a part the reader may have folded away; a pin always shows it.
+    clone.querySelectorAll(".snap-pin, .snap-skip").forEach(function (el) { el.remove(); });
+    clone.querySelectorAll(".snap-show").forEach(function (el) {
+      el.hidden = false;
+      if (el.removeAttribute) el.removeAttribute("hidden");
+    });
     // A cloned textarea carries the analyst's TYPED value, not the markup
     // default: the HTML spec has textarea's cloning steps propagate the API
     // value and the dirty flag. So a note typed since the last render freezes

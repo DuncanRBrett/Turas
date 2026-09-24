@@ -382,6 +382,69 @@ run("an unclear area shows one chip and dashes, and the scenario groups levers b
   assert(g3.length === 1 && g3[0].name === "", "no bundles: one plain list");
 });
 
+run("every panel folds, a fold survives a dropdown re-render, and Rate says chance, not the score", () => {
+  // A host that keeps the listeners bind() attaches, so a click can be fired.
+  function liveHost() {
+    const h = { innerHTML: "", handlers: [] };
+    const attr = (html, sel) => {           // elements the rendered html holds for a [data-x] selector
+      const name = sel.replace(/^\[|\]$/g, "");
+      return (html.match(new RegExp(name + '="([^"]*)"', "g")) || []).map((m) => m.split('"')[1]);
+    };
+    h.querySelectorAll = (sel) => attr(h.innerHTML, sel).map((v) => ({
+      value: "", getAttribute: () => v,
+      addEventListener: (ev, fn) => h.handlers.push({ sel: sel, v: v, ev: ev, fn: fn })
+    }));
+    h.parts = {};
+    h.querySelector = (sel) => {
+      const k = sel;
+      if (!h.parts[k]) h.parts[k] = { hidden: null, attrs: {}, setAttribute: function (a, b) { this.attrs[a] = b; },
+        closest: () => ({ classList: { toggle: () => {} } }) };
+      return h.parts[k];
+    };
+    h.fire = (sel, v, ev, value) => {
+      const hd = h.handlers.filter((x) => x.sel === sel && x.v === v && x.ev === ev);
+      assert(hd.length, "no " + ev + " handler for " + sel + "=" + v);
+      hd[hd.length - 1].fn();
+      return hd;
+    };
+    return h;
+  }
+  const sb = sandbox(openIsland(), { micro: true });
+  const h = liveHost();
+  sb.TR.whatif.render(h);
+  const body = (html, id) => {
+    const m = html.match(new RegExp('<div class="wi-body snap-show" data-wi-body="' + id + '"( hidden)?>'));
+    assert(m, "panel " + id + " has a body");
+    return m[1] ? "folded" : "open";
+  };
+  ["effort", "scenario", "build"].forEach((id) => assert(body(h.innerHTML, id) === "open", id + " opens by default"));
+  ["rate", "how"].forEach((id) => assert(body(h.innerHTML, id) === "folded", id + " starts folded"));
+  has(h.innerHTML, 'class="wi-toggle snap-skip"', "fold buttons are dropped from pins");
+  // Open Rate by its button, fold the effort table by its title: the DOM flips, no re-render.
+  const before = h.innerHTML;
+  h.fire("[data-wi-toggle]", "rate", "click");
+  h.fire("[data-wi-toggle-title]", "effort", "click");
+  assert(h.innerHTML === before, "a fold does not re-render");
+  assert(h.parts['[data-wi-body="rate"]'].hidden === false, "Rate body shown");
+  assert(h.parts['[data-wi-body="effort"]'].hidden === true, "effort body hidden");
+  assert(h.parts['[data-wi-toggle="rate"]'].attrs["aria-expanded"] === "true", "aria-expanded follows");
+  // A dropdown in Rate re-renders the tab; both folds must survive it.
+  const key = FX.model.levers[0].key;
+  sb.TR.whatif.state.rate[key] = 1;
+  sb.TR.whatif.render(h);
+  assert(body(h.innerHTML, "rate") === "open", "Rate stays open after a re-render");
+  assert(body(h.innerHTML, "effort") === "folded", "the effort table stays folded after a re-render");
+  // Rate is one student's chance of each outcome, never the group score.
+  const rate = h.innerHTML.slice(h.innerHTML.indexOf('data-wi-body="rate"'), h.innerHTML.indexOf('data-wi-body="how"'));
+  has(rate, "ends up a Detractor, a Passive or a Promoter");
+  has(rate, "It is a chance for one student, not NPS: NPS is a score for a group");
+  has(rate, "This student has a ");
+  has(rate, "% chance of ending up a Promoter");
+  has(rate, "<th>Chance of ending up</th>");
+  has(h.innerHTML, "chance of each outcome, not NPS", "the Rate heading's hint says so too");
+  lacks(h.innerHTML, "<details", "no details panels left");
+});
+
 run("the kept audiences and moves give the same page as a fresh start, and a new island starts afresh", () => {
   const key = Object.keys(FX.open.ctx)[0];
   const mask = FX.open.ctx[key].map((c) => (c === 0 ? 1 : 0));

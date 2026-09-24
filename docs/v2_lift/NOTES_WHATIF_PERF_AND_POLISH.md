@@ -120,3 +120,31 @@ pinnable cards, and the TurasPins capture inliner skips default-looking style
 values (CLAUDE.md, report rendering). The bar now sits in a flex cell, and
 the halo and unclear chips are new. Pin both cards to the Story and check
 that the bars and chips survive in the pin.
+
+## Follow-up, same day: folding panels and the Rate wording
+
+Duncan found that every dropdown in "Rate SACAP as one student" folded the
+panel shut. The cause: each change re-renders the tab, and a re-rendered
+`<details>` starts closed. Branch `fix/whatif-panel-fold`:
+
+- Every panel below the headline now folds, with a chevron button, and the
+  title also toggles. Where to direct effort, Build a scenario and Build a
+  student start open. Rate and How this works start folded. `wi.state.open`
+  keeps the folds, so a dropdown or a filter re-render leaves each panel as
+  the reader left it. A fold flips only that panel's body, with no re-render.
+- Pins: `shell.snapshotCard` (24_shell.js) drops `.snap-skip` elements (the
+  fold button) and un-hides `.snap-show` ones (the panel body). A pin of a
+  folded card therefore shows the whole card.
+- Rate says what it is: one student's chance of ending up a Detractor, a
+  Passive or a Promoter, "not NPS: NPS is a score for a group". The headline
+  reads "This student has a 62% chance of ending up a Promoter", and the row
+  is labelled "Chance of ending up". Build a student's headline now reads
+  "Expected NPS for students like this: 54. Each has a 66% chance of ending
+  up a Promoter."
+
+Checked: the gate has 22 tests. The new fold test fails when the fold state
+is forgotten. The shell snapshot suite has 13 tests, and its new test fails on
+the old shell. All 58 v2 node suites exit 0, and engine parity is still
+bit-identical. In real headless Chrome, a fold click, a Rate dropdown change
+and a scenario pick leave the folds as set. A scratch hardening passed its
+checks, with no new names or strings, and the hardened copy renders the folds.

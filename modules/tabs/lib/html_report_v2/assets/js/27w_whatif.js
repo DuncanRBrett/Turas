@@ -15,7 +15,9 @@
  *         single-area results for combined scenarios, labelled approximate.
  *
  * Panels: the headline, where to direct effort, build a scenario, Build a ...
- * (who the respondent is), Rate as one (how they rate), diagnostics.
+ * (who the respondent is), Rate as one (one respondent's chance of each
+ * outcome, never the group score), diagnostics. Every panel below the headline
+ * folds; wi.state.open keeps the folds through re-renders.
  *
  * Association, not cause: nothing here says fixing an area WILL add points.
  * A respondent flagged dk in the open rows gave no rating for that lever: the
@@ -69,6 +71,11 @@
   function sig(z) { return 1 / (1 + Math.exp(-z)); }
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
   function an(word) { return /^[aeiou]/i.test(word) ? "an" : "a"; }
+  /** "a Detractor, a Passive or a Promoter". */
+  function orList(levels) {
+    var w = levels.map(function (l) { return an(l) + " " + l; });
+    return w.length < 2 ? w.join("") : w.slice(0, -1).join(", ") + " or " + w[w.length - 1];
+  }
 
   function W() { return TR.WI || {}; }
   function meta() { return W().meta || {}; }
@@ -163,7 +170,7 @@
   }
 
   // ---------------------------------------------------------------- mode
-  wi.state = { safeFilters: [], scen: {}, prof: null, profNote: "", rate: null, rateHas: {} };
+  wi.state = { safeFilters: [], scen: {}, prof: null, profNote: "", rate: null, rateHas: {}, open: {} };
 
   /** Whether this report carries a What if contribution at all. */
   wi.available = function () {
@@ -421,6 +428,30 @@
       '" data-snap-context="' + esc(ctx) + '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>';
   }
 
+  // ---------------------------------------------------------------- panels that fold
+  // Every panel below the headline folds. Which are open lives in wi.state, so
+  // a re-render (any dropdown) leaves each panel as the reader left it, and a
+  // fold itself only flips the panel's body, with no re-render.
+  var PANEL_OPEN = { effort: true, scenario: true, build: true, rate: false, how: false };
+  function isOpen(id) {
+    var o = wi.state.open[id];
+    return o === undefined ? PANEL_OPEN[id] !== false : o === true;
+  }
+  /** The panel's heading row: fold button, title, a one-line hint, the pin. */
+  function panelHead(id, title, hint, pin) {
+    return '<div class="wi-cardhead"><div class="wi-titlerow">' +
+      '<button type="button" class="wi-toggle snap-skip" data-wi-toggle="' + id + '" aria-expanded="' + isOpen(id) +
+      '" aria-label="Show or hide ' + esc(title) + '"></button>' +
+      '<h3 data-wi-toggle-title="' + id + '">' + esc(title) + "</h3>" +
+      (hint ? '<span class="wi-sumhint">' + esc(hint) + "</span>" : "") + "</div>" + (pin || "") + "</div>";
+  }
+  /** Opens the panel's body; the caller closes it with "</div>". A pin always
+   *  shows the body, folded or not (.snap-show, see shell.snapshotCard). */
+  function panelBody(id) {
+    return '<div class="wi-body snap-show" data-wi-body="' + id + '"' + (isOpen(id) ? "" : " hidden") + ">";
+  }
+  function panelClass(id) { return "wi-panel" + (isOpen(id) ? "" : " wi-folded"); }
+
   // ---------------------------------------------------------------- panels
   function headHtml(G) {
     var M = meta(), live = wi.live(), label = M.score_label || "Score";
@@ -490,8 +521,8 @@
     }).sort(function (a, b) { return (a.unclear - b.unclear) || ((withheld(b.fix) ? 0 : b.fix.pt) - (withheld(a.fix) ? 0 : a.fix.pt)); });
     var mx = Math.max.apply(null, rows.filter(function (r) { return !r.unclear && r.per100 !== null; })
       .map(function (r) { return r.per100; }).concat([1]));
-    var h = '<div class="wi-panel" data-snap-card><div class="wi-cardhead"><h3>Where to direct effort</h3>' +
-      pinButton("Where to direct effort", G.who) + "</div>";
+    var h = '<div class="' + panelClass("effort") + '" data-snap-card>' +
+      panelHead("effort", "Where to direct effort", "", pinButton("Where to direct effort", G.who)) + panelBody("effort");
     h += '<p class="wi-lead">What ' + esc(M.score_label || "the score") + " would lose if an area slipped, and gain if it were fixed for the " +
       esc(units) + " who need it, for " + esc(G.who) + ".</p>";
     h += '<div class="wi-tablewrap"><table class="wi-table wi-effort"><thead><tr><th class="wi-areacol">Area</th><th class="num">' + esc(cap(units)) +
@@ -536,7 +567,7 @@
       ", with the " + rangeName() + " across the refits underneath. " +
       (G.exact ? "" : "A count or an effect is not shown when it would rest on fewer than " + esc(M.min_group) + " " + esc(units) +
         ", on its own or set against another published group.") + "</p>";
-    return h + "</div>";
+    return h + "</div></div>";
   }
 
   /** The scenario's levers, grouped under the config's bundles when each lever
@@ -560,8 +591,8 @@
 
   function scenarioHtml(G) {
     var M = meta(), md = model(), st = wi.state, label = M.score_label || "score";
-    var h = '<div class="wi-panel" data-snap-card><div class="wi-cardhead"><h3>Build a scenario</h3>' +
-      pinButton("What if scenario", G.who) + "</div>";
+    var h = '<div class="' + panelClass("scenario") + '" data-snap-card>' +
+      panelHead("scenario", "Build a scenario", "", pinButton("What if scenario", G.who)) + panelBody("scenario");
     h += '<p class="wi-lead">' + (G.exact
       ? "Combine moves across areas. Worked out exactly, " + esc(M.unit) + " by " + esc(M.unit) + ", for the current group."
       : "Combine moves across areas. Each area's own result is added up, so combined results are approximate; the bundles below show how close that gets.") + "</p>";
@@ -616,7 +647,7 @@
       });
       h += "</tbody></table></div>";
     }
-    return h + "</div>";
+    return h + "</div></div>";
   }
 
   // ---------------------------------------------------------------- Build a ...
@@ -716,8 +747,8 @@
       st.prof = defaultProfile(P);
     }
     var prof = st.prof, unit = M.unit || "respondent", units = M.units || "respondents";
-    var h = '<div class="wi-panel" data-snap-card><div class="wi-cardhead"><h3>Build ' + an(unit) + " " + esc(unit) + "</h3>" +
-      pinButton("Build " + an(unit) + " " + unit, "") + "</div>";
+    var h = '<div class="' + panelClass("build") + '" data-snap-card>' +
+      panelHead("build", "Build " + an(unit) + " " + unit, "", pinButton("Build " + an(unit) + " " + unit, "")) + panelBody("build");
     h += '<p class="wi-lead">Choose who the ' + esc(unit) + " is. The model gives the " + esc(M.score_label || "score") +
       " it expects from " + esc(units) + " like this, against all " + esc(units) + ". The group above does not apply here.</p>";
     var keyed = {};
@@ -744,8 +775,8 @@
     var main = profileScore(P, prof, P.fits[0]);
     var draws = P.fits.slice(1).map(function (f) { return profileScore(P, prof, f).score; });
     var top = (M.outcome_levels || []).slice(-1)[0] || "top";
-    h += '<p class="wi-headline">Expected ' + esc(M.score_label || "score") + " " + r0(main.score) + ": " +
-      Math.round(100 * main.probs[main.probs.length - 1]) + "% chance of being " + esc(an(top)) + " " + esc(top) + ".</p>";
+    h += '<p class="wi-headline">Expected ' + esc(M.score_label || "score") + " for " + esc(units) + " like this: " + r0(main.score) +
+      ". Each has a " + Math.round(100 * main.probs[main.probs.length - 1]) + "% chance of ending up " + esc(an(top)) + " " + esc(top) + ".</p>";
     var tq = (1 - rangeLevel()) / 2;
     h += lineHtml(M.actual, "All " + units, main.score, draws.length ? [pct(draws, tq), pct(draws, 1 - tq)] : null);
     // The notes sit together under the line, then the buttons.
@@ -757,7 +788,7 @@
       " runs from about " + r0(P.spread[0]) + " to " + r0(P.spread[2]) + ".</p></div>";
     h += '<div class="wi-btnrow"><button class="wi-btn" data-wi-random>Show a random ' + esc(unit) + '</button>' +
       '<button class="wi-btn" data-wi-reset>Reset</button></div>';
-    return h + "</div>";
+    return h + "</div></div>";
   }
 
   function matchNote(P, prof) {
@@ -784,14 +815,21 @@
 
   // ---------------------------------------------------------------- Rate as one
   function rateHtml() {
-    var M = meta(), md = model(), st = wi.state, sc = scaleOf(), unit = M.unit || "respondent";
+    var M = meta(), md = model(), st = wi.state, sc = scaleOf(), unit = M.unit || "respondent", label = M.score_label;
+    var levels = M.outcome_levels || [], top = levels[levels.length - 1] || "";
     if (!st.rate) {
       st.rate = {};
       md.levers.forEach(function (lv) { st.rate[lv.key] = lv.kind === "coverage" ? 1 : goodOf(lv); st.rateHas[lv.key] = 1; });
     }
-    var h = '<details class="wi-panel"><summary><span class="wi-sumtitle">Rate ' + esc(M.brand || "them") + " as one " + esc(unit) +
-      '</span><span class="wi-sumhint">How one ' + esc(unit) + "'s ratings map to the outcome</span></summary>";
-    h += '<p class="wi-lead">Set how one ' + esc(unit) + " rates each area. The model gives the chance they would be in each outcome group. " +
+    var h = '<div class="' + panelClass("rate") + '">' +
+      panelHead("rate", "Rate " + (M.brand || "them") + " as one " + unit,
+        "One " + unit + "'s chance of each outcome, not " + (label || "a score")) + panelBody("rate");
+    // One person's chance of each outcome, which is not the group score: say so,
+    // because the effort table and the scenario above are in score points.
+    h += '<p class="wi-lead">Set how one ' + esc(unit) + " rates each area. The model gives the chance that this " + esc(unit) +
+      " ends up " + esc(orList(levels)) + ". " +
+      (label ? "It is a chance for one " + esc(unit) + ", not " + esc(label) + ": " + esc(label) +
+        " is a score for a group, as in the panels above. " : "") +
       "Who they are is set to the average " + esc(unit) + ". This is the model behind the effort table, seen from one " + esc(unit) + "'s side.</p>";
     h += '<div class="wi-grid">';
     var opts = [];
@@ -825,15 +863,15 @@
       });
       return probsAt(f, e);
     };
-    var p = probs(md.fits[0], 0), levels = M.outcome_levels || [];
+    var p = probs(md.fits[0], 0);
     var tops = md.fits.slice(1).map(function (f, i) { var q = probs(f, i + 1); return q[q.length - 1]; });
-    h += '<p class="wi-headline">' + Math.round(100 * p[p.length - 1]) + "% chance of being " + esc(an(levels[levels.length - 1] || "")) + " " +
-      esc(levels[levels.length - 1] || "") + " (" + rangeName() + " " + Math.round(100 * pct(tops, (1 - rangeLevel()) / 2)) + "% to " +
+    h += '<p class="wi-headline">This ' + esc(unit) + " has a " + Math.round(100 * p[p.length - 1]) + "% chance of ending up " +
+      esc(an(top)) + " " + esc(top) + " (" + rangeName() + " " + Math.round(100 * pct(tops, (1 - rangeLevel()) / 2)) + "% to " +
       Math.round(100 * pct(tops, 1 - (1 - rangeLevel()) / 2)) + "%).</p>";
-    h += '<table class="wi-table"><tbody><tr>' + levels.map(function (l, i) {
+    h += '<table class="wi-table wi-chances"><tbody><tr><th>Chance of ending up</th>' + levels.map(function (l, i) {
       return "<td>" + esc(l) + ' <b class="num">' + Math.round(100 * p[i]) + "%</b></td>";
     }).join("") + "</tr></tbody></table>";
-    return h + "</details>";
+    return h + "</div></div>";
   }
 
   // ---------------------------------------------------------------- diagnostics
@@ -862,8 +900,8 @@
     items.push("This is association, not cause. " + cap(units) + " who like " + (M.brand || "the organisation") +
       " rate everything higher, so real gains are probably smaller than shown.");
     (md.notes || []).forEach(function (t) { items.push(t); });
-    var h = '<details class="wi-panel"><summary><span class="wi-sumtitle">How this works</span>' +
-      '<span class="wi-sumhint">The model, its checks and its limits</span></summary><ul class="wi-list">' +
+    var h = '<div class="' + panelClass("how") + '">' +
+      panelHead("how", "How this works", "The model, its checks and its limits") + panelBody("how") + '<ul class="wi-list">' +
       items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>";
     if ((md.symptoms || []).length) {
       h += "<h4>Looks like a lever, is not one</h4><ul class=\"wi-list\">" + md.symptoms.map(function (s) {
@@ -882,7 +920,7 @@
           " groups it holds each have at least " + W0.safe.min_group + ". No individual answers are in the file."
         : "Privacy check failed. Do not send this file.") + "</p>";
     }
-    return h + "</details>";
+    return h + "</div></div>";
   }
 
   // ---------------------------------------------------------------- render and events
@@ -908,6 +946,20 @@
     var on = function (sel, ev, fn) {
       Array.prototype.forEach.call(host.querySelectorAll(sel), function (el) { el.addEventListener(ev, function () { fn(el); }); });
     };
+    // Fold a panel in place: flip its body and remember it, no re-render.
+    var fold = function (id) {
+      var open = !isOpen(id), body = host.querySelector('[data-wi-body="' + id + '"]');
+      var btn = host.querySelector('[data-wi-toggle="' + id + '"]');
+      wi.state.open[id] = open;
+      if (body) body.hidden = !open;
+      if (btn) {
+        btn.setAttribute("aria-expanded", String(open));
+        var panel = btn.closest(".wi-panel");
+        if (panel) panel.classList.toggle("wi-folded", !open);
+      }
+    };
+    on("[data-wi-toggle]", "click", function (el) { fold(el.getAttribute("data-wi-toggle")); });
+    on("[data-wi-toggle-title]", "click", function (el) { fold(el.getAttribute("data-wi-toggle-title")); });
     on("[data-wi-scen]", "change", function (el) { wi.state.scen[el.getAttribute("data-wi-scen")] = el.value || null; rerender(); });
     on("[data-wi-addfilter]", "change", function (el) {
       if (!el.value) return;

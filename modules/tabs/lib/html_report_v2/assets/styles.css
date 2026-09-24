@@ -1720,13 +1720,16 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 .wi-panel { margin: 16px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 22px; }
 .wi-panel h3 { margin: 0; font-size: 1.05rem; }
 .wi-panel h4 { margin: 14px 0 4px; font-size: .95rem; }
-.wi-panel > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.wi-panel > summary::-webkit-details-marker { display: none; }
-.wi-panel > summary::before { content: ""; align-self: center; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
-.wi-panel[open] > summary::before { transform: rotate(45deg); }
-.wi-panel[open] > summary { margin-bottom: 8px; }
-.wi-sumtitle { font-size: 1.05rem; font-weight: 600; color: var(--ink); }
+/* Every panel below the headline folds: a chevron button, the title also toggles. */
+.wi-titlerow { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.wi-toggle { align-self: center; flex: none; position: relative; width: 22px; height: 22px; margin-left: -4px; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+.wi-toggle::before { content: ""; position: absolute; left: 7px; top: 5px; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; }
+.wi-toggle[aria-expanded="false"]::before { left: 5px; top: 7px; transform: rotate(-45deg); }
+.wi-toggle:hover, .wi-toggle:focus-visible { background: var(--soft); }
+.wi-titlerow h3 { cursor: pointer; }
+.wi-folded .wi-cardhead { margin-bottom: 0; }
 .wi-sumhint { font-size: .82rem; color: var(--muted); }
+.wi-chances th { font-weight: 600; color: var(--muted); font-size: .8rem; white-space: nowrap; }
 .wi-cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
 .wi-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; vertical-align: middle; }
 .wi-live { background: #e7f4ec; color: #1f6b3a; }
