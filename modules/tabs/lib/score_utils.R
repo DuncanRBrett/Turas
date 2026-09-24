@@ -71,19 +71,24 @@ nps_bucket_score <- function(v) {
 #' covariance is carried by the score itself, so the existing weighted-t path
 #' needs no new statistics.
 #'
-#' EVERY row in \code{data} gets a score, including respondents who did not
-#' answer (NA) and those in an unboxed middle category. Both score 0. That is
-#' deliberate: the published row divides top and bottom counts by the column's
-#' BASE (banner bases are the base-filtered column, not the answered base), so
-#' the score must share that denominator or the tested quantity would not be
-#' the printed one.
+#' A respondent in an unboxed middle category scores 0 and stays in the base.
+#' A respondent who did not answer scores NA and leaves the test, because the
+#' published row divides top and bottom counts by the ANSWERED base
+#' (calculate_single_response_base() counts non-missing answers), so the score
+#' must share that denominator or the tested quantity is not the printed one.
+#' This comment used to say the opposite, and non-answerers scored 0: with no
+#' base filter a column's net was tested diluted by everyone who skipped the
+#' question, which could letter two identical printed nets (review 24 Sep
+#' 2026). "Answered" is read exactly as the base reads it: NA for a numeric
+#' column, NA or blank for text.
 #'
 #' @param data Data frame, the question's base-filtered survey data
 #' @param question_info One-row data frame of question metadata (QuestionCode)
 #' @param question_options Data frame of options carrying BoxCategory
 #' @param top_category Character, the favourable BoxCategory name
 #' @param bottom_category Character, the unfavourable BoxCategory name
-#' @return Numeric vector, one score per row of \code{data} (never NA)
+#' @return Numeric vector, one score per row of \code{data}; NA where the
+#'   respondent did not answer the question
 #' @export
 net_positive_scores <- function(data, question_info, question_options,
                                 top_category, bottom_category) {
@@ -92,6 +97,13 @@ net_positive_scores <- function(data, question_info, question_options,
   if (!(question_col %in% names(data))) return(scores)
 
   answers <- data[[question_col]]
+  answered <- if (is.numeric(answers)) {
+    !is.na(answers)
+  } else {
+    a <- trimws(as.character(answers))
+    !is.na(a) & nzchar(a)
+  }
+  scores[!answered] <- NA_real_
   texts_for <- function(category) {
     as.character(question_options$OptionText[
       !is.na(question_options$BoxCategory) &

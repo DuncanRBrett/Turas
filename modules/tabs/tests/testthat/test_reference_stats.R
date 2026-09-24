@@ -249,3 +249,47 @@ test_that("reference: numeric letters test the same values as the printed mean",
   expect_equal(sig[[kb]][1], "")
   expect_equal(sig[[ka]][1], "")
 })
+
+# ==============================================================================
+# NET POSITIVE: the letters test the base the row prints
+# ==============================================================================
+#
+# The row prints (top - bottom) over the ANSWERED base (calculate_single_
+# response_base counts non-missing answers). Column A: 40 answers, 20 top box
+# (5), 20 middle (3): net +50. Column B: the same 40 answers plus 80 people who
+# did not answer (NA), no base filter: printed net also +50. Identical printed
+# nets, so no letter. The engine scored every row of the column, non-answerers
+# as 0, so B was tested on a mean of 20 * 100 / 120 = 16.7 against A's 50:
+# t ~ 3.8, a letter B on A under two identical printed nets.
+
+test_that("reference: NET POSITIVE letters test the printed (answered) base", {
+  kt <- "TOTAL::Total"; ka <- "GRP::A"; kb <- "GRP::B"
+  ans <- c(rep("5", 20), rep("3", 20))
+  d <- data.frame(Q = c(ans, ans, rep(NA, 80)), stringsAsFactors = FALSE)
+  idx <- list(seq_len(160), 1:40, 41:160); names(idx) <- c(kt, ka, kb)
+  answered <- function(i) sum(!is.na(d$Q[i]))
+  bases <- lapply(idx, function(i) list(unweighted = answered(i), weighted = answered(i),
+                                          effective = answered(i)))
+  banner <- list(internal_keys = c(kt, ka, kb),
+                 banner_info = list(GRP = list(internal_keys = c(ka, kb),
+                                               letters = setNames(c("A", "B"), c(ka, kb)))))
+  cfg <- list(show_net_positive = TRUE, enable_significance_testing = TRUE,
+              alpha = 0.05, bonferroni_correction = FALSE, significance_min_base = 30,
+              alpha_secondary = NULL, decimal_places_percent = 1)
+  qi <- data.frame(QuestionCode = "Q", Variable_Type = "Rating", stringsAsFactors = FALSE)
+  opts <- data.frame(QuestionCode = "Q", OptionText = as.character(1:5),
+                     DisplayText = as.character(1:5), DisplayOrder = 1:5,
+                     BoxCategory = c("Bottom 2", "Bottom 2", NA, "Top 2", "Top 2"),
+                     stringsAsFactors = FALSE)
+  seed <- data.frame(RowLabel = "seed", RowType = "Column %", x1 = "", x2 = "", x3 = "",
+                     RowSource = NA_character_, stringsAsFactors = FALSE)
+  names(seed)[3:5] <- c(kt, ka, kb)
+  out <- add_net_positive_row(seed, d, qi, opts, banner, idx, rep(1, 160), bases, cfg, FALSE)
+  np <- out[grepl("^NET POSITIVE", out$RowLabel), , drop = FALSE]
+  expect_equal(as.numeric(np[[ka]]), 50)
+  expect_equal(as.numeric(np[[kb]]), 50)
+  sig <- out[out$RowType == "Sig.", , drop = FALSE]
+  expect_equal(nrow(sig), 1)
+  expect_equal(sig[[ka]][1], "")
+  expect_equal(sig[[kb]][1], "")
+})
