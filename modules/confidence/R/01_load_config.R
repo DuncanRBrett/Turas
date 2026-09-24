@@ -903,9 +903,13 @@ load_population_margins_sheet <- function(config_path) {
       ))
     }
 
-    # Convert to numeric
-    df$Target_Prop[i] <- target_prop
   }
+
+  # Convert the whole column. The sheet is read as text, and assigning one
+  # number at a time back into a text column left it text, so tapply(sum)
+  # below failed and every config with this sheet refused at load
+  # (review 2026-09-24).
+  df$Target_Prop <- suppressWarnings(as.numeric(df$Target_Prop))
 
   # Stop if validation errors
   if (length(errors) > 0) {
