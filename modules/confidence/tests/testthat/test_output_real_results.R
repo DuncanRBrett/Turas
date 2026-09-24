@@ -58,3 +58,33 @@ test_that("Proportions_Detail carries the normal interval the calculator produce
   expect_equal(row$MOE_Normal_Upper, res$moe$upper, tolerance = 1e-9)
   expect_equal(row$Wilson_Lower, res$wilson$lower, tolerance = 1e-9)
 })
+
+test_that("HTML report builds for a weighted mean whose df is fractional", {
+  # Weights 1,1,3: n_eff = 50^2 / 110 = 22.727, so df = 21.727. The mean
+  # detail table formatted df with %d, sprintf refused the fractional value,
+  # and the whole HTML report came back REFUSED on any weighted study with a
+  # mean question (review 2026-09-24).
+  d <- data.frame(x = rep(c(2, 4, 7), 10), w = rep(c(1, 1, 3), 10))
+  res <- process_mean_question(rr_q_row("x"), d, "w", rr_config())$result
+  expect_equal(res$t_dist$df, 50^2 / 110 - 1, tolerance = 1e-12)
+
+  tbl <- build_mean_detail_table(res, 0.95)
+  expect_true(grepl("df = 21.7,", tbl, fixed = TRUE))
+
+  cr <- list(
+    study_stats = NULL, proportion_results = list(),
+    mean_results = list(x = res), nps_results = list(), warnings = character(),
+    config = list(study_settings = list(Confidence_Level = "0.95"))
+  )
+  html_path <- tempfile(fileext = ".html")
+  on.exit(unlink(html_path), add = TRUE)
+  rep <- suppressMessages(generate_confidence_html_report(cr, html_path, list()))
+  expect_equal(rep$status, "PASS")
+  expect_true(file.exists(html_path))
+})
+
+test_that("HTML mean detail keeps a whole df whole", {
+  d <- data.frame(x = rep(c(2, 4, 7), 10))
+  res <- process_mean_question(rr_q_row("x"), d, NULL, rr_config())$result
+  expect_true(grepl("df = 29,", build_mean_detail_table(res, 0.95), fixed = TRUE))
+})

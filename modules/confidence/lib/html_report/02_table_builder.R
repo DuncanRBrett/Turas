@@ -244,9 +244,14 @@ build_mean_detail_table <- function(result, conf_level, labels = NULL) {
   }
 
   if (!is.null(result$t_dist)) {
+    # df is n_eff - 1, fractional for weighted data (21.727). %d refused it
+    # and the whole report failed (review 2026-09-24): print to 1 dp, and a
+    # whole df as a whole number.
+    df_val <- result$t_dist$df %||% NA
+    df_label <- if (is.na(df_val)) "NA" else format(round(df_val, 1))
     add_row("t-Distribution",
             result$t_dist$lower, result$t_dist$upper,
-            sprintf("df = %d, SE = %.3f", result$t_dist$df %||% NA, result$t_dist$se %||% NA))
+            sprintf("df = %s, SE = %.3f", df_label, result$t_dist$se %||% NA))
   }
   if (!is.null(result$bootstrap)) {
     add_row("Bootstrap",
