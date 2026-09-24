@@ -763,3 +763,34 @@ test_that("a text don't-know answer is dropped even if its option has an Index_W
   st$Index_Weight[st$OptionText == "Don't know"] <- 99
   expect_equal(resolve_question_values(c("5", "Don't know", "2"), st, "Q7"), c(5, NA, 2))
 })
+
+
+# ==============================================================================
+# SINGLE CHOICE "all": answers in questionnaire order (Duncan, 24 Sep 2026)
+# ==============================================================================
+# The tracked answers were ordered as they first appeared in the data, so the
+# Dashboard headline (the first answer) could be any of them ("Café"
+# rather than "Yes"). With a StructureFile the order is the questionnaire's;
+# answers it does not list follow in data order.
+
+test_that("single-choice answers follow the structure's option order", {
+  frames <- list(
+    W1 = data.frame(Q20 = c("Maybe", "No", "Yes", "Other", "Yes", "No"), weight_var = 1,
+                    stringsAsFactors = FALSE),
+    W2 = data.frame(Q20 = c("No", "Yes", "Maybe", "Yes"), weight_var = 1,
+                    stringsAsFactors = FALSE))
+  mapping <- data.frame(QuestionCode = "AWARE", QuestionText = "Aware", QuestionType = "Single_Response",
+                        TrackingSpecs = "all", W1 = "Q20", W2 = "Q20", stringsAsFactors = FALSE)
+  s <- ref_setup(frames, mapping)
+  st <- data.frame(QuestionCode = "Q20", OptionText = c("Yes", "No", "Maybe"),
+                   DisplayText = c("Yes", "No", "Maybe"), Index_Weight = NA_real_,
+                   BoxCategory = NA_character_, ExcludeFromIndex = NA_character_,
+                   stringsAsFactors = FALSE)
+  capture.output(r <- calculate_single_choice_trend_enhanced("AWARE", s$question_map, s$wave_data,
+                                                             s$config, list(W1 = st, W2 = st)))
+  expect_identical(as.character(r$response_codes), c("Yes", "No", "Maybe", "Other"))
+  # Without a structure the data order stands
+  capture.output(r0 <- calculate_single_choice_trend_enhanced("AWARE", s$question_map, s$wave_data,
+                                                              s$config, NULL))
+  expect_identical(as.character(r0$response_codes), c("Maybe", "No", "Yes", "Other"))
+})

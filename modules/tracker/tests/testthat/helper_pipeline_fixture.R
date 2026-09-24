@@ -70,7 +70,12 @@ pipeline_fixture_write <- function(dir) {
                ExcludeFromIndex = "Y", stringsAsFactors = FALSE),
     scale_rows("Q11", 1:5),
     scale_rows("Q15", 0:10),
-    scale_rows("Q40", 1:5)
+    scale_rows("Q40", 1:5),
+    # Q20 in questionnaire order; the data meets "Caf\u00e9" first
+    data.frame(QuestionCode = "Q20",
+               OptionText = c("Yes", "No", "Caf\u00e9", "- None of these"),
+               Index_Weight = NA, ExcludeFromIndex = NA_character_,
+               stringsAsFactors = FALSE)
   )
   for (wid in names(waves)) {
     wb <- openxlsx::createWorkbook()

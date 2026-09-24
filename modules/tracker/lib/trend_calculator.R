@@ -420,6 +420,36 @@ parse_single_choice_specs <- function(tracking_specs, all_codes) {
 }
 
 
+#' Order Answer Codes by the Questionnaire
+#'
+#' Puts single-choice answer codes in the order the StructureFile lists the
+#' question's options (the latest wave with a listing wins, since that is the
+#' questionnaire in the field now). Codes the structure does not list follow in
+#' the order the data gave them. With no structure the order is unchanged.
+#'
+#' @param codes Character vector of answer codes, in data order
+#' @param q_code Character. Standard question code
+#' @param question_map List. Question map index
+#' @param wave_structures Named list of structure Options by wave, or NULL
+#' @param wave_ids Character vector of wave IDs
+#' @return Character vector, the same codes reordered
+#' @keywords internal
+order_codes_by_structure <- function(codes, q_code, question_map, wave_structures, wave_ids) {
+  if (is.null(wave_structures) || length(codes) < 2) return(codes)
+  for (wave_id in rev(wave_ids)) {
+    st <- wave_structures[[wave_id]]
+    if (is.null(st)) next
+    wave_col <- get_wave_question_code(question_map, q_code, wave_id)
+    if (is.na(wave_col)) next
+    listed <- trimws(as.character(st$OptionText[st$QuestionCode == wave_col]))
+    if (length(listed) == 0) next
+    pos <- match(tolower(trimws(as.character(codes))), tolower(listed))
+    return(codes[order(is.na(pos), pos, seq_along(codes))])
+  }
+  codes
+}
+
+
 #' Calculate Single Choice Trend Enhanced
 #'
 #' Enhanced version with TrackingSpecs support.
@@ -449,6 +479,11 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
       all_codes <- unique(c(all_codes, unique(q_data[valid_idx])))
     }
   }
+
+  # Questionnaire order when a StructureFile lists the options (Duncan,
+  # 24 Sep 2026): the first answer is the Dashboard headline and the trend
+  # sheet's first row, so it must not depend on which answer the data met first
+  all_codes <- order_codes_by_structure(all_codes, q_code, question_map, wave_structures, wave_ids)
 
   # Parse specs to determine which codes to track
   specs_parsed <- parse_single_choice_specs(tracking_specs, all_codes)

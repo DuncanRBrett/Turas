@@ -221,6 +221,9 @@ test_that("detailed sheets match survey::svymean and hand counts, wave by wave",
   expect_2dp(row_values(rec, "% Detractors (0-6)", cols), ref2(function(x) 100 * x$rec$pd))
 
   aware <- read_sheet(f, "AWARE")
+  # Rows in questionnaire order (the structure lists Yes, No, Caf\u00e9, - None of these)
+  body <- aware[[1]][(which(aware[[1]] == "Response Option") + 1):nrow(aware)]
+  expect_identical(head(body, 4), c("Yes", "No", "Caf\u00e9", "- None of these"))
   for (code in c("Yes", "No", "Café", "- None of these")) {
     expect_2dp(row_values(aware, code, cols), ref2(function(x) x$aware[[code]]), info = code)
   }
@@ -288,6 +291,8 @@ test_that("Trend Dashboard values and arrows match the hand-computed tests", {
   expect_true(any(unlist(hv) != "→"))
   expect_true(any(unlist(hv) == "→"))
   expect_identical(row("NEWQ")$Status, "Not tested")
+  # The single-choice headline is the questionnaire's first answer ("Yes")
+  expect_2dp(as.numeric(sub("%$", "", row("AWARE")$Latest)), r$W2$aware$Yes)
 })
 
 test_that("Sig Matrix cells match the Dashboard and the hand-computed tests", {
