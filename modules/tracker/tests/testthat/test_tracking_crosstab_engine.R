@@ -526,3 +526,51 @@ test_that("a confidence_level that disagrees with alpha is reported as unused", 
     list(Q_SAT = create_mock_rating_trend()), config, create_mock_question_map()))
   expect_true(any(grepl("confidence_level = 0.95 is not used", out, fixed = TRUE)))
 })
+
+
+# ==============================================================================
+# TESTS: multi-mention rows carry values (robustness review 24 Sep 2026)
+# ==============================================================================
+# "auto" was not expanded to the option columns and values were looked up at
+# the top level, so the crosstab and the HTML report built from it showed a
+# multi-mention question as rows named "auto" and "% Any" with every cell
+# blank. Shape below is calculate_multi_mention_trend()'s.
+
+mm_trend <- function() {
+  wr <- function(a, b, any) list(available = TRUE, n_unweighted = 90, eff_n = 70,
+                                 mention_proportions = list(Q30_1 = a, Q30_2 = b),
+                                 additional_metrics = list(any_mention_pct = any),
+                                 tracked_columns = c("Q30_1", "Q30_2"))
+  list(question_code = "CHAN", question_text = "Channels", question_type = "Multi_Mention",
+       metric_type = "multi_mention", tracking_specs = "auto,any",
+       tracked_columns = c("Q30_1", "Q30_2"),
+       wave_results = list(W1 = wr(40, 20, 50), W2 = wr(55, 22, 66), W3 = wr(60, 25, 70)),
+       changes = list(),
+       significance = list(
+         Q30_1 = list(W1_vs_W2 = list(significant = TRUE), W2_vs_W3 = list(significant = FALSE)),
+         Q30_2 = list(W1_vs_W2 = list(significant = FALSE), W2_vs_W3 = list(significant = FALSE)),
+         any_mention_pct = list(W1_vs_W2 = list(significant = TRUE), W2_vs_W3 = list(significant = FALSE))))
+}
+
+test_that("crosstab expands multi-mention auto into options and fills any-mention", {
+  config <- create_mock_config()
+  config$tracked_questions <- data.frame(QuestionCode = "CHAN", MetricLabel = "Channels",
+                                         TrackingSpecs = "auto,any", Section = "S", SortOrder = 1,
+                                         stringsAsFactors = FALSE)
+  qm <- create_mock_question_map()
+  qm$standard_to_wave$CHAN <- list(W1 = "Q30", W2 = "Q30", W3 = "Q30")
+  qm$question_metadata <- rbind(qm$question_metadata, data.frame(
+    QuestionCode = "CHAN", QuestionText = "Channels used", QuestionType = "Multi_Mention",
+    stringsAsFactors = FALSE))
+  capture.output(res <- build_tracking_crosstab(list(CHAN = mm_trend()), config, qm))
+  rows <- res$metrics[vapply(res$metrics, function(m) m$question_code == "CHAN", logical(1))]
+  by_name <- setNames(rows, vapply(rows, function(m) m$metric_name, character(1)))
+  expect_setequal(names(by_name), c("q30_1", "q30_2", "any"))
+  vals <- function(nm) unlist(by_name[[nm]]$segments$Total$values)
+  expect_equal(unname(vals("q30_1")), c(40, 55, 60))
+  expect_equal(unname(vals("q30_2")), c(20, 22, 25))
+  expect_equal(unname(vals("any")), c(50, 66, 70))
+  sig <- by_name[["q30_1"]]$segments$Total$sig_vs_previous
+  expect_true(isTRUE(sig$W2))
+  expect_true(isTRUE(by_name[["any"]]$segments$Total$sig_vs_previous$W2))
+})

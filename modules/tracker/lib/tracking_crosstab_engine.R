@@ -243,6 +243,20 @@ build_metric_rows_for_question <- function(q_code, q_trend, metric_type,
     specs_list <- expanded
   }
 
+  # Multi-mention "auto" → one row per tracked option column (or category),
+  # the options the calculator actually tracked for this question
+  if (metric_type %in% c("multi_mention", "category_mentions")) {
+    ref_trend <- if (has_banners) q_trend[[segment_names[1]]] else q_trend
+    options <- ref_trend$tracked_columns
+    if (is.null(options)) options <- ref_trend$response_categories
+    expanded <- character(0)
+    for (s in specs_list) {
+      core <- tolower(trimws(parse_spec_label(s)$core))
+      expanded <- c(expanded, if (core == "auto") as.character(options) else s)
+    }
+    specs_list <- unique(expanded)
+  }
+
   # For each spec, build a metric_row
   for (spec_idx in seq_along(specs_list)) {
     spec_original <- specs_list[spec_idx]
@@ -473,7 +487,19 @@ extract_metric_value <- function(wave_result, metric_type, metric_name) {
     return(NA_real_)
 
   } else if (metric_type %in% c("multi_mention", "multi_choice", "category_mentions")) {
-    # Multi-mention: various structures
+    # Calculator shape: option shares in $mention_proportions (keyed by column
+    # or category text), "any" and "count_mean" in $additional_metrics
+    if (metric_name %in% c("any", "count_mean")) {
+      field <- if (metric_name == "any") "any_mention_pct" else "count_mean"
+      v <- wave_result$additional_metrics[[field]]
+      return(if (is.null(v)) NA_real_ else v)
+    }
+    mp <- wave_result$mention_proportions
+    if (!is.null(mp) && length(mp) > 0) {
+      hit <- which(crosstab_norm_key(names(mp)) == crosstab_norm_key(sub("^category_", "", metric_name)))
+      if (length(hit) > 0) return(mp[[hit[1]]])
+    }
+    # Other structures
     if (!is.null(wave_result[[metric_name]])) {
       return(wave_result[[metric_name]])
     }
@@ -505,6 +531,9 @@ extract_metric_value <- function(wave_result, metric_type, metric_name) {
 #' @keywords internal
 extract_significance <- function(seg_trend, metric_name, sig_key) {
 
+  # Multi-mention "any" is stored as any_mention_pct
+  if (identical(metric_name, "any")) metric_name <- "any_mention_pct"
+
   # Check multiple significance storage locations
   # 1. Enhanced: $significance$metric_name$sig_key
   if (!is.null(seg_trend$significance)) {
@@ -532,6 +561,18 @@ extract_significance <- function(seg_trend, metric_name, sig_key) {
         }
         return(sig_result)
       }
+    }
+
+    # Normalised fallback: a category spec ("category_email") against the
+    # category text it was stored under ("Email")
+    norm_match <- which(crosstab_norm_key(sig_names) ==
+                          crosstab_norm_key(sub("^category_", "", metric_name)))
+    if (length(norm_match) > 0 && !is.null(sig[[sig_names[norm_match[1]]]][[sig_key]])) {
+      sig_result <- sig[[sig_names[norm_match[1]]]][[sig_key]]
+      if (is.list(sig_result) && !is.null(sig_result$significant)) {
+        return(sig_result$significant)
+      }
+      return(sig_result)
     }
 
     # Legacy NPS/basic: sig directly at $significance$sig_key
@@ -596,6 +637,15 @@ normalize_metric_name <- function(spec_lower) {
     spec_lower
   }
 }
+
+
+#' Normalised Key for Matching a Spec to a Stored Name
+#'
+#' Lower case, every non-alphanumeric character as "_", so "Q30_1", "q30_1"
+#' and "Brand A" / "brand_a" meet.
+#'
+#' @keywords internal
+crosstab_norm_key <- function(x) gsub("[^a-z0-9]", "_", tolower(as.character(x)))
 
 
 #' Get Default Specs List for a Metric Type

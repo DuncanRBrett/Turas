@@ -379,3 +379,31 @@ test_that("with banners the Dashboard and Sig Matrix report the Total segment", 
   sheets <- openxlsx::getSheetNames(output_file(runs$banner$dir, "SigMatrix"))
   expect_true(all(paste0(c("SAT", "REC", "AWARE", "CHAN", "CX", "NEWQ"), "_SigMatrix") %in% sheets))
 })
+
+test_that("multi-mention reaches the crosstab and the banner sheet with its values", {
+  runs <- pipeline_runs()
+  fx <- runs$banner
+  r <- references(fx)
+  ct <- read_sheet(output_file(fx$dir, "TrackingCrosstab"), "Tracking Crosstab")
+  num <- function(x) suppressWarnings(as.numeric(x))
+  for (opt in c("q1", "q2", "q3")) {
+    label <- paste0("Q30_", substring(opt, 2))
+    expect_equal(num(crosstab_cell(ct, "Channels used", label, 3)), r$W1$chan[[opt]],
+                 tolerance = 1e-9, info = label)
+    expect_equal(num(crosstab_cell(ct, "Channels used", label, 4)), r$W2$chan[[opt]],
+                 tolerance = 1e-9, info = label)
+  }
+  expect_equal(num(crosstab_cell(ct, "Channels used", "% Any", 4)), r$W2$chan$any, tolerance = 1e-9)
+
+  # Channel 2 moves a lot; its star matches the hand z-test on the Kish bases
+  p2 <- z_p(r$W1$chan$q2 / 100, r$W1$chan$eff, r$W2$chan$q2 / 100, r$W2$chan$eff)
+  starred <- grepl("\\*", ct[crosstab_row(ct, "Channels used", "Q30_2") + 1, 4])
+  expect_identical(starred, p2 < 0.05)
+  expect_lt(p2, 0.05)
+
+  sheet <- read_sheet(output_file(fx$dir, "Tracker"), "CHAN")
+  hdr <- which(sheet[[1]] == "Metric")[1]
+  cols <- match(c("W1_Total", "W2_Total"), unlist(sheet[hdr, ]))
+  expect_equal(row_values(sheet, "Q30_2", cols), round(c(r$W1$chan$q2, r$W2$chan$q2), 2))
+  expect_equal(row_values(sheet, "% Mentioning Any", cols), round(c(r$W1$chan$any, r$W2$chan$any), 2))
+})

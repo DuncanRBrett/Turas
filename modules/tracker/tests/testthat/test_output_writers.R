@@ -885,3 +885,34 @@ test_that("wave history finds range: and box: values", {
   }, numeric(1))
   expect_equal(unname(vals), c(4.1, 72, 50))
 })
+
+
+# ==============================================================================
+# Multi-mention rows on the banner trend sheet (robustness review 24 Sep 2026)
+# ==============================================================================
+# The banner writer had no multi-mention branch: the sheet showed the sample
+# size and nothing else. Shape below is calculate_multi_mention_trend()'s.
+
+mm_result <- function(q1, any) {
+  wr <- function(a, b) list(available = TRUE, n_unweighted = 90, eff_n = 70,
+                            mention_proportions = list(Q30_1 = a, Q30_2 = 20),
+                            additional_metrics = list(any_mention_pct = b),
+                            tracked_columns = c("Q30_1", "Q30_2"))
+  list(question_code = "CHAN", question_text = "Channels", question_type = "Multi_Mention",
+       metric_type = "multi_mention", tracked_columns = c("Q30_1", "Q30_2"),
+       wave_results = list(W1 = wr(q1[1], any[1]), W2 = wr(q1[2], any[2])),
+       changes = list(), significance = list())
+}
+
+test_that("banner trend sheet writes multi-mention option and any-mention rows", {
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "CHAN")
+  segs <- list(Total = mm_result(c(50, 60), c(70, 80)),
+               Region_North = mm_result(c(45, 55), c(65, 75)))
+  write_banner_trend_table(wb, "CHAN", segs, c("W1", "W2"), make_mock_config(),
+                           create_tracker_styles(), 1)
+  df <- sheet_cells(wb, "CHAN")
+  expect_equal(as.numeric(df[which(df[[1]] == "Q30_1")[1], 2:5]), c(50, 60, 45, 55))
+  expect_equal(as.numeric(df[which(df[[1]] == "Q30_2")[1], 2:5]), c(20, 20, 20, 20))
+  expect_equal(as.numeric(df[which(df[[1]] == "% Mentioning Any")[1], 2:5]), c(70, 80, 65, 75))
+})

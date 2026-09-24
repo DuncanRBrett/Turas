@@ -268,6 +268,46 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
       current_row <- current_row + 1
     }
 
+  } else if (first_seg$metric_type %in% c(METRIC_TYPES$MULTI_MENTION, METRIC_TYPES$CATEGORY_MENTIONS)) {
+    # Multi-mention: one row per tracked option (or category), then any-mention
+    options <- first_seg$tracked_columns
+    if (is.null(options)) options <- first_seg$response_categories
+    has_any <- any(vapply(segment_names, function(sn) {
+      any(vapply(wave_ids, function(wid) {
+        !is.null(safe_wave_result(question_segments[[sn]]$wave_results, wid)$additional_metrics$any_mention_pct)
+      }, logical(1)))
+    }, logical(1)))
+    row_specs <- c(as.character(options), if (has_any) "% Mentioning Any")
+
+    for (row_label in row_specs) {
+      openxlsx::writeData(wb, sheet_name, row_label,
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+      row_values <- numeric(length(segment_names) * length(wave_ids))
+      idx <- 1
+      for (seg_name in segment_names) {
+        seg_result <- question_segments[[seg_name]]
+        for (wave_id in wave_ids) {
+          wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
+          val <- if (!isTRUE(wave_result$available)) NULL else if (row_label == "% Mentioning Any") {
+            wave_result$additional_metrics$any_mention_pct
+          } else {
+            wave_result$mention_proportions[[row_label]]
+          }
+          row_values[idx] <- if (is.null(val) || is.na(val)) NA_real_ else round(val, decimal_places)
+          idx <- idx + 1
+        }
+      }
+
+      openxlsx::writeData(wb, sheet_name, t(row_values),
+                          startRow = current_row, startCol = 2, colNames = FALSE)
+      number_style <- openxlsx::createStyle(numFmt = number_format)
+      openxlsx::addStyle(wb, sheet_name, number_style,
+                        rows = current_row, cols = 2:length(headers), gridExpand = TRUE, stack = TRUE)
+      current_row <- current_row + 1
+    }
+
   } else if (first_seg$metric_type == METRIC_TYPES$NPS) {
     # NPS rows
     metrics <- c("NPS Score", "% Promoters", "% Passives", "% Detractors")
