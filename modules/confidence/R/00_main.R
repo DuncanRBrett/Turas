@@ -864,22 +864,23 @@ generate_stats_pack_step <- function(config, survey_data, weight_var,
   assumptions <- list(
     # --- Confidence level & scope ---
     "Confidence Level"           = if (!is.na(conf_level)) sprintf("%.0f%%", conf_level * 100) else "—",
-    "Tests: Proportion CIs"      = sprintf("%d  (Wilson score interval — base R formula)",
-                                           length(proportion_results)),
-    "Tests: Mean CIs"            = sprintf("%d  (t-distribution — base R t.test())",
-                                           length(mean_results)),
-    "Tests: NPS CIs"             = sprintf("%d  (Wilson score interval — base R formula)",
-                                           length(nps_results)),
+    "Tests: Proportion CIs"      = sprintf("%d question(s)", length(proportion_results)),
+    "Tests: Mean CIs"            = sprintf("%d question(s)", length(mean_results)),
+    "Tests: NPS CIs"             = sprintf("%d question(s)", length(nps_results)),
     "Total CI tests run"         = as.character(length(proportion_results) +
                                                 length(mean_results) +
                                                 length(nps_results)),
     # --- Methods & implementation ---
-    "Proportions method"         = "Wilson score interval (base R formula)",
-    "Means method"               = "t-distribution (base R t.test())",
+    # Described from the results, not asserted. This used to say NPS used
+    # Wilson, means used t.test() and DEFF came from the survey package; none
+    # was true (review 2026-09-24).
+    "Proportions method"         = describe_methods_run(proportion_results, "proportion"),
+    "Means method"               = describe_methods_run(mean_results, "mean"),
+    "NPS method"                 = describe_methods_run(nps_results, "nps"),
     "Bootstrap (if used)"        = if (!is.null(boot_iters) && !is.na(boot_iters)) {
-                                     sprintf("%s iterations (base R sampling)", boot_iters)
+                                     sprintf("%s iterations, percentile method (base R sampling)", boot_iters)
                                    } else "Not used",
-    "DEFF / Effective N"         = "survey package (design-aware variance estimation)",
+    "DEFF / Effective N"         = "Kish: n_eff = (sum w)^2 / sum w^2, DEFF = n / n_eff (base R)",
     # --- Sample & design ---
     "Sampling Method"            = config$study_settings$Sampling_Method %||% "Not specified",
     "Weighting"                  = if (!is.null(weight_var) && nzchar(weight_var %||% "")) {
@@ -917,7 +918,7 @@ generate_stats_pack_step <- function(config, survey_data, weight_var,
     data_used        = data_used,
     assumptions      = assumptions,
     run_result       = run_result,
-    packages         = c("openxlsx", "readxl", "data.table", "survey"),
+    packages         = c("openxlsx", "readxl", "data.table"),
     config_echo      = config_echo
   )
 
@@ -928,6 +929,47 @@ generate_stats_pack_step <- function(config, survey_data, weight_var,
   }
 
   result
+}
+
+
+#' Describe the Interval Methods That Ran, for the Stats Pack
+#'
+#' Counts, across one statistic type's results, the questions carrying each
+#' interval, and names the formula behind it.
+#'
+#' @param results Named list of question results (proportion, mean or NPS)
+#' @param type Character. "proportion", "mean" or "nps"
+#' @return Character. e.g. "Wilson score on the Kish effective n (3 questions);
+#'   Percentile bootstrap (1 question)", or "None run"
+#' @keywords internal
+describe_methods_run <- function(results, type) {
+  catalogue <- switch(type,
+    proportion = c(
+      moe       = "Normal approximation (Wald), SE = sqrt(p(1-p)/n_eff)",
+      wilson    = "Wilson score on the Kish effective n",
+      bootstrap = "Percentile bootstrap",
+      bayesian  = "Beta-binomial credible interval on the effective n"
+    ),
+    mean = c(
+      t_dist    = "t-distribution, SE = SD / sqrt(n_eff), df = n_eff - 1",
+      bootstrap = "Percentile bootstrap",
+      bayesian  = "Normal-normal credible interval"
+    ),
+    nps = c(
+      moe_normal = "Normal approximation, SE includes the promoter/detractor covariance",
+      bootstrap  = "Percentile bootstrap",
+      bayesian   = "Normal-normal credible interval"
+    )
+  )
+  parts <- character(0)
+  for (field in names(catalogue)) {
+    n_q <- sum(vapply(results, function(r) !is.null(r[[field]]), logical(1)))
+    if (n_q > 0) {
+      parts <- c(parts, sprintf("%s (%d question%s)", catalogue[[field]], n_q,
+                                if (n_q == 1) "" else "s"))
+    }
+  }
+  if (length(parts) == 0) "None run" else paste(parts, collapse = "; ")
 }
 
 
