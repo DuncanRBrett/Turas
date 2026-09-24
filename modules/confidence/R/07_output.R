@@ -910,11 +910,14 @@ build_proportions_dataframe <- function(prop_results) {
       Effective_n = ifelse(!is.null(q_result$n_eff), q_result$n_eff, NA)
     )
 
-    # MOE
-    if (!is.null(q_result$moe_normal)) {
-      base_row$MOE_Normal_Lower <- q_result$moe_normal$lower
-      base_row$MOE_Normal_Upper <- q_result$moe_normal$upper
-      base_row$MOE <- q_result$moe_normal$moe
+    # MOE. The calculator stores the normal interval as `moe`; this read only
+    # `moe_normal`, so real runs never showed it (review 2026-09-24).
+    # `moe_normal` stays as a fallback for older result lists.
+    prop_normal <- q_result$moe %||% q_result$moe_normal
+    if (!is.null(prop_normal)) {
+      base_row$MOE_Normal_Lower <- prop_normal$lower
+      base_row$MOE_Normal_Upper <- prop_normal$upper
+      base_row$MOE <- prop_normal$moe
     }
 
     # Wilson
