@@ -57,14 +57,16 @@ extract_fn(".read_whatif_contribution")
 extract_fn(".whatif_open_payload")
 
 FIXTURE <- file.path(root, "modules", "tabs", "tests", "fixtures", "whatif", "synthetic_whatif_island.json")
-fx <- jsonlite::fromJSON(FIXTURE, simplifyVector = FALSE)
+top <- jsonlite::fromJSON(FIXTURE, simplifyVector = FALSE)
+fx <- top$variants$weighted      # the fixture has a weight column W
 ids <- vapply(fx$open$ids, as.character, "")
 
 # A tabs data frame holding the What if respondents in another order, plus two
 # the What if run left out (partial interviews), the way SACAP 2025 arrives.
 survey_data <- data.frame(ID = c(rev(ids), "P0001", "P0002"), Q1 = "x", stringsAsFactors = FALSE)
 
-read_wi <- function(mode, data = survey_data, cfg = list(whatif_island = FIXTURE)) {
+WEIGHTED <- list(whatif_island = FIXTURE, apply_weighting = TRUE, weight_variable = "W")
+read_wi <- function(mode, data = survey_data, cfg = WEIGHTED) {
   out <- NULL
   utils::capture.output(out <- .read_whatif_contribution(cfg, mode, data))
   if (is.null(out)) NULL else jsonlite::fromJSON(out, simplifyVector = FALSE)
@@ -121,12 +123,38 @@ test_that("a client-safe report gets only the published groups and the client-sa
 })
 
 test_that("a contribution file from before the client-safe model block is not embedded", {
-  old <- fx
-  old$safe$model <- NULL
+  old <- top
+  old$variants$weighted$safe$model <- NULL
   f <- tempfile(fileext = ".json")
   writeLines(as.character(jsonlite::toJSON(old, auto_unbox = TRUE, null = "null", na = "null", digits = NA)), f)
-  out <- capture.output(res <- .read_whatif_contribution(list(whatif_island = f), "cube", survey_data))
+  out <- capture.output(res <- .read_whatif_contribution(modifyList(WEIGHTED, list(whatif_island = f)), "cube", survey_data))
   expect_null(res)
+})
+
+test_that("the tab follows the report's weighting: weighted, unweighted, or left out", {
+  u <- read_wi("records", cfg = list(whatif_island = FIXTURE, apply_weighting = FALSE))
+  expect_false(u$meta$weighted)
+  expect_equal(unlist(u$model$fits[[1]]$b), unlist(top$variants$unweighted$model$fits[[1]]$b))
+  w <- read_wi("records")
+  expect_true(w$meta$weighted)
+  expect_equal(unlist(w$model$fits[[1]]$b), unlist(top$variants$weighted$model$fits[[1]]$b))
+  out <- capture.output(res <- .read_whatif_contribution(
+    list(whatif_island = FIXTURE, apply_weighting = TRUE, weight_variable = "other_weight"), "records", survey_data))
+  expect_null(res)
+  expect_true(any(grepl("left out", out)))
+  only_u <- top
+  only_u$variants$weighted <- NULL
+  f <- tempfile(fileext = ".json")
+  writeLines(as.character(jsonlite::toJSON(only_u, auto_unbox = TRUE, null = "null", na = "null", digits = NA)), f)
+  out <- capture.output(res <- .read_whatif_contribution(modifyList(WEIGHTED, list(whatif_island = f)), "cube", survey_data))
+  expect_null(res)
+  expect_false(is.null(read_wi("cube", cfg = list(whatif_island = f, apply_weighting = FALSE))))
+  old <- fx
+  f2 <- tempfile(fileext = ".json")
+  writeLines(as.character(jsonlite::toJSON(old, auto_unbox = TRUE, null = "null", na = "null", digits = NA)), f2)
+  out <- capture.output(res <- .read_whatif_contribution(list(whatif_island = f2), "records", survey_data))
+  expect_null(res)
+  expect_true(any(grepl("earlier What if version", out)))
 })
 
 test_that("open rows that cannot be lined up fall back to the client-safe part", {
@@ -143,10 +171,10 @@ test_that("open rows that cannot be lined up fall back to the client-safe part",
 
 test_that("a client-safe report whose minimum is stricter than the What if file leaves the tab out", {
   out <- capture.output(res <- .read_whatif_contribution(
-    list(whatif_island = FIXTURE, min_reporting_base = 10), "cube", survey_data))
+    modifyList(WEIGHTED, list(min_reporting_base = 10)), "cube", survey_data))
   expect_null(res)
   expect_true(any(grepl("DISCLOSURE WARNING", out)))
-  expect_false(is.null(read_wi("cube", cfg = list(whatif_island = FIXTURE, min_reporting_base = 5))))
+  expect_false(is.null(read_wi("cube", cfg = modifyList(WEIGHTED, list(min_reporting_base = 5)))))
 })
 
 V2_ASSETS <- file.path(root, "modules", "tabs", "lib", "html_report_v2", "assets")

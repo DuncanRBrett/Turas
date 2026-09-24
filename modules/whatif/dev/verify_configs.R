@@ -20,6 +20,7 @@ fit_without_baselines <- function(path) {
   cfg <- whatif_read_config(path)
   cfg$context$Baseline <- "N"
   prep <- whatif_prepare(cfg, verbose = FALSE)
+  prep$spec$weights <- NULL   # the prototypes' numbers are unweighted
   model <- whatif_run_engine_impl(prep$spec, verbose = FALSE)
   list(cfg = cfg, prep = prep, model = model)
 }

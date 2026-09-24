@@ -12,9 +12,11 @@
 #      disclosure_groups.R, 05)
 #   6. write {output_name}.xlsx and {output_name}_whatif_island.json (11, 13)
 #
-# Point the tabs setting whatif_island at the .json to add the What if tab to
-# the report. The tabs build embeds the open or the client-safe part
-# according to its "Who is this file for?" choice.
+# Steps 3 to 5 run once unweighted and, when the config names a weight column,
+# once weighted. Point the tabs setting whatif_island at the .json to add the
+# What if tab to the report. The tabs build embeds the version that matches the
+# report's own weighting, and the open or the client-safe part according to its
+# "Who is this file for?" choice.
 #
 # ==============================================================================
 
@@ -45,24 +47,8 @@ run_whatif_impl <- function(config_file, verbose = TRUE) {
   pf <- whatif_preflight(prep, cfg)
   whatif_print_preflight(pf$log, verbose)
 
-  model <- whatif_run_engine_impl(prep$spec, verbose)
-  model$spec$penalty_levers <- model$spec$penalty_levers %||% WHATIF_LEVER_PENALTY
-  after <- whatif_preflight_after_fit(model)
-  log <- rbind(pf$log, after)
-
-  cal <- whatif_calibration(model)
-  cal_ratings <- if (length(prep$spec$baselines)) {
-    ro <- prep$spec
-    ro$baselines <- character(0)
-    ro$profile <- NULL
-    ro$n_boot <- 0L
-    whatif_calibration(whatif_run_engine_impl(ro, verbose = FALSE))
-  } else cal
-  whatif_say(sprintf("calibration: held-out pseudo R2 %.3f, %d of %d groups of 30+ outside their 95%% band (ratings only: %.3f, %d of %d)",
-                     cal$cv_r2, cal$n_outside, cal$n_groups, cal_ratings$cv_r2, cal_ratings$n_outside,
-                     cal_ratings$n_groups), verbose = verbose)
-  symptoms <- whatif_symptom_effects(model, prep$symptoms)
-
+  # The groups a client-safe file may publish. Counted on respondents, never
+  # weights, so they are the same for the weighted and unweighted versions.
   filter_keys <- cfg$context$Key[whatif_flag(cfg$context$Filter)]
   if (!length(filter_keys)) filter_keys <- cfg$context$Key
   crossings <- lapply(seq_len(nrow(cfg$crossings)), function(i) c(cfg$crossings$Key1[i], cfg$crossings$Key2[i]))
@@ -73,45 +59,93 @@ run_whatif_impl <- function(config_file, verbose = TRUE) {
       "A published crossing is a filter combination; its variables must be filters.",
       "Set Filter = Y for those variables or remove the crossing.")
   }
-  publish <- disclosure_publish_groups(model$spec$context[filter_keys], crossings, s$min_group,
-                                       paste("All", s$units_noun))
+  publish <- disclosure_publish_groups(lapply(prep$spec$context[filter_keys], function(cx) {
+    cx$values <- as.character(cx$values); cx }), crossings, s$min_group, paste("All", s$units_noun))
   masks <- lapply(seq_len(ncol(publish$members)), function(j) publish$members[, j])
   names(masks) <- colnames(publish$members)
-  safe_results <- whatif_group_results_impl(model, masks)
-  whatif_say(sprintf("client-safe: %d groups published at a minimum of %d (%d crossing cells hidden, %d groups hidden by the nesting check)",
-                     nrow(publish$groups), s$min_group, nrow(publish$hidden), publish$audit$nesting_hidden),
-             verbose = verbose)
-  sentence <- whatif_sentence(cfg, model)
-  safe_profile <- if (!is.null(model$profile)) whatif_safe_profile(model, s$min_group, prep, sentence, verbose) else NULL
+  whatif_say(sprintf("client-safe: %d groups published at a minimum of %d (%d crossing cells hidden; %d hidden by the nesting check, %d by the recoverability check)",
+                     nrow(publish$groups), s$min_group, nrow(publish$hidden), publish$audit$nesting_hidden,
+                     publish$audit$recovery_hidden), verbose = verbose)
 
-  warnings <- c(model$warnings, log$Message[log$Severity == "Warning" & log$Check != "Sign check" & log$Check != "Model"])
+  # One version per weighting the report might use. The tabs build embeds the
+  # one that matches how the report is weighted when it is built, so the What
+  # if tab always agrees with the report's own numbers.
+  specs <- list(unweighted = prep$spec)
+  specs$unweighted$weights <- NULL
+  if (!is.null(prep$spec$weights)) specs$weighted <- prep$spec
+  variants <- lapply(names(specs), function(v) {
+    whatif_say(sprintf("fitting the %s version", v), verbose = verbose)
+    whatif_fit_variant(specs[[v]], prep, cfg, publish, masks, verbose)
+  })
+  names(variants) <- names(specs)
+  primary <- if ("weighted" %in% names(variants)) "weighted" else "unweighted"
+
+  log <- rbind(pf$log, variants[[primary]]$after)
+  warnings <- c(variants[[primary]]$model$warnings,
+                log$Message[log$Severity == "Warning" & log$Check != "Sign check" & log$Check != "Model"])
   run_status <- if (length(warnings)) "PARTIAL" else "PASS"
-  notes <- whatif_notes(model, prep, s)
-
-  run <- list(cfg = cfg, prep = prep, model = model, calibration = cal, calibration_ratings_only = cal_ratings,
-              symptoms = symptoms, publish = publish, safe_results = safe_results, safe_profile = safe_profile,
-              filter_keys = filter_keys, crossings = crossings, run_status = run_status, warnings = warnings,
-              notes = notes, sentence = sentence, scale_labels = whatif_scale_labels(prep))
+  runs <- lapply(variants, function(fv) {
+    list(cfg = cfg, prep = prep, model = fv$model, calibration = fv$cal, calibration_ratings_only = fv$cal_ratings,
+         symptoms = fv$symptoms, publish = publish, safe_results = fv$safe_results, safe_profile = fv$safe_profile,
+         filter_keys = filter_keys, crossings = crossings, run_status = run_status, warnings = warnings,
+         notes = whatif_notes(fv$model, prep, s), sentence = fv$sentence, scale_labels = whatif_scale_labels(prep))
+  })
 
   out_dir <- whatif_resolve(cfg$project_root, s$output_folder)
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
   island_path <- file.path(out_dir, paste0(s$output_name, "_whatif_island.json"))
   excel_path <- file.path(out_dir, paste0(s$output_name, ".xlsx"))
-  payload <- whatif_island_payload(run)
+  payload <- list(
+    meta = list(kind = "whatif", schema_version = WHATIF_ISLAND_SCHEMA, title = s$study_title,
+                versions = whatif_arr(names(runs)),
+                weight_variable = if ("weighted" %in% names(runs)) s$weight_variable else NULL),
+    variants = lapply(runs, whatif_island_payload))
   whatif_write_island(payload, island_path)
-  whatif_write_excel(run, log, pf$proposed_structure, excel_path)
-  whatif_say(sprintf("wrote %s (%.0f kb) and %s. %s in %.0f s.", basename(island_path),
-                     file.size(island_path) / 1024, basename(excel_path), run_status,
-                     as.numeric(difftime(Sys.time(), t0, units = "secs"))), verbose = verbose)
+  whatif_write_excel(runs[[primary]], log, pf$proposed_structure, excel_path,
+                     other = if (primary == "weighted") runs$unweighted else NULL)
+  whatif_say(sprintf("wrote %s (%.0f kb, %s) and %s. %s in %.0f s.", basename(island_path),
+                     file.size(island_path) / 1024, paste(names(runs), collapse = " and "), basename(excel_path),
+                     run_status, as.numeric(difftime(Sys.time(), t0, units = "secs"))), verbose = verbose)
   if (run_status == "PARTIAL" && verbose) {
     cat("\n[What if] PARTIAL: see the Preflight sheet. Warnings:\n")
     for (w in unique(warnings)) cat("  -", w, "\n")
   }
+  pv <- variants[[primary]]
   list(status = run_status, warnings = warnings,
        files = list(excel = excel_path, island = island_path),
-       model = model, preflight = log, proposed_structure = pf$proposed_structure,
-       publish = publish, calibration = cal, calibration_ratings_only = cal_ratings,
-       prep = prep, payload = payload)
+       model = pv$model, preflight = log, proposed_structure = pf$proposed_structure,
+       publish = publish, calibration = pv$cal, calibration_ratings_only = pv$cal_ratings,
+       prep = prep, payload = payload, variants = variants, primary = primary)
+}
+
+
+#' Fit One Version (Weighted or Unweighted) of a Study
+#'
+#' @return List with model, cal, cal_ratings, symptoms, safe_results,
+#'   safe_profile, sentence, after (preflight rows after the fit)
+#' @keywords internal
+whatif_fit_variant <- function(spec, prep, cfg, publish, masks, verbose = TRUE) {
+  s <- cfg$settings
+  model <- whatif_run_engine_impl(spec, verbose)
+  model$spec$penalty_levers <- model$spec$penalty_levers %||% WHATIF_LEVER_PENALTY
+  cal <- whatif_calibration(model)
+  cal_ratings <- if (length(spec$baselines)) {
+    ro <- spec
+    ro$baselines <- character(0)
+    ro$profile <- NULL
+    ro$n_boot <- 0L
+    whatif_calibration(whatif_run_engine_impl(ro, verbose = FALSE))
+  } else cal
+  whatif_say(sprintf("calibration: held-out pseudo R2 %.3f, %d of %d groups of 30+ outside their 95%% band (ratings only: %.3f, %d of %d)",
+                     cal$cv_r2, cal$n_outside, cal$n_groups, cal_ratings$cv_r2, cal_ratings$n_outside,
+                     cal_ratings$n_groups), verbose = verbose)
+  sentence <- whatif_sentence(cfg, model)
+  list(model = model, cal = cal, cal_ratings = cal_ratings,
+       symptoms = whatif_symptom_effects(model, prep$symptoms),
+       safe_results = whatif_group_results_impl(model, masks),
+       safe_profile = if (!is.null(model$profile)) whatif_safe_profile(model, s$min_group, prep, sentence, verbose) else NULL,
+       sentence = sentence,
+       after = whatif_preflight_after_fit(model))
 }
 
 

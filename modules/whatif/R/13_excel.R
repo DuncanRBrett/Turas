@@ -7,6 +7,9 @@
 #   Run_Status          status, warnings, counts, files (always first)
 #   Effort              every lever for all respondents: slip and fix with 90%
 #                       ranges, who needs it, net gain per 100 reached
+#   Effort_unweighted   the same from the unweighted version, when the run
+#                       also fitted a weighted one (the other sheets show the
+#                       weighted version)
 #   Groups              the same for every group a client-safe file publishes
 #   Calibration         held-out predicted against actual by group, with and
 #                       without context baselines
@@ -31,7 +34,7 @@
 #' @param path Output path
 #' @return The path, invisibly
 #' @keywords internal
-whatif_write_excel <- function(run, log, proposed, path) {
+whatif_write_excel <- function(run, log, proposed, path, other = NULL) {
   model <- run$model
   spec <- model$spec
   s <- run$cfg$settings
@@ -58,7 +61,7 @@ whatif_write_excel <- function(run, log, proposed, path) {
               format(Sys.time(), "%Y-%m-%d %H:%M"), run$warnings),
     stringsAsFactors = FALSE))
 
-  effort_rows <- function(res, group_id = NULL, group_label = NULL) {
+  effort_rows <- function(res, group_id = NULL, group_label = NULL, sign = model$sign) {
     lv <- res$levers
     keys <- unique(lv$key)
     do.call(rbind, lapply(keys, function(key) {
@@ -72,12 +75,16 @@ whatif_write_excel <- function(run, log, proposed, path) {
         If_slips = round(slip$est, 1), Slip_lo = round(slip$lo, 1), Slip_hi = round(slip$hi, 1),
         If_fixed = round(fix$est, 1), Fix_lo = round(fix$lo, 1), Fix_hi = round(fix$hi, 1),
         Per_100_reached = round(fix$per_100, 1),
-        Wrong_sign_share = model$sign$wrong_share[model$sign$key == key],
+        Wrong_sign_share = sign$wrong_share[sign$key == key],
         stringsAsFactors = FALSE)
     }))
   }
   all_res <- run$safe_results[["all"]]
   sheet("Effort", effort_rows(all_res))
+  if (!is.null(other)) {
+    # The unweighted version, for a report built unweighted.
+    sheet("Effort_unweighted", effort_rows(other$safe_results[["all"]], sign = other$model$sign))
+  }
   grp <- run$publish$groups
   sheet("Groups", do.call(rbind, lapply(seq_len(nrow(grp)), function(i) {
     df <- effort_rows(run$safe_results[[grp$id[i]]], grp$id[i], paste0(grp$family[i], ": ", grp$label[i]))

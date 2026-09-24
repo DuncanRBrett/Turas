@@ -787,10 +787,14 @@ format_output_value <- function(value, type = "frequency",
 
 #' Read a What if Contribution, Shaped for This Report's Delivery Mode
 #'
-#' The whatif module writes `{output_name}_whatif_island.json` with an OPEN part
-#' (one row per respondent, with respondent IDs) and a CLIENT-SAFE part
-#' (precomputed results for published groups only). The delivery choice is made
-#' here, when the report is built, from the mode this run resolved
+#' The whatif module writes `{output_name}_whatif_island.json` holding one
+#' version per weighting it fitted (always unweighted; weighted too when its
+#' config names a weight column). This picks the version matching this report's
+#' own weighting (apply_weighting, weight_variable), so the What if tab follows
+#' however the tabs are run. Each version has an OPEN part (one row per
+#' respondent, with respondent IDs) and a CLIENT-SAFE part (precomputed results
+#' for published groups only). The delivery choice is made here, when the
+#' report is built, from the mode this run resolved
 #' (tabs_delivery_interactivity):
 #'
 #'   records   open: the model plus the respondents' lever values, lined up by
@@ -819,11 +823,39 @@ format_output_value <- function(value, type = "frequency",
     say("\n[WARNING] whatif_island points at a file that is not there: %s\n  The report is built without the What if tab.\n", path)
     return(NULL)
   }
-  wi <- tryCatch(jsonlite::fromJSON(paste(readLines(path, warn = FALSE), collapse = ""),
-                                    simplifyVector = FALSE), error = function(e) NULL)
-  if (is.null(wi) || !identical(wi$meta$kind, "whatif") || is.null(wi$model) || is.null(wi$safe) ||
-      is.null(wi$safe$model)) {
+  top <- tryCatch(jsonlite::fromJSON(paste(readLines(path, warn = FALSE), collapse = ""),
+                                     simplifyVector = FALSE), error = function(e) NULL)
+  if (is.null(top) || !identical(top$meta$kind, "whatif")) {
     say("\n[WARNING] %s is not a What if contribution file.\n  The report is built without the What if tab.\n",
+        basename(path))
+    return(NULL)
+  }
+  if (is.null(top$variants)) {
+    say("\n[WARNING] %s was written by an earlier What if version.\n  Run the What if module again. The report is built without the What if tab.\n",
+        basename(path))
+    return(NULL)
+  }
+  # The version fitted the way this report is weighted, so the tab's actual
+  # score and every effect agree with the report's own numbers.
+  report_weighted <- isTRUE(config_obj$apply_weighting)
+  report_wv <- as.character(config_obj$weight_variable %||% "")
+  wi <- if (report_weighted) top$variants$weighted else top$variants$unweighted
+  wi_wv <- as.character(wi$meta$weight_variable %||% "")
+  if (is.null(wi) || (report_weighted && !identical(wi_wv, report_wv))) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────────┐\n")
+    cat(sprintf("│ This report is %s, but the What if file has no version\n",
+                if (report_weighted) sprintf("weighted by '%s'", report_wv) else "unweighted"))
+    cat(sprintf("│ fitted that way (it has: %s%s). The What if tab is left out.\n",
+                paste(names(top$variants), collapse = ", "),
+                if (nzchar(as.character(top$meta$weight_variable %||% "")))
+                  sprintf(", weighted by '%s'", top$meta$weight_variable) else ""))
+    cat("│ Fix: set weight_variable on the What if config to the report's\n")
+    cat("│ weight column and run the What if module again.\n")
+    cat("└───────────────────────────────────────────────────────────┘\n\n")
+    return(NULL)
+  }
+  if (is.null(wi$model) || is.null(wi$safe) || is.null(wi$safe$model)) {
+    say("\n[WARNING] %s is not a complete What if contribution file.\n  The report is built without the What if tab.\n",
         basename(path))
     return(NULL)
   }

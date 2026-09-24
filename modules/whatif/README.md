@@ -12,7 +12,9 @@ Status: sessions 1 to 4 of `docs/v2_lift/BRIEF_WHATIF_SIMULATOR.md` built
 2. `launch_turas()` then the **What If** tile, or
    `source("modules/whatif/source_whatif.R"); run_whatif("<config>.xlsx")`.
 3. Set the tabs setting `whatif_island` to the `{output_name}_whatif_island.json`
-   it writes, and rebuild the tabs report. A full report gets the live tab; a
+   it writes, and rebuild the tabs report. If the config names a weight
+   column, the file holds a weighted and an unweighted version and the report
+   uses whichever matches its own weighting. A full report gets the live tab; a
    client-safe report gets published groups only. The `.json` itself holds
    respondent rows: keep it with the project, never send it.
 

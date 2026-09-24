@@ -2,9 +2,12 @@
 # WHAT IF - THE CONTRIBUTION FILE FOR THE TABS REPORT
 # ==============================================================================
 #
-# One run writes one file, {output_name}_whatif_island.json, with every block
-# either delivery mode could need. The tabs build decides which blocks go into
-# the report from its "Who is this file for?" choice (run_crosstabs.R,
+# One run writes one file, {output_name}_whatif_island.json. At the top: meta
+# (kind, schema, versions) and variants, one per weighting the run fitted
+# ("unweighted" always, "weighted" when the config names a weight column).
+# Each variant holds every block either delivery mode could need. The tabs
+# build picks the variant matching its own weighting, then the blocks its
+# "Who is this file for?" choice allows (run_crosstabs.R,
 # .read_whatif_contribution):
 #
 #   meta      study, outcome, scale, minimum group, run status
@@ -24,7 +27,8 @@
 #
 # ==============================================================================
 
-WHATIF_ISLAND_SCHEMA <- 1L
+# 2: the file holds one version per weighting (variants), 24 Sep 2026.
+WHATIF_ISLAND_SCHEMA <- 2L
 
 #' @keywords internal
 whatif_arr <- function(x) I(unname(x))
@@ -91,7 +95,8 @@ whatif_island_payload <- function(run) {
     title = s$study_title, brand = s$brand_name, unit = s$unit_noun, units = s$units_noun,
     outcome_text = s$outcome_text, score_label = spec$outcome$score_label,
     outcome_levels = whatif_arr(spec$outcome$levels), scores = whatif_arr(score),
-    weighted = isTRUE(spec$weighted), n = n,
+    weighted = isTRUE(spec$weighted), weight_variable = if (isTRUE(spec$weighted)) s$weight_variable else NULL,
+    n = n,
     n_by_outcome = whatif_arr(tabulate(spec$y, spec$n_cat)),
     actual = round(actual, 2),
     min_group = s$min_group, reliability_floor = s$reliability_floor, range_level = WHATIF_RANGE_LEVEL,

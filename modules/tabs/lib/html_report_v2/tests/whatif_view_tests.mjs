@@ -28,7 +28,7 @@ const JS_DIR = path.join(HERE, "..", "assets", "js");
 const FIXTURE = path.join(HERE, "..", "..", "..", "tests", "fixtures", "whatif", "synthetic_whatif_island.json");
 const load = (sandbox, file) =>
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
-const FX = JSON.parse(readFileSync(FIXTURE, "utf8"));
+const FX = JSON.parse(readFileSync(FIXTURE, "utf8")).variants.weighted;   // fixture has a weight column
 
 let passed = 0, failed = 0;
 function run(name, fn) {

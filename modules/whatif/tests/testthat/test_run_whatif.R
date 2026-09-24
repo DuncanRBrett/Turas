@@ -41,7 +41,7 @@ test_that("proposed Structure rules list structural combinations nobody has, nev
 })
 
 test_that("the contribution file has every block, and meta says what it is", {
-  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)
+  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)$variants$weighted
   expect_equal(j$meta$kind, "whatif")
   expect_equal(j$meta$n, 500)
   expect_equal(j$meta$id_variable, "ID")
@@ -59,7 +59,7 @@ longest_list <- function(o) {
 }
 
 test_that("the client-safe block holds no respondent-length list and no group under the minimum", {
-  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)
+  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)$variants$weighted
   safe <- list(meta = j$meta, model = j$model, safe = j$safe)
   expect_lt(longest_list(safe), 500)
   ns <- vapply(j$safe$groups, `[[`, 0, "n")
@@ -71,7 +71,7 @@ test_that("the client-safe block holds no respondent-length list and no group un
 })
 
 test_that("published group results equal the engine's for the same group", {
-  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)
+  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)$variants$weighted
   g <- j$safe$groups[[which(vapply(j$safe$groups, `[[`, "", "id") == "campus=North")]]
   mask <- res$model$spec$context$campus$values == "North"
   r <- whatif_group_results(res$model, list(north = mask))$north
@@ -82,7 +82,7 @@ test_that("published group results equal the engine's for the same group", {
 })
 
 test_that("the client-safe profile offers only combinations shared by the minimum", {
-  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)
+  j <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)$variants$weighted
   sp <- j$safe$profile
   keys <- vapply(sp$keys, `[[`, "", "key")
   ctx <- res$model$spec$context
@@ -98,20 +98,20 @@ test_that("the client-safe profile offers only combinations shared by the minimu
 test_that("the profile builder switch removes Build a ... from every block", {
   p2 <- test_project(config = list(profile_builder = "N"), n = 300)
   r2 <- quietly(run_whatif(p2$config, verbose = FALSE))
-  j <- jsonlite::fromJSON(r2$files$island, simplifyVector = FALSE)
+  j <- jsonlite::fromJSON(r2$files$island, simplifyVector = FALSE)$variants$weighted
   expect_null(j$profile)
   expect_null(j$safe$profile)
 })
 
 test_that("symptom effects are reported and never enter the model", {
-  expect_length(res$payload$model$symptoms, 1)
+  expect_length(res$payload$variants$weighted$model$symptoms, 1)
   expect_false("called" %in% vapply(res$model$spec$levers, `[[`, "", "key"))
 })
 
 test_that("the client-safe block never names a level it does not publish", {
   p3 <- test_project(n = 160, seed = 4)
   r3 <- quietly(run_whatif(p3$config, verbose = FALSE))
-  j <- jsonlite::fromJSON(r3$files$island, simplifyVector = FALSE)
+  j <- jsonlite::fromJSON(r3$files$island, simplifyVector = FALSE)$variants$weighted
   expect_false(any(c("refused", "hidden", "hidden_cells") %in% names(j$safe)))
   expect_null(j$safe$profile$pooled)
   refused <- r3$publish$refused$group
@@ -123,4 +123,24 @@ test_that("the client-safe block never names a level it does not publish", {
     expect_false(grepl(paste0('"', lv, '"'), safe_text, fixed = TRUE), info = lv)
   }
   expect_true("Privacy" %in% readxl::excel_sheets(r3$files$excel))
+})
+
+test_that("a weight column gives both versions; the unweighted one equals a run with no weights", {
+  top <- jsonlite::fromJSON(res$files$island, simplifyVector = FALSE)
+  expect_setequal(names(top$variants), c("unweighted", "weighted"))
+  expect_equal(top$meta$weight_variable, "W")
+  expect_true(top$variants$weighted$meta$weighted)
+  expect_false(top$variants$unweighted$meta$weighted)
+  expect_equal(top$variants$weighted$meta$weight_variable, "W")
+  bw <- unlist(top$variants$weighted$model$fits[[1]]$b)
+  bu <- unlist(top$variants$unweighted$model$fits[[1]]$b)
+  expect_gt(max(abs(bw - bu)), 1e-3)
+  p0 <- test_project(config = list(weight_variable = ""))
+  r0 <- quietly(run_whatif(p0$config, verbose = FALSE))
+  t0 <- jsonlite::fromJSON(r0$files$island, simplifyVector = FALSE)
+  expect_equal(names(t0$variants), "unweighted")
+  expect_null(t0$meta$weight_variable)
+  expect_equal(unlist(t0$variants$unweighted$model$fits[[1]]$b), bu, tolerance = 1e-9)
+  expect_true("Effort_unweighted" %in% readxl::excel_sheets(res$files$excel))
+  expect_false("Effort_unweighted" %in% readxl::excel_sheets(r0$files$excel))
 })

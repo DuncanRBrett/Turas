@@ -15,7 +15,19 @@ Built 24 Sep 2026 on branch `feature/whatif-engine-r` (commits `fcacaa3f`,
    resolves to) gets only the published groups. Nothing about the What if run
    changes between the two. `.read_whatif_contribution` in
    `modules/tabs/lib/run_crosstabs.R`.
-2. **Levers set before the run, as now.** The config's Levers sheet: one row
+2. **The tab follows however the tabs are weighted** (Duncan, 24 Sep: SACAP
+   2025 runs weighted, 2026 will likely run unweighted). When the What if
+   config names a weight column, the run fits the model twice, unweighted and
+   weighted, and the contribution file carries both versions (the published
+   groups are counted on respondents, so they are the same in both). The tabs
+   build takes the version matching its own `apply_weighting` and
+   `weight_variable` at build time. If the report is weighted by a column the
+   What if file was not fitted with, the tab is left out with a boxed console
+   message. SACAP 2025 checked on its own data file: a weighted report gets
+   NPS 46.6 in the tab, an unweighted one 45.6, in both delivery modes. The run
+   takes about twice as long (SACAP 40 s) and the file doubles (1.1 MB); the
+   report carries one version only.
+3. **Levers set before the run, as now.** The config's Levers sheet: one row
    per lever, `Include` = Y, N or Symptom, averaged items, nested and coverage
    kinds. The preflight flags what needs judgement before the numbers are read.
 
@@ -151,10 +163,10 @@ the tabs cube already does).
 
 | Suite | Result |
 |---|---|
-| What if (`modules/whatif/tests/run_tests.R`) | 293 of 293 |
+| What if (`modules/whatif/tests/run_tests.R`) | 304 of 304 |
 | Shared disclosure (`test_disclosure_groups.R`) | 305 of 305 |
 | Shared release audit (`test_release_audit.R`) | 71 of 71 |
-| Tabs What if island (`test_whatif_island.R`) | 62 of 62 |
+| Tabs What if island (`test_whatif_island.R`) | 72 of 72 |
 | Node: whatif view / renderer presence / cover / sig level | 15 / 13 / 37 / 28, all passed |
 | Tabs full suite (before the disclosure fix) | 6420, 1 failure: the template drift, fixed by regenerating the template |
 | Shared full suite (before the disclosure fix) | 2265, 1 failure that predates this branch |
@@ -166,11 +178,9 @@ before this branch (18 now). Both fail on main as well.
 
 ## Still open
 
-- **For Duncan**: the SACAP 2025 tabs config has `apply_weighting = True` with
-  a `weight` column, while the What if config runs unweighted (brief decision
-  8). In an open report the What if tab uses its own weights, so its actual
-  NPS (45.6) will not match a weighted report's (46.6). Decide which is right
-  and set `weight_variable` to match.
+- Settled 24 Sep: the tab follows the tabs weighting (item 2 above). The
+  SACAP config names `weight`, so it serves the weighted 2025 report and an
+  unweighted 2026 one alike.
 - **For Duncan**: review the 44 proposed Structure rules for SACAP (workbook
   sheet Proposed_Structure) and copy the real ones onto the Structure sheet.
   Only one rule (BSW with Masters) is there now.
