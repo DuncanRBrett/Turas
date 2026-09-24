@@ -8,7 +8,7 @@
 # Functions:
 #   - is_significant()          Safe significance check
 #   - normalize_question_type() Type mapping (TurasTabs/legacy -> internal)
-#   - t_test_for_means()        Pooled two-sample t-test from summary stats
+#   - t_test_for_means()        Welch two-sample t-test from summary stats
 #   - z_test_for_proportions()  Two-sample z-test for proportions
 #   - calculate_weighted_mean() Weighted mean with SD, CI, and eff_n
 #   - calculate_nps_score()     Net Promoter Score with eff_n
@@ -77,72 +77,49 @@ normalize_question_type <- function(q_type) {
   return(as.character(normalized))
 }
 
-#' T-Test for Means
+#' T-Test for Means (Welch)
 #'
-#' Two-sample t-test for comparing means using summary statistics.
+#' Welch's two-sample t-test from summary statistics: each wave keeps its own
+#' variance, and the degrees of freedom are Welch-Satterthwaite. Matches
+#' t.test(var.equal = FALSE). Chosen 24 Sep 2026 as the more defensible test
+#' when two waves' spreads differ; it replaced a pooled-variance test.
 #'
 #' @param mean1 Numeric, mean of first sample
 #' @param sd1 Numeric, standard deviation of first sample
-#' @param n1 Integer, sample size of first sample
+#' @param n1 Numeric, effective sample size of first sample (may be fractional)
 #' @param mean2 Numeric, mean of second sample
 #' @param sd2 Numeric, standard deviation of second sample
-#' @param n2 Integer, sample size of second sample
+#' @param n2 Numeric, effective sample size of second sample
 #' @param alpha Numeric, significance level (default: 0.05)
 #' @return List with t_stat, df, p_value, significant, alpha
 #' @keywords internal
 t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = DEFAULT_ALPHA) {
-  # Guard against insufficient sample sizes for pooled t-test
-  # Need at least 2 observations in each group (df = n1 + n2 - 2 > 0)
-  df <- n1 + n2 - 2
-  if (df <= 0) {
-    return(list(
-      t_stat = NA_real_,
-      df = df,
-      p_value = NA_real_,
-      significant = FALSE,
-      alpha = alpha,
-      error = "Insufficient sample size: need at least 2 observations per group for pooled t-test"
-    ))
+  untested <- function(reason) {
+    list(t_stat = NA_real_, df = NA_real_, p_value = NA_real_,
+         significant = FALSE, alpha = alpha, error = reason)
   }
 
-  # Guard against zero sample sizes which would cause division by zero
-
-  if (n1 <= 0 || n2 <= 0) {
-    return(list(
-      t_stat = NA_real_,
-      df = df,
-      p_value = NA_real_,
-      significant = FALSE,
-      alpha = alpha,
-      error = "Sample sizes must be positive"
-    ))
+  # Each wave's variance term needs n - 1 > 0
+  if (is.na(n1) || is.na(n2) || n1 <= 1 || n2 <= 1) {
+    return(untested("Insufficient sample size: need an effective base above 1 in each wave"))
   }
 
-  pooled_var <- ((n1 - 1) * sd1^2 + (n2 - 1) * sd2^2) / df
-  pooled_sd <- sqrt(pooled_var)
-  se <- pooled_sd * sqrt(1/n1 + 1/n2)
-
-  # Guard against zero standard error
+  v1 <- sd1^2 / n1
+  v2 <- sd2^2 / n2
+  se <- sqrt(v1 + v2)
   if (is.na(se) || se == 0) {
-    return(list(
-      t_stat = NA_real_,
-      df = df,
-      p_value = NA_real_,
-      significant = FALSE,
-      alpha = alpha,
-      error = "Cannot calculate t-statistic: standard error is zero"
-    ))
+    return(untested("Cannot calculate t-statistic: standard error is zero"))
   }
 
+  df <- (v1 + v2)^2 / (v1^2 / (n1 - 1) + v2^2 / (n2 - 1))
   t_stat <- (mean2 - mean1) / se
   p_value <- 2 * pt(-abs(t_stat), df)
-  significant <- p_value < alpha
 
   list(
     t_stat = t_stat,
     df = df,
     p_value = p_value,
-    significant = significant,
+    significant = p_value < alpha,
     alpha = alpha
   )
 }

@@ -10,7 +10,7 @@
 #                     Turas code
 #   Consistency gate  the detailed sheet, wave history, Trend Dashboard, Sig
 #                     Matrix and tracking crosstab agree with each other and
-#                     with the same hand-computed tests
+#                     with the same hand-computed tests (Welch t for means)
 #   Adversarial gate  design-effect weights, W2 grossed to 2.4 million, a
 #                     numeric don't-know code, a routed multi-mention, a
 #                     composite, a code present in one wave only, a label
@@ -98,11 +98,11 @@ svy_mean <- function(x, w) unname(stats::coef(survey::svymean(~x, svy(data.frame
 svy_share <- function(hit, w) 100 * svy_mean(as.numeric(hit), w)
 wsd <- function(x, w) sqrt(stats::cov.wt(matrix(x), wt = w / sum(w), method = "unbiased")$cov[1, 1])
 
-# Pooled t on Kish effective bases, and pooled two-proportion z, written out
+# Welch t on Kish effective bases, and pooled two-proportion z, written out
 t_p <- function(m1, s1, n1, m2, s2, n2) {
-  pooled <- ((n1 - 1) * s1^2 + (n2 - 1) * s2^2) / (n1 + n2 - 2)
-  t <- (m2 - m1) / sqrt(pooled * (1 / n1 + 1 / n2))
-  2 * stats::pt(-abs(t), n1 + n2 - 2)
+  v1 <- s1^2 / n1; v2 <- s2^2 / n2
+  df <- (v1 + v2)^2 / (v1^2 / (n1 - 1) + v2^2 / (n2 - 1))
+  2 * stats::pt(-abs((m2 - m1) / sqrt(v1 + v2)), df)
 }
 z_p <- function(p1, n1, p2, n2) {
   pp <- (p1 * n1 + p2 * n2) / (n1 + n2)

@@ -329,21 +329,19 @@ test_that("pairwise_significance: non-significant when means are close", {
   expect_equal(result$sig_code, 0)
 })
 
-test_that("pairwise_significance: means use the trend path's pooled t-test", {
-  # The Dashboard used Welch's test while the trend chart (trend_significance.R)
-  # uses a pooled t-test, so the two could disagree about the same movement on
-  # a borderline mean. The Dashboard now calls the trend path's own
-  # t_test_for_means() (review follow-up, 24 Sep 2026). Known answer with
-  # unequal SDs, where the two tests differ:
+test_that("pairwise_significance: means use the trend path's Welch t-test", {
+  # The Dashboard calls the trend path's own t_test_for_means(), so the two
+  # cannot disagree about the same movement. Since 24 Sep 2026 that test is
+  # Welch's. Known answer with unequal SDs, where pooled and Welch differ:
   from <- make_mean_result(mean_val = 3.0, sd_val = 1.0, n_weighted = 50)
   to <- make_mean_result(mean_val = 4.0, sd_val = 2.0, n_weighted = 80)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
 
-  # Pooled: sp^2 = (49 x 1 + 79 x 4) / 128 = 2.8516, SE = sp x sqrt(1/50 + 1/80),
-  # t = 1 / SE, df = 128
-  sp <- sqrt((49 * 1 + 79 * 4) / 128)
-  t_stat <- 1 / (sp * sqrt(1 / 50 + 1 / 80))
-  p_expected <- 2 * pt(-abs(t_stat), 128)
+  # Welch: v1 = 1 / 50 = 0.02, v2 = 4 / 80 = 0.05, SE = sqrt(0.07),
+  # t = 1 / SE, df = 0.07^2 / (0.02^2 / 49 + 0.05^2 / 79)
+  t_stat <- 1 / sqrt(0.07)
+  df <- 0.07^2 / (0.02^2 / 49 + 0.05^2 / 79)
+  p_expected <- 2 * pt(-abs(t_stat), df)
   expect_equal(result$p_value, p_expected, tolerance = 1e-10)
 
   trend <- t_test_for_means(3.0, 1.0, 50, 4.0, 2.0, 80)

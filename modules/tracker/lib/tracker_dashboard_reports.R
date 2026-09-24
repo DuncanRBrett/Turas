@@ -403,10 +403,9 @@ dashboard_comparison_test <- function(from_result, to_result, metric_type, n1, n
 
 #' t-Test For Two Wave Means, Sized On Effective n
 #'
-#' Calls the trend path's own t_test_for_means() (statistical_core.R), a
-#' pooled t-test, so the Dashboard and the trend chart cannot disagree about
-#' the same movement. The Dashboard used Welch's test until the review
-#' follow-up of 24 Sep 2026.
+#' Calls the trend path's own t_test_for_means() (statistical_core.R),
+#' Welch's t-test since 24 Sep 2026, so the Dashboard and the trend chart
+#' cannot disagree about the same movement.
 #'
 #' @param from_result,to_result Lists carrying $mean and $sd
 #' @param n1,n2 Numeric. Effective bases
@@ -458,7 +457,7 @@ dashboard_nps_test <- function(from_result, to_result, n1, n2) {
 #' effective base (dashboard_test_base()), and a comparison where either
 #' base is under `min_base` is not tested, the same gate the trend path uses:
 #'   - Proportions: two-proportion z-test on the first tracked code
-#'   - Means: pooled t-test, the trend path's t_test_for_means()
+#'   - Means: Welch t-test, the trend path's t_test_for_means()
 #'   - NPS: z-test with the closed-form multinomial variance
 #'
 #' @param from_result List. Wave result for "from" wave

@@ -304,7 +304,7 @@ p_value = 2 * Phi(-|z|)
 Used for single-choice shares, top / bottom boxes, `range:` and `box:`
 metrics, multi-mention options and any-mention.
 
-### Pooled T-Test for Means
+### Welch T-Test for Means
 
 **Use Case:** Test if a mean (rating or composite) changed significantly
 between waves.
@@ -312,16 +312,20 @@ between waves.
 **Formula (n1, n2 are the effective bases, s1, s2 the SDs above):**
 
 ```         
-s_pool^2 = ((n1 - 1) s1^2 + (n2 - 1) s2^2) / (n1 + n2 - 2)
-SE = s_pool * sqrt(1/n1 + 1/n2)
-t = (mean2 - mean1) / SE,   df = n1 + n2 - 2
+v1 = s1^2 / n1,   v2 = s2^2 / n2
+SE = sqrt(v1 + v2)
+t  = (mean2 - mean1) / SE
+df = (v1 + v2)^2 / (v1^2 / (n1 - 1) + v2^2 / (n2 - 1))
 p_value = 2 * t_dist(-|t|, df)
 ```
 
+Each wave keeps its own variance, so a wave with more spread is not
+averaged with a steadier one. This matches `t.test(var.equal = FALSE)`.
 The trend sheets, Trend Dashboard and Significance Matrix all run this
-test. The tabs v2 Tracking tab runs Welch's test for the same pair; with
-similar SDs and bases the two agree closely, but they are not the same
-test.
+test (since 24 Sep 2026; it replaced a pooled-variance test). The tabs v2
+Tracking tab uses the same standard error but compares it with the normal
+curve instead of the t distribution, a difference of about 2.00 against
+1.96 at the minimum base.
 
 ### Z-Test for NPS
 

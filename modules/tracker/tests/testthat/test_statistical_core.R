@@ -204,9 +204,11 @@ test_that("t_test_for_means detects non-significant when means are close", {
   expect_true(result$p_value >= 0.05)
 })
 
-test_that("t_test_for_means computes correct df for pooled test", {
+test_that("t_test_for_means computes the Welch-Satterthwaite df", {
+  # v1 = 1 / 50 = 0.02, v2 = 1.44 / 60 = 0.024
+  # df = 0.044^2 / (0.02^2 / 49 + 0.024^2 / 59) = 107.9997 (Welch, 24 Sep 2026)
   result <- t_test_for_means(3.0, 1.0, 50, 3.5, 1.2, 60)
-  expect_equal(result$df, 50 + 60 - 2)
+  expect_equal(result$df, 0.044^2 / (0.02^2 / 49 + 0.024^2 / 59))
 })
 
 test_that("t_test_for_means handles equal means", {
@@ -229,38 +231,35 @@ test_that("t_test_for_means two-tailed: negative t_stat when mean1 > mean2", {
 
 # --- Validation against R's built-in t.test ---
 
-test_that("t_test_for_means agrees with R t.test (pooled) on known data", {
+test_that("t_test_for_means agrees with R t.test (Welch) on known data", {
   # Create actual data and compare
   set.seed(42)
   x <- rnorm(50, mean = 3.0, sd = 1.0)
   y <- rnorm(50, mean = 4.5, sd = 1.0)
 
-  r_test <- t.test(y, x, var.equal = TRUE)
+  r_test <- t.test(y, x, var.equal = FALSE)
   our_result <- t_test_for_means(mean(x), sd(x), 50, mean(y), sd(y), 50)
 
-  # t-stats should be close (not exact due to pooled SD estimation differences)
-  expect_equal(our_result$t_stat, r_test$statistic[[1]], tolerance = 0.1)
-  expect_equal(our_result$df, r_test$parameter[[1]])
+  expect_equal(our_result$t_stat, r_test$statistic[[1]], tolerance = 1e-10)
+  expect_equal(our_result$df, r_test$parameter[[1]], tolerance = 1e-10)
   # Both should agree on significance
   expect_equal(our_result$significant, r_test$p.value < 0.05)
 })
 
 # --- Edge cases ---
 
-test_that("t_test_for_means with n1=1 still computes (df = n1+n2-2 > 0)", {
-  # When n1=1, df = 1+50-2 = 49 which is valid for pooled t-test
-  # The pooled variance is dominated by group 2's data
+test_that("t_test_for_means with n1=1 is not tested", {
+  # Welch's test needs each wave's own variance, which a base of 1 does not
+  # give (n1 - 1 = 0). The minimum base gate (30) stops this long before.
   result <- t_test_for_means(3.0, 0, 1, 4.0, 1.0, 50)
-  expect_true(is.numeric(result$t_stat))
-  expect_true(is.numeric(result$p_value))
-  expect_equal(result$df, 49)
+  expect_true(is.na(result$p_value))
+  expect_false(result$significant)
 })
 
-test_that("t_test_for_means with n2=1 still computes (df = n1+n2-2 > 0)", {
+test_that("t_test_for_means with n2=1 is not tested", {
   result <- t_test_for_means(3.0, 1.0, 50, 4.0, 0, 1)
-  expect_true(is.numeric(result$t_stat))
-  expect_true(is.numeric(result$p_value))
-  expect_equal(result$df, 49)
+  expect_true(is.na(result$p_value))
+  expect_false(result$significant)
 })
 
 test_that("t_test_for_means with n1=1, n2=1 returns error (df=0)", {
@@ -285,7 +284,7 @@ test_that("t_test_for_means handles negative sample size", {
 })
 
 test_that("t_test_for_means handles zero SDs (zero standard error)", {
-  # Both SDs zero = zero pooled variance = zero SE
+  # Both SDs zero = zero variance = zero SE
   result <- t_test_for_means(3.0, 0, 50, 4.0, 0, 50)
   expect_true(is.na(result$t_stat))
   expect_false(result$significant)
@@ -862,7 +861,7 @@ test_that("calculate_custom_range handles min > max", {
 # Pins the behaviour Duncan flagged on the Coca-Cola Peninsula Beverages W25
 # report: "Rate CCS in their handling..." showed delta -0.90 NOT significant,
 # while "Equipment Cleanliness" showed delta -0.83 significant — at the same
-# sample size. This is correct behaviour: the pooled t-test penalises noisier
+# sample size. This is correct behaviour: the t-test penalises noisier
 # data, so a larger raw delta in high-variance data can legitimately fail to
 # clear p<0.05.
 
@@ -882,7 +881,7 @@ test_that("t_test_for_means is variance-sensitive (CCS regression)", {
 
   # The variance-sensitive case is documented behaviour, not a bug.
   # If this test fails, the t-test calculation has changed in a way that
-  # changes the variance / pooled-SD weighting — investigate before adjusting.
+  # changes the variance weighting. Investigate before adjusting.
 })
 
 

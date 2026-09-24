@@ -186,7 +186,7 @@ test_that("weighted SD is the unbiased reliability-weight SD (stats::cov.wt)", {
   }
 })
 
-test_that("mean trend t-test on unit weights equals t.test(var.equal = TRUE)", {
+test_that("mean trend t-test on unit weights equals t.test(var.equal = FALSE)", {
   # End to end through the calculator: SD, effective n and the pooled test
   # together must reproduce base R on the raw vectors.
   set.seed(5)
@@ -198,7 +198,7 @@ test_that("mean trend t-test on unit weights equals t.test(var.equal = TRUE)", {
                 B = list(available = TRUE, mean = m2$mean, sd = m2$sd, eff_n = m2$eff_n))
   sig <- perform_significance_tests_means(waves, c("A", "B"),
                                           list(settings = list(minimum_base = 30)))
-  ref <- stats::t.test(x2, x1, var.equal = TRUE)
+  ref <- stats::t.test(x2, x1, var.equal = FALSE)
   expect_equal(sig$A_vs_B$p_value, ref$p.value, tolerance = 1e-10)
 })
 
@@ -267,28 +267,33 @@ test_that("two-proportion z-test matches prop.test without continuity correction
   expect_equal(z$z_stat, 0.12 / sqrt((79 / 175) * (96 / 175) * (1 / 100 + 1 / 75)))
 })
 
-test_that("pooled t-test matches t.test(var.equal = TRUE) from summary stats", {
+test_that("Welch t-test matches t.test(var.equal = FALSE) from summary stats", {
+  # Duncan, 24 Sep 2026: means are tested with Welch's test, the more
+  # defensible choice when two waves' spreads differ.
   set.seed(11)
   x1 <- sample(1:5, 45, replace = TRUE)
   x2 <- sample(2:5, 38, replace = TRUE)
   t <- t_test_for_means(mean(x1), stats::sd(x1), 45, mean(x2), stats::sd(x2), 38)
-  ref <- stats::t.test(x2, x1, var.equal = TRUE)
+  ref <- stats::t.test(x2, x1, var.equal = FALSE)
   expect_equal(t$t_stat, unname(ref$statistic), tolerance = 1e-10)
   expect_equal(t$p_value, ref$p.value, tolerance = 1e-10)
-  expect_equal(t$df, unname(ref$parameter))
+  expect_equal(t$df, unname(ref$parameter), tolerance = 1e-10)
 })
 
-test_that("pooled t-test accepts a fractional effective n without rounding", {
-  # n1 = 30.4, n2 = 41.7: df = 70.1. Written out:
-  #   pooled var = (29.4 * 1.1^2 + 40.7 * 0.9^2) / 70.1 = 0.977789
-  #   SE = sqrt(0.977789 * (1/30.4 + 1/41.7)) = 0.235965
-  #   t  = (3.6 - 3.2) / SE
+test_that("Welch t-test accepts a fractional effective n, by hand", {
+  # n1 = 30.4, n2 = 41.7, SDs 1.1 and 0.9. Written out:
+  #   v1 = 1.1^2 / 30.4 = 0.039803,  v2 = 0.9^2 / 41.7 = 0.019424
+  #   SE = sqrt(v1 + v2) = 0.243366
+  #   t  = (3.6 - 3.2) / SE = 1.64361
+  #   df = (v1 + v2)^2 / (v1^2 / 29.4 + v2^2 / 40.7) = 55.5421
   t <- t_test_for_means(3.2, 1.1, 30.4, 3.6, 0.9, 41.7)
-  pooled <- (29.4 * 1.1^2 + 40.7 * 0.9^2) / 70.1
-  se <- sqrt(pooled * (1 / 30.4 + 1 / 41.7))
-  expect_equal(t$df, 70.1)
-  expect_equal(t$t_stat, 0.4 / se)
-  expect_equal(t$p_value, 2 * stats::pt(-abs(0.4 / se), 70.1))
+  v1 <- 1.1^2 / 30.4; v2 <- 0.9^2 / 41.7
+  df <- (v1 + v2)^2 / (v1^2 / 29.4 + v2^2 / 40.7)
+  expect_equal(t$t_stat, 0.4 / sqrt(v1 + v2))
+  expect_equal(t$df, df)
+  expect_equal(t$p_value, 2 * stats::pt(-abs(0.4 / sqrt(v1 + v2)), df))
+  expect_equal(round(t$t_stat, 4), 1.6436)
+  expect_equal(round(t$df, 4), 55.5421)
 })
 
 nps_wave <- function(nps, pp, pd, eff_n) {

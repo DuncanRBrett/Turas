@@ -33,7 +33,7 @@ for tracking study analysis.
 ### Statistical Rigor
 
 -   Two-proportion Z-tests for percentage changes
--   Pooled T-tests for mean comparisons
+-   Welch T-tests for mean comparisons
 -   Every test sized on the Kish effective base of weighted data
 -   Configurable confidence levels (default 95%)
 
