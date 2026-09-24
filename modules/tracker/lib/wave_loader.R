@@ -1009,10 +1009,16 @@ load_wave_structure <- function(file_path, wave_id) {
   if (!"BoxCategory" %in% names(options_df)) {
     options_df$BoxCategory <- NA_character_
   }
+  # ExcludeFromIndex = Y marks a non-answer (don't know, not applicable). As in
+  # tabs, it is dropped from means, NPS and boxes, and is not a scale point.
+  if (!"ExcludeFromIndex" %in% names(options_df)) {
+    options_df$ExcludeFromIndex <- NA_character_
+  }
+  options_df$ExcludeFromIndex <- toupper(trimws(as.character(options_df$ExcludeFromIndex)))
 
   # Keep only relevant columns
   result <- options_df[, c("QuestionCode", "OptionText", "DisplayText",
-                            "Index_Weight", "BoxCategory"), drop = FALSE]
+                            "Index_Weight", "BoxCategory", "ExcludeFromIndex"), drop = FALSE]
 
   cat(paste0("    Loaded structure: ", length(unique(result$QuestionCode)),
              " questions, ", nrow(result), " options\n"))
@@ -1131,13 +1137,20 @@ resolve_question_values <- function(raw_values, wave_structure, q_code) {
     return(raw_values)
   }
 
-  # Already numeric → pass through
-  if (is.numeric(raw_values)) {
-    return(raw_values)
-  }
-
   # Get options for this question from structure
   q_options <- wave_structure[wave_structure$QuestionCode == q_code, , drop = FALSE]
+  excluded <- structure_excluded_options(q_options)
+
+  # Already numeric → pass through, except codes whose option is flagged
+  # ExcludeFromIndex = Y (a 99 "Don't know" is not a score)
+  if (is.numeric(raw_values)) {
+    excluded_codes <- suppressWarnings(as.numeric(q_options$OptionText[excluded]))
+    excluded_codes <- excluded_codes[!is.na(excluded_codes)]
+    if (length(excluded_codes) > 0) {
+      raw_values[raw_values %in% excluded_codes] <- NA
+    }
+    return(raw_values)
+  }
 
   if (nrow(q_options) == 0) {
     # No structure entry for this question — try numeric conversion
@@ -1149,8 +1162,9 @@ resolve_question_values <- function(raw_values, wave_structure, q_code) {
     return(result)
   }
 
-  # Build text → Index_Weight lookup (case-insensitive)
-  lookup <- stats::setNames(q_options$Index_Weight,
+  # Build text → Index_Weight lookup (case-insensitive). An excluded option
+  # maps to NA even if it carries an Index_Weight.
+  lookup <- stats::setNames(ifelse(excluded, NA_real_, q_options$Index_Weight),
                             tolower(trimws(as.character(q_options$OptionText))))
 
   # Map values
@@ -1244,11 +1258,23 @@ get_box_options <- function(wave_structure, q_code, box_name) {
 }
 
 
+#' Which Options Are Flagged ExcludeFromIndex = Y
+#'
+#' @param q_options Data frame. One question's rows of the structure Options
+#' @return Logical vector, one per row
+#' @keywords internal
+structure_excluded_options <- function(q_options) {
+  if (!"ExcludeFromIndex" %in% names(q_options)) return(rep(FALSE, nrow(q_options)))
+  flag <- toupper(trimws(as.character(q_options$ExcludeFromIndex)))
+  !is.na(flag) & flag == "Y"
+}
+
+
 #' Get a Question's Scale Points From the Survey Structure
 #'
 #' The scale is every Index_Weight defined for the question's options.
-#' Options without an Index_Weight (don't know, not applicable) are not scale
-#' points. Used to define top and bottom boxes.
+#' Options without an Index_Weight, or flagged ExcludeFromIndex = Y (don't
+#' know, not applicable), are not scale points. Used to define top and bottom boxes.
 #'
 #' @param wave_structure Data frame. Options metadata from load_wave_structure(), or NULL
 #' @param q_code Character. The question's code in this wave
@@ -1257,7 +1283,8 @@ get_box_options <- function(wave_structure, q_code, box_name) {
 #' @keywords internal
 get_question_scale <- function(wave_structure, q_code) {
   if (is.null(wave_structure) || is.null(q_code) || is.na(q_code)) return(NULL)
-  points <- wave_structure$Index_Weight[wave_structure$QuestionCode == q_code]
+  q_options <- wave_structure[wave_structure$QuestionCode == q_code, , drop = FALSE]
+  points <- q_options$Index_Weight[!structure_excluded_options(q_options)]
   points <- sort(unique(points[!is.na(points)]))
   if (length(points) == 0) NULL else points
 }

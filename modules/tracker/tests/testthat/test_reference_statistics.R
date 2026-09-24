@@ -655,3 +655,80 @@ test_that("range:4-5 counts every score from 4 to 5 inclusive, by hand", {
   # A half-point bound: 3.5-5 on 3, 3.5, 4, 5 -> 3 / 4.
   expect_equal(calculate_custom_range(c(3, 3.5, 4, 5), rep(1, 4), "3.5-5")$proportion, 75)
 })
+
+
+# ==============================================================================
+# DON'T KNOW CODES: an option flagged ExcludeFromIndex = Y is not an answer
+# ==============================================================================
+# Tabs drops ExcludeFromIndex = Y options from a mean (cell_calculator.R,
+# calculate_rating_mean). When the data holds numeric codes, a 99 "Don't know"
+# must leave the mean, the NPS and the boxes, not be averaged in.
+
+dk_structure <- function(code, points) {
+  data.frame(QuestionCode = code,
+             OptionText = c(as.character(points), "99"),
+             DisplayText = c(as.character(points), "Don't know"),
+             Index_Weight = c(points, NA),
+             BoxCategory = NA_character_,
+             ExcludeFromIndex = c(rep(NA, length(points)), "Y"),
+             stringsAsFactors = FALSE)
+}
+
+test_that("a numeric don't-know code is dropped from the mean and the boxes", {
+  # Answers 5, 4, 99, 3, 99 on a 1-5 scale; 99 = Don't know.
+  #   mean over the three real answers = (5 + 4 + 3) / 3 = 4
+  #   top box = 1 / 3 = 33.33%   (99 is neither in the box nor the base)
+  frames <- list(W1 = data.frame(Q7 = c(5, 4, 99, 3, 99), weight_var = 1),
+                 W2 = data.frame(Q7 = c(5, 4, 99, 3, 99), weight_var = 1))
+  mapping <- data.frame(QuestionCode = "SAT", QuestionText = "Sat", QuestionType = "Rating",
+                        TrackingSpecs = "mean,top_box", W1 = "Q7", W2 = "Q7",
+                        stringsAsFactors = FALSE)
+  s <- ref_setup(frames, mapping)
+  st <- list(W1 = dk_structure("Q7", 1:5), W2 = dk_structure("Q7", 1:5))
+  capture.output(r <- calculate_rating_trend_enhanced("SAT", s$question_map, s$wave_data,
+                                                      s$config, st))
+  expect_equal(r$wave_results$W1$metrics$mean, 4)
+  expect_equal(r$wave_results$W1$metrics$top_box, 100 / 3)
+  expect_equal(r$wave_results$W1$n_unweighted, 3)
+})
+
+test_that("a numeric don't-know code is not an NPS promoter", {
+  # Answers 10, 9, 99, 3 on 0-10; 99 = Don't know. Of the three real
+  # answers: promoters 2, detractors 1 -> NPS = (2 - 1) / 3 = 33.33.
+  frames <- list(W1 = data.frame(Q15 = c(10, 9, 99, 3), weight_var = 1),
+                 W2 = data.frame(Q15 = c(10, 9, 99, 3), weight_var = 1))
+  mapping <- data.frame(QuestionCode = "REC", QuestionText = "Recommend", QuestionType = "NPS",
+                        W1 = "Q15", W2 = "Q15", stringsAsFactors = FALSE)
+  s <- ref_setup(frames, mapping)
+  st <- list(W1 = dk_structure("Q15", 0:10), W2 = dk_structure("Q15", 0:10))
+  capture.output(r <- calculate_nps_trend("REC", s$question_map, s$wave_data, s$config, st))
+  expect_equal(r$wave_results$W1$nps, 100 / 3)
+  expect_equal(r$wave_results$W1$n_unweighted, 3)
+})
+
+test_that("a don't-know option with an Index_Weight is still not a scale point", {
+  st <- dk_structure("Q7", 1:5)
+  st$Index_Weight[st$OptionText == "99"] <- 99
+  expect_equal(get_question_scale(st, "Q7"), 1:5)
+})
+
+test_that("a composite drops its sources' don't-know codes, by hand", {
+  # Respondent 1: A = 4, B = 99 (DK) -> composite 4 (B skipped)
+  # Respondent 2: A = 2, B = 4       -> composite 3
+  df <- data.frame(QA = c(4, 2), QB = c(99, 4), weight_var = 1)
+  mapping <- data.frame(QuestionCode = c("SA", "SB"), QuestionType = "Rating",
+                        W1 = c("QA", "QB"), stringsAsFactors = FALSE)
+  s <- ref_setup(list(W1 = df), mapping)
+  st <- rbind(dk_structure("QA", 1:5), dk_structure("QB", 1:5))
+  capture.output(
+    comp <- calculate_composite_values_per_respondent(df, "W1", c("SA", "SB"),
+                                                      s$question_map, st))
+  expect_equal(comp, c(4, 3))
+})
+
+test_that("a text don't-know answer is dropped even if its option has an Index_Weight", {
+  st <- dk_structure("Q7", 1:5)
+  st$OptionText[st$OptionText == "99"] <- "Don't know"
+  st$Index_Weight[st$OptionText == "Don't know"] <- 99
+  expect_equal(resolve_question_values(c("5", "Don't know", "2"), st, "Q7"), c(5, NA, 2))
+})

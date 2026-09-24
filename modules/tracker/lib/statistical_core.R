@@ -487,8 +487,9 @@ calculate_bottom_box <- function(values, weights, n_boxes = 1, scale_values = NU
 
 #' Shared Top / Bottom Box Calculation
 #'
-#' The base is every non-missing answer, the same base as a single-choice
-#' share; answers off the scale (a "don't know" code) stay in the base.
+#' The base is every non-missing answer. Options the structure flags
+#' ExcludeFromIndex = Y (don't know) were set to NA upstream by
+#' resolve_question_values(), so they are in neither the box nor the base.
 #'
 #' @keywords internal
 calculate_scale_box <- function(values, weights, n_boxes, scale_values, top) {

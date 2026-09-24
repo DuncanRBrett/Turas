@@ -818,8 +818,11 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
 #' Calculates composite score for each respondent (row mean of source questions).
 #' Returns the composite values vector which can then be treated like rating values.
 #'
+#' @param wave_structure Data frame or NULL. This wave's structure Options,
+#'   used to resolve text answers and drop ExcludeFromIndex = Y codes
 #' @keywords internal
-calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_questions, question_map) {
+calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_questions, question_map,
+                                                      wave_structure = NULL) {
 
   # Extract data for each source question
   source_values <- list()
@@ -832,7 +835,9 @@ calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_q
     src_data <- extract_question_data(wave_df, wave_id, src_code, question_map)
 
     if (!is.null(src_data)) {
-      source_values[[src_code]] <- src_data
+      # Same value rules as a rating source: text resolved through the
+      # structure, don't-know codes (ExcludeFromIndex = Y) dropped
+      source_values[[src_code]] <- resolve_question_values(src_data, wave_structure, wave_code)
       cat(paste0("    ✓ Found source question ", src_code, " (", wave_code, ") for ", wave_id, "\n"))
     } else {
       missing_sources <- c(missing_sources, src_code)
@@ -930,7 +935,8 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
 
     # Calculate composite values per respondent
     composite_values <- calculate_composite_values_per_respondent(
-      wave_df, wave_id, source_questions, question_map
+      wave_df, wave_id, source_questions, question_map,
+      if (!is.null(wave_structures)) wave_structures[[wave_id]] else NULL
     )
 
     # Check if we got valid composite values
