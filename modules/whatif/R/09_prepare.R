@@ -7,7 +7,9 @@
 #
 #   outcome    the outcome question banded (NPS: 0-6, 7-8, 9-10) and scored
 #   levers     rating, nested and coverage values, items averaged, don't-know
-#              answers set by the dont_know rule and counted
+#              answers set by the dont_know rule and counted; a respondent
+#              with no rating of their own is flagged dk (out of the need
+#              count and the moves)
 #   context    descriptive variables: missing label, BoxCategory or Recodes,
 #              small levels collapsed
 #   profile, structure rules, baselines, bundles, symptoms
@@ -303,6 +305,10 @@ whatif_prepare <- function(cfg, verbose = TRUE) {
     }, numeric(1))
     dk <- sapply(scored, `[[`, "dk")
     if (!is.matrix(dk)) dk <- matrix(dk, ncol = length(items))
+    # A respondent with no rating of their own on any item (every item
+    # don't-know or blank) is flagged dk: their lever value is a fill, so
+    # they are left out of the need count and never moved (04_moves.R).
+    dk_resp <- has & rowSums(!is.na(vals) & !dk) == 0
     n_dk <- 0L
     for (j in seq_along(items)) {
       miss <- dk[, j] & has
@@ -317,7 +323,7 @@ whatif_prepare <- function(cfg, verbose = TRUE) {
     v <- rowMeans(vals, na.rm = TRUE)
     v[!has] <- NA_real_
     lv <- list(key = row$Key, label = row$Label %||% row$Key, kind = kind, values = v,
-               expected = whatif_expected(row), missing = n_dk,
+               expected = whatif_expected(row), missing = n_dk, dk = dk_resp,
                sub = row$Note %||% "", has_label = row$HasLabel)
     if (!is.na(row$Target)) lv$target <- suppressWarnings(as.numeric(row$Target))
     if (kind == "nested") lv$has <- has

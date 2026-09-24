@@ -1746,6 +1746,7 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 .wi-rng { display: block; color: var(--muted); font-size: .76rem; }
 .wi-tag { margin-left: 6px; font-size: .7rem; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .wi-unclear td { color: #9aa1ad; }
+.wi-halo > td:first-child { box-shadow: inset 3px 0 0 #d9a441; }
 .wi-barcol { width: 18%; min-width: 90px; }
 .wi-bar { height: 9px; background: #eef0f4; border-radius: 2px; }
 .wi-bar i { display: block; height: 9px; border-radius: 2px; background: var(--brand, #323367); }

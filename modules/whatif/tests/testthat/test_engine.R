@@ -137,3 +137,46 @@ test_that("a spec without a profile runs (no partial match on another setting)",
   expect_null(m$profile)
   expect_false(is.na(m$baseline_penalty))
 })
+
+test_that("the halo check flags a lever that is a noisy copy of a strong one, and clears independent ones", {
+  spec <- whatif_synthetic_study(n = 1200, seed = 5)
+  teach <- spec$levers[[1]]$values
+  set.seed(9)
+  echo <- pmin(5, pmax(1, teach + sample(c(-1, 0, 0, 0, 1), 1200, TRUE)))
+  spec$levers[[length(spec$levers) + 1]] <- list(key = "echo", label = "Echo of teaching", kind = "rating", values = echo)
+  spec$n_boot <- 5
+  m <- quietly(whatif_run_engine(spec, verbose = FALSE))
+  h <- m$halo
+  expect_equal(h$key, vapply(spec$levers, `[[`, "", "key"))
+  expect_true(all(c("single", "partial", "ratio", "halo") %in% names(h)))
+  # Echo carries teaching's association on its own, little once teaching is held.
+  expect_gt(h$single[h$key == "echo"], 5)
+  expect_lt(h$ratio[h$key == "echo"], WHATIF_HALO_RATIO)
+  expect_true(h$halo[h$key == "echo"])
+  # Teaching keeps most of its own effect; mentor (coverage) is independent.
+  expect_gt(h$ratio[h$key == "teach"], WHATIF_HALO_RATIO)
+  expect_false(h$halo[h$key == "teach"])
+  expect_false(h$halo[h$key == "mentor"])
+  expect_equal(h$partial[h$key == "mentor"],
+               quietly(whatif_group_results(m, list(all = rep(TRUE, 1200))))$all$levers$est[
+                 with(quietly(whatif_group_results(m, list(all = rep(TRUE, 1200))))$all$levers, key == "mentor" & move == "extend")],
+               tolerance = 1e-8)
+})
+
+test_that("LMG shares sum to 100, rank the strong lever first, and the linear R2 is attached", {
+  l <- model$lmg
+  expect_equal(l$key, c("teach", "admin", "noise", "online", "mentor"))
+  expect_equal(sum(l$lmg_share), 100, tolerance = 1e-6)
+  expect_equal(l$key[which.max(l$lmg_share)], "teach")
+  expect_lt(l$lmg_share[l$key == "noise"], 5)
+  expect_true(attr(l, "r2") > 0.1 && attr(l, "r2") < 1)
+  expect_equal(sign(l$marginal_r[l$key == "teach"]), 1)
+  # Twelve levers is the ceiling: thirteen returns NULL, the run still passes.
+  spec <- whatif_synthetic_study(n = 300)
+  for (i in 1:8) spec$levers[[length(spec$levers) + 1]] <-
+    list(key = paste0("x", i), kind = "rating", values = pmin(5, pmax(1, round(rnorm(300, 3.5, 1)))))
+  spec$n_boot <- 2
+  m13 <- quietly(whatif_run_engine(spec, verbose = FALSE))
+  expect_s3_class(m13, "whatif_model")
+  expect_null(m13$lmg)
+})

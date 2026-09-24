@@ -122,6 +122,14 @@ whatif_island_payload <- function(run) {
     ctx_offset = whatif_arr(round(ctx_offset, 6)),
     sign = stats::setNames(as.list(round(model$sign$wrong_share, 3)), model$sign$key),
     unclear_share = WHATIF_SIGN_UNCLEAR,
+    # Each lever's fix effect fitted alone against its partial effect, both
+    # for the whole sample; the tab says "caught in the halo" under the
+    # ratio. Whole-sample averages, so the client-safe block keeps them.
+    halo = stats::setNames(lapply(seq_len(nrow(model$halo)), function(i) list(
+      single = round(model$halo$single[i], 2), partial = round(model$halo$partial[i], 2),
+      ratio = if (is.na(model$halo$ratio[i])) NULL else round(model$halo$ratio[i], 3),
+      flag = isTRUE(model$halo$halo[i]))), model$halo$key),
+    halo_ratio = WHATIF_HALO_RATIO,
     cv_r2 = round(model$cv_r2, 4),
     baselines = list(keys = whatif_arr(spec$baselines), penalty = model$baseline_penalty),
     moves = whatif_arr(WHATIF_MOVES),
@@ -151,11 +159,16 @@ whatif_island_payload <- function(run) {
       v <- if (lv$kind == "nested") ifelse(lv$has, lv$values, NA) else lv$values
       whatif_arr(round(v, 4))
     }),
+    # 1 where the respondent gave no rating for the lever (the value is a
+    # fill): the live tab leaves them out of the need count and the moves,
+    # as the R engine does.
+    dk = lapply(levers, function(lv) whatif_arr(as.integer(lv$dk %||% rep(FALSE, n)))),
     ctx_levels = lapply(ctx_levels, whatif_arr),
     ctx = lapply(names(spec$context), function(k) whatif_arr(match(spec$context[[k]]$values, ctx_levels[[k]]) - 1L))
   )
   names(open$ctx) <- names(spec$context)
   names(open$val) <- keys
+  names(open$dk) <- keys
 
   list(meta = meta, model = model_block, profile = profile, open = open,
        safe = whatif_safe_block(run, keys, model_block))
@@ -215,13 +228,28 @@ whatif_safe_block <- function(run, keys, model_block) {
          }))
   })
   counts <- tabulate(spec$y, spec$n_cat)
+  # The halo numbers are the whole sample's fix effect (partial) and the same
+  # from a single-lever fit: statistics about the movers, the respondents
+  # below the target. Where the disclosure layer withholds the "all" group's
+  # fix effect (movers or non-movers under k), the numbers go with it and only
+  # the flag stays.
+  safe_model <- whatif_safe_model(model_block, k, length(spec$y), run$notes_safe)
+  all_i <- which(vapply(groups, function(g) length(g$def) == 0, logical(1)))[1]
+  if (!is.na(all_i)) {
+    for (j in seq_along(keys)) {
+      mv <- if (spec$levers[[j]]$kind == "coverage") "extend" else "floor"
+      if (is.na(groups[[all_i]]$est[[j]][match(mv, moves)])) {
+        safe_model$halo[[keys[j]]][c("single", "partial", "ratio")] <- list(NULL, NULL, NULL)
+      }
+    }
+  }
   list(
     min_group = k,
     # Whole-sample facts the client-safe cut must state differently: outcome
     # counts only when every category clears k, and warnings without counts.
     meta = list(n_by_outcome = if (all(counts >= k)) whatif_arr(counts) else NULL,
                 warnings = whatif_arr(run$warnings_safe %||% character(0))),
-    model = whatif_safe_model(model_block, k, length(spec$y), run$notes_safe),
+    model = safe_model,
     filters = lapply(run$filter_keys, function(key) list(
       key = key, label = spec$context[[key]]$label)),
     crossings = lapply(seq_len(NROW(pub$crossings)), function(i)

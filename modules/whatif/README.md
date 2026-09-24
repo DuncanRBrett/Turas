@@ -33,6 +33,21 @@ equals `ordinal::clm` (to 1e-4 in the tests; to 1e-9 on SACAP 2025).
 It is association, not cause. Nothing built on this module may say that fixing
 an area WILL add points.
 
+Every move holds the other areas where they are. That is right for what is
+unique to an area and a floor for what fixing it would do, because ratings move
+together. The halo check (`whatif_halo_check()`, 07_calibration.R) fits each
+lever on its own and compares that fix effect with the partial one; an area
+whose partial effect is under a third of its own (and whose own effect is at
+least one point) is shown "caught in the halo"
+in the tab and the workbook, with its number kept, never greyed to zero. The
+workbook's Relative_importance sheet carries the LMG shares (a conventional key
+driver ranking) beside the effort table so the two can be reconciled.
+
+A respondent with no rating of their own for a lever (every item don't-know or
+blank) carries a fill in the model but is flagged `dk`: they are never counted
+as needing the fix and no move touches them, in R and in the live tab alike.
+Their number is reported beside each lever.
+
 ## Files
 
 | File | Purpose |
@@ -46,7 +61,7 @@ an area WILL add points.
 | `R/04_moves.R` | Moves: slip2, slip1, up1, up2, floor (lift to the fix target), withdraw, extend |
 | `R/05_groups.R` | `whatif_group_results()`: actual score and every move's change for a group, with 90% ranges |
 | `R/06_profile.R` | Profile model; `whatif_profile_predict()` refuses a profile the Structure rules block |
-| `R/07_calibration.R` | `whatif_calibration()`: held-out predicted against actual score by context group |
+| `R/07_calibration.R` | `whatif_calibration()`: held-out predicted against actual score by context group; `whatif_halo_check()` and `whatif_lmg()` |
 | `R/08_config.R` to `R/13_excel.R` | Config reader, data preparation, preflight, contribution file, `run_whatif()`, analyst workbook |
 | `lib/generate_config_template.R` | Blank or filled What if config workbook |
 | `run_whatif_gui.R` | The What If tile in `launch_turas()` |

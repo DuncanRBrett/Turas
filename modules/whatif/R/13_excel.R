@@ -6,7 +6,10 @@
 #
 #   Run_Status          status, warnings, counts, files (always first)
 #   Effort              every lever for all respondents: slip and fix with 90%
-#                       ranges, who needs it, net gain per 100 reached
+#                       ranges, who needs it, net gain per 100 reached, and
+#                       the halo check (fix effect alone against partial)
+#   Relative_importance LMG shares of the linear R2, a conventional key
+#                       driver ranking to reconcile the effort table against
 #   Effort_unweighted   the same from the unweighted version, when the run
 #                       also fitted a weighted one (the other sheets show the
 #                       weighted version)
@@ -79,11 +82,26 @@ whatif_write_excel <- function(run, log, proposed, path, other = NULL) {
         stringsAsFactors = FALSE)
     }))
   }
+  halo_cols <- function(df, halo = model$halo) {
+    i <- match(labels[halo$key], df$Lever)
+    df$Fixed_alone <- NA_real_; df$Halo_ratio <- NA_real_; df$Halo <- NA_character_
+    df$Fixed_alone[i] <- round(halo$single, 1)
+    df$Halo_ratio[i] <- round(halo$ratio, 2)
+    df$Halo[i] <- ifelse(halo$halo, "caught in the halo", "")
+    df
+  }
   all_res <- run$safe_results[["all"]]
-  sheet("Effort", effort_rows(all_res))
+  sheet("Effort", halo_cols(effort_rows(all_res)))
+  lmg <- model$lmg
+  sheet("Relative_importance", if (is.null(lmg)) NULL else data.frame(
+    Lever = labels[lmg$key], LMG_share_of_R2 = round(lmg$lmg_share, 1),
+    Marginal_r = round(lmg$marginal_r, 3), Linear_R2 = round(attr(lmg, "r2"), 3),
+    Note = "Shares of the explained variance over every entry order (a conventional key driver ranking); the Effort sheet holds each area's partial effect with the others held where they are.",
+    stringsAsFactors = FALSE))
   if (!is.null(other)) {
     # The unweighted version, for a report built unweighted.
-    sheet("Effort_unweighted", effort_rows(other$safe_results[["all"]], sign = other$model$sign))
+    sheet("Effort_unweighted", halo_cols(effort_rows(other$safe_results[["all"]], sign = other$model$sign),
+                                        halo = other$model$halo))
   }
   grp <- run$publish$groups
   sheet("Groups", do.call(rbind, lapply(seq_len(nrow(grp)), function(i) {

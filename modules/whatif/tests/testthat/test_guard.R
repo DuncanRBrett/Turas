@@ -105,3 +105,22 @@ test_that("a refusal is printed to the console with its code", {
   expect_true(any(grepl("DATA_OUTCOME_CODES", printed)))
   expect_true(any(grepl("How to fix", printed)))
 })
+
+test_that("dk flags default to none, must match the respondents, and never apply to coverage", {
+  spec <- whatif_synthetic_study(n = 200)
+  g <- quietly(whatif_guard_spec(spec))
+  expect_true(all(vapply(g$levers, function(lv) is.logical(lv$dk) && length(lv$dk) == 200 && !any(lv$dk), logical(1))))
+  bad <- spec
+  bad$levers[[1]]$dk <- c(TRUE, FALSE)
+  r <- quietly(whatif_run_engine(bad, verbose = FALSE))
+  expect_true(is_refusal(r))
+  expect_equal(r$code, "DATA_LEVER_DK")
+  cov <- spec
+  cov$levers[[5]]$dk <- rep(TRUE, 200)
+  g2 <- quietly(whatif_guard_spec(cov))
+  expect_false(any(g2$levers[[5]]$dk))
+  nest <- spec
+  nest$levers[[4]]$dk <- rep(TRUE, 200)
+  g3 <- quietly(whatif_guard_spec(nest))
+  expect_equal(g3$levers[[4]]$dk, g3$levers[[4]]$has)
+})

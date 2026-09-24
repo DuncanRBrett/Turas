@@ -302,5 +302,54 @@ run("the scores follow the cumulative logit (probabilities sum to one)", () => {
   assert(s >= Math.min(...FX.meta.scores) && s <= Math.max(...FX.meta.scores), "score in range");
 });
 
+run("a respondent flagged dk is never moved and never counted as needing the fix, live as in R", () => {
+  const sb = sandbox(openIsland(), { micro: true });
+  const lv = FX.model.levers.find((l) => l.kind === "rating");
+  assert(sb.TR.whatif._delta(lv, "floor", 2, false) > 0, "a rating below Good is lifted");
+  assert(sb.TR.whatif._delta(lv, "floor", 2, true) === 0, "a dk respondent is not lifted");
+  assert(sb.TR.whatif._delta(lv, "slip1", 4, true) === 0, "nor let slip");
+  // The fixture's admin lever has 20 don't-know respondents sitting on a fill.
+  const j = FX.model.levers.findIndex((l) => l.key === "admin");
+  const flagged = FX.open.dk.admin.reduce((a, b) => a + b, 0);
+  assert(flagged === 20, "fixture flags " + flagged);
+  const g = sb.TR.whatif._openGroup(null);
+  assert(g.need[j] === safeAll.need[j], "live need " + g.need[j] + " equals R's " + safeAll.need[j]);
+  // Strip the flags and the same rows count as in need wherever the fill sits below Good.
+  const w = openIsland();
+  delete w.open.dk;
+  const g2 = sandbox(w, { micro: true }).TR.whatif._openGroup(null);
+  const below = FX.open.val.admin.filter((v, i) => FX.open.dk.admin[i] === 1 && v !== null && v < 4).length;
+  assert(g2.need[j] === g.need[j] + below, "without flags the fills count: " + g2.need[j] + " vs " + (g.need[j] + below));
+});
+
+run("an area caught in the halo says so under its name, keeps its number, and is listed in How this works", () => {
+  const w = safeIsland();
+  const key = w.model.levers[0].key;
+  w.model.halo = w.model.halo || {};
+  w.model.halo[key] = { single: 12.3, partial: 2.1, ratio: 0.171, flag: true };
+  const html = render(sandbox(w));
+  has(html, "Caught in the halo: fixed on its own this area is worth +12.3 points");
+  has(html, "+2.1 with the other areas held where they are");
+  has(html, 'class="wi-halo"');
+  has(html, "The data cannot separate those areas from the areas they move with");
+  const row = html.slice(html.indexOf('<tr class="wi-halo">'), html.indexOf("</tr>", html.indexOf('<tr class="wi-halo">')));
+  lacks(row, "~0", "a halo area is not greyed to zero");
+  const own = safeAll.est[0][MOVES.indexOf("floor")];
+  assert(own > 0, "fixture's first lever has a published positive fix effect");
+  has(row, "+" + own.toFixed(1), "the area keeps its own number");
+  // Numbers withheld with the whole sample's effect: the flag still reads, no NaN.
+  const w3 = safeIsland();
+  w3.model.halo[key] = { flag: true };
+  const html3 = render(sandbox(w3));
+  has(html3, "the numbers rest on too few to show");
+  lacks(html3, "NaN");
+  lacks(html3, "undefined");
+  const w2 = safeIsland();
+  Object.keys(w2.model.halo || {}).forEach((k) => { w2.model.halo[k].flag = false; });
+  const html2 = render(sandbox(w2));
+  has(html2, "Halo check: no area's effect collapses");
+  lacks(html2, "Caught in the halo");
+});
+
 console.log((failed ? "\n✗ " : "\n✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

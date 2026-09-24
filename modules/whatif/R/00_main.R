@@ -10,7 +10,9 @@
 #      terms only);
 #   2. bootstrap refits and the sign check;
 #   3. the change each move makes to each lever's model column;
-#   4. the profile model for "Build a ...", when the spec has a profile.
+#   4. the halo check (each lever's fix effect alone against its partial
+#      effect) and the LMG relative importance, both in 07_calibration.R;
+#   5. the profile model for "Build a ...", when the spec has a profile.
 #
 # Group results (whatif_group_results), profile answers
 # (whatif_profile_predict) and the calibration table (whatif_calibration) are
@@ -37,6 +39,8 @@
 #'   \item{sign}{sign check table}
 #'   \item{cv_r2}{held-out pseudo R-squared of the lever model}
 #'   \item{deltas}{per lever, per move: change in the lever's column}
+#'   \item{halo}{halo check table: key, single, partial, ratio, halo}
+#'   \item{lmg}{LMG relative importance table, or NULL with many levers}
 #'   \item{profile}{profile model, or NULL}
 #' @examples
 #' \dontrun{
@@ -113,6 +117,13 @@ whatif_run_engine_impl <- function(spec, verbose = TRUE) {
   })
   names(deltas) <- vapply(spec$levers, `[[`, character(1), "key")
 
+  halo <- whatif_halo_check(spec, design, main, deltas)
+  if (any(halo$halo)) {
+    whatif_say(sprintf("[%s] halo check: %s fixed alone would be worth far more than with the other areas held; shown as caught in the halo",
+                       sid, paste(halo$key[halo$halo], collapse = ", ")), verbose = verbose)
+  }
+  lmg <- whatif_lmg(spec, design)
+
   profile <- if (!is.null(spec[["profile"]]) && length(spec[["profile"]]$keys)) {
     whatif_fit_profile(spec, folds, verbose)
   } else NULL
@@ -123,6 +134,6 @@ whatif_run_engine_impl <- function(spec, verbose = TRUE) {
     spec = spec, design = design, penalty = penalty, folds = folds,
     baseline_penalty = baseline_penalty, baseline_cv = baseline_cv,
     main = main, boot = boot, sign = sign, cv_r2 = cv_r2,
-    deltas = deltas, profile = profile
+    deltas = deltas, halo = halo, lmg = lmg, profile = profile
   ), class = "whatif_model")
 }

@@ -321,3 +321,21 @@ test_that("the release audit catches leaks it can see from the island alone", {
   w$safe$groups[[inner]]$need[[1]] <- 37
   expect_true(any(grepl("differ between nested groups", audit_of(w))))
 })
+
+test_that("a full report carries the don't-know flags, lined up like every other open row", {
+  wi <- read_wi("records")
+  expect_equal(names(wi$open$dk), names(fx$open$val))
+  d_fix <- vapply(fx$open$dk$admin, as.numeric, 0)
+  d_emb <- vapply(wi$open$dk$admin, function(v) if (is.null(v)) NA_real_ else as.numeric(v), 0)
+  expect_equal(d_emb[seq_along(ids)], rev(d_fix))
+  expect_true(all(is.na(d_emb[length(ids) + 1:2])))
+  expect_equal(sum(d_fix), 20)
+  for (mode in c("cube", "none")) expect_null(read_wi(mode)$open)
+})
+
+test_that("both model blocks carry the halo check", {
+  expect_equal(names(fx$model$halo), vapply(fx$model$levers, `[[`, "", "key"))
+  wi <- read_wi("cube")
+  expect_equal(names(wi$model$halo), names(fx$model$halo))
+  expect_true(any(vapply(wi$model$halo, function(h) isTRUE(h$flag), logical(1))))
+})
