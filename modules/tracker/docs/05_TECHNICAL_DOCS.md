@@ -411,7 +411,7 @@ mapping <- load_question_mapping("question_mapping.xlsx")
 question_map <- build_question_map_index(mapping, config)
 
 # Get setting value safely
-confidence <- get_setting(config, "confidence_level", default = 0.95)
+alpha <- get_setting(config, "alpha", default = 0.05)
 ```
 
 ### Wave Data Functions
@@ -460,7 +460,7 @@ list(
   ),
   settings = list(
     project_name = "...",
-    confidence_level = 0.95,
+    alpha = 0.05,
     ...
   ),
   banner = data.frame(

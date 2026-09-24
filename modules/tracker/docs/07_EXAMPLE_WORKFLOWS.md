@@ -62,7 +62,7 @@ W3     | Q3 2024  | wave3_q3.csv   | Weight
 SettingName      | SettingValue
 project_name     | Brand Tracking Q3 2024
 report_types     | detailed
-confidence_level | 0.95
+alpha            | 0.05
 ```
 
 **TrackedQuestions sheet:**
@@ -451,10 +451,10 @@ Q10 | Multi_Mention | category:Option A,category:Option B
 
 ### Issue: Significance always shows "stable" (→)
 
-**Possible causes:** 1. Base sizes too small (\< min_base_size) 2.
+**Possible causes:** 1. Effective bases too small (\< minimum_base) 2.
 Changes too small relative to variance 3. Alpha level too strict
 
-**Solutions:** 1. Check sample sizes in output 2. Lower min_base_size
+**Solutions:** 1. Check sample sizes in output 2. Lower minimum_base
 setting (but not below 20) 3. Consider using 90% confidence instead of
 95%
 

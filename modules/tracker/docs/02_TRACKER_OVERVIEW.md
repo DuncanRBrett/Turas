@@ -33,8 +33,8 @@ for tracking study analysis.
 ### Statistical Rigor
 
 -   Two-proportion Z-tests for percentage changes
--   Welch's T-tests for mean comparisons
--   Design effect (DEFF) adjustment for weighted data
+-   Pooled T-tests for mean comparisons
+-   Every test sized on the Kish effective base of weighted data
 -   Configurable confidence levels (default 95%)
 
 ### Flexible Question Handling

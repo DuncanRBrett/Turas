@@ -248,53 +248,106 @@ Same as Rating after composite score calculation.
 
 ## Statistical Methods {#statistical-methods}
 
+Every formula below is the one in the code (`lib/statistical_core.R`,
+`lib/trend_significance.R`) and is checked against an independent
+calculation in `tests/testthat/test_reference_statistics.R`.
+
+### Effective Base (Kish)
+
+**Purpose:** The base every significance test is sized on. Weighting
+spends sample, so a weighted wave of 500 tests like a smaller simple
+random sample.
+
+**Formula (over the respondents who answered):**
+
+```         
+n_eff = (sum of w)^2 / (sum of w^2)
+DEFF  = n / n_eff          (n = unweighted count)
+```
+
+**Notes:** Grossing the weights to a population total leaves `n_eff`, every
+share, mean and SD unchanged; only the weighted total moves. `n_eff` is not
+rounded. A test runs only when both waves have `n_eff >= minimum_base`
+(default 30); otherwise no arrow is shown, and the Dashboard and Sig
+Matrix show an en dash for "not tested".
+
+**Interpretation:** DEFF = 1.0: equal weights. DEFF 1.1-1.3: moderate.
+DEFF 1.5-2.0: high (the effective base is a half to two thirds of the
+count). DEFF above 2.0: review the weighting.
+
+### Weighted Mean and SD
+
+```         
+mean = sum(w x) / sum(w)
+SD   = sqrt( [sum(w (x - mean)^2) / sum(w)] * n_eff / (n_eff - 1) )
+```
+
+The SD is the unbiased estimator for survey (reliability) weights. It
+equals `sd()` when every weight is 1, matches
+`stats::cov.wt(method = "unbiased")`, and is the formula the tabs v2
+Tracking tab uses. The mean's confidence interval is
+`mean +/- z(1 - alpha/2) * SD / sqrt(n_eff)`.
+
 ### Z-Test for Proportions
 
 **Use Case:** Test if percentage changed significantly between waves.
 
-**Formula:**
+**Formula (n1, n2 are the effective bases):**
 
 ```         
-p_pool = (p₁×n₁ + p₂×n₂) / (n₁ + n₂)
-SE = √(p_pool × (1 - p_pool) × (1/n₁ + 1/n₂))
-z = (p₂ - p₁) / SE
-p_value = 2 × Φ(-|z|)
+p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
+SE = sqrt(p_pool * (1 - p_pool) * (1/n1 + 1/n2))
+z = (p2 - p1) / SE
+p_value = 2 * Phi(-|z|)
 ```
 
-**Assumptions:** - Independent samples - Sample sizes ≥ 30 recommended -
-Random sampling
+Used for single-choice shares, top / bottom boxes, `range:` and `box:`
+metrics, multi-mention options and any-mention.
 
-### Welch's T-Test for Means
+### Pooled T-Test for Means
 
-**Use Case:** Test if mean rating changed significantly between waves.
+**Use Case:** Test if a mean (rating or composite) changed significantly
+between waves.
 
-**Formula:**
+**Formula (n1, n2 are the effective bases, s1, s2 the SDs above):**
 
 ```         
-SE = √(s₁²/n₁ + s₂²/n₂)
-t = (μ₂ - μ₁) / SE
-df = (s₁²/n₁ + s₂²/n₂)² / ((s₁²/n₁)²/(n₁-1) + (s₂²/n₂)²/(n₂-1))
-p_value = 2 × t_dist(-|t|, df)
+s_pool^2 = ((n1 - 1) s1^2 + (n2 - 1) s2^2) / (n1 + n2 - 2)
+SE = s_pool * sqrt(1/n1 + 1/n2)
+t = (mean2 - mean1) / SE,   df = n1 + n2 - 2
+p_value = 2 * t_dist(-|t|, df)
 ```
 
-**Why Welch's:** - Doesn't assume equal variances - More robust to
-unequal sample sizes
+The trend sheets, Trend Dashboard and Significance Matrix all run this
+test. The tabs v2 Tracking tab runs Welch's test for the same pair; with
+similar SDs and bases the two agree closely, but they are not the same
+test.
 
-### Design Effect (DEFF)
+### Z-Test for NPS
 
-**Purpose:** Adjust for weighting impact on effective sample size.
-
-**Formula:**
+NPS = 100 * (p_promoters - p_detractors), with promoters 9-10 and
+detractors 0-6. Its variance is the multinomial closed form, which keeps
+the negative covariance between the two shares:
 
 ```         
-cv = σ(weights) / μ(weights)
-DEFF = 1 + cv²
-n_effective = n_weighted / DEFF
+Var(NPS) = 10000 * ((p_p + p_d) - (p_p - p_d)^2) / n_eff
+z = (NPS2 - NPS1) / sqrt(Var1 + Var2)
 ```
 
-**Interpretation:** - DEFF = 1.0: No impact (equal weights) - DEFF =
-1.1-1.3: Moderate (10-30% reduction) - DEFF = 1.5-2.0: High (33-50%
-reduction) - DEFF \> 2.0: Very high (review weighting)
+### Bases and Missing Answers
+
+- Single choice: every non-missing answer, "don't know" included.
+- Rating, NPS and composite: an option flagged `ExcludeFromIndex = Y` in
+  the StructureFile (a numeric 99, or text "Don't know") is dropped from
+  the mean, the NPS and the boxes.
+- Multi-mention: the respondents who answered the question (any of its
+  option columns holds a value); people routed past it are not in the
+  base.
+
+### Multiple Comparisons
+
+No correction (Bonferroni, Holm, FDR) is applied; each wave pair is
+tested on its own at `alpha`.
 
 ------------------------------------------------------------------------
 

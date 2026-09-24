@@ -142,8 +142,8 @@ report_types | tracking_crosstab
 
 | Setting           | Type    | Default | Description                               |
 |-----------------|-----------------|-----------------|-----------------------|
-| confidence_level  | Numeric | 0.95    | Statistical confidence (0.90, 0.95, 0.99) |
-| min_base_size     | Integer | 30      | Minimum n for significance testing        |
+| alpha             | Numeric | 0.05    | Significance level; reports state 1 - alpha as the confidence |
+| minimum_base      | Integer | 30      | Smallest effective base that is tested    |
 | show_significance | Boolean | TRUE    | Show trend indicators (↑↓→)               |
 
 ### Formatting Settings
@@ -162,8 +162,8 @@ project_name             | Q4 2024 Brand Tracking
 report_types             | detailed,wave_history
 output_file              | Q4_Brand_Tracking.xlsx
 output_dir               | /Users/duncan/Reports
-confidence_level         | 0.95
-min_base_size            | 30
+alpha                    | 0.05
+minimum_base             | 30
 decimal_places_ratings   | 1
 decimal_places_percents  | 0
 show_significance        | TRUE

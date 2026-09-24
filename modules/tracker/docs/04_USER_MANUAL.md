@@ -177,7 +177,7 @@ Controls analysis parameters. Two-column format: `Setting` (or
 | `report_types` | CSV list | "detailed" | Which reports to generate. See [Output Reports](#9-output-reports). |
 | `weight_variable` | Text | *(none)* | Global weight variable name. Used for all waves unless overridden by WeightVar in the Waves sheet. |
 | `alpha` | Number | 0.05 | Significance level for statistical testing (0.05 = 95% confidence). |
-| `minimum_base` | Number | 30 | Minimum base size for reporting. Cells below this threshold are suppressed. |
+| `minimum_base` | Number | 30 | Smallest effective base (Kish) that is significance-tested. Values below it are still shown; the pair is not tested and shows no arrow. |
 | `baseline_wave` | WaveID | *(first wave)* | Wave used for "vs Baseline" comparisons. Must match a WaveID from the Waves sheet. |
 | `decimal_places_ratings` | Number | 1 | Decimal places for rating/mean scores in output. |
 | `decimal_places_nps` | Number | 2 | Decimal places for NPS scores. |
