@@ -52,6 +52,13 @@ for (f in shared_files) {
 
 # Source confidence module R files in dependency order
 r_dir <- file.path(MODULE_DIR, "R")
+# 00_main.R finds its own files through script_dir_override when it is set,
+# else through the Rscript --file argument or the working directory, neither
+# of which is the module under testthat. Without this it refused
+# IO_MODULE_LOAD_FAILED, the "Could not source 00_main.R" note below fired, and
+# process_proportion_question() and its siblings were never loaded, so no test
+# exercised the question pipeline end to end (review 2026-09-24).
+assign("script_dir_override", r_dir, envir = .GlobalEnv)
 r_files <- c(
   "utils.R", "sampling_labels.R", "00_guard.R", "03_study_level.R",
   "04_proportions.R", "05_means.R",
@@ -67,6 +74,9 @@ for (f in r_files) {
     })
   }
 }
+# Remove it again, as run_confidence_gui.R does: tools/run_all_tests.R runs every
+# module in one R session, and pricing's 00_main.R reads the same variable.
+rm("script_dir_override", envir = .GlobalEnv)
 
 # Source HTML report submodules if they exist
 html_report_dir <- file.path(MODULE_DIR, "lib", "html_report")

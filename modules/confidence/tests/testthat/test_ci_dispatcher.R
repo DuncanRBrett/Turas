@@ -221,20 +221,28 @@ test_that("a weighted proportion question shows n_eff 19 and sizes its MOE on 18
   q_row <- make_q_row(run_moe = "Y")
   q_row$Categories <- "1"
 
-  # 00_main.R loads its component files itself and cannot be sourced whole
-  # under testthat (setup.R notes the failure), so take just this function's
-  # definition from the shipped file.
-  main_exprs <- parse(file.path(dirname(dirname(getwd())), "R", "00_main.R"))
-  is_def <- vapply(main_exprs, function(e) {
-    is.call(e) && identical(e[[1]], as.name("<-")) &&
-      identical(e[[2]], as.name("process_proportion_question"))
-  }, logical(1))
-  expect_equal(sum(is_def), 1)
-  eval(main_exprs[[which(is_def)]])
-
   out <- process_proportion_question(q_row, survey_data, "wt", make_config())
 
   expect_equal(out$result$n_eff, 19)
   expect_equal(out$result$moe$moe, qnorm(0.975) * sqrt(0.4 * 0.6 / (35^2 / 65)),
                tolerance = 1e-10)
+})
+
+# ==============================================================================
+# END TO END: the mean question through the real pipeline
+# ==============================================================================
+# 00_main.R now loads under testthat (setup.R sets script_dir_override), so
+# the per-question processors are tested directly. Weights: 20 respondents at 1
+# and 5 at 3, n_eff = 35^2 / 65 = 18.846, displayed as 19.
+
+fractional_weights <- c(rep(1, 20), rep(3, 5))
+
+test_that("a weighted mean question sizes its t interval on the exact n_eff", {
+  survey_data <- data.frame(Q2 = c(rep(c(4, 6), 10), c(3, 5, 7, 9, 5)),
+                            wt = fractional_weights)
+  out <- process_mean_question(make_q_row(q_id = "Q2", run_moe = "Y"),
+                               survey_data, "wt", make_config())
+  expect_equal(out$result$n_eff, 19)
+  expect_equal(out$result$t_dist$df, 35^2 / 65 - 1)
+  expect_equal(out$result$t_dist$se, out$result$t_dist$sd / sqrt(35^2 / 65))
 })
