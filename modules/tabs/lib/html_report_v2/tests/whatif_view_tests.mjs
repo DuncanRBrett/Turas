@@ -110,17 +110,25 @@ run("live numbers for everyone equal the R engine's published numbers", () => {
   const g = sb.TR.whatif._openGroup(null);
   assert(g.n === FX.meta.n, "n " + g.n);
   close(g.actual, safeAll.actual, 0.01, "actual");
+  // A null in the safe block is a result the R build withheld (it would rest
+  // on fewer than the minimum group); the live view still computes it.
+  let compared = 0;
   FX.model.levers.forEach((lv, l) => {
     const fixMove = lv.kind === "coverage" ? "extend" : "floor";
     const slipMove = lv.kind === "coverage" ? "withdraw" : "slip1";
-    close(g.fix[l].pt, safeAll.est[l][MOVES.indexOf(fixMove)], 0.006, lv.key + " fix");
-    close(g.slip[l].pt, safeAll.est[l][MOVES.indexOf(slipMove)], 0.006, lv.key + " slip");
-    close(g.fix[l].lo, safeAll.lo[l][MOVES.indexOf(fixMove)], 0.006, lv.key + " fix lo");
-    close(g.fix[l].hi, safeAll.hi[l][MOVES.indexOf(fixMove)], 0.006, lv.key + " fix hi");
+    const fi = MOVES.indexOf(fixMove), si = MOVES.indexOf(slipMove);
+    if (safeAll.est[l][fi] !== null) {
+      close(g.fix[l].pt, safeAll.est[l][fi], 0.006, lv.key + " fix");
+      close(g.fix[l].lo, safeAll.lo[l][fi], 0.006, lv.key + " fix lo");
+      close(g.fix[l].hi, safeAll.hi[l][fi], 0.006, lv.key + " fix hi");
+      compared++;
+    }
+    if (safeAll.est[l][si] !== null) { close(g.slip[l].pt, safeAll.est[l][si], 0.006, lv.key + " slip"); compared++; }
   });
   (FX.model.bundles || []).forEach((b, bi) => {
-    close(g.bundle(b, bi).pt, safeAll.bundles[bi][0], 0.006, "bundle " + b.name);
+    if (safeAll.bundles[bi][0] !== null) { close(g.bundle(b, bi).pt, safeAll.bundles[bi][0], 0.006, "bundle " + b.name); compared++; }
   });
+  assert(compared >= 6, "compared " + compared);
 });
 
 run("live numbers under a filter equal the R engine's for the same group", () => {
@@ -135,8 +143,53 @@ run("live numbers under a filter equal the R engine's for the same group", () =>
   close(g.actual, target.actual, 0.01, "actual");
   FX.model.levers.forEach((lv, l) => {
     const fixMove = lv.kind === "coverage" ? "extend" : "floor";
-    close(g.fix[l].pt, target.est[l][MOVES.indexOf(fixMove)], 0.006, lv.key + " fix");
+    const v = target.est[l][MOVES.indexOf(fixMove)];
+    if (v !== null) close(g.fix[l].pt, v, 0.006, lv.key + " fix");
   });
+});
+
+run("a need count or effect the R build withheld renders as not shown, in the table, the scenario and the bundles", () => {
+  const w = safeIsland();
+  const M = w.model;
+  const applies = (lv, m) => (lv.kind === "coverage") === (m === "withdraw" || m === "extend");
+  let hit = null;
+  w.safe.groups.forEach((g) => {
+    if (hit) return;
+    M.levers.forEach((lv, l) => {
+      if (hit) return;
+      M.moves.forEach((m, mi) => {
+        if (!hit && applies(lv, m) && g.est[l][mi] === null) hit = { g, lv, m };
+      });
+    });
+  });
+  assert(hit, "the fixture has a withheld effect");
+  const sb = sandbox(w);
+  sb.TR.whatif.state.safeFilters = Object.keys(hit.g.def).map((k) => ({ key: k, level: hit.g.def[k] }));
+  sb.TR.whatif.state.scen = {};
+  sb.TR.whatif.state.scen[hit.lv.key] = hit.m;
+  const html = render(sb);
+  has(html, "not shown");
+  has(html, "Not shown: one of the chosen moves is not published for this group");
+  lacks(html, "NaN");
+  lacks(html, "undefined");
+  const sg = sb.TR.whatif._safeGroup(hit.g.def);
+  assert(sg.scenario(sb.TR.whatif.state.scen).hidden === true, "scenario flagged hidden");
+  // A bundle whose every part is published still shows its sum of parts.
+  const shownBundle = (M.bundles || []).findIndex((b, bi) => hit.g.bundles[bi][0] !== null &&
+    Object.keys(b.moves).every((k) => { const l = M.levers.findIndex((lv) => lv.key === k); return hit.g.est[l][M.moves.indexOf(b.moves[k])] !== null; }));
+  if (shownBundle !== -1) {
+    const row = html.slice(html.indexOf(M.bundles[shownBundle].name));
+    const cells = row.match(/<td class="num">([^<]+)/g).slice(0, 2);
+    assert(cells.every((c) => c.indexOf("not shown") === -1), "published bundle shows numbers");
+  }
+});
+
+run("the privacy paragraph needs the need and effect checks recorded, not just the group checks", () => {
+  const w = safeIsland();
+  has(render(sandbox(w)), "Prepared so that every published group");
+  const w2 = safeIsland();
+  delete w2.safe.audit.need_checked;
+  has(render(sandbox(w2)), "Privacy check failed");
 });
 
 run("the bundle table's sum of parts adds single-area results, it is not the exact answer again", () => {

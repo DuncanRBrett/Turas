@@ -854,7 +854,7 @@ format_output_value <- function(value, type = "frequency",
     cat("└───────────────────────────────────────────────────────────┘\n\n")
     return(NULL)
   }
-  if (is.null(wi$model) || is.null(wi$safe) || is.null(wi$safe$model)) {
+  if (is.null(wi$model) || is.null(wi$safe) || is.null(wi$safe$model) || is.null(wi$safe$meta)) {
     say("\n[WARNING] %s is not a complete What if contribution file.\n  The report is built without the What if tab.\n",
         basename(path))
     return(NULL)
@@ -875,9 +875,15 @@ format_output_value <- function(value, type = "frequency",
     wi$meta$mode <- "safe"
     wi$meta$id_variable <- NULL
     say("  What if tab: client-safe, %d published groups%s.", length(wi$safe$groups), note)
-    # The client-safe model block (no context baselines) replaces the full one.
+    # The client-safe model block (no context baselines) replaces the full
+    # one, and the client-safe meta fields (outcome counts only when every
+    # category clears the minimum, warnings without counts) replace theirs.
     model <- wi$safe$model
     wi$safe$model <- NULL
+    sm <- wi$safe$meta
+    wi$meta$n_by_outcome <- sm$n_by_outcome          # absent or null: every category did not clear the minimum
+    wi$meta$warnings <- if (is.null(sm$warnings)) list() else sm$warnings
+    wi$safe$meta <- NULL
     list(meta = wi$meta, model = model, safe = wi$safe)
   }
   payload <- NULL

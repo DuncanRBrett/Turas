@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # Which groups of respondents may a client-safe file publish results for, when
-# the client knows who is in the population? Three rules, applied together:
+# the client knows who is in the population? Four rules, applied together:
 #
 #   1. Minimum group. No published group, and no cell of a published crossing,
 #      has fewer than k respondents (counted on respondents, never weights).
@@ -16,21 +16,27 @@
 #      they differ by fewer than k respondents give that difference away by
 #      subtraction (for example "Online Access, Honours year" against "Online
 #      Access, BSocSci Honours"). The inner group is hidden.
-#   4. Recoverability check. Rules 2 and 3 look at one table or one pair at a
-#      time; subtraction can chain across them (the whole sample minus every
-#      other level gives a small level back; a row total minus its shown cells
-#      gives a hidden cell, which then solves a column). A group can be worked
-#      out exactly when its membership is a linear combination of the published
-#      groups' memberships, so every small candidate (each single level and
-#      each cell of every two-way crossing of the variables, declared or not,
-#      with 1 to k-1 respondents) is tested against the published groups by
-#      least squares. When one is recoverable, the smallest published group in
-#      its combination is hidden, and everything repeats until none is. This is
-#      a practical bound, not a proof: a small set of any other shape (a
-#      three-way cell, a union of cells from different rows) is not tested.
+#   4. Recoverability check, exact. Every published number is a sum over the
+#      respondents in some set, and a reader can recover the sum over any set
+#      whose indicator is a linear combination of the published sets'
+#      indicators. Work on atoms (the distinct combinations of the context
+#      variables): every published group is a union of atoms, so any
+#      recoverable set of 1 to k-1 respondents is a union of at most k-1 atoms
+#      that each have under k. disclosure_small_recoverable() finds every such
+#      set exactly (see its header). When one exists, the smallest published
+#      group in its combination is hidden, and everything repeats until none
+#      is. Past its work cap the engine refuses rather than passing silently.
 #
 # Rule 4 was added after an independent review on 24 Sep 2026: with rules 1
-# to 3 only, 117 of 150 random studies leaked a count of 1 to 9.
+# to 3 only, 117 of 150 random studies leaked a count of 1 to 9. Its first
+# version tested single levels and two-way cells only; a second review the
+# same day recovered unions of small cells across rows and columns (23 of 150
+# random studies) and three-way cells through nested levels (4 of 100), so
+# the check was made exact (docs/v2_lift/REVIEW_WHATIF_DISCLOSURE_2026_09_24.md).
+#
+# The same engine serves the What if module's need counts and effects, where
+# the atoms are refined by "needs the fix" or "changed by this move"
+# (modules/whatif/R/11_island.R, whatif_safe_suppression).
 #
 # First built for the What if simulator (modules/whatif), in the shared layer
 # so the tabs cube can adopt it: the same differencing problem is the known
@@ -117,79 +123,230 @@ disclosure_line_failures <- function(tab, hide, k) {
 }
 
 
-#' Small Groups a Reader Might Try to Recover
+#' Atoms: the Distinct Combinations of the Context Variables
 #'
-#' Every single level and every cell of every two-way crossing of the context
-#' variables (declared or not) with 1 to k-1 respondents.
+#' Every group a client-safe file publishes is a union of atoms, so the
+#' recoverability check works on them. Optional yes/no attributes (needs the
+#' fix, changed by a move) refine the atoms further.
 #'
-#' @param context Named list of list(label, values)
-#' @param k Minimum group
-#' @return List of candidate definitions list(id, def = named character, n)
+#' @param context Named list of list(label, values), one value per respondent
+#' @param attributes Optional named list of logical vectors, one per respondent
+#' @return List: index (atom of each respondent), n (respondents per atom), id
+#'   (a readable "key=level|key=level" per atom), parts (character matrix,
+#'   atoms by context keys), attributes (logical matrix, atoms by attributes)
 #' @export
-disclosure_candidates <- function(context, k) {
-  out <- list()
+disclosure_atoms <- function(context, attributes = NULL) {
   keys <- names(context)
-  for (key in keys) {
-    tab <- table(context[[key]]$values)
-    for (lev in names(tab)[tab > 0 & tab < k]) {
-      out[[length(out) + 1]] <- list(id = paste0(key, "=", lev), def = stats::setNames(lev, key), n = tab[[lev]])
-    }
+  cols <- lapply(keys, function(kk) as.character(context[[kk]]$values))
+  n <- length(cols[[1]])
+  if (is.null(attributes)) attributes <- list()
+  attr_cols <- lapply(attributes, function(a) as.character(as.integer(as.logical(a))))
+  combo <- do.call(paste, c(cols, attr_cols, sep = "\r"))
+  atoms <- unique(combo)
+  index <- match(combo, atoms)
+  parts <- do.call(rbind, strsplit(atoms, "\r", fixed = TRUE))
+  if (!is.matrix(parts)) parts <- matrix(parts, ncol = length(keys) + length(attr_cols))
+  ctx_parts <- parts[, seq_along(keys), drop = FALSE]
+  colnames(ctx_parts) <- keys
+  attrs <- parts[, length(keys) + seq_along(attr_cols), drop = FALSE] == "1"
+  colnames(attrs) <- names(attributes)
+  id <- apply(ctx_parts, 1, function(r) paste0(keys, "=", r, collapse = "|"))
+  if (length(attr_cols)) {
+    id <- paste0(id, "|", apply(attrs, 1, function(r) paste0(colnames(attrs), "=", ifelse(r, "yes", "no"), collapse = "|")))
   }
-  if (length(keys) > 1) for (i in seq_len(length(keys) - 1)) for (j in (i + 1):length(keys)) {
-    tab <- table(context[[keys[i]]]$values, context[[keys[j]]]$values)
-    hit <- which(tab > 0 & tab < k, arr.ind = TRUE)
-    for (r in seq_len(nrow(hit))) {
-      a <- rownames(tab)[hit[r, 1]]
-      b <- colnames(tab)[hit[r, 2]]
-      out[[length(out) + 1]] <- list(id = paste0(keys[i], "=", a, "|", keys[j], "=", b),
-                                     def = stats::setNames(c(a, b), keys[c(i, j)]), n = tab[a, b])
-    }
-  }
-  out
+  list(index = index, n = as.integer(tabulate(index, length(atoms))), id = id, parts = ctx_parts, attributes = attrs)
 }
 
 
-#' Which Small Candidates Can Be Worked Out From the Published Groups
+#' Indicator Matrix of Published Sets Over Atoms
 #'
-#' Works on atoms (the distinct combinations of every context variable), where
-#' every group is a union of atoms. A candidate is recoverable when its atom
-#' indicator lies in the span of the published groups' indicators (least
-#' squares residual under 1e-8).
-#'
-#' @param context Named list of list(label, values)
-#' @param published List of named character definitions (empty = everyone)
-#' @param candidates From disclosure_candidates()
-#' @return List: recoverable (logical per candidate), coef (matrix, published by
-#'   recoverable candidates; the combination that recovers each)
+#' @param atoms From disclosure_atoms()
+#' @param masks List of logical vectors (one per respondent), each a set whose
+#'   size a file publishes; every set must be a union of atoms
+#' @return Numeric 0/1 matrix, atoms by sets
 #' @export
-disclosure_recoverable <- function(context, published, candidates) {
-  if (!length(candidates)) return(list(recoverable = logical(0), coef = NULL))
-  keys <- names(context)
-  combo <- do.call(paste, c(lapply(keys, function(k) context[[k]]$values), sep = "\r"))
-  atoms <- unique(combo)
-  parts <- do.call(rbind, strsplit(atoms, "\r", fixed = TRUE))
-  if (!is.matrix(parts)) parts <- matrix(parts, ncol = length(keys))
-  colnames(parts) <- keys
-  indicator <- function(def) {
-    m <- rep(TRUE, length(atoms))
-    for (k in names(def)) m <- m & parts[, k] == def[[k]]
-    as.numeric(m)
+disclosure_atom_sets <- function(atoms, masks) {
+  A <- vapply(masks, function(m) as.numeric(tabulate(atoms$index[m], length(atoms$n)) > 0), numeric(length(atoms$n)))
+  if (!is.matrix(A)) A <- matrix(A, nrow = length(atoms$n))
+  A
+}
+
+
+#' Subsets of Small Classes, Counted Before Anything Is Enumerated
+#' @keywords internal
+.disclosure_count_subsets <- function(cnt, k, max_size) {
+  tab <- matrix(0, max_size + 1, k)
+  tab[1, 1] <- 1
+  for (c in cnt) {
+    if (c > k - 1) next
+    for (s in max_size:1) for (t in (k - 1):c) tab[s + 1, t + 1] <- tab[s + 1, t + 1] + tab[s, t + 1 - c]
   }
-  A <- vapply(published, indicator, numeric(length(atoms)))
-  if (!is.matrix(A)) A <- matrix(A, ncol = length(published))
-  Tm <- vapply(candidates, function(cn) indicator(cn$def), numeric(length(atoms)))
-  if (!is.matrix(Tm)) Tm <- matrix(Tm, ncol = length(candidates))
-  q <- qr(A, tol = 1e-10)
-  res <- qr.resid(q, Tm)
-  if (!is.matrix(res)) res <- matrix(res, ncol = length(candidates))
-  rec <- apply(abs(res), 2, max) < 1e-8
-  coef <- NULL
-  if (any(rec)) {
-    coef <- qr.coef(q, Tm[, rec, drop = FALSE])
-    if (!is.matrix(coef)) coef <- matrix(coef, ncol = sum(rec))
+  rowSums(tab)[-1]
+}
+
+
+#' Small Sets a Reader Could Work Out From Published Sums
+#'
+#' The exact recoverability engine. Every published number is a sum over the
+#' respondents in some set (a group's membership, a group's members who need
+#' a fix, a group's members a move changes). A reader can recover the sum
+#' over any set whose atom indicator is a linear combination of the published
+#' sets' indicators. Such a set is constant across atoms with identical rows
+#' of A, so atoms are first merged into those classes; a recoverable set of 1
+#' to k-1 respondents is then a union of at most k-1 classes that each have
+#' under k. With N a basis of the left null space of A, a union of classes is
+#' recoverable when its rows of N sum to zero: singles are zero rows, pairs are
+#' rows that cancel, and larger unions are found by meeting in the middle on
+#' hashed partial sums (projected to four random directions to keep the keys
+#' short; every hit is then verified against the full rows). Only minimal sets
+#' are returned.
+#'
+#' The search is counted before it is run. Past \code{max_work} subsets on
+#' either side it refuses (CALC_DISCLOSURE_RECOVERABLE): a check that did not
+#' finish must never read as a check that passed.
+#'
+#' @param atom_n Integer respondents per atom
+#' @param A Numeric 0/1 matrix, atoms by published sets
+#' @param k Minimum group
+#' @param max_work Cap on the subsets enumerated on either side of the search
+#' @return List with
+#'   \item{sets}{list of recoverable sets, each list(atoms, n, coef): atom
+#'     indices, respondents, and the combination of published sets (one
+#'     coefficient per column of A) that recovers it}
+#'   \item{classes, small_classes}{how many classes the atoms merged into, and
+#'     how many of those are under k}
+#'   \item{work}{subsets enumerated}
+#'   \item{exact}{TRUE: the search covered every candidate}
+#' @export
+disclosure_small_recoverable <- function(atom_n, A, k, max_work = 500000) {
+  atom_n <- as.integer(atom_n)
+  m <- length(atom_n)
+  if (!is.matrix(A)) A <- matrix(A, nrow = m)
+  out <- list(sets = list(), classes = 0L, small_classes = 0L, work = 0L, exact = TRUE)
+  if (m == 0 || ncol(A) == 0) return(out)
+
+  key <- do.call(paste, c(as.data.frame(A), sep = ""))
+  cls <- match(key, unique(key))
+  C <- max(cls)
+  n_c <- as.integer(rowsum(atom_n, cls)[, 1])
+  Ac <- A[!duplicated(cls), , drop = FALSE]
+  out$classes <- C
+  small <- which(n_c > 0 & n_c < k)
+  out$small_classes <- length(small)
+  if (!length(small)) return(out)
+
+  q <- qr(Ac, tol = 1e-10)
+  N <- if (q$rank < C) qr.Q(q, complete = TRUE)[, (q$rank + 1):C, drop = FALSE] else matrix(0, C, 0)
+  Ns <- N[small, , drop = FALSE]
+  cnt <- n_c[small]
+  ms <- length(small)
+  zero_row <- if (ncol(Ns)) apply(abs(Ns), 1, max) < 1e-8 else rep(TRUE, ms)
+  found <- lapply(which(zero_row), function(i) i)
+  cand <- which(!zero_row)
+
+  if (length(cand) >= 2 && k > 2) {
+    h <- max(1L, (k - 1L) %/% 2L)
+    hs <- k - 1L - h
+    per_size <- .disclosure_count_subsets(cnt[cand], k, max(h, hs))
+    side_p <- sum(per_size[seq_len(h)])
+    side_q <- sum(per_size[seq_len(hs)])
+    if (side_p > max_work || side_q > max_work) {
+      turas_refuse(
+        code = "CALC_DISCLOSURE_RECOVERABLE",
+        title = "The disclosure check is too large to run exactly",
+        problem = sprintf(paste0("%d small groups of respondents (under %d) could combine in %s ways, more than the ",
+                                 "%s the check allows."),
+                          length(cand), k, format(max(side_p, side_q), big.mark = ","), format(max_work, big.mark = ",")),
+        why_it_matters = "Without an exact check a client-safe file could let a group smaller than the minimum be worked out.",
+        how_to_fix = c("Declare fewer crossings or fewer filter variables, or raise the minimum group.",
+                       "Report this case."),
+        module = "DISCLOSURE")
+    }
+    nc <- length(cand)
+    # Four random directions for the hash keys, drawn from a fixed seed with
+    # the caller's random stream put back afterwards, so this stays a pure
+    # function. A collision only costs a verification; a true zero sum can
+    # never be missed.
+    had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+    saved_seed <- if (had_seed) get(".Random.seed", envir = globalenv(), inherits = FALSE) else NULL
+    set.seed(20260924L)
+    G <- matrix(stats::rnorm(ncol(Ns) * 4L), ncol(Ns), 4L)
+    if (had_seed) assign(".Random.seed", saved_seed, envir = globalenv()) else rm(".Random.seed", envir = globalenv())
+    V <- Ns[cand, , drop = FALSE] %*% G
+    cc <- cnt[cand]
+    levels <- list(list(idx = matrix(seq_len(nc), ncol = 1), proj = V, tot = cc))
+    grow <- function(prev) {
+      s <- ncol(prev$idx)
+      last <- prev$idx[, s]
+      idx <- list(); proj <- list(); tot <- list()
+      for (L in sort(unique(last))) {
+        rows <- which(last == L)
+        js <- which(seq_len(nc) > L)
+        if (!length(js)) next
+        ri <- rep(rows, each = length(js)); jj <- rep(js, times = length(rows))
+        t2 <- prev$tot[ri] + cc[jj]
+        ok <- t2 <= k - 1
+        if (!any(ok)) next
+        ri <- ri[ok]; jj <- jj[ok]
+        idx[[length(idx) + 1]] <- cbind(prev$idx[ri, , drop = FALSE], jj)
+        proj[[length(proj) + 1]] <- prev$proj[ri, , drop = FALSE] + V[jj, , drop = FALSE]
+        tot[[length(tot) + 1]] <- t2[ok]
+      }
+      if (!length(idx)) return(NULL)
+      list(idx = do.call(rbind, idx), proj = do.call(rbind, proj), tot = unlist(tot))
+    }
+    for (s in seq_len(max(h, hs) - 1L)) {
+      nxt <- grow(levels[[s]])
+      if (is.null(nxt)) break
+      levels[[s + 1L]] <- nxt
+    }
+    key_of <- function(P) do.call(paste, c(as.data.frame(round(P, 6)), sep = "|"))
+    p_size <- integer(0); p_row <- integer(0); p_key <- character(0)
+    for (s in seq_len(min(h, length(levels)))) {
+      lv <- levels[[s]]
+      p_size <- c(p_size, rep(s, nrow(lv$idx))); p_row <- c(p_row, seq_len(nrow(lv$idx)))
+      p_key <- c(p_key, key_of(lv$proj))
+    }
+    out$work <- length(p_key)
+    hash <- split(seq_along(p_key), p_key)
+    seen <- character(0)
+    exact_zero <- function(pos) max(abs(colSums(Ns[cand[pos], , drop = FALSE]))) < 1e-8
+    for (s in seq_len(min(hs, length(levels)))) {
+      lv <- levels[[s]]
+      out$work <- out$work + nrow(lv$idx)
+      hits <- hash[key_of(-lv$proj)]
+      for (qi in which(!vapply(hits, is.null, logical(1)))) {
+        Q <- lv$idx[qi, ]
+        for (g in hits[[qi]]) {
+          P <- levels[[p_size[g]]]$idx[p_row[g], ]
+          if (any(P %in% Q)) next
+          if (sum(cc[P]) + sum(cc[Q]) > k - 1) next
+          pos <- sort(c(P, Q))
+          sk <- paste(pos, collapse = ",")
+          if (sk %in% seen) next
+          if (!exact_zero(pos)) next
+          seen <- c(seen, sk)
+          found[[length(found) + 1]] <- cand[pos]
+          if (length(found) >= 5000L) break
+        }
+      }
+    }
+  }
+  if (!length(found)) return(out)
+  found <- unique(lapply(found, sort))
+  minimal <- vapply(seq_along(found), function(i) {
+    !any(vapply(seq_along(found), function(j) j != i && length(found[[j]]) < length(found[[i]]) &&
+                  all(found[[j]] %in% found[[i]]), logical(1)))
+  }, logical(1))
+  found <- found[minimal]
+  out$sets <- lapply(found, function(pos) {
+    classes <- small[pos]
+    s_c <- numeric(C); s_c[classes] <- 1
+    coef <- qr.coef(q, s_c)
     coef[is.na(coef)] <- 0
-  }
-  list(recoverable = rec, coef = coef)
+    list(atoms = which(cls %in% classes), n = sum(n_c[classes]), coef = as.numeric(coef))
+  })
+  out
 }
 
 
@@ -213,7 +370,7 @@ disclosure_differencing_pairs <- function(members, k) {
 #' Decide Which Groups a Client-Safe File May Publish
 #'
 #' Groups are the whole sample, every level of every context variable, and
-#' every cell of each declared two-way crossing, subject to the three rules in
+#' every cell of each declared two-way crossing, subject to the four rules in
 #' the file header.
 #'
 #' @param context Named list; each element list(label, values) with one value
@@ -228,8 +385,8 @@ disclosure_differencing_pairs <- function(members, k) {
 #'   \item{refused}{data frame group, why (single levels not published)}
 #'   \item{crossings}{data frame family, cells, shown, small, protecting}
 #'   \item{audit}{list line_failures (diagnostic only), differencing_failures,
-#'     recoverable_failures, candidates_checked, nesting_hidden, recovery_hidden,
-#'     rounds, k}
+#'     recoverable_failures, exact, small_atoms, nesting_hidden,
+#'     recovery_hidden, rounds, k}
 #' @export
 disclosure_publish_groups <- function(context, crossings, k, all_label = "All respondents") {
   n <- length(context[[1]]$values)
@@ -296,13 +453,7 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
     m
   }
 
-  def_of <- function(g) {
-    d <- character(0)
-    if (!is.na(g$key1)) d[g$key1] <- g$level1
-    if (!is.na(g$key2)) d[g$key2] <- g$level2
-    d
-  }
-  candidates <- disclosure_candidates(context, k)
+  atoms <- disclosure_atoms(context)
   stuck <- function(problem) {
     turas_refuse(
       code = "CALC_DISCLOSURE_RECOVERABLE", title = "A small group could still be worked out",
@@ -332,16 +483,17 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
       forced <- c(forced, new)
       next
     }
-    rc <- disclosure_recoverable(context, lapply(published, def_of), candidates)
-    if (!any(rc$recoverable)) break
-    for (j in seq_len(ncol(rc$coef))) {
-      used <- which(abs(rc$coef[, j]) > 1e-8 & ids != "all" & !ids %in% forced)
+    rc <- disclosure_small_recoverable(atoms$n, disclosure_atom_sets(atoms, lapply(seq_len(ncol(members)),
+                                                                                    function(j) members[, j])), k)
+    if (!length(rc$sets)) break
+    for (st in rc$sets) {
+      used <- which(abs(st$coef) > 1e-8 & ids != "all" & !ids %in% forced)
       if (length(used)) new <- c(new, ids[used[which.min(sizes[used])]])
     }
     new <- setdiff(unique(new), forced)
     if (!length(new)) {
-      stuck(sprintf("%d group(s) under %d respondents can be worked out and nothing more can be hidden.",
-                    sum(rc$recoverable), k))
+      stuck(sprintf("%d set(s) of under %d respondents can be worked out and nothing more can be hidden.",
+                    length(rc$sets), k))
     }
     by_recovery <- c(by_recovery, new)
     forced <- c(forced, new)
@@ -365,7 +517,8 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
     refused = if (length(refused)) do.call(rbind, refused) else data.frame(group = character(0), why = character(0)),
     crossings = if (length(cx$summ)) do.call(rbind, cx$summ) else data.frame(),
     audit = list(line_failures = cx$fails, differencing_failures = nrow(pairs),
-                 recoverable_failures = 0L, candidates_checked = length(candidates),
+                 recoverable_failures = length(rc$sets), exact = isTRUE(rc$exact),
+                 small_atoms = sum(atoms$n < k),
                  nesting_hidden = length(by_nesting), recovery_hidden = length(by_recovery),
                  rounds = rounds, k = k)
   )
@@ -377,7 +530,8 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
 #' Independent re-check of what disclosure_publish_groups() promises, for use
 #' before a file is released: every group at or above k, no pair of groups that
 #' differ by 1 to k-1 respondents with one inside the other, and, when the
-#' context is given, no small candidate recoverable from the groups.
+#' context is given, no set of 1 to k-1 respondents recoverable from the
+#' groups (the exact engine).
 #'
 #' @param members Logical matrix, respondents by groups
 #' @param k Minimum group
@@ -385,16 +539,18 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
 #' @param defs Optional list of named character definitions, one per column of
 #'   members (needed with context)
 #' @return List ok (logical), small (group ids under k), pairs (differencing
-#'   pairs), recoverable (candidate ids that can be worked out)
+#'   pairs), recoverable (readable descriptions of the sets that can be worked
+#'   out, atoms joined by " + ")
 #' @export
 disclosure_audit_groups <- function(members, k, context = NULL, defs = NULL) {
   n <- colSums(members)
   pairs <- disclosure_differencing_pairs(members, k)
   recoverable <- character(0)
   if (!is.null(context) && !is.null(defs)) {
-    cand <- disclosure_candidates(context, k)
-    rc <- disclosure_recoverable(context, defs, cand)
-    recoverable <- vapply(cand, `[[`, "", "id")[rc$recoverable]
+    atoms <- disclosure_atoms(context)
+    rc <- disclosure_small_recoverable(atoms$n, disclosure_atom_sets(atoms, lapply(seq_len(ncol(members)),
+                                                                                    function(j) members[, j])), k)
+    recoverable <- vapply(rc$sets, function(s) paste(atoms$id[s$atoms], collapse = " + "), "")
   }
   list(ok = all(n >= k) && nrow(pairs) == 0 && !length(recoverable),
        small = colnames(members)[n < k],
