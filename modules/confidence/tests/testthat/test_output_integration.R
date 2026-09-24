@@ -14,67 +14,64 @@
 library(testthat)
 
 # ==============================================================================
-# MOCK DATA BUILDERS
+# RESULT BUILDERS
 # ==============================================================================
+# These used to be hand-built mocks, and their shapes had drifted from what
+# the calculators produce: the proportion mock carried `moe_normal` (the
+# calculator stores `moe`), the study stats were a Metric/Value table, and
+# the NPS mock used field names nothing reads. The writer matched the mock,
+# so this suite passed while real runs lost the normal interval
+# (review 2026-09-24). The builders now call the real calculators.
 
-build_mock_study_stats <- function() {
+io_config <- function() {
+  list(study_settings = list(Confidence_Level = 0.95, Bootstrap_Iterations = 1000))
+}
+
+io_q_row <- function(q_id, categories = NA, wilson = "N",
+                     promoters = NA, detractors = NA) {
   data.frame(
-    Metric = c("DEFF", "Effective_N", "Weight_CV"),
-    Value = c(1.15, 870, 0.22),
-    stringsAsFactors = FALSE
+    Question_ID = q_id, Statistic_Type = "x", Categories = categories,
+    Promoter_Codes = promoters, Detractor_Codes = detractors,
+    Run_MOE = "Y", Run_Wilson = wilson, Run_Bootstrap = "N", Run_Credible = "N",
+    Prior_Mean = NA, Prior_SD = NA, Prior_N = NA, stringsAsFactors = FALSE
   )
 }
 
+io_data <- function() {
+  data.frame(
+    Q1 = rep(c(1, 1, 2, 3), 25),
+    Q2 = rep(c(4, 5, 5, 2, 1), 20),
+    Q3 = rep(c(7, 8, 6, 9), 25),
+    Q4 = rep(c(3, 4, 4, 5), 25),
+    NPS1 = rep(c(10, 9, 8, 7, 6, 3, 0, 10, 9, 5), 10),
+    w = rep(c(0.8, 1, 1.2, 1.5), 25)
+  )
+}
+
+build_mock_study_stats <- function() {
+  calculate_study_level_stats(io_data(), weight_variable = "w")
+}
+
 build_mock_proportion_results <- function() {
+  d <- io_data()
   list(
-    Q1 = list(
-      proportion = 0.45,
-      n = 100,
-      n_eff = 90,
-      category = "Yes",
-      moe_normal = list(lower = 0.35, upper = 0.55, moe = 0.098)
-    ),
-    Q2 = list(
-      proportion = 0.72,
-      n = 200,
-      n_eff = 180,
-      category = "Agree",
-      wilson = list(lower = 0.65, upper = 0.78)
-    )
+    Q1 = process_proportion_question(io_q_row("Q1", "1"), d, "w", io_config())$result,
+    Q2 = process_proportion_question(io_q_row("Q2", "4,5", wilson = "Y"), d, "w", io_config())$result
   )
 }
 
 build_mock_mean_results <- function() {
+  d <- io_data()
   list(
-    Q3 = list(
-      mean = 7.2,
-      sd = 1.5,
-      n = 150,
-      n_eff = 140,
-      t_dist = list(lower = 6.95, upper = 7.45, se = 0.12, df = 139)
-    ),
-    Q4 = list(
-      mean = 3.8,
-      sd = 0.9,
-      n = 120,
-      n_eff = 110,
-      t_dist = list(lower = 3.62, upper = 3.98, se = 0.08, df = 109)
-    )
+    Q3 = process_mean_question(io_q_row("Q3"), d, "w", io_config())$result,
+    Q4 = process_mean_question(io_q_row("Q4"), d, "w", io_config())$result
   )
 }
 
 build_mock_nps_results <- function() {
-  list(
-    NPS1 = list(
-      nps_score = 42,
-      n = 300,
-      n_eff = 280,
-      promoters = 0.55,
-      passives = 0.32,
-      detractors = 0.13,
-      ci = list(lower = 35, upper = 49)
-    )
-  )
+  list(NPS1 = process_nps_question(
+    io_q_row("NPS1", promoters = "9,10", detractors = "0,1,2,3,4,5,6"),
+    io_data(), "w", io_config())$result)
 }
 
 build_mock_config <- function() {
