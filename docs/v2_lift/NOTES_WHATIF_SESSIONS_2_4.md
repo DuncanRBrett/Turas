@@ -141,7 +141,11 @@ rule switched off, so it can fail).
 Limit, stated plainly: this tests single levels and two-way cells. A small
 set of another shape (a three-way cell, a union of cells from different rows)
 is not tested. It is the practical bound for what a reader can compose from
-one- and two-way groups, not a proof.
+one- and two-way groups, not a proof. Two things the file still reveals, by
+design: which full Build a ... profiles have fewer than k respondents (they are
+simply not offered, the usual k-anonymity practice), and how many cells of each
+declared crossing are shown (not which are hidden, nor their sizes, much as
+the tabs cube already does).
 
 ## Tests (quoted from the runs, 24 Sep 2026)
 

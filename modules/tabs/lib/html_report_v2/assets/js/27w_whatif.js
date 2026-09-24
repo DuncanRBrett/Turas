@@ -9,7 +9,8 @@
  *         whatever the filter bar says, and every number is worked out exactly,
  *         respondent by respondent, from the fixed model.
  *   safe  The island carries the model and precomputed results for published
- *         groups only (minimum group, secondary suppression, nesting check). The
+ *         groups only (modules/shared/lib/disclosure_groups.R: minimum group,
+ *         secondary suppression, nesting and recoverability checks). The
  *         tab has its own picker, offers only published groups, and adds up
  *         single-area results for combined scenarios, labelled approximate.
  *
