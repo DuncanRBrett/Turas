@@ -371,8 +371,8 @@ comparisons - Color-coded significance
 | project_name | (required) | Project title |
 | question_mapping_file | (auto-detected) | Path to question mapping file (filename, relative, or absolute) |
 | report_types | detailed | Comma-separated: detailed,wave_history,dashboard,sig_matrix,tracking_crosstab |
-| confidence_level | 0.95 | Statistical confidence |
-| min_base_size | 30 | Minimum n for sig testing |
+| alpha | 0.05 | Significance level for every wave-on-wave test; reports state 1 - alpha as the confidence |
+| minimum_base | 30 | Smallest effective base (Kish) that is tested; a smaller pair shows no arrow |
 | decimal_places_ratings | 1 | Decimal places for means |
 | decimal_places_percents | 0 | Decimal places for percentages |
 | decimal_separator | . | Period or comma |

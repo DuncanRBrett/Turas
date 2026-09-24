@@ -99,15 +99,16 @@ build_tracker_footer <- function(html_data, config) {
 
   company_name <- get_setting(config, "company_name", default = "") %||% ""
   baseline_label <- html_data$wave_lookup[html_data$baseline_wave]
-  min_base <- 30L
-  alpha <- html_data$metadata$confidence_level
-  p_val <- if (!is.null(alpha)) sprintf("p<%.2f", 1 - alpha) else "p<0.05"
+  # Both come from the settings the tests ran with (crosstab metadata)
+  min_base <- html_data$metadata$minimum_base %||% DEFAULT_MINIMUM_BASE
+  alpha <- html_data$metadata$alpha %||% DEFAULT_ALPHA
+  p_val <- sprintf("p<%.2f", alpha)
 
   # Significance test method line (matching crosstabs footer pattern)
   sig_info_parts <- c(
     "Significance testing: Wave-on-wave z-test / t-test",
     p_val,
-    sprintf("Minimum base n=%d", min_base)
+    sprintf("Minimum base n=%s", format(min_base))
   )
   sig_line <- paste(sig_info_parts, collapse = " \u00B7 ")
 

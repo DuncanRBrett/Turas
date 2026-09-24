@@ -1792,3 +1792,19 @@ test_that("Legacy build_tracker_sidebar function is removed", {
   # build_tracker_sidebar was a passthrough wrapper — now removed
   expect_false(exists("build_tracker_sidebar", mode = "function"))
 })
+
+
+# ==============================================================================
+# Footer states the alpha and minimum base the tests used
+# ==============================================================================
+
+test_that("footer prints the tested alpha and minimum base, not fixed values", {
+  html_data <- list(
+    wave_lookup = c(W1 = "Jan 2024"), baseline_wave = "W1",
+    metadata = list(alpha = 0.10, confidence_level = 0.90, minimum_base = 50,
+                    generated_at = Sys.time()))
+  txt <- as.character(build_tracker_footer(html_data, list(settings = list())))
+  expect_match(txt, "p&lt;0.10", fixed = TRUE)   # htmltools escapes "<"
+  expect_match(txt, "Minimum base n=50", fixed = TRUE)
+  expect_match(txt, "Confidence: 90%", fixed = TRUE)
+})

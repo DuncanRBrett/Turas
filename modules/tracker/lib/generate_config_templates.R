@@ -218,7 +218,7 @@ generate_tracking_config_template <- function(output_path) {
           name = "confidence_level",
           required = FALSE,
           default = "0.95",
-          description = "Confidence level for interval estimation",
+          description = "Not used for testing: significance and intervals use alpha, and reports state 1 - alpha",
           valid_values_text = "0.90, 0.95, or 0.99",
           dropdown = c("0.90", "0.95", "0.99")
         ),

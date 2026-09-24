@@ -144,11 +144,27 @@ build_tracking_crosstab <- function(trend_results, config, question_map,
     if (is.na(r$section) || r$section == "") "(Ungrouped)" else r$section
   }, character(1)))
 
+  # A confidence_level that disagrees with alpha used to be printed as the
+  # report's confidence. Say plainly that it is not what the tests used.
+  stated_conf <- suppressWarnings(as.numeric(get_setting(config, "confidence_level", default = NA)))
+  tested_alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  if (!is.na(stated_conf) && abs(stated_conf - (1 - tested_alpha)) > 1e-9) {
+    cat(sprintf(paste0("[WARNING] Setting confidence_level = %s is not used. Significance ",
+                       "is tested at alpha = %s, so the report states %s%% confidence. ",
+                       "Change alpha to change the test.\n"),
+                format(stated_conf), format(tested_alpha), format(100 * (1 - tested_alpha))))
+  }
+
   # Build metadata
   metadata <- list(
     project_name = get_setting(config, "project_name", default = "Tracking Report"),
     generated_at = Sys.time(),
-    confidence_level = get_setting(config, "confidence_level", default = 0.95),
+    # The arrows are tested at `alpha` and gated on `minimum_base`
+    # (trend_significance.R). State those, so the label cannot disagree with
+    # the test; the separate confidence_level setting is not used for testing.
+    alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA),
+    confidence_level = 1 - get_setting(config, "alpha", default = DEFAULT_ALPHA),
+    minimum_base = get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE),
     n_metrics = length(all_metric_rows),
     n_waves = length(wave_ids),
     n_segments = length(segment_names)

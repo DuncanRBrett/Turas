@@ -487,3 +487,42 @@ test_that("handles empty tracked questions", {
   result <- build_tracking_crosstab(trend_results, config, question_map)
   expect_equal(length(result$metrics), 0)
 })
+
+
+# ==============================================================================
+# TESTS: the report states the alpha and minimum base the tests used
+# ==============================================================================
+# Significance arrows are tested at the `alpha` setting and gated on
+# `minimum_base` (trend_significance.R). The Excel "Confidence Level" row and
+# the HTML footer printed the separate `confidence_level` setting and a fixed
+# base of 30, so a study run at alpha 0.10 was labelled 95%.
+
+test_that("crosstab metadata states 1 - alpha, not a separate confidence_level", {
+  config <- create_mock_config()
+  config$settings$alpha <- 0.10
+  config$settings$confidence_level <- 0.95   # stale label, not what was tested
+  config$settings$minimum_base <- 50
+  capture.output(result <- build_tracking_crosstab(
+    list(Q_SAT = create_mock_rating_trend(), Q_NPS = create_mock_nps_trend()),
+    config, create_mock_question_map()))
+  expect_equal(result$metadata$alpha, 0.10)
+  expect_equal(result$metadata$confidence_level, 0.90)
+  expect_equal(result$metadata$minimum_base, 50)
+})
+
+test_that("crosstab metadata defaults to alpha 0.05 and base 30", {
+  config <- create_mock_config()
+  capture.output(result <- build_tracking_crosstab(
+    list(Q_SAT = create_mock_rating_trend()), config, create_mock_question_map()))
+  expect_equal(result$metadata$confidence_level, 0.95)
+  expect_equal(result$metadata$minimum_base, 30)
+})
+
+test_that("a confidence_level that disagrees with alpha is reported as unused", {
+  config <- create_mock_config()
+  config$settings$alpha <- 0.10
+  config$settings$confidence_level <- 0.95
+  out <- capture.output(build_tracking_crosstab(
+    list(Q_SAT = create_mock_rating_trend()), config, create_mock_question_map()))
+  expect_true(any(grepl("confidence_level = 0.95 is not used", out, fixed = TRUE)))
+})
