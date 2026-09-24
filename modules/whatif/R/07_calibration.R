@@ -102,7 +102,9 @@ whatif_symptom_effects <- function(model, symptoms) {
 #' or real spillover; the data cannot separate the two). Chosen from the
 #' SACAP 2025 probe of 24 Sep 2026 (docs/v2_lift/BLINDSPOT_WHATIF_RESULTS_2026_09_24.md):
 #' assessment feedback and email responsiveness sat near a tenth of their
-#' single-lever effect, the areas the tab was right about near a half.
+#' single-lever effect, the areas the tab was right about near a half. An
+#' area whose single-lever effect is under one point is never flagged: there
+#' is nothing to collapse.
 WHATIF_HALO_RATIO <- 1 / 3
 
 

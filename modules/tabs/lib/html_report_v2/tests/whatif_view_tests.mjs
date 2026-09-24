@@ -334,7 +334,16 @@ run("an area caught in the halo says so under its name, keeps its number, and is
   has(html, "The data cannot separate those areas from the areas they move with");
   const row = html.slice(html.indexOf('<tr class="wi-halo">'), html.indexOf("</tr>", html.indexOf('<tr class="wi-halo">')));
   lacks(row, "~0", "a halo area is not greyed to zero");
-  has(row, "+24.3", "the area keeps its own number");
+  const own = safeAll.est[0][MOVES.indexOf("floor")];
+  assert(own > 0, "fixture's first lever has a published positive fix effect");
+  has(row, "+" + own.toFixed(1), "the area keeps its own number");
+  // Numbers withheld with the whole sample's effect: the flag still reads, no NaN.
+  const w3 = safeIsland();
+  w3.model.halo[key] = { flag: true };
+  const html3 = render(sandbox(w3));
+  has(html3, "the numbers rest on too few to show");
+  lacks(html3, "NaN");
+  lacks(html3, "undefined");
   const w2 = safeIsland();
   Object.keys(w2.model.halo || {}).forEach((k) => { w2.model.halo[k].flag = false; });
   const html2 = render(sandbox(w2));

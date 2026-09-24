@@ -140,11 +140,14 @@
     var h = (model().halo || {})[key];
     return h && h.flag === true ? h : null;
   }
+  function haloNum(h) { return h && typeof h.single === "number" && typeof h.partial === "number"; }
   function haloText(key) {
     var h = halo(key);
     if (!h) return "";
-    return "Caught in the halo: fixed on its own this area is worth " + f1(h.single) + " points for everyone, " +
-      f1(h.partial) + " with the other areas held where they are. The data cannot separate it from the areas it moves with.";
+    return "Caught in the halo: fixed on its own this area " + (haloNum(h)
+      ? "is worth " + f1(h.single) + " points for everyone, " + f1(h.partial) + " with the other areas held where they are."
+      : "is worth far more than with the other areas held where they are (the numbers rest on too few to show).") +
+      " The data cannot separate it from the areas it moves with.";
   }
   /** Whether respondent i gave no rating of their own for the lever. */
   function dkOf(O, key, i) {
@@ -765,7 +768,7 @@
     var hl = md.levers.filter(function (lv) { return halo(lv.key); });
     items.push("Every effect holds the other areas where they are, which is right for what is unique to an area and a floor for what fixing it would do, because ratings move together. " +
       (hl.length ? "Caught in the halo (fixed alone worth more than " + Math.round(1 / (md.halo_ratio || (1 / 3))) + " times its own effect): " +
-        hl.map(function (lv) { return lv.label + " (" + f1(md.halo[lv.key].single) + " alone, " + f1(md.halo[lv.key].partial) + " held); "; }).join("").replace(/; $/, ".") +
+        hl.map(function (lv) { var h = md.halo[lv.key]; return lv.label + (haloNum(h) ? " (" + f1(h.single) + " alone, " + f1(h.partial) + " held)" : "") + "; "; }).join("").replace(/; $/, ".") +
         " The data cannot separate those areas from the areas they move with; read their effect as a floor."
         : "Halo check: no area's effect collapses when the others are held where they are."));
     items.push("This is association, not cause. " + cap(units) + " who like " + (M.brand || "the organisation") +

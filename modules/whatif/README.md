@@ -37,7 +37,8 @@ Every move holds the other areas where they are. That is right for what is
 unique to an area and a floor for what fixing it would do, because ratings move
 together. The halo check (`whatif_halo_check()`, 07_calibration.R) fits each
 lever on its own and compares that fix effect with the partial one; an area
-whose partial effect is under a third of its own is shown "caught in the halo"
+whose partial effect is under a third of its own (and whose own effect is at
+least one point) is shown "caught in the halo"
 in the tab and the workbook, with its number kept, never greyed to zero. The
 workbook's Relative_importance sheet carries the LMG shares (a conventional key
 driver ranking) beside the effort table so the two can be reconciled.

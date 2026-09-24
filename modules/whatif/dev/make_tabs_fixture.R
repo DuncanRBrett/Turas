@@ -19,7 +19,9 @@ for (f in list.files(file.path("modules", "whatif", "tests", "fixtures", "synthe
                      pattern = "\\.R$", full.names = TRUE)) source(f)
 dir <- tempfile("whatif_fixture_")
 dir.create(dir)
-p <- whatif_write_test_project(dir, n = 160, seed = 21, config = list(n_boot = 10))
+# dont_know = centre so the 20 don't-know fills sit below the target: the
+# live-equals-R gate then exercises the dk flags in the need count and moves.
+p <- whatif_write_test_project(dir, n = 160, seed = 21, config = list(n_boot = 10, dont_know = "centre"))
 res <- run_whatif(p$config, verbose = FALSE)
 if (is_refusal(res) || is_error(res)) quit(status = 1)
 out <- file.path("modules", "tabs", "tests", "fixtures", "whatif", "synthetic_whatif_island.json")

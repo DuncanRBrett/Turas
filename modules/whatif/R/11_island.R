@@ -228,13 +228,28 @@ whatif_safe_block <- function(run, keys, model_block) {
          }))
   })
   counts <- tabulate(spec$y, spec$n_cat)
+  # The halo numbers are the whole sample's fix effect (partial) and the same
+  # from a single-lever fit: statistics about the movers, the respondents
+  # below the target. Where the disclosure layer withholds the "all" group's
+  # fix effect (movers or non-movers under k), the numbers go with it and only
+  # the flag stays.
+  safe_model <- whatif_safe_model(model_block, k, length(spec$y), run$notes_safe)
+  all_i <- which(vapply(groups, function(g) length(g$def) == 0, logical(1)))[1]
+  if (!is.na(all_i)) {
+    for (j in seq_along(keys)) {
+      mv <- if (spec$levers[[j]]$kind == "coverage") "extend" else "floor"
+      if (is.na(groups[[all_i]]$est[[j]][match(mv, moves)])) {
+        safe_model$halo[[keys[j]]][c("single", "partial", "ratio")] <- list(NULL, NULL, NULL)
+      }
+    }
+  }
   list(
     min_group = k,
     # Whole-sample facts the client-safe cut must state differently: outcome
     # counts only when every category clears k, and warnings without counts.
     meta = list(n_by_outcome = if (all(counts >= k)) whatif_arr(counts) else NULL,
                 warnings = whatif_arr(run$warnings_safe %||% character(0))),
-    model = whatif_safe_model(model_block, k, length(spec$y), run$notes_safe),
+    model = safe_model,
     filters = lapply(run$filter_keys, function(key) list(
       key = key, label = spec$context[[key]]$label)),
     crossings = lapply(seq_len(NROW(pub$crossings)), function(i)

@@ -147,6 +147,28 @@ release_audit_whatif <- function(body) {
   if (!is.null(safe$refused) || !is.null(safe$hidden)) {
     out$violations <- c(out$violations, "the What if island names the groups it refused or hid")
   }
+  # The halo numbers (an area's whole-sample fix effect, alone and partial)
+  # are statistics about the movers. Where the "all" group's fix effect is
+  # withheld, they must be too; the flag alone may stay.
+  md <- wi$model %||% list()
+  halo <- md$halo %||% list()
+  if (length(halo)) {
+    all_g <- Filter(function(g) length(g$def %||% list()) == 0, groups)
+    moves <- unlist(md$moves %||% list())
+    levers <- md$levers %||% list()
+    if (length(all_g) && length(moves) && length(levers)) {
+      leaked <- 0L
+      for (j in seq_along(levers)) {
+        key <- levers[[j]]$key
+        mv <- if (identical(levers[[j]]$kind, "coverage")) "extend" else "floor"
+        est <- all_g[[1]]$est[[j]][[match(mv, moves)]]
+        h <- halo[[key]] %||% list()
+        if (is.null(est) && (!is.null(h$single) || !is.null(h$partial) || !is.null(h$ratio))) leaked <- leaked + 1L
+      }
+      if (leaked) out$violations <- c(out$violations, sprintf(
+        "%d What if area(s) carry halo numbers where the whole sample's fix effect is withheld", leaked))
+    }
+  }
   if (is.na(k)) return(out)
   small <- function(x) !is.na(x) & x > 0 & x < k
   # 6. subtraction a reader can do with the island alone

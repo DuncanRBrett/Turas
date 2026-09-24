@@ -48,8 +48,20 @@ so this is the check finding the planted overlap, not a false alarm.
 
 ## Tests
 
-- whatif suite (worktree, primary renv library): 1148 passed, 0 failed.
+- whatif suite (worktree, primary renv library): 1181 passed, 0 failed.
 - shared `test_release_audit.R`: 88 passed.
+- Fixture built with `dont_know = centre`, so its 20 don't-know fills sit
+  below the target and the live-equals-R gate exercises the dk flags.
+
+## Leak found and closed in the same session
+
+The first cut shipped the halo numbers (each area's whole-sample fix effect,
+alone and partial) in the client-safe model block even where the disclosure
+layer withholds that area's "all" effect (movers or non-movers under the
+minimum). `whatif_safe_block()` now nulls single, partial and ratio for those
+areas and keeps the flag; the tab renders the flag without numbers;
+`release_audit_whatif()` refuses a file where the numbers are back. Tested on a
+planted project with three respondents below the target on one lever.
 - tabs `test_whatif_island.R`: 100 passed.
 - node `whatif_view_tests.mjs`: 19 passed.
 - Fixture regenerated: `modules/tabs/tests/fixtures/whatif/synthetic_whatif_island.json`.

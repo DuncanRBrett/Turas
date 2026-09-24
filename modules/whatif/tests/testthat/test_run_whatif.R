@@ -371,11 +371,54 @@ test_that("the halo check ships in both model blocks, and the workbook carries i
   expect_true(all(c("single", "partial", "flag") %in% names(h)))
   expect_true(is.logical(h$flag))
   expect_equal(names(j$safe$model$halo), keys)
-  expect_equal(j$safe$model$halo$teach$single, h$single)
+  # The client-safe block carries the numbers exactly where the whole
+  # sample's fix effect is published, and only the flag where it is not.
+  all_g <- Filter(function(g) length(g$def) == 0, j$safe$groups)[[1]]
+  moves <- unlist(j$model$moves)
+  for (jj in seq_along(keys)) {
+    mv <- if (j$model$levers[[jj]]$kind == "coverage") "extend" else "floor"
+    est <- all_g$est[[jj]][[match(mv, moves)]]
+    sh <- j$safe$model$halo[[keys[jj]]]
+    expect_equal(is.null(sh$single), is.null(est), info = keys[jj])
+    expect_equal(is.null(sh$partial), is.null(est), info = keys[jj])
+    expect_true(is.logical(sh$flag))
+    if (!is.null(est)) expect_equal(sh$single, j$model$halo[[keys[jj]]]$single)
+  }
   eff <- openxlsx::read.xlsx(res$files$excel, sheet = "Effort", skipEmptyRows = FALSE)
   expect_true(all(c("Fixed_alone", "Halo_ratio", "Halo") %in% names(eff)))
   expect_false(any(is.na(eff$Fixed_alone)))
   ri <- openxlsx::read.xlsx(res$files$excel, sheet = "Relative_importance", skipEmptyRows = FALSE)
   expect_equal(nrow(ri), length(keys))
   expect_equal(sum(ri$LMG_share_of_R2), 100, tolerance = 0.5)
+})
+
+test_that("a lever with fewer than the minimum below the target ships no halo numbers in the client-safe block, and the audit would catch them", {
+  p <- test_project(n = 300, seed = 11)
+  d <- utils::read.csv(file.path(p$dir, "data.csv"), stringsAsFactors = FALSE, check.names = FALSE, na.strings = "")
+  low <- which(d$Status == "Complete" & d$N1 %in% c("Terrible", "Not very good", "About average"))
+  d$N1[low[-(1:3)]] <- "Good"
+  utils::write.csv(d, file.path(p$dir, "data.csv"), row.names = FALSE, na = "")
+  r <- quietly(run_whatif(p$config, verbose = FALSE))
+  expect_false(is_refusal(r))
+  v <- jsonlite::fromJSON(r$files$island, simplifyVector = FALSE)$variants$unweighted
+  keys <- vapply(v$model$levers, `[[`, "", "key")
+  jn <- which(keys == "noise")
+  all_g <- Filter(function(g) length(g$def) == 0, v$safe$groups)[[1]]
+  fl <- match("floor", unlist(v$model$moves))
+  expect_null(all_g$est[[jn]][[fl]])
+  expect_null(all_g$need[[jn]])
+  sh <- v$safe$model$halo$noise
+  expect_null(sh$single); expect_null(sh$partial); expect_null(sh$ratio)
+  expect_true(is.logical(sh$flag))
+  expect_false(is.null(v$model$halo$noise$single))
+  # The release audit refuses the numbers if they were put back.
+  if (exists("release_audit_whatif", mode = "function")) {
+    cut <- function(w) { m <- w$safe$model; w$safe$model <- NULL; w$safe$meta <- NULL; w$meta$mode <- "safe"
+      list(meta = w$meta, model = m, safe = w$safe) }
+    body <- function(w) as.character(jsonlite::toJSON(w, auto_unbox = TRUE, null = "null", na = "null", digits = NA))
+    expect_false(any(grepl("halo numbers", release_audit_whatif(body(cut(v)))$violations)))
+    bad <- v
+    bad$safe$model$halo$noise$partial <- 1.5
+    expect_true(any(grepl("halo numbers", release_audit_whatif(body(cut(bad)))$violations)))
+  }
 })
