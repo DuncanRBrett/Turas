@@ -120,33 +120,24 @@ test_that("minify_css trims result", {
 
 test_that("build_tracker_css returns a non-empty string", {
   result <- build_tracker_css("#323367", "#5b8def")
-  # If the CSS file exists, should be non-empty; if not, empty string is acceptable
-  if (nzchar(result)) {
-    expect_true(is.character(result))
-    expect_true(nchar(result) > 0)
-  } else {
-    skip("CSS asset file not found — skipping content check")
-  }
+  # The CSS asset (lib/html_report/assets/tracker_styles.css) is tracked in
+  # git, so an empty result is a failure, not a skip
+  expect_true(is.character(result))
+  expect_true(nchar(result) > 0, info = "tracker_styles.css must be found")
 })
 
 test_that("build_tracker_css substitutes BRAND_COLOUR", {
   result <- build_tracker_css("#aa1122", "#5b8def")
-  if (nzchar(result)) {
-    expect_true(grepl("#aa1122", result, fixed = TRUE))
-    expect_false(grepl("BRAND_COLOUR", result, fixed = TRUE))
-  } else {
-    skip("CSS asset file not found — skipping substitution check")
-  }
+  expect_true(nchar(result) > 0, info = "tracker_styles.css must be found")
+  expect_true(grepl("#aa1122", result, fixed = TRUE))
+  expect_false(grepl("BRAND_COLOUR", result, fixed = TRUE))
 })
 
 test_that("build_tracker_css substitutes ACCENT_COLOUR", {
   result <- build_tracker_css("#323367", "#ff9900")
-  if (nzchar(result)) {
-    expect_true(grepl("#ff9900", result, fixed = TRUE))
-    expect_false(grepl("ACCENT_COLOUR", result, fixed = TRUE))
-  } else {
-    skip("CSS asset file not found — skipping substitution check")
-  }
+  expect_true(nchar(result) > 0, info = "tracker_styles.css must be found")
+  expect_true(grepl("#ff9900", result, fixed = TRUE))
+  expect_false(grepl("ACCENT_COLOUR", result, fixed = TRUE))
 })
 
 

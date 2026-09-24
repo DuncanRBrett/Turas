@@ -189,8 +189,7 @@ test_that("TrackingSpecs preserves valid specs", {
 # ==============================================================================
 
 test_that("config loader TrackingSpecs validation: comma-separated specs do not warn", {
-  skip_if_not(exists("load_tracking_config", mode = "function"),
-              "load_tracking_config not loaded")
+  expect_true(exists("load_tracking_config", mode = "function"), info = "load_tracking_config must be loaded")
   skip_if_not(requireNamespace("openxlsx", quietly = TRUE), "openxlsx not available")
 
   tmp_dir <- tempdir()
@@ -239,8 +238,7 @@ test_that("config loader TrackingSpecs validation: comma-separated specs do not 
 })
 
 test_that("config loader TrackingSpecs validation: invalid specs produce warning", {
-  skip_if_not(exists("load_tracking_config", mode = "function"),
-              "load_tracking_config not loaded")
+  expect_true(exists("load_tracking_config", mode = "function"), info = "load_tracking_config must be loaded")
   skip_if_not(requireNamespace("openxlsx", quietly = TRUE), "openxlsx not available")
 
   tmp_dir <- tempdir()
@@ -292,10 +290,8 @@ test_that("config loader TrackingSpecs validation: invalid specs produce warning
 # ==============================================================================
 
 test_that("preflight check_tracking_specs_valid: accepts all valid spec types", {
-  skip_if_not(exists("check_tracking_specs_valid", mode = "function"),
-              "check_tracking_specs_valid not loaded")
-  skip_if_not(exists("log_preflight_issue", mode = "function"),
-              "log_preflight_issue not loaded")
+  expect_true(exists("check_tracking_specs_valid", mode = "function"), info = "check_tracking_specs_valid must be loaded")
+  expect_true(exists("log_preflight_issue", mode = "function"), info = "log_preflight_issue must be loaded")
 
   # Use the actual column structure from log_preflight_issue
   error_log <- data.frame(Timestamp = character(0), Component = character(0),
@@ -323,10 +319,8 @@ test_that("preflight check_tracking_specs_valid: accepts all valid spec types", 
 })
 
 test_that("preflight check_tracking_specs_valid: rejects invalid specs", {
-  skip_if_not(exists("check_tracking_specs_valid", mode = "function"),
-              "check_tracking_specs_valid not loaded")
-  skip_if_not(exists("log_preflight_issue", mode = "function"),
-              "log_preflight_issue not loaded")
+  expect_true(exists("check_tracking_specs_valid", mode = "function"), info = "check_tracking_specs_valid must be loaded")
+  expect_true(exists("log_preflight_issue", mode = "function"), info = "log_preflight_issue must be loaded")
 
   error_log <- data.frame(Timestamp = character(0), Component = character(0),
                           Issue_Type = character(0), Description = character(0),
@@ -347,10 +341,8 @@ test_that("preflight check_tracking_specs_valid: rejects invalid specs", {
 })
 
 test_that("preflight check_tracking_specs_valid: strips =Label before validation", {
-  skip_if_not(exists("check_tracking_specs_valid", mode = "function"),
-              "check_tracking_specs_valid not loaded")
-  skip_if_not(exists("log_preflight_issue", mode = "function"),
-              "log_preflight_issue not loaded")
+  expect_true(exists("check_tracking_specs_valid", mode = "function"), info = "check_tracking_specs_valid must be loaded")
+  expect_true(exists("log_preflight_issue", mode = "function"), info = "log_preflight_issue must be loaded")
 
   error_log <- data.frame(Timestamp = character(0), Component = character(0),
                           Issue_Type = character(0), Description = character(0),

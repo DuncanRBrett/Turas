@@ -126,8 +126,7 @@ make_wave_data_list <- function(n = 50) {
 # --- 1. check_wave_ids_unique ---
 
 test_that("check_wave_ids_unique detects duplicate WaveIDs", {
-  skip_if(!exists("check_wave_ids_unique", mode = "function"),
-          "check_wave_ids_unique not available")
+  expect_true(exists("check_wave_ids_unique", mode = "function"), info = "check_wave_ids_unique must exist in preflight_validators.R")
 
   waves_df <- make_waves_df(ids = c("W1", "W1", "W2"))
 
@@ -138,8 +137,7 @@ test_that("check_wave_ids_unique detects duplicate WaveIDs", {
 })
 
 test_that("check_wave_ids_unique passes with unique IDs", {
-  skip_if(!exists("check_wave_ids_unique", mode = "function"),
-          "check_wave_ids_unique not available")
+  expect_true(exists("check_wave_ids_unique", mode = "function"), info = "check_wave_ids_unique must exist in preflight_validators.R")
 
   waves_df <- make_waves_df()
   result <- check_wave_ids_unique(waves_df, new_error_log())
@@ -151,8 +149,7 @@ test_that("check_wave_ids_unique passes with unique IDs", {
 # --- 2. check_wave_dates_valid ---
 
 test_that("check_wave_dates_valid detects start after end", {
-  skip_if(!exists("check_wave_dates_valid", mode = "function"),
-          "check_wave_dates_valid not available")
+  expect_true(exists("check_wave_dates_valid", mode = "function"), info = "check_wave_dates_valid must exist in preflight_validators.R")
 
   waves_df <- make_waves_df(
     starts = c("2025-02-01", "2025-07-01"),
@@ -166,8 +163,7 @@ test_that("check_wave_dates_valid detects start after end", {
 })
 
 test_that("check_wave_dates_valid warns about non-chronological order", {
-  skip_if(!exists("check_wave_dates_valid", mode = "function"),
-          "check_wave_dates_valid not available")
+  expect_true(exists("check_wave_dates_valid", mode = "function"), info = "check_wave_dates_valid must exist in preflight_validators.R")
 
   waves_df <- make_waves_df(
     starts = c("2025-07-01", "2025-01-01"),
@@ -183,8 +179,7 @@ test_that("check_wave_dates_valid warns about non-chronological order", {
 # --- 3. check_tracked_questions_in_mapping ---
 
 test_that("check_tracked_questions_in_mapping detects unmapped questions", {
-  skip_if(!exists("check_tracked_questions_in_mapping", mode = "function"),
-          "check_tracked_questions_in_mapping not available")
+  expect_true(exists("check_tracked_questions_in_mapping", mode = "function"), info = "check_tracked_questions_in_mapping must exist in preflight_validators.R")
 
   tracked_df <- make_tracked_df(codes = c("Q1", "Q2", "Q99"))
   mapping_df <- make_mapping_df(codes = c("Q1", "Q2"))
@@ -199,8 +194,7 @@ test_that("check_tracked_questions_in_mapping detects unmapped questions", {
 # --- 4. check_tracking_specs_valid ---
 
 test_that("check_tracking_specs_valid detects invalid tokens", {
-  skip_if(!exists("check_tracking_specs_valid", mode = "function"),
-          "check_tracking_specs_valid not available")
+  expect_true(exists("check_tracking_specs_valid", mode = "function"), info = "check_tracking_specs_valid must exist in preflight_validators.R")
 
   tracked_df <- data.frame(
     QuestionCode = "Q1",
@@ -216,8 +210,7 @@ test_that("check_tracking_specs_valid detects invalid tokens", {
 })
 
 test_that("check_tracking_specs_valid passes with valid specs", {
-  skip_if(!exists("check_tracking_specs_valid", mode = "function"),
-          "check_tracking_specs_valid not available")
+  expect_true(exists("check_tracking_specs_valid", mode = "function"), info = "check_tracking_specs_valid must exist in preflight_validators.R")
 
   tracked_df <- data.frame(
     QuestionCode = c("Q1", "Q2"),
@@ -235,8 +228,7 @@ test_that("check_tracking_specs_valid passes with valid specs", {
 # --- 5. check_minimum_wave_count ---
 
 test_that("check_minimum_wave_count detects single wave", {
-  skip_if(!exists("check_minimum_wave_count", mode = "function"),
-          "check_minimum_wave_count not available")
+  expect_true(exists("check_minimum_wave_count", mode = "function"), info = "check_minimum_wave_count must exist in preflight_validators.R")
 
   waves_df <- data.frame(WaveID = "W1", stringsAsFactors = FALSE)
 
@@ -247,8 +239,7 @@ test_that("check_minimum_wave_count detects single wave", {
 })
 
 test_that("check_minimum_wave_count passes with two waves", {
-  skip_if(!exists("check_minimum_wave_count", mode = "function"),
-          "check_minimum_wave_count not available")
+  expect_true(exists("check_minimum_wave_count", mode = "function"), info = "check_minimum_wave_count must exist in preflight_validators.R")
 
   waves_df <- make_waves_df()
   result <- check_minimum_wave_count(waves_df, new_error_log())
@@ -260,8 +251,7 @@ test_that("check_minimum_wave_count passes with two waves", {
 # --- 6. check_baseline_wave_valid ---
 
 test_that("check_baseline_wave_valid detects invalid baseline wave", {
-  skip_if(!exists("check_baseline_wave_valid", mode = "function"),
-          "check_baseline_wave_valid not available")
+  expect_true(exists("check_baseline_wave_valid", mode = "function"), info = "check_baseline_wave_valid must exist in preflight_validators.R")
 
   config <- list(baseline_wave = "W99")
   waves_df <- make_waves_df()
@@ -273,8 +263,7 @@ test_that("check_baseline_wave_valid detects invalid baseline wave", {
 })
 
 test_that("check_baseline_wave_valid skips when no baseline specified", {
-  skip_if(!exists("check_baseline_wave_valid", mode = "function"),
-          "check_baseline_wave_valid not available")
+  expect_true(exists("check_baseline_wave_valid", mode = "function"), info = "check_baseline_wave_valid must exist in preflight_validators.R")
 
   config <- list(baseline_wave = NULL)
   waves_df <- make_waves_df()
@@ -287,8 +276,7 @@ test_that("check_baseline_wave_valid skips when no baseline specified", {
 # --- 7. check_wave_files_exist ---
 
 test_that("check_wave_files_exist detects missing files", {
-  skip_if(!exists("check_wave_files_exist", mode = "function"),
-          "check_wave_files_exist not available")
+  expect_true(exists("check_wave_files_exist", mode = "function"), info = "check_wave_files_exist must exist in preflight_validators.R")
 
   waves_df <- data.frame(
     WaveID = c("W1", "W2"),
@@ -302,8 +290,7 @@ test_that("check_wave_files_exist detects missing files", {
 })
 
 test_that("check_wave_files_exist passes with existing files", {
-  skip_if(!exists("check_wave_files_exist", mode = "function"),
-          "check_wave_files_exist not available")
+  expect_true(exists("check_wave_files_exist", mode = "function"), info = "check_wave_files_exist must exist in preflight_validators.R")
 
   tmp <- tempdir()
   f1 <- file.path(tmp, "wave1.csv")
@@ -328,8 +315,7 @@ test_that("check_wave_files_exist passes with existing files", {
 # --- 8. check_logo_and_colours ---
 
 test_that("check_logo_and_colours detects invalid hex colour", {
-  skip_if(!exists("check_logo_and_colours", mode = "function"),
-          "check_logo_and_colours not available")
+  expect_true(exists("check_logo_and_colours", mode = "function"), info = "check_logo_and_colours must exist in preflight_validators.R")
 
   config <- list(brand_colour = "not-hex", accent_colour = "#323367")
 
@@ -339,8 +325,7 @@ test_that("check_logo_and_colours detects invalid hex colour", {
 })
 
 test_that("check_logo_and_colours passes with valid hex colours", {
-  skip_if(!exists("check_logo_and_colours", mode = "function"),
-          "check_logo_and_colours not available")
+  expect_true(exists("check_logo_and_colours", mode = "function"), info = "check_logo_and_colours must exist in preflight_validators.R")
 
   config <- list(brand_colour = "#1e3a5f", accent_colour = "#2aa198")
 
@@ -352,8 +337,7 @@ test_that("check_logo_and_colours passes with valid hex colours", {
 # --- 9. check_nps_question_range ---
 
 test_that("check_nps_question_range detects out-of-range NPS data", {
-  skip_if(!exists("check_nps_question_range", mode = "function"),
-          "check_nps_question_range not available")
+  expect_true(exists("check_nps_question_range", mode = "function"), info = "check_nps_question_range must exist in preflight_validators.R")
 
   tracked_df <- data.frame(
     QuestionCode = "QNPS", QuestionType = "NPS",
@@ -377,8 +361,7 @@ test_that("check_nps_question_range detects out-of-range NPS data", {
 # --- 10. check_rating_question_numeric ---
 
 test_that("check_rating_question_numeric detects non-numeric data", {
-  skip_if(!exists("check_rating_question_numeric", mode = "function"),
-          "check_rating_question_numeric not available")
+  expect_true(exists("check_rating_question_numeric", mode = "function"), info = "check_rating_question_numeric must exist in preflight_validators.R")
 
   tracked_df <- data.frame(
     QuestionCode = "QR", QuestionType = "Rating",
@@ -404,8 +387,7 @@ test_that("check_rating_question_numeric detects non-numeric data", {
 # --- 11. validate_tracker_preflight orchestrator ---
 
 test_that("validate_tracker_preflight runs on minimal valid inputs", {
-  skip_if(!exists("validate_tracker_preflight", mode = "function"),
-          "validate_tracker_preflight not available")
+  expect_true(exists("validate_tracker_preflight", mode = "function"), info = "validate_tracker_preflight must exist in preflight_validators.R")
 
   tmp <- tempdir()
   f1 <- file.path(tmp, "w1_data.csv")
@@ -444,8 +426,7 @@ test_that("validate_tracker_preflight runs on minimal valid inputs", {
 })
 
 test_that("validate_tracker_preflight detects issues in bad config", {
-  skip_if(!exists("validate_tracker_preflight", mode = "function"),
-          "validate_tracker_preflight not available")
+  expect_true(exists("validate_tracker_preflight", mode = "function"), info = "validate_tracker_preflight must exist in preflight_validators.R")
 
   waves_df <- data.frame(
     WaveID = c("W1"),
