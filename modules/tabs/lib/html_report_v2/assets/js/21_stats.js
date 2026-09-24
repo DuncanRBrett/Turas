@@ -863,10 +863,20 @@
    * pooled SE, alpha 0.05, and the normal-approximation precondition
    * n*p̂ >= 5 and n*(1-p̂) >= 5 in BOTH groups.
    */
-  /** z statistic of p1 vs p2, or null when preconditions fail. */
-  stats.propZ = function (x1, n1, x2, n2) {
+  /**
+   * z statistic of p1 vs p2, or null when preconditions fail. n1 / n2 are the
+   * bases the SE rides (the Kish effective base when weighted). Pass the
+   * WEIGHTED bases w1 / w2 as well on a weighted design: the pooled p is then
+   * R's, formed on the design-weighted counts and bases, (p1 w1 + p2 w2) /
+   * (w1 + w2). Without them it pooled on n_eff, a different p whenever the two
+   * columns' design effects differ, which could flip a letter or the n*p >= 5
+   * precondition against R (review 24 Sep 2026). Unweighted callers omit them.
+   */
+  stats.propZ = function (x1, n1, x2, n2, w1, w2) {
     if (n1 < 1 || n2 < 1) return null;
-    var pooled = (x1 + x2) / (n1 + n2);
+    var pooled = (w1 > 0 && w2 > 0)
+      ? (x1 / n1 * w1 + x2 / n2 * w2) / (w1 + w2)
+      : (x1 + x2) / (n1 + n2);
     if (pooled === 0 || pooled === 1) return null;
     var minExpected = Math.min(n1 * pooled, n1 * (1 - pooled),
       n2 * pooled, n2 * (1 - pooled));
@@ -1008,7 +1018,7 @@
         if (!sizeOf(other) || sizeOf(other) < lowBaseThreshold) continue;
         var z = isMean
           ? stats.meanZ(cell.mean, cell.sd, cell.k, other.mean, other.sd, other.k)
-          : stats.propZ(cell.x, cell.base, other.x, other.base);
+          : stats.propZ(cell.x, cell.base, other.x, other.base, cell.wbase, other.wbase);
         if (z === null) continue;
         if (z > zHi) out += letters[j] || "";
         else if (dual && z > zLo) out += (letters[j] || "").toLowerCase();

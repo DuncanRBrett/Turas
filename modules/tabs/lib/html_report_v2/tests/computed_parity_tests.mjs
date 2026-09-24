@@ -244,7 +244,8 @@ function publishedLetters(TR, pub, row, dual) {
       return { x: null, base: null };
     }
     const denom = c.baseW != null ? c.baseW : c.base;
-    return { x: (cell.n / denom) * size, base: size };
+    // wbase: pool on the weighted counts, R's rule (21_stats.js propZ).
+    return { x: (cell.n / denom) * size, base: size, wbase: c.baseW != null ? c.baseW : undefined };
   });
   return TR.stats.sigLetters(cells, letters, pub.lowBaseThreshold ||
     TR.AGG.project.low_base_threshold || 30, false, dual);
