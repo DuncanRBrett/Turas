@@ -1717,43 +1717,74 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 /* the estimate, a band for its 90% range.                                   */
 .wi-view { max-width: 1100px; }
 .wi-view h2 { margin: 0 0 4px; }
-.wi-panel { margin: 18px 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.wi-panel { margin: 16px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 22px; }
 .wi-panel h3 { margin: 0; font-size: 1.05rem; }
 .wi-panel h4 { margin: 14px 0 4px; font-size: .95rem; }
-.wi-panel > summary { cursor: pointer; font-weight: 600; font-size: 1rem; }
+.wi-panel > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wi-panel > summary::-webkit-details-marker { display: none; }
+.wi-panel > summary::before { content: ""; align-self: center; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
+.wi-panel[open] > summary::before { transform: rotate(45deg); }
+.wi-panel[open] > summary { margin-bottom: 8px; }
+.wi-sumtitle { font-size: 1.05rem; font-weight: 600; color: var(--ink); }
+.wi-sumhint { font-size: .82rem; color: var(--muted); }
 .wi-cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
 .wi-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; vertical-align: middle; }
 .wi-live { background: #e7f4ec; color: #1f6b3a; }
 .wi-safe { background: #eceaf7; color: var(--brand); }
 .wi-prov { margin: 4px 0; font-size: .9rem; }
+.wi-note, .wi-lead, .wi-prov { max-width: 720px; }
 .wi-note, .wi-lead { margin: 4px 0 10px; font-size: .86rem; color: var(--muted); line-height: 1.45; }
+.wi-note b { color: var(--ink); font-weight: 600; }
+.wi-notes { margin: 4px 0 10px; }
+.wi-notes .wi-note { margin: 2px 0; }
 .wi-warn { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #c2410c; background: #fff7ed; font-size: .88rem; }
 .wi-ok { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #15803d; background: #f0fdf4; font-size: .88rem; }
-.wi-kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
-.wi-kpi { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-width: 120px; }
-.wi-kpi b { display: block; font-size: 1.5rem; color: var(--brand); }
-.wi-kpi span { font-size: .8rem; color: var(--muted); }
+/* The KPI tiles take the Dashboard stat tile look (.kpi), without its hover and click. */
+.wi-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 12px; max-width: 520px; }
+.wi-kpi { border: 1px solid var(--line); border-left: 4px solid var(--brand); border-radius: 10px; padding: 9px 12px 7px; background: var(--card); display: flex; flex-direction: column; gap: 2px; }
+.wi-kpi-label { font-size: 10.5px; color: var(--muted); }
+.wi-kpi-value { font-size: 21px; font-weight: 800; color: var(--ink); }
 .wi-picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .wi-lbl { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
 .wi-lbl-note { font-size: .8rem; color: var(--muted); }
 .wi-chip { background: var(--soft, #f1f0fb); border: 1px solid var(--line); border-radius: 999px; padding: 3px 6px 3px 12px; font-size: 12px; }
 .wi-chip button { border: 0; background: transparent; cursor: pointer; color: var(--muted); }
+.wi-tablewrap { overflow-x: auto; }
 .wi-table { border-collapse: collapse; width: 100%; margin: 6px 0; }
 .wi-table th, .wi-table td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; font-size: .88rem; vertical-align: top; }
 .wi-table thead th { font-weight: 600; border-bottom: 1px solid #cfcfd6; }
 .wi-table .num { text-align: right; white-space: nowrap; }
 .wi-table small { display: block; color: var(--muted); font-size: .78rem; }
 .wi-rng { display: block; color: var(--muted); font-size: .76rem; }
-.wi-tag { margin-left: 6px; font-size: .7rem; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.wi-tag { margin-left: 6px; font-size: .7rem; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+.wi-tag-halo { color: #7a5200; background: #fdf3dc; border-color: #ecd9a8; }
+.wi-tag-unclear { color: var(--muted); background: var(--soft); }
 .wi-unclear td { color: #9aa1ad; }
 .wi-halo > td:first-child { box-shadow: inset 3px 0 0 #d9a441; }
-.wi-barcol { width: 18%; min-width: 90px; }
-.wi-bar { height: 9px; background: #eef0f4; border-radius: 2px; }
+.wi-effort td { vertical-align: middle; }
+.wi-effort .wi-areacol { width: 45%; }
+.wi-effort .wi-areacol small { font-size: .76rem; }
+.wi-effort .wi-area { font-weight: 500; }
+.wi-effort .wi-gaincol { width: 21%; }
+.wi-gain { display: flex; align-items: center; gap: 10px; }
+.wi-gain b { min-width: 34px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.wi-bar { flex: 1; height: 9px; min-width: 60px; background: #eef0f4; border-radius: 2px; }
 .wi-bar i { display: block; height: 9px; border-radius: 2px; background: var(--brand, #323367); }
+.wi-halonote { border-left: 3px solid #d9a441; padding-left: 9px; }
 .wi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 14px; margin: 8px 0; }
 .wi-grid label { display: flex; flex-direction: column; gap: 3px; font-size: .84rem; }
 .wi-grid select, .wi-picker select, .wi-sentence select { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; max-width: 100%; }
-.wi-scenres { font-size: .95rem; margin: 10px 0 4px; }
+.wi-moves { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 6px 28px; margin: 10px 0 6px; }
+.wi-grp { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 6px 0 2px; }
+.wi-moverow { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding: 5px 0; font-size: .86rem; }
+.wi-moverow span { color: var(--muted); min-width: 0; }
+.wi-moverow select { flex: none; width: 240px; font: inherit; font-size: .84rem; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.wi-moverow.wi-on span { color: var(--ink); font-weight: 600; }
+.wi-moverow.wi-on select { border-color: var(--brand); font-weight: 600; }
+.wi-result { margin: 12px 0 10px; padding: 10px 14px 4px; background: var(--soft); border-left: 3px solid var(--brand); border-radius: 6px; }
+.wi-result .wi-line { margin-bottom: 0; }
+.wi-scenres { font-size: .95rem; margin: 2px 0 4px; }
+.wi-scenres b { font-size: 1.3rem; font-weight: 800; }
 .wi-sentence { font-size: 1.05rem; line-height: 2.2; margin: 8px 0; }
 .wi-sentence select { font-size: .95rem; margin: 0 2px; }
 .wi-headline { font-size: 1rem; font-weight: 600; margin: 8px 0; }
@@ -1769,7 +1800,13 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 .wi-hollow { border: 2px solid var(--ink); background: #fff; }
 .wi-fill { background: var(--brand); color: #fff; }
 .wi-cap { position: absolute; top: 0; transform: translateX(-50%); font-size: 10.5px; color: var(--ink); white-space: nowrap; }
-@media (max-width: 640px) { .wi-barcol { display: none; } }
+@media (max-width: 640px) {
+  .wi-bar { display: none; }
+  .wi-effort { min-width: 560px; }
+  .wi-effort .wi-areacol { width: 40%; }
+  .wi-moves { grid-template-columns: 1fr; }
+  .wi-moverow select { width: 160px; }
+}
 
 /* The bar track. The bar is the estimate; the whisker is its interval, drawn
    over the bar so a wide interval reads as uncertainty rather than as size. */

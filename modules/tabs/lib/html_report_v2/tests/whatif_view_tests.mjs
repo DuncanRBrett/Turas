@@ -322,21 +322,25 @@ run("a respondent flagged dk is never moved and never counted as needing the fix
   assert(g2.need[j] === g.need[j] + below, "without flags the fills count: " + g2.need[j] + " vs " + (g.need[j] + below));
 });
 
-run("an area caught in the halo says so under its name, keeps its number, and is listed in How this works", () => {
+run("an area caught in the halo is marked on its row, keeps its number, is explained under the table and listed in How this works", () => {
   const w = safeIsland();
-  const key = w.model.levers[0].key;
+  const lv0 = w.model.levers[0], key = lv0.key;
   w.model.halo = w.model.halo || {};
+  Object.keys(w.model.halo).forEach((k) => { w.model.halo[k].flag = false; });
   w.model.halo[key] = { single: 12.3, partial: 2.1, ratio: 0.171, flag: true };
   const html = render(sandbox(w));
-  has(html, "Caught in the halo: fixed on its own this area is worth +12.3 points");
-  has(html, "+2.1 with the other areas held where they are");
   has(html, 'class="wi-halo"');
-  has(html, "The data cannot separate those areas from the areas they move with");
   const row = html.slice(html.indexOf('<tr class="wi-halo">'), html.indexOf("</tr>", html.indexOf('<tr class="wi-halo">')));
-  lacks(row, "~0", "a halo area is not greyed to zero");
+  has(row, "caught in the halo", "the row carries the chip");
+  lacks(row, "fixed on its own", "the row stays one line: the sentence is under the table");
   const own = safeAll.est[0][MOVES.indexOf("floor")];
   assert(own > 0, "fixture's first lever has a published positive fix effect");
   has(row, "+" + own.toFixed(1), "the area keeps its own number");
+  const note = html.slice(html.indexOf("wi-halonote"), html.indexOf("</p>", html.indexOf("wi-halonote")));
+  has(note, "this area is worth far more than with the other areas held where they are");
+  has(note, lv0.label + ": +12.3 on its own, +2.1 held", "the note gives the area's two numbers");
+  has(note, "read the number in the table as a floor");
+  has(html, "The data cannot separate those areas from the areas they move with", "How this works lists it");
   // Numbers withheld with the whole sample's effect: the flag still reads, no NaN.
   const w3 = safeIsland();
   w3.model.halo[key] = { flag: true };
@@ -349,6 +353,33 @@ run("an area caught in the halo says so under its name, keeps its number, and is
   const html2 = render(sandbox(w2));
   has(html2, "Halo check: no area's effect collapses");
   lacks(html2, "Caught in the halo");
+});
+
+run("an unclear area shows one chip and dashes, and the scenario groups levers by bundle only when bundles do not overlap", () => {
+  const w = safeIsland();
+  const lv0 = w.model.levers[0];
+  w.model.sign = w.model.sign || {};
+  w.model.sign[lv0.key] = 0.4;
+  const html = render(sandbox(w));
+  const at = html.indexOf('<tr class="wi-unclear">');
+  assert(at !== -1, "an unclear row");
+  const row = html.slice(at, html.indexOf("</tr>", at));
+  has(row, "wi-tag-unclear");
+  has(row, "Points the wrong way in 40% of refits");
+  lacks(row, "~0");
+  lacks(row, "wi-bar", "no empty bar for an unclear area");
+  assert((row.match(/–/g) || []).length === 3, "a dash in each number cell");
+  has(html, "the effect points the wrong way in more than", "explained once under the table");
+  // Grouping: bundles that share no lever become the groups, the rest go last.
+  const levers = [{ key: "a" }, { key: "b" }, { key: "c" }, { key: "d" }];
+  const sg = sandbox(w).TR.whatif._scenarioGroups;
+  const g1 = sg({ levers: levers, bundles: [{ name: "One", moves: { b: "up1", a: "up1" } }, { name: "Two", moves: { c: "up1" } }] });
+  assert(JSON.stringify(g1.map((g) => [g.name, g.levers.map((l) => l.key)])) ===
+    JSON.stringify([["One", ["a", "b"]], ["Two", ["c"]], ["Other areas", ["d"]]]), "grouped: " + JSON.stringify(g1));
+  const g2 = sg({ levers: levers, bundles: [{ name: "One", moves: { a: "up1" } }, { name: "Two", moves: { a: "up1", c: "up1" } }] });
+  assert(g2.length === 1 && g2[0].name === "" && g2[0].levers.length === 4, "overlapping bundles: one plain list");
+  const g3 = sg({ levers: levers, bundles: [] });
+  assert(g3.length === 1 && g3[0].name === "", "no bundles: one plain list");
 });
 
 run("the kept audiences and moves give the same page as a fresh start, and a new island starts afresh", () => {

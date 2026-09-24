@@ -21,7 +21,8 @@
  * A respondent flagged dk in the open rows gave no rating for that lever: the
  * live view leaves them out of the need count and the moves, as R does. The
  * model block's halo check marks an area whose effect collapses when the other
- * areas are held (shown under the area, never greyed to zero).
+ * areas are held (a chip on the area and one note under the effort table,
+ * never greyed to zero).
  * Literal strings only (no TR.txt keys), no em dashes.
  */
 (function (global) {
@@ -141,13 +142,19 @@
     return h && h.flag === true ? h : null;
   }
   function haloNum(h) { return h && typeof h.single === "number" && typeof h.partial === "number"; }
-  function haloText(key) {
-    var h = halo(key);
-    if (!h) return "";
-    return "Caught in the halo: fixed on its own this area " + (haloNum(h)
-      ? "is worth " + f1(h.single) + " points for everyone, " + f1(h.partial) + " with the other areas held where they are."
-      : "is worth far more than with the other areas held where they are (the numbers rest on too few to show).") +
-      " The data cannot separate it from the areas it moves with.";
+  /** One note under the effort table for every area marked with the halo
+   *  chip, so the rows stay one line each. */
+  function haloNote(levers) {
+    if (!levers.length) return "";
+    var items = levers.map(function (lv) {
+      var h = halo(lv.key);
+      return lv.label + ": " + (haloNum(h) ? f1(h.single) + " on its own, " + f1(h.partial) + " held"
+        : "the numbers rest on too few to show");
+    });
+    return "fixed on its own for everyone, " + (levers.length > 1 ? "each of these areas is" : "this area is") +
+      " worth far more than with the other areas held where they are. " + items.join("; ") +
+      ". The data cannot separate " + (levers.length > 1 ? "them" : "it") + " from the areas " +
+      (levers.length > 1 ? "they move" : "it moves") + " with, so read the number in the table as a floor.";
   }
   /** Whether respondent i gave no rating of their own for the lever. */
   function dkOf(O, key, i) {
@@ -429,8 +436,10 @@
         esc(M.units || "respondents") + ", and the picker below offers only those groups.") + "</p>";
     if (!live) h += safePickerHtml();
     if (G && G.n >= (M.min_group || 1)) {
-      h += '<div class="wi-kpis"><div class="wi-kpi"><b>' + r0(G.actual) + "</b><span>Actual " + esc(label) + "</span></div>" +
-        '<div class="wi-kpi"><b>' + esc(G.n) + "</b><span>" + esc(cap(M.units || "respondents")) + " in the model</span></div></div>";
+      h += '<div class="wi-kpis"><div class="wi-kpi"><span class="wi-kpi-label">Actual ' + esc(label) + '</span><b class="wi-kpi-value">' +
+        r0(G.actual) + "</b></div>" +
+        '<div class="wi-kpi"><span class="wi-kpi-label">' + esc(cap(M.units || "respondents")) + ' in the model</span><b class="wi-kpi-value">' +
+        esc(G.n) + "</b></div></div>";
       if (G.n < (M.reliability_floor || 30)) {
         h += '<p class="wi-warn">Only ' + esc(G.n) + " " + esc(M.units) + " in this group. Results under " +
           esc(M.reliability_floor) + " are thin: a pointer, not a finding.</p>";
@@ -485,26 +494,41 @@
       pinButton("Where to direct effort", G.who) + "</div>";
     h += '<p class="wi-lead">What ' + esc(M.score_label || "the score") + " would lose if an area slipped, and gain if it were fixed for the " +
       esc(units) + " who need it, for " + esc(G.who) + ".</p>";
-    h += '<table class="wi-table"><thead><tr><th>Area</th><th class="num">' + esc(cap(units)) + " who need it</th>" +
-      '<th class="num">If it slips</th><th class="num">If fixed</th><th class="num">Net gain per 100 ' + esc(units) +
-      ' reached</th><th class="wi-barcol"></th></tr></thead><tbody>';
+    h += '<div class="wi-tablewrap"><table class="wi-table wi-effort"><thead><tr><th class="wi-areacol">Area</th><th class="num">' + esc(cap(units)) +
+      " who need it</th>" + '<th class="num">If it slips</th><th class="num">If fixed</th><th class="wi-gaincol" title="Net gain per 100 ' +
+      esc(units) + ' reached">Net gain per 100 reached</th></tr></thead><tbody>';
+    var haloed = [], DASH = "–";
     rows.forEach(function (r) {
-      var lv = r.lv, sub = r.unclear ? "Effect unclear: points the wrong way in " + Math.round(100 * md.sign[lv.key]) + "% of refits"
-        : halo(lv.key) ? haloText(lv.key) + (lv.sub ? " " + lv.sub : "") : lv.sub;
+      var lv = r.lv, hl = !r.unclear && !!halo(lv.key);
+      if (hl) haloed.push(lv);
+      // One short line under the area: why it is unclear, or the config's note.
+      var sub = r.unclear ? "Points the wrong way in " + Math.round(100 * md.sign[lv.key]) + "% of refits" : lv.sub;
       var needTxt = r.cnt === null || r.cnt === undefined ? "not shown" : String(r.cnt);
-      h += "<tr" + (r.unclear ? ' class="wi-unclear"' : halo(lv.key) ? ' class="wi-halo"' : "") + "><td>" + esc(lv.label) +
+      h += "<tr" + (r.unclear ? ' class="wi-unclear"' : hl ? ' class="wi-halo"' : "") + '><td class="wi-areacol">' +
+        '<span class="wi-area">' + esc(lv.label) + "</span>" +
         '<span class="wi-tag">' + (lv.kind === "coverage" ? "coverage" : "rating") + "</span>" +
+        (r.unclear ? '<span class="wi-tag wi-tag-unclear">unclear</span>' : "") +
+        (hl ? '<span class="wi-tag wi-tag-halo">caught in the halo</span>' : "") +
         (sub ? "<small>" + esc(sub) + "</small>" : "") + "</td>";
       h += '<td class="num">' + esc(needTxt) + "</td>";
       [r.slip, r.fix].forEach(function (s) {
-        h += '<td class="num">' + (r.unclear ? "~0" : withheld(s) ? "not shown" :
+        h += '<td class="num">' + (r.unclear ? DASH : withheld(s) ? "not shown" :
           f1(s.pt) + '<span class="wi-rng">' + f1(s.lo) + " to " + f1(s.hi) + "</span>") + "</td>";
       });
-      h += '<td class="num">' + (r.unclear ? "~0" : r.per100 === null ? "n/a" : f0(r.per100)) + "</td>";
-      var w = r.unclear || r.per100 === null ? 0 : Math.max(0, 100 * r.per100 / mx);
-      h += '<td class="wi-barcol"><div class="wi-bar"><i style="width:' + w.toFixed(1) + '%"></i></div></td></tr>';
+      var bar = "";
+      if (!r.unclear && r.per100 !== null) {
+        bar = '<span class="wi-bar"><i style="width:' + Math.max(0, 100 * r.per100 / mx).toFixed(1) + '%"></i></span>';
+      }
+      h += '<td class="wi-gaincol"><span class="wi-gain"><b>' + (r.unclear ? DASH : r.per100 === null ? "n/a" : f0(r.per100)) +
+        "</b>" + bar + "</span></td></tr>";
     });
-    h += "</tbody></table>";
+    h += "</tbody></table></div>";
+    if (haloed.length) h += '<p class="wi-note wi-halonote"><b>Caught in the halo:</b> ' + esc(haloNote(haloed)) + "</p>";
+    if (rows.some(function (r) { return r.unclear; })) {
+      h += '<p class="wi-note"><b>Unclear:</b> the effect points the wrong way in more than ' +
+        Math.round(100 * (md.unclear_share || 0.1)) + "% of the refits, so no number is shown. " +
+        "The data cannot separate it from the areas it overlaps.</p>";
+    }
     var sc = scaleOf(), good = labelOf(sc.good);
     h += '<p class="wi-note">Ratings: slipping is one ' + esc(sc.step || "point") + " lower for everyone; fixing lifts every " +
       esc(unit) + " below " + esc(good) + " up to " + esc(good) + ". Coverage: slipping withdraws it from every " + esc(unit) +
@@ -515,6 +539,25 @@
     return h + "</div>";
   }
 
+  /** The scenario's levers, grouped under the config's bundles when each lever
+   *  sits in one bundle at most (SACAP: Teaching, Service, then the rest).
+   *  Otherwise one ungrouped list, in the config's order. */
+  function scenarioGroups(md) {
+    var bundles = md.bundles || [], seen = {}, overlap = false;
+    bundles.forEach(function (b) {
+      Object.keys(b.moves || {}).forEach(function (k) { if (seen[k]) overlap = true; seen[k] = true; });
+    });
+    if (!bundles.length || overlap) return [{ name: "", levers: md.levers }];
+    var groups = bundles.map(function (b) {
+      return { name: b.name, levers: md.levers.filter(function (lv) { return b.moves[lv.key]; }) };
+    }).filter(function (g) { return g.levers.length; });
+    if (!groups.length) return [{ name: "", levers: md.levers }];
+    var rest = md.levers.filter(function (lv) { return !seen[lv.key]; });
+    if (rest.length) groups.push({ name: "Other areas", levers: rest });
+    return groups;
+  }
+  wi._scenarioGroups = scenarioGroups;
+
   function scenarioHtml(G) {
     var M = meta(), md = model(), st = wi.state, label = M.score_label || "score";
     var h = '<div class="wi-panel" data-snap-card><div class="wi-cardhead"><h3>Build a scenario</h3>' +
@@ -522,16 +565,20 @@
     h += '<p class="wi-lead">' + (G.exact
       ? "Combine moves across areas. Worked out exactly, " + esc(M.unit) + " by " + esc(M.unit) + ", for the current group."
       : "Combine moves across areas. Each area's own result is added up, so combined results are approximate; the bundles below show how close that gets.") + "</p>";
-    h += '<div class="wi-grid">';
-    md.levers.forEach(function (lv) {
-      h += "<label><span>" + esc(lv.label) + "</span><select data-wi-scen=\"" + esc(lv.key) + '" aria-label="' +
-        esc(lv.label) + ' scenario"><option value="">No change</option>';
-      movesFor(lv).forEach(function (m) {
-        h += '<option value="' + m + '"' + (st.scen[lv.key] === m ? " selected" : "") + ">" + esc(moveLabel(lv, m)) + "</option>";
+    h += '<div class="wi-moves">';
+    scenarioGroups(md).forEach(function (g) {
+      h += '<div class="wi-movegrp">' + (g.name ? '<div class="wi-grp">' + esc(g.name) + "</div>" : "");
+      g.levers.forEach(function (lv) {
+        h += '<label class="wi-moverow' + (st.scen[lv.key] ? " wi-on" : "") + '"><span>' + esc(lv.label) +
+          "</span><select data-wi-scen=\"" + esc(lv.key) + '" aria-label="' + esc(lv.label) + ' scenario"><option value="">No change</option>';
+        movesFor(lv).forEach(function (m) {
+          h += '<option value="' + m + '"' + (st.scen[lv.key] === m ? " selected" : "") + ">" + esc(moveLabel(lv, m)) + "</option>";
+        });
+        h += "</select></label>";
       });
-      h += "</select></label>";
+      h += "</div>";
     });
-    h += "</div>";
+    h += '</div><div class="wi-result">';
     var chosen = Object.keys(st.scen).filter(function (k) { return st.scen[k]; });
     if (!chosen.length) {
       h += '<p class="wi-scenres">' + esc(cap(label)) + " for " + esc(G.who) + ": <b>" + r0(G.actual) +
@@ -550,8 +597,9 @@
       var unc = md.levers.filter(function (lv) { return st.scen[lv.key] && unclear(lv.key); }).map(function (lv) { return lv.label; });
       if (unc.length) h += '<p class="wi-note">' + esc(unc.join(" and ")) + (unc.length > 1 ? " have" : " has") + " no reliable effect, so that part is noise.</p>";
     }
+    h += "</div>";
     if ((md.bundles || []).length) {
-      h += '<table class="wi-table wi-bundles"><thead><tr><th>Bundle</th><th class="num">Worked out together</th>' +
+      h += '<div class="wi-tablewrap"><table class="wi-table wi-bundles"><thead><tr><th>Bundle</th><th class="num">Worked out together</th>' +
         '<th class="num">Sum of each part</th></tr></thead><tbody>';
       md.bundles.forEach(function (b, bi) {
         // "Sum of each part" adds single-area results, the client-safe
@@ -566,7 +614,7 @@
           '<td class="num">' + (withheld(ex) ? "not shown" : f1(ex.pt) + '<span class="wi-rng">' + f1(ex.lo) + " to " + f1(ex.hi) + "</span>") + "</td>" +
           '<td class="num">' + (parts.hidden ? "not shown" : f1(parts.pt)) + "</td></tr>";
       });
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
     }
     return h + "</div>";
   }
@@ -700,13 +748,15 @@
       Math.round(100 * main.probs[main.probs.length - 1]) + "% chance of being " + esc(an(top)) + " " + esc(top) + ".</p>";
     var tq = (1 - rangeLevel()) / 2;
     h += lineHtml(M.actual, "All " + units, main.score, draws.length ? [pct(draws, tq), pct(draws, 1 - tq)] : null);
+    // The notes sit together under the line, then the buttons.
+    h += '<div class="wi-notes">';
     if (st.profNote) h += '<p class="wi-note">' + esc(st.profNote) + "</p>";
     h += '<p class="wi-note">' + esc(matchNote(P, prof)) + "</p>";
-    h += '<div class="wi-btnrow"><button class="wi-btn" data-wi-random>Show a random ' + esc(unit) + '</button>' +
-      '<button class="wi-btn" data-wi-reset>Reset</button></div>';
     h += '<p class="wi-note">Who ' + an(unit) + " " + esc(unit) + " is explains little of any one " + esc(unit) +
       "'s answer, but groups do differ: across real " + esc(units) + "' profiles the expected " + esc(M.score_label || "score") +
-      " runs from about " + r0(P.spread[0]) + " to " + r0(P.spread[2]) + ".</p>";
+      " runs from about " + r0(P.spread[0]) + " to " + r0(P.spread[2]) + ".</p></div>";
+    h += '<div class="wi-btnrow"><button class="wi-btn" data-wi-random>Show a random ' + esc(unit) + '</button>' +
+      '<button class="wi-btn" data-wi-reset>Reset</button></div>';
     return h + "</div>";
   }
 
@@ -739,7 +789,8 @@
       st.rate = {};
       md.levers.forEach(function (lv) { st.rate[lv.key] = lv.kind === "coverage" ? 1 : goodOf(lv); st.rateHas[lv.key] = 1; });
     }
-    var h = '<details class="wi-panel"><summary>Rate ' + esc(M.brand || "them") + " as one " + esc(unit) + "</summary>";
+    var h = '<details class="wi-panel"><summary><span class="wi-sumtitle">Rate ' + esc(M.brand || "them") + " as one " + esc(unit) +
+      '</span><span class="wi-sumhint">How one ' + esc(unit) + "'s ratings map to the outcome</span></summary>";
     h += '<p class="wi-lead">Set how one ' + esc(unit) + " rates each area. The model gives the chance they would be in each outcome group. " +
       "Who they are is set to the average " + esc(unit) + ". This is the model behind the effort table, seen from one " + esc(unit) + "'s side.</p>";
     h += '<div class="wi-grid">';
@@ -811,7 +862,8 @@
     items.push("This is association, not cause. " + cap(units) + " who like " + (M.brand || "the organisation") +
       " rate everything higher, so real gains are probably smaller than shown.");
     (md.notes || []).forEach(function (t) { items.push(t); });
-    var h = '<details class="wi-panel"><summary>How this works</summary><ul class="wi-list">' +
+    var h = '<details class="wi-panel"><summary><span class="wi-sumtitle">How this works</span>' +
+      '<span class="wi-sumhint">The model, its checks and its limits</span></summary><ul class="wi-list">' +
       items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>";
     if ((md.symptoms || []).length) {
       h += "<h4>Looks like a lever, is not one</h4><ul class=\"wi-list\">" + md.symptoms.map(function (s) {
