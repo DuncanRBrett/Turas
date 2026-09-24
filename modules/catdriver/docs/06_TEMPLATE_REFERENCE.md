@@ -143,6 +143,18 @@ listed an Instructions sheet, which the template has never contained.
 -   **When FALSE:** Omits Odds Ratios and Diagnostics sheets
 -   **When TRUE:** Full 6-sheet output
 
+#### v2_island
+
+-   **Purpose:** Also write `{output}_cd_island.json` beside the Excel
+    output, so a tabs report for the same project can carry a
+    Categorical drivers tab
+-   **Required:** No
+-   **Data Type:** TRUE/FALSE
+-   **Default:** `FALSE`
+-   **To use it:** set the tabs config's `catdriver_island` setting to
+    the file this writes, then rebuild the tabs report. See
+    `modules/tabs/docs/MODULE_TABS_GUIDE.md`
+
 ------------------------------------------------------------------------
 
 ### Subgroup Comparison Settings (Optional)

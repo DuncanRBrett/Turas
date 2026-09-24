@@ -658,6 +658,20 @@ frequent value).
 
 **Note:** Mode is calculated on unweighted data only.
 
+#### show_numeric_sd
+
+**What it does:** Controls whether Numeric questions show the Standard
+Deviation row.
+
+**Required:** No
+
+**What to enter:** `TRUE` or `FALSE`
+
+**Default:** `TRUE`
+
+**Note:** Turn it off for skewed measures such as spend or counts, where
+the SD exceeds the mean and says less than the bins above it.
+
 #### show_numeric_outliers
 
 **What it does:** Controls whether to report outlier counts for Numeric
@@ -901,6 +915,74 @@ nothing behind it.
 | `show_differences` | Show the Differences tab | TRUE / FALSE | TRUE |
 | `show_tracking` | Show the Tracking tab. Also needs `html_report_v2_tracking = TRUE` and at least one prior wave in `waves_source` | TRUE / FALSE | TRUE |
 | `show_qualitative` | Show the Qualitative (comment) tab. Also needs a `qual_workbook` that joins to the survey | TRUE / FALSE | TRUE |
+| `show_save_copy` | Show the *Save copy* button in the report header. This is a button, not a tab. Set `FALSE` for a copy that is published rather than worked in, such as a public demo or a client copy that must stay the one version of record | TRUE / FALSE | TRUE |
+
+The module tabs (Conjoint, MaxDiff, Pricing, Key drivers, Categorical
+drivers, What if) have no `show_` switch. Each appears only when its
+contribution file is named. See Module Tabs below.
+
+### Who Is This File For? (Delivery Mode)
+
+Every report is built in one of three modes. The config sets what the
+project normally ships; the tabs GUI then asks **Who is this file for?**
+for each build.
+
+| GUI choice | Mode it builds | What the file carries |
+|----|----|----|
+| Full report | `records` | De-identified respondent-level records (coded answers and weights). Every live view works. For you, or for a client who has been told |
+| Client safe, interactive | `cube` | No respondent records. Precomputed group statistics power the live filter, custom and composite banners, Differences, Group overview and the Reader, on the declared variables only. Any cut where a group falls below `min_reporting_base` is withheld |
+| Client safe, frozen | `none` | No respondent records and no live filtering. Published tables, dashboard, tracking and comments only |
+
+The GUI choice sets a **floor** of protection and never lowers the
+config's own. Ordered from least to most protected: `records`, `cube`,
+`none`. So *Client safe, interactive* turns a `records` config into a cube
+but leaves a `none` config at `none`, and *Full report* leaves the config's
+mode as it is. A project configured to ship aggregates cannot be turned
+back into a respondent-level file from the GUI.
+
+A cube needs a threshold. A config that sets `html_report_v2_interactivity
+= cube` with `min_reporting_base` not above 1 is refused
+(`CFG_CUBE_NEEDS_K`). When it is the GUI's *Client safe, interactive*
+choice that asks for the cube and there is no threshold, the build drops
+to `none` instead and says so on the console.
+
+A client-safe build (either kind) also floors the comment dials: verbatim
+text off `full` becomes `redacted`, and demographic tags become `safe`
+(interactive, when `min_reporting_base` is set) or `block` (frozen, or no
+threshold). Module tabs follow the mode too: see Module Tabs below.
+
+| Setting | Description | Values | Default |
+|----|----|----|----|
+| `html_report_v2_interactivity` | What powers the report's live views, as above. Blank inherits from `html_report_v2_microdata` (`FALSE` there means `none`). Setting `html_report_v2_microdata = FALSE` together with `records` or `cube` here is refused (`CFG_INTERACTIVITY_CONFLICT`); prefer this setting and leave the old one blank | `records` / `cube` / `none` | `records` |
+| `html_report_v2_filter_vars` | Extra questions a `cube` build may be filtered and cross-tabbed by, beyond the banner groups. Each must be a single-response question with category rows; a multi-mention question is not supported. A cut by anything undeclared is refused on the page, so declare what the client will want to cut by. Ignored on `records` and `none` builds | Comma-separated question codes, e.g. `Q008,Q012` | *(blank)* |
+| `html_report_v2_cube_order` | How many declared variables a live filter on a `cube` build may combine. One filter plus a banner is two, so `2` means "filter and still see every banner". `3` allows a filter on two variables plus a banner, at roughly a third more file size and more withheld cuts on a small sample. `1` is filter or banner, not both. Ignored on `records` and `none` builds | `1` / `2` / `3` | `2` |
+
+Operator guidance, including when each mode is the right one to send:
+[OPERATOR_GUIDE.md](../../../OPERATOR_GUIDE.md), "Confidentiality Ship".
+
+### Module Tabs
+
+Each of these names another Turas module's contribution file. Named, the
+report gains that module's tab in the Read group; blank, there is no tab and
+nothing else about the report changes. A relative path is read from this
+config file's folder; a full path works too. A named file that is missing
+or of the wrong kind prints a console `[WARNING]` and the report is built
+without the tab. The run does not stop.
+
+| Setting | File (written by) | Tab |
+|----|----|----|
+| `conjoint_island` | `{output}_cj_island.json` (conjoint, every run with utilities) | Conjoint |
+| `maxdiff_island` | `{output}_md_island.json` (maxdiff, every run) | MaxDiff |
+| `pricing_island` | `{output}_pr_island.json` (pricing, every run) | Pricing |
+| `keydriver_island` | `{output}_kd_island.json` (keydriver, every run) | Key drivers |
+| `catdriver_island` | `{output}_cd_island.json` (catdriver, when its own `v2_island = TRUE`) | Categorical drivers |
+| `whatif_island` | `{output_name}_whatif_island.json` (whatif, every run) | What if |
+
+What if is the only one that changes with the delivery mode and the
+report's weighting. The other five ship the same in every mode and follow
+their own module's weighting. Full guide, including the route that adds
+segment, conjoint, maxdiff and pricing results as crosstab questions:
+[MODULE_TABS_GUIDE.md](MODULE_TABS_GUIDE.md).
 
 ### Dashboard Settings
 
@@ -1044,7 +1126,7 @@ above. Descriptions below are the template's own help text.
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `html_report_v2_microdata` | `TRUE` | Embed the anonymised per-respondent microdata island in the v2 report (coded answer indices + weights, no names, IDs or text). Powers the live filter, custom banners and COMPUTED views. Set `FALSE` for a confidentiality ship to insider populations (e.g. a small staff survey sent to the employer): the file then carries published aggregates only, and the live features switch off for that build. The Tracking tab still works, its current wave is built from the published figures, but no `*_wave.json` is written, so keep the one from your microdata run. **`FALSE` is required wherever `min_reporting_base` is a promise**, with the island present, sub-k detail is reconstructable from the page source. Tip: keep `TRUE` for your own working copy and build the client copy with `FALSE` from a second config. |
+| `html_report_v2_microdata` | `TRUE` | Embed the anonymised per-respondent microdata island in the v2 report (coded answer indices + weights, no names, IDs or text). Powers the live filter, custom banners and COMPUTED views. Set `FALSE` for a confidentiality ship to insider populations (e.g. a small staff survey sent to the employer): the file then carries published aggregates only, and the live features switch off for that build. The Tracking tab still works, its current wave is built from the published figures, but no `*_wave.json` is written, so keep the one from your microdata run. **A client-safe build is required wherever `min_reporting_base` is a promise**: with the island present, sub-k detail is reconstructable from the page source. The newer `html_report_v2_interactivity` setting (see Who Is This File For?) says the same thing in three values and adds the interactive `cube` build; prefer it, and leave this one blank. Tip: keep your own working copy on `records` and build the client copy by choosing a client-safe option in the GUI. |
 | `population_size` | *(blank)* | Total universe size for a census / full-invite study (e.g. all staff or students invited). Enables the finite population correction in the v2 report: intervals narrow as coverage of the universe rises, and a small base that is most of a known group is no longer flagged unstable. Per-group sizes go in the optional Population sheet. Blank = no correction. |
 | `sampling_note` | *(blank)* | Fieldwork caveat appended to the "How sure can I be of these numbers?" sentence in the v2 report, e.g. substitution when a selected store was unavailable, replaced clusters, low response. Plain text, one or two sentences. |
 

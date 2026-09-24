@@ -359,6 +359,19 @@ build_catdriver_settings_def <- function() {
           integer_range = NULL
         ),
         list(
+          name = "v2_island",
+          required = FALSE,
+          default = "FALSE",
+          description = paste0("Also write {output}_cd_island.json beside the Excel output, so a ",
+            "tabs report for the same project can carry a Categorical drivers tab. Point the ",
+            "tabs config's catdriver_island setting at that file. Off by default: a project ",
+            "with no tabs report has no use for it."),
+          valid_values_text = "TRUE or FALSE",
+          dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
           name = "probability_lifts",
           required = FALSE,
           default = "TRUE",
