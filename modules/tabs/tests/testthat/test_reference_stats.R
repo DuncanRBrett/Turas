@@ -182,3 +182,24 @@ test_that("reference: a DK flagged ExcludeFromIndex with an in-range code leaves
   # 0 excluded: promoters 10, 9; detractor 6; n = 3 -> (2 - 1) / 3 * 100
   expect_equal(r$value, 100 / 3)
 })
+
+# ==============================================================================
+# LIKERT INDEX: ExcludeFromIndex wins over an Index_Weight
+# ==============================================================================
+#
+# Hand example. Options 1..5 carry Index_Weight 0, 25, 50, 75, 100; "DK"
+# carries Index_Weight 0 (filled in by habit) and ExcludeFromIndex = Y.
+# Answers 1, 5, DK, DK: index without the DKs = (0 + 100) / 2 = 50. The engine
+# counted them at weight 0: (0 + 100 + 0 + 0) / 4 = 25. The microdata writer
+# and the island's index_scores already honour the flag, so the Excel index and
+# the report's recompute disagreed.
+
+test_that("reference: an option flagged ExcludeFromIndex stays out of the Likert index", {
+  opts <- data.frame(QuestionCode = "L", OptionText = c(as.character(1:5), "DK"),
+                     Index_Weight = c(0, 25, 50, 75, 100, 0),
+                     ExcludeFromIndex = c(rep(NA, 5), "Y"), stringsAsFactors = FALSE)
+  qi <- data.frame(QuestionCode = "L", Variable_Type = "Likert", stringsAsFactors = FALSE)
+  r <- calculate_summary_statistic(data.frame(L = c("1", "5", "DK", "DK")), qi, opts, rep(1, 4))
+  expect_equal(r$value, 50)
+  expect_equal(length(r$values), 2)
+})

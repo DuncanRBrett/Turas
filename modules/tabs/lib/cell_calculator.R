@@ -411,8 +411,16 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
 #' @export
 calculate_likert_index <- function(data, question_col, options_info, weights) {
   
-  # Get options with index weights
-  index_options <- options_info[!is.na(options_info$Index_Weight), ]
+  # Options with an index weight, less any flagged ExcludeFromIndex = Y. The
+  # flag wins over a weight filled in by habit: the microdata writer and the
+  # island's index_scores already dropped flagged options, so the Excel index
+  # counted a don't-know the report's recompute did not (review 24 Sep 2026).
+  keep <- !is.na(options_info$Index_Weight)
+  if ("ExcludeFromIndex" %in% names(options_info)) {
+    flag <- toupper(trimws(as.character(options_info$ExcludeFromIndex)))
+    keep <- keep & (is.na(flag) | flag != "Y")
+  }
+  index_options <- options_info[keep, , drop = FALSE]
   
   if (nrow(index_options) == 0 || !question_col %in% names(data)) {
     return(NULL)
