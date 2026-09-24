@@ -114,3 +114,9 @@ Regenerate SACAP 2025 through `launch_turas()` once this is merged. Look at
 the What if tab in the dev report and in the hardened report. Things to try:
 change the audience filter, go back to everyone, pick two scenario moves, and
 look at the effort table's halo note.
+
+Not checked here: pins. "Where to direct effort" and "Build a scenario" are
+pinnable cards, and the TurasPins capture inliner skips default-looking style
+values (CLAUDE.md, report rendering). The bar now sits in a flex cell, and
+the halo and unclear chips are new. Pin both cards to the Story and check
+that the bars and chips survive in the pin.
