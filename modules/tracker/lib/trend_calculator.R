@@ -613,8 +613,7 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
       # Strip "range:" prefix before passing to calculate_custom_range
       range_part <- sub("^range:", "", spec_lower)
       result <- calculate_custom_range(values, weights, range_part)
-      metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)  # Clean for list name
-      metrics[[metric_name]] <- result$proportion
+      metrics[[metric_storage_key(spec_lower)]] <- result$proportion
 
     } else if (grepl("^box:", spec_lower)) {
       # box:CATEGORY — calculate proportion of values in a BoxCategory group
@@ -633,8 +632,7 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
       } else {
         proportion <- NA
       }
-      metric_name <- paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
-      metrics[[metric_name]] <- proportion
+      metrics[[metric_storage_key(spec)]] <- proportion
 
     } else if (spec_lower == "distribution") {
       result <- calculate_distribution(values, weights)
@@ -663,15 +661,7 @@ calculate_enhanced_changes_and_significance <- function(specs_list, wave_results
   significance <- list()
 
   for (spec in specs_list) {
-    spec_lower <- tolower(trimws(spec))
-    metric_name <- if (grepl("^range:", spec_lower)) {
-      gsub("[^a-z0-9_]", "_", spec_lower)
-    } else if (grepl("^box:", spec_lower)) {
-      box_name <- sub("^box:", "", spec_lower)
-      paste0("box_", gsub("[^a-z0-9_]", "_", box_name))
-    } else {
-      spec_lower
-    }
+    metric_name <- metric_storage_key(spec)
 
     # Skip distribution (too complex for wave-over-wave comparison)
     if (metric_name == "distribution") {

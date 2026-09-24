@@ -183,7 +183,7 @@ write_enhanced_rating_trend_table <- function(wb, sheet_name, result, wave_ids, 
     for (i in seq_along(wave_ids)) {
       wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
       if (isTRUE(wave_result$available) && !is.null(wave_result$metrics)) {
-        metric_val <- wave_result$metrics[[metric_lower]]
+        metric_val <- wave_result$metrics[[metric_storage_key(metric_lower)]]
         if (!is.null(metric_val)) {
           metric_values[i] <- round(metric_val, decimal_places)
         } else {
@@ -722,7 +722,7 @@ extract_wave_history_metrics <- function(q_result) {
       }
 
       metrics[[length(metrics) + 1]] <- list(
-        metric_key = spec_lower,
+        metric_key = metric_storage_key(spec_lower),
         label = label
       )
     }

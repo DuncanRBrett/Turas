@@ -206,7 +206,7 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
         for (wave_id in wave_ids) {
           wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
           if (isTRUE(wave_result$available) && !is.null(wave_result$metrics)) {
-            metric_val <- wave_result$metrics[[metric_lower]]
+            metric_val <- wave_result$metrics[[metric_storage_key(metric_lower)]]
             if (!is.null(metric_val) && is.numeric(metric_val)) {
               metric_values[idx] <- round(metric_val, decimal_places)
             } else {
@@ -665,12 +665,16 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
           # Get baseline and latest values from metrics list
           baseline_wr <- safe_wave_result(total_result$wave_results, baseline_wave)
           if (isTRUE(baseline_wr$available)) {
-            baseline_val <- baseline_wr$metrics[[metric_lower]]
+            baseline_val <- baseline_wr$metrics[[metric_storage_key(metric_lower)]]
           }
           latest_wr <- safe_wave_result(total_result$wave_results, latest_wave)
           if (isTRUE(latest_wr$available)) {
-            latest_val <- latest_wr$metrics[[metric_lower]]
+            latest_val <- latest_wr$metrics[[metric_storage_key(metric_lower)]]
           }
+
+          # A metric missing from a wave is NA here, never NULL
+          if (is.null(baseline_val) || length(baseline_val) != 1) baseline_val <- NA
+          if (is.null(latest_val) || length(latest_val) != 1) latest_val <- NA
 
           # Calculate change
           abs_change <- NA

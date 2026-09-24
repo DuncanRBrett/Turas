@@ -40,6 +40,30 @@ VALID_METRIC_TYPES <- unlist(METRIC_TYPES, use.names = FALSE)
 # VALIDATION FUNCTIONS
 # ------------------------------------------------------------------------------
 
+#' Storage Key for a Rating / Composite Metric Spec
+#'
+#' The one place that decides the name a TrackingSpec is stored under in a
+#' wave result's `metrics` list. The calculator writes with it and every
+#' writer reads with it, so a `range:` or `box:` row cannot be written blank.
+#'   "range:4-5"  -> "range_4_5"
+#'   "box:Agree"  -> "box_agree"
+#'   "top2_box"   -> "top2_box" (unchanged)
+#'
+#' @param spec Character. One TrackingSpec, any case, label already stripped
+#' @return Character. The metrics-list name
+#' @keywords internal
+metric_storage_key <- function(spec) {
+  spec_lower <- tolower(trimws(spec))
+  if (grepl("^range:", spec_lower)) {
+    gsub("[^a-z0-9_]", "_", spec_lower)
+  } else if (grepl("^box:", spec_lower)) {
+    paste0("box_", gsub("[^a-z0-9_]", "_", trimws(sub("^box:", "", spec_lower))))
+  } else {
+    spec_lower
+  }
+}
+
+
 #' Check if a metric type is valid
 #'
 #' @param metric_type Character string to validate

@@ -817,3 +817,71 @@ test_that("write_tracker_output handles banner results end-to-end", {
   expect_true("Change_Summary" %in% sheet_names)
   expect_true("Metadata" %in% sheet_names)
 })
+
+
+# ==============================================================================
+# range: and box: metrics reach the sheets (robustness review 24 Sep 2026)
+# ==============================================================================
+# The calculator stores range:4-5 as metrics$range_4_5 and box:Agree as
+# metrics$box_agree. The writers looked the raw spec up instead, so those rows
+# were written blank on every trend sheet and the Change Summary crashed the
+# whole run on the NULL it got back.
+
+range_box_result <- function(w1 = c(3.9, 60, 45), w2 = c(4.1, 72, 50)) {
+  wr <- function(v) list(available = TRUE, n_unweighted = 100, eff_n = 80,
+                         metrics = list(mean = v[1], range_4_5 = v[2], box_agree = v[3]))
+  list(question_code = "CX", question_text = "CX index", question_type = "Composite",
+       metric_type = "composite_enhanced",
+       tracking_specs = c("mean", "range:4-5", "box:Agree"),
+       wave_results = list(W1 = wr(w1), W2 = wr(w2)),
+       changes = list(), significance = list())
+}
+
+sheet_cells <- function(wb, sheet) {
+  openxlsx::read.xlsx(wb, sheet = sheet, colNames = FALSE, skipEmptyRows = FALSE)
+}
+
+test_that("detailed trend sheet writes range: and box: values, not blanks", {
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "CX")
+  write_enhanced_rating_trend_table(wb, "CX", range_box_result(), c("W1", "W2"),
+                                    make_mock_config(), create_tracker_styles(), 1)
+  df <- sheet_cells(wb, "CX")
+  row_of <- function(label) which(df[[1]] == label)[1]
+  expect_equal(as.numeric(df[row_of("% 4-5"), 2:3]), c(60, 72))
+  box_row <- which(grepl("Agree", df[[1]]))[1]
+  expect_false(is.na(box_row))
+  expect_equal(as.numeric(df[box_row, 2:3]), c(45, 50))
+})
+
+test_that("banner trend sheet writes range: values for every segment", {
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "CX")
+  segs <- list(Total = range_box_result(), Region_North = range_box_result(c(3.8, 55, 40), c(4.0, 70, 48)))
+  write_banner_trend_table(wb, "CX", segs, c("W1", "W2"), make_mock_config(),
+                           create_tracker_styles(), 1)
+  df <- sheet_cells(wb, "CX")
+  r <- which(df[[1]] == "% 4-5")[1]
+  expect_equal(as.numeric(df[r, 2:5]), c(60, 72, 55, 70))
+})
+
+test_that("Change Summary handles range: specs and shows their change", {
+  wb <- openxlsx::createWorkbook()
+  banner_results <- list(CX = list(Total = range_box_result()))
+  expect_no_error(write_change_summary_sheet(wb, banner_results, make_mock_config(),
+                                             create_tracker_styles()))
+  df <- sheet_cells(wb, "Change_Summary")
+  r <- which(df[[2]] == "range:4-5")[1]
+  expect_false(is.na(r))
+  expect_equal(as.numeric(df[r, 3:5]), c(60, 72, 12))
+})
+
+test_that("wave history finds range: and box: values", {
+  res <- range_box_result()
+  keys <- extract_wave_history_metrics(res)
+  vals <- vapply(keys, function(k) {
+    v <- extract_metric_value_by_key(res$wave_results$W2, k$metric_key, res$metric_type)
+    if (is.null(v)) NA_real_ else as.numeric(v)
+  }, numeric(1))
+  expect_equal(unname(vals), c(4.1, 72, 50))
+})
