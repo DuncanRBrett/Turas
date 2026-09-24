@@ -30,6 +30,17 @@ safe_extract_numeric <- function(value) {
   suppressWarnings(as.numeric(val_str))
 }
 
+# The Study_Settings random_seed, or NULL when blank or absent. The template
+# promises it makes the bootstrap reproducible; until 2026-09-24 it was
+# validated and never passed on, so every run gave different intervals. Each
+# bootstrap reseeds with it, so a question's interval does not depend on which
+# questions ran before it.
+config_bootstrap_seed <- function(config) {
+  seed <- safe_extract_numeric(config$study_settings$random_seed)
+  if (is.null(seed) || is.na(seed)) return(NULL)
+  as.integer(seed)
+}
+
 # ==============================================================================
 # PROPORTION CI DISPATCH
 # ==============================================================================
@@ -104,7 +115,8 @@ dispatch_proportion_ci <- function(p, n_eff, values, categories, weights,
         categories = categories,
         weights    = weights,
         B          = boot_iter,
-        conf_level = conf_level
+        conf_level = conf_level,
+        seed       = config_bootstrap_seed(config)
       )
     }, error = function(e) {
       warnings_list <<- c(warnings_list,
@@ -206,7 +218,8 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
         values     = values,
         weights    = weights,
         B          = boot_iter,
-        conf_level = conf_level
+        conf_level = conf_level,
+        seed       = config_bootstrap_seed(config)
       )
     }, error = function(e) {
       warnings_list <<- c(warnings_list,
@@ -337,6 +350,8 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
 
     n <- length(values)
     boot_nps <- numeric(boot_iter)
+    boot_seed <- config_bootstrap_seed(config)
+    if (!is.null(boot_seed)) set.seed(boot_seed)
 
     for (b in 1:boot_iter) {
       boot_idx <- sample(1:n, size = n, replace = TRUE)
