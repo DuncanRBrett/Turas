@@ -88,6 +88,29 @@ var PricingSimulator = (function() {
     return intents[intents.length - 1];
   }
 
+  /**
+   * The price a view's revenue is compared against, or null when it has none.
+   * Total: R's optimum, unchanged. A segment: its OWN optimum, found by the
+   * rule R uses for the total (find_optimal_price, 04_gabor_granger.R): the
+   * tested price with the highest price x intent, the first on a tie as
+   * which.max takes it. Tested prices only, because R does not search between
+   * them and the two must agree. The total's price is never a fallback: it
+   * made a segment read "at optimum" at the wrong price (review 2026-09-24).
+   */
+  function optimalPriceFor(segment) {
+    if (!segment || segment === "total") return data.optimal_price || null;
+    var s = data.segments && data.segments[segment];
+    if (!s || !s.price_range || !s.demand_curve) return null;
+    var best = null, bestRevenue = -Infinity;
+    var n = Math.min(s.price_range.length, s.demand_curve.length);
+    for (var i = 0; i < n; i++) {
+      var p = s.price_range[i], q = s.demand_curve[i];
+      if (typeof p !== "number" || typeof q !== "number" || !isFinite(p) || !isFinite(q)) continue;
+      if (p * q > bestRevenue) { bestRevenue = p * q; best = p; }
+    }
+    return best;
+  }
+
   function calcRevenue(price, segment) {
     return price * interpolateIntent(price, segment);
   }
@@ -167,10 +190,13 @@ var PricingSimulator = (function() {
       setHTML("sim-profit-value", "N/A");
     }
 
-    if (data.optimal_price) {
-      var optRevenue = calcRevenue(data.optimal_price, seg);
+    var optPrice = optimalPriceFor(seg);
+    if (optPrice) {
+      var optRevenue = calcRevenue(optPrice, seg);
       var revDelta = ((revenue - optRevenue) / optRevenue * 100);
       setDelta("sim-revenue-delta", revDelta);
+    } else {
+      clearDelta("sim-revenue-delta");
     }
 
     // Update price input field
@@ -185,6 +211,15 @@ var PricingSimulator = (function() {
       renderComparisonTable();
     }
 
+  }
+
+  // A view with no optimum shows no comparison. Clearing it matters: the card
+  // would otherwise keep the delta of the view selected before.
+  function clearDelta(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = "";
+    el.className = "sim-metric-delta";
   }
 
   function setDelta(id, pct) {
@@ -390,7 +425,7 @@ var PricingSimulator = (function() {
     }
 
     var seg = state.currentSegment;
-    var optPrice = data.optimal_price || 0;
+    var optPrice = optimalPriceFor(seg) || 0;
     var optRevenue = optPrice > 0 ? calcRevenue(optPrice, seg) : 0;
     var hasProfit = config.unit_cost > 0;
     var optProfit = hasProfit && optPrice > 0 ? calcProfit(optPrice, seg) : 0;
@@ -627,6 +662,7 @@ var PricingSimulator = (function() {
     getState: function() { return state; },
     _initialized: _initialized,
     _removeScenario: removeScenario,
+    _optimalPriceFor: optimalPriceFor,
     _onPriceChange: onScenarioPriceChange
   };
 
