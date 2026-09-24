@@ -142,7 +142,7 @@ build_segment_data <- function(n = 1200, seed = 2026) {
   cat("  turas_save_workbook_atomic.R was not found, so this example is written\n")
   cat("  without part reconciliation and Excel may offer to repair it.\n")
   cat("  How to fix: run from the Turas project root.\n\n")
-  function(wb, file, overwrite = TRUE) openxlsx::saveWorkbook(wb, file, overwrite = overwrite)
+  function(wb, file, overwrite = TRUE) openxlsx::saveWorkbook(wb, file, overwrite = overwrite)  # turas-saver-fallback
 }
 
 
