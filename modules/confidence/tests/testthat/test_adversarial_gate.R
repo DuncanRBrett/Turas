@@ -141,3 +141,24 @@ test_that("an NPS with every respondent in one group has finite bounds and a war
   expect_equal(r$bayesian$post_mean, 100)
   expect_true(any(grepl("Question nps: .*standard error is zero", out$warnings)))
 })
+
+test_that("a mean whose effective n is below 2 gets no t interval, and says why", {
+  # One weight of a million among nineteen 1s: n_eff = (1e6 + 19)^2 /
+  # (1e12 + 19) = 1.000038, so df = 0.000038, qt() is Inf and the interval
+  # was -Inf to Inf, written without a warning (review 2026-09-24).
+  d <- data.frame(x = c(1:19, 50), w = c(rep(1, 19), 1e6))
+  out <- process_mean_question(adv_q_row("x", stat = "mean"), d, "w", adv_config())
+  expect_null(out$result$t_dist)
+  expect_true(any(grepl("Question x: effective n is 1.0, below 2", out$warnings, fixed = TRUE)))
+  # The mean itself and the flat-prior Bayesian interval are still finite
+  expect_equal(out$result$mean, weighted.mean(d$x, d$w), tolerance = 1e-12)
+  expect_true(all(is.finite(c(out$result$bayesian$lower, out$result$bayesian$upper))))
+})
+
+test_that("a mean whose effective n is above 2 keeps its t interval", {
+  d2 <- data.frame(x = c(3, 5, 9, 4, 6), w = c(1, 1, 4, 1, 1))
+  ne2 <- 8^2 / 20                                         # 3.2: above 2
+  out2 <- process_mean_question(adv_q_row("x", stat = "mean"), d2, "w", adv_config())$result
+  expect_equal(out2$t_dist$df, ne2 - 1, tolerance = 1e-12)
+  expect_true(is.finite(out2$t_dist$upper))
+})

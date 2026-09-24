@@ -200,11 +200,20 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
   # -------------------------------------------------------------------------
   run_moe_flag <- q_row$Run_MOE
   if (!is.null(run_moe_flag) && !is.na(run_moe_flag) && toupper(run_moe_flag) == "Y") {
-    result$t_dist <- calculate_mean_ci(
-      values     = values,
-      weights    = weights,
-      conf_level = conf_level
-    )
+    if (!is.na(n_eff) && n_eff < 2) {
+      # df = n_eff - 1 is below 1. When one weight dominates, n_eff is near 1,
+      # qt() is Inf and the interval was -Inf to Inf, written without a word
+      # (review 2026-09-24).
+      warnings_list <- c(warnings_list, sprintf(
+        "Question %s: effective n is %s, below 2, so no t interval (one or two respondents carry almost all the weight)",
+        q_id, format(round(n_eff, 1), nsmall = 1)))
+    } else {
+      result$t_dist <- calculate_mean_ci(
+        values     = values,
+        weights    = weights,
+        conf_level = conf_level
+      )
+    }
   }
 
   # -------------------------------------------------------------------------
