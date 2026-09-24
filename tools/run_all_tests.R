@@ -89,6 +89,9 @@ modules <- list(
   list(name = "AlchemerParser", id = "AlchemerParser",
        test_dir = "modules/AlchemerParser/tests/testthat",
        description = "Survey parsing, routing detection, error handling"),
+  list(name = "AlchemerExport", id = "AlchemerExport",
+       test_dir = "modules/AlchemerExport/tests/testthat",
+       description = "Alchemer export validation and brand columns"),
   list(name = "Confidence", id = "confidence",
        test_dir = "modules/confidence/tests/testthat",
        description = "Confidence intervals, bootstrap, proportion/mean CIs"),
@@ -124,16 +127,34 @@ modules <- list(
        description = "Project hub app, scanner, search index, PPTX export"),
   list(name = "Report Hub", id = "report_hub",
        test_dir = "modules/report_hub/tests/testthat",
-       description = "Report combination, HTML parsing, page assembly")
+       description = "Report combination, HTML parsing, page assembly"),
+  # The six below had tests but were missing from this list until review
+  # 2026-09-24, so "all modules pass" never covered them.
+  list(name = "Brand", id = "brand",
+       test_dir = "modules/brand/tests/testthat",
+       description = "Brand health analytics (IPK fixture tests skip when not built)"),
+  list(name = "Portfolio", id = "portfolio",
+       test_dir = "modules/portfolio/tests/testthat",
+       description = "Portfolio analysis"),
+  list(name = "Steps", id = "steps",
+       test_dir = "modules/steps/tests/testthat",
+       description = "Pipeline steps"),
+  list(name = "VAS", id = "vas",
+       test_dir = "modules/vas/tests/testthat",
+       description = "VAS market sizing engine"),
+  list(name = "What If", id = "whatif",
+       test_dir = "modules/whatif/tests/testthat",
+       description = "What-if driver simulator")
 )
 
 # Filter to selected module
+all_modules_for_help <- modules
 if (!is.null(selected_module)) {
   modules <- Filter(function(m) m$id == selected_module, modules)
   if (length(modules) == 0) {
     cat(sprintf("\n[ERROR] Module '%s' not found.\n", selected_module))
-    cat("Available: shared, AlchemerParser, confidence, conjoint, catdriver,\n")
-    cat("  hub_app, keydriver, maxdiff, pricing, segment, tabs, tracker, weighting, report_hub\n\n")
+    cat("Available:", paste(vapply(all_modules_for_help, function(m) m$id, character(1)),
+                            collapse = ", "), "\n\n")
     stop("Module not found")
   }
 }
@@ -295,6 +316,11 @@ for (i in seq_along(modules)) {
     } else {
       df <- as.data.frame(file_result)
       fp <- sum(df$passed, na.rm = TRUE)
+      # A test that ERRORS (an R error before or between its expectations) is
+      # a failure. Counting only `failed` left errored tests out of every
+      # column, so a module could print PASS with broken tests (review
+      # 2026-09-24).
+      df$failed <- df$failed + as.integer(df$error %in% TRUE)
       ff <- sum(df$failed, na.rm = TRUE)
       fs <- sum(df$skipped, na.rm = TRUE)
       fw <- sum(df$warning, na.rm = TRUE)
