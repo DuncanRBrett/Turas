@@ -240,136 +240,164 @@ extract_primary_metric <- function(wave_result, metric_type) {
 # HELPER FUNCTIONS - Statistical Calculations
 # ==============================================================================
 
+#' Effective Sample Size Of One Wave Result
+#'
+#' The base a Dashboard or Sig Matrix test is sized on: the Kish effective n
+#' when the wave result carries one, else the unweighted count. Never the sum
+#' of the weights (`n_weighted`), which is on the weight's own scale: weights
+#' grossed to a population would make every movement significant. This is the
+#' same rule the trend path uses (trend_significance.R).
+#'
+#' @param wave_result List. One wave's calculator output
+#' @return Numeric scalar, or NA when neither field is present
+#' @keywords internal
+dashboard_test_base <- function(wave_result) {
+  n <- wave_result[["eff_n"]]
+  if (is.null(n)) n <- wave_result[["n_unweighted"]]
+  if (is.null(n) || length(n) != 1) return(NA_real_)
+  as.numeric(n)
+}
+
+
+#' First Tracked Proportion Of One Wave Result (0-100 scale)
+#'
+#' Exact-name lookups throughout. `wave_result$proportion` would partial-match
+#' `proportions` and return every tracked code, which broke the test for any
+#' question tracking more than one code. The first code is the one
+#' extract_primary_metric() displays, so the test and the shown value agree.
+#'
+#' @param wave_result List. One wave's calculator output
+#' @return Numeric scalar, or NULL when the result carries no proportion
+#' @keywords internal
+dashboard_first_proportion <- function(wave_result) {
+  for (field in c("proportions", "proportion", "item_proportions")) {
+    v <- wave_result[[field]]
+    if (!is.null(v) && length(v) > 0) return(as.numeric(unlist(v)[1]))
+  }
+  NULL
+}
+
+
+#' Two-Sided p-Value For One Dashboard Comparison
+#'
+#' @param from_result,to_result Lists. Wave results, "from" then "to"
+#' @param metric_type Character. Type of metric
+#' @param n1,n2 Numeric. Effective bases from dashboard_test_base()
+#' @return List with $p_value and $direction (the signed difference), or NULL
+#'   when the metric cannot be tested
+#' @keywords internal
+dashboard_comparison_test <- function(from_result, to_result, metric_type, n1, n2) {
+  if (is_proportion_metric(metric_type)) {
+    p1 <- dashboard_first_proportion(from_result)
+    p2 <- dashboard_first_proportion(to_result)
+    if (is.null(p1) || is.null(p2)) return(NULL)
+    z <- z_test_for_proportions(p1 / 100, n1, p2 / 100, n2)
+    return(list(p_value = z$p_value, direction = p2 - p1))
+  }
+  if (is_numeric_metric(metric_type)) {
+    return(dashboard_welch_test(from_result, to_result, n1, n2))
+  }
+  if (is_nps_metric(metric_type)) {
+    return(dashboard_nps_test(from_result, to_result, n1, n2))
+  }
+  NULL
+}
+
+
+#' Welch t-Test For Two Wave Means, Sized On Effective n
+#'
+#' @param from_result,to_result Lists carrying $mean and $sd
+#' @param n1,n2 Numeric. Effective bases
+#' @return List with $p_value and $direction, or NULL when untestable
+#' @keywords internal
+dashboard_welch_test <- function(from_result, to_result, n1, n2) {
+  m1 <- from_result[["mean"]]; m2 <- to_result[["mean"]]
+  sd1 <- from_result[["sd"]]; sd2 <- to_result[["sd"]]
+  if (any(vapply(list(m1, m2, sd1, sd2), is.null, logical(1)))) return(NULL)
+  if (any(is.na(c(m1, m2, sd1, sd2))) || n1 <= 1 || n2 <= 1) return(NULL)
+  v1 <- sd1^2 / n1
+  v2 <- sd2^2 / n2
+  se <- sqrt(v1 + v2)
+  if (is.na(se) || se == 0) return(NULL)
+  df <- (v1 + v2)^2 / (v1^2 / (n1 - 1) + v2^2 / (n2 - 1))
+  if (is.na(df) || df <= 0) return(NULL)
+  t_stat <- (m2 - m1) / se
+  list(p_value = 2 * pt(-abs(t_stat), df), direction = m2 - m1)
+}
+
+
+#' z-Test For Two Wave NPS Scores, Sized On Effective n
+#'
+#' Uses the closed-form multinomial variance the trend path uses
+#' (trend_significance.R): Var(NPS) = 10000 * [(p_p + p_d) - (p_p - p_d)^2] / n.
+#' A result without promoter and detractor shares falls back to the worst-case
+#' variance 10000 / n, which can only understate significance.
+#'
+#' @param from_result,to_result Lists carrying $nps and, ideally,
+#'   $promoters_pct and $detractors_pct (0-100 scale)
+#' @param n1,n2 Numeric. Effective bases
+#' @return List with $p_value and $direction, or NULL when untestable
+#' @keywords internal
+dashboard_nps_test <- function(from_result, to_result, n1, n2) {
+  nps1 <- from_result[["nps"]]; nps2 <- to_result[["nps"]]
+  if (is.null(nps1) || is.null(nps2) || any(is.na(c(nps1, nps2)))) return(NULL)
+  nps_variance <- function(r, n) {
+    pp <- r[["promoters_pct"]]; pd <- r[["detractors_pct"]]
+    if (is.null(pp) || is.null(pd) || any(is.na(c(pp, pd)))) return(10000 / n)
+    pp <- pp / 100; pd <- pd / 100
+    10000 * ((pp + pd) - (pp - pd)^2) / n
+  }
+  se <- sqrt(nps_variance(from_result, n1) + nps_variance(to_result, n2))
+  if (is.na(se) || se <= 0) return(NULL)
+  z <- (nps2 - nps1) / se
+  list(p_value = 2 * pnorm(-abs(z)), direction = nps2 - nps1)
+}
+
+
 #' Calculate Pairwise Significance Between Two Waves
 #'
-#' Calculates statistical significance between two wave results.
-#' Uses appropriate test based on metric type:
-#'   - Proportions: Two-proportion z-test
-#'   - Means: Two-sample t-test (Welch's)
-#'   - NPS: Simplified z-test approximation
+#' Calculates statistical significance between two wave results for the
+#' Trend Dashboard and the Significance Matrix. Every test is sized on the
+#' effective base (dashboard_test_base()), and a comparison where either
+#' base is under `min_base` is not tested, the same gate the trend path uses:
+#'   - Proportions: two-proportion z-test on the first tracked code
+#'   - Means: Welch's t-test
+#'   - NPS: z-test with the closed-form multinomial variance
 #'
 #' @param from_result List. Wave result for "from" wave
 #' @param to_result List. Wave result for "to" wave
 #' @param metric_type Character. Type of metric
 #' @param alpha Numeric. Significance level (default 0.05)
-#' @return List with $sig_code (-1, 0, 1) and $p_value
+#' @param min_base Numeric. Smallest effective base that is tested
+#'   (default DEFAULT_MINIMUM_BASE)
+#' @return List with $sig_code (-1, 0, 1) and $p_value (NA when untested)
 #'
 #' @keywords internal
-calculate_pairwise_significance <- function(from_result, to_result, metric_type, alpha = 0.05) {
+calculate_pairwise_significance <- function(from_result, to_result, metric_type,
+                                            alpha = 0.05,
+                                            min_base = DEFAULT_MINIMUM_BASE) {
 
-  # Default return for errors or insufficient data
   default_return <- list(sig_code = 0, p_value = NA)
 
-  # Check for valid inputs
   if (is.null(from_result) || is.null(to_result)) return(default_return)
   if (!isTRUE(from_result$available) || !isTRUE(to_result$available)) return(default_return)
 
-  # Validate metric type
   validate_metric_type(metric_type, context = "calculate_pairwise_significance")
 
   tryCatch({
-    # Use helper functions to determine metric type category
-    if (is_proportion_metric(metric_type)) {
-      # Two-proportion z-test
-      # NOTE: Proportions are stored on 0-100 scale by calculate_proportions().
-      # The z-test formula requires 0-1 scale, so we convert below.
-      p1_raw <- if (!is.null(from_result$proportion)) {
-        from_result$proportion
-      } else if (!is.null(from_result$proportions) && length(from_result$proportions) > 0) {
-        from_result$proportions[1]
-      } else if (!is.null(from_result$item_proportions) && length(from_result$item_proportions) > 0) {
-        from_result$item_proportions[1]
-      } else {
-        return(default_return)
-      }
+    n1 <- dashboard_test_base(from_result)
+    n2 <- dashboard_test_base(to_result)
+    if (is.na(n1) || is.na(n2) || n1 < min_base || n2 < min_base) return(default_return)
 
-      p2_raw <- if (!is.null(to_result$proportion)) {
-        to_result$proportion
-      } else if (!is.null(to_result$proportions) && length(to_result$proportions) > 0) {
-        to_result$proportions[1]
-      } else if (!is.null(to_result$item_proportions) && length(to_result$item_proportions) > 0) {
-        to_result$item_proportions[1]
-      } else {
-        return(default_return)
-      }
+    test <- dashboard_comparison_test(from_result, to_result, metric_type, n1, n2)
+    if (is.null(test) || is.na(test$p_value)) return(default_return)
 
-      # Convert from 0-100 scale to 0-1 scale for z-test
-      p1 <- p1_raw / 100
-      p2 <- p2_raw / 100
-
-      n1 <- from_result$n_weighted
-      n2 <- to_result$n_weighted
-
-      if (is.na(n1) || is.na(n2) || n1 <= 0 || n2 <= 0) return(default_return)
-
-      # Pooled proportion (now on 0-1 scale)
-      p_pooled <- (p1 * n1 + p2 * n2) / (n1 + n2)
-
-      # Standard error
-      se <- sqrt(p_pooled * (1 - p_pooled) * (1/n1 + 1/n2))
-
-      if (se == 0 || is.na(se) || is.nan(se)) return(default_return)
-
-      # Z-score
-      z <- (p2 - p1) / se
-      p_value <- 2 * pnorm(-abs(z))
-
-    } else if (is_numeric_metric(metric_type)) {
-      # Two-sample t-test (Welch's approximation) for numeric metrics
-      m1 <- from_result$mean
-      m2 <- to_result$mean
-      sd1 <- from_result$sd
-      sd2 <- to_result$sd
-      n1 <- from_result$n_weighted
-      n2 <- to_result$n_weighted
-
-      if (any(is.na(c(m1, m2, sd1, sd2, n1, n2)))) return(default_return)
-      if (n1 <= 1 || n2 <= 1) return(default_return)
-
-      se <- sqrt(sd1^2/n1 + sd2^2/n2)
-
-      if (se == 0 || is.na(se)) return(default_return)
-
-      t_stat <- (m2 - m1) / se
-
-      # Welch-Satterthwaite degrees of freedom
-      df <- (sd1^2/n1 + sd2^2/n2)^2 /
-            ((sd1^2/n1)^2/(n1-1) + (sd2^2/n2)^2/(n2-1))
-
-      if (is.na(df) || df <= 0) return(default_return)
-
-      p_value <- 2 * pt(-abs(t_stat), df)
-      z <- t_stat  # Use t_stat for direction
-
-    } else if (is_nps_metric(metric_type)) {
-      # NPS significance test (simplified approach)
-      nps1 <- from_result$nps
-      nps2 <- to_result$nps
-      n1 <- from_result$n_weighted
-      n2 <- to_result$n_weighted
-
-      if (any(is.na(c(nps1, nps2, n1, n2)))) return(default_return)
-      if (n1 <= 0 || n2 <= 0) return(default_return)
-
-      # Rough approximation using standard error
-      se <- sqrt(100^2 * (1/n1 + 1/n2))
-      z <- (nps2 - nps1) / se
-      p_value <- 2 * pnorm(-abs(z))
-
+    sig_code <- if (test$p_value < alpha) {
+      if (test$direction > 0) 1 else -1
     } else {
-      return(default_return)
+      0
     }
-
-    # Determine significance code
-    if (is.na(p_value)) {
-      sig_code <- 0
-    } else if (p_value < alpha) {
-      sig_code <- if (z > 0) 1 else -1
-    } else {
-      sig_code <- 0
-    }
-
-    return(list(sig_code = sig_code, p_value = p_value))
+    list(sig_code = sig_code, p_value = test$p_value)
 
   }, error = function(e) {
     cat("[WARNING] Significance test failed: ", e$message, "\n")
@@ -386,13 +414,15 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
 #' @param from_wave_result List. Wave result for starting wave
 #' @param to_wave_result List. Wave result for ending wave
 #' @param metric_type Character. Type of metric
-#' @param config Configuration object (for alpha level)
+#' @param config Configuration object (for alpha and minimum_base)
 #' @return Integer. Significance code: -1, 0, or 1
 #'
 #' @keywords internal
 calculate_change_significance <- function(from_wave_result, to_wave_result, metric_type, config) {
   alpha <- get_setting(config, "alpha", default = 0.05)
-  sig_result <- calculate_pairwise_significance(from_wave_result, to_wave_result, metric_type, alpha)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
+  sig_result <- calculate_pairwise_significance(from_wave_result, to_wave_result, metric_type,
+                                                alpha, min_base)
   return(sig_result$sig_code)
 }
 
@@ -821,11 +851,12 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
 #' @param decimal_places Numeric. Decimal places for formatting
 #' @param styles List. Dashboard styles
 #' @param start_row Integer. First row of the matrix data
+#' @param min_base Numeric. Smallest effective base a cell is tested on
 #' @return Integer. Next row number after writing
 #' @keywords internal
 write_matrix_data_cells <- function(wb, sheet_name, wave_ids, wave_values,
                                     q_result, alpha, decimal_places, styles,
-                                    start_row) {
+                                    start_row, min_base = DEFAULT_MINIMUM_BASE) {
   current_row <- start_row
 
   for (i in seq_along(wave_ids)) {
@@ -865,7 +896,7 @@ write_matrix_data_cells <- function(wb, sheet_name, wave_ids, wave_values,
           # Calculate change and significance
           change <- wave_values[j] - wave_values[i]
           sig_result <- calculate_pairwise_significance(
-            from_result, to_result, q_result$metric_type, alpha
+            from_result, to_result, q_result$metric_type, alpha, min_base
           )
 
           # Format cell content
@@ -1024,7 +1055,8 @@ write_significance_matrix <- function(wb, q_result, config, wave_ids) {
 
   current_row <- write_matrix_data_cells(
     wb, sheet_name, wave_ids, wave_values,
-    q_result, alpha, decimal_places, styles, current_row
+    q_result, alpha, decimal_places, styles, current_row,
+    min_base = get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
   )
 
   # ===========================================================================

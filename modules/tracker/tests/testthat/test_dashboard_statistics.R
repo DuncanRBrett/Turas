@@ -279,8 +279,10 @@ test_that("pairwise_significance: proportion scale conversion is correct (0-100 
 })
 
 test_that("pairwise_significance: uses $proportion field as fallback", {
-  from <- list(available = TRUE, proportion = 35, n_weighted = 150)
-  to <- list(available = TRUE, proportion = 55, n_weighted = 150)
+  # Tests are sized on eff_n or n_unweighted (never n_weighted), which every
+  # calculator result carries, so the fixture carries one too.
+  from <- list(available = TRUE, proportion = 35, n_weighted = 150, n_unweighted = 150)
+  to <- list(available = TRUE, proportion = 55, n_weighted = 150, n_unweighted = 150)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$PROPORTIONS)
 
   expect_true(is.numeric(result$p_value))
@@ -554,6 +556,105 @@ test_that("full pipeline: calculate_proportions -> extract -> pairwise all use 0
   expect_true(sig_result$p_value >= 0 && sig_result$p_value <= 1)
   # With ~40% vs ~65% and n=200, should be significant
   expect_equal(sig_result$sig_code, 1)
+})
+
+
+# ==============================================================================
+# calculate_pairwise_significance() - SIZED ON EFFECTIVE N (review 2026-09-24)
+# ==============================================================================
+# The Dashboard and Sig Matrix used to size every test on n_weighted, the SUM of
+# the weights. Weights grossed to a population made every movement significant,
+# and weights with a design effect overstated precision. They now use eff_n
+# (falling back to n_unweighted), the same base the trend path uses.
+
+#' Build a proportion wave result with explicit weighted, unweighted and effective n
+make_sized_proportion <- function(pct, n_weighted, n_unweighted, eff_n = NULL) {
+  r <- list(available = TRUE, proportions = c(`1` = pct),
+            n_weighted = n_weighted, n_unweighted = n_unweighted)
+  if (!is.null(eff_n)) r$eff_n <- eff_n
+  r
+}
+
+test_that("pairwise_significance: proportions are sized on eff_n, not the sum of weights", {
+  # Known answer: 40% vs 49% on n_eff 200 each. Pooled p = .445,
+  # SE = sqrt(.445 * .555 * (2 / 200)) = .04970, z = .09 / .04970 = 1.811,
+  # two-sided p = .0701. Not significant at 95%.
+  mean_one <- calculate_pairwise_significance(
+    make_sized_proportion(40, 400, 400, eff_n = 200),
+    make_sized_proportion(49, 400, 400, eff_n = 200),
+    METRIC_TYPES$PROPORTIONS)
+  grossed <- calculate_pairwise_significance(
+    make_sized_proportion(40, 2.5e6, 400, eff_n = 200),
+    make_sized_proportion(49, 2.5e6, 400, eff_n = 200),
+    METRIC_TYPES$PROPORTIONS)
+
+  expect_equal(mean_one$p_value, 0.0701, tolerance = 0.001)
+  expect_equal(mean_one$sig_code, 0)
+  expect_equal(grossed$p_value, mean_one$p_value)
+  expect_equal(grossed$sig_code, 0)
+})
+
+test_that("pairwise_significance: without eff_n the base is n_unweighted, never n_weighted", {
+  result <- calculate_pairwise_significance(
+    make_sized_proportion(40, 2.5e6, 200),
+    make_sized_proportion(49, 2.5e6, 200),
+    METRIC_TYPES$PROPORTIONS)
+  expect_equal(result$p_value, 0.0701, tolerance = 0.001)
+})
+
+test_that("pairwise_significance: bases under the minimum are not tested", {
+  tiny <- calculate_pairwise_significance(
+    make_sized_proportion(66.7, 15000, 3, eff_n = 3),
+    make_sized_proportion(80, 25000, 5, eff_n = 5),
+    METRIC_TYPES$PROPORTIONS)
+  expect_equal(tiny$sig_code, 0)
+  expect_true(is.na(tiny$p_value))
+
+  # A configured minimum above the effective base also suppresses the test
+  gated <- calculate_pairwise_significance(
+    make_sized_proportion(30, 40, 40, eff_n = 40),
+    make_sized_proportion(70, 40, 40, eff_n = 40),
+    METRIC_TYPES$PROPORTIONS, min_base = 50)
+  expect_equal(gated$sig_code, 0)
+  expect_true(is.na(gated$p_value))
+})
+
+test_that("pairwise_significance: a question tracking several codes is still tested", {
+  # `result$proportion` used to partial-match `proportions`, return every
+  # tracked code, and fail with "length = 2 in coercion to logical(1)", so the
+  # Dashboard showed no significance for any multi-code question.
+  from <- list(available = TRUE, proportions = c(`1` = 40, `2` = 60),
+               n_weighted = 200, n_unweighted = 200, eff_n = 200)
+  to <- list(available = TRUE, proportions = c(`1` = 49, `2` = 51),
+             n_weighted = 200, n_unweighted = 200, eff_n = 200)
+  result <- calculate_pairwise_significance(from, to, METRIC_TYPES$PROPORTIONS)
+  # The first tracked code is tested, the same one extract_primary_metric shows
+  expect_equal(result$p_value, 0.0701, tolerance = 0.001)
+})
+
+test_that("pairwise_significance: means are sized on eff_n", {
+  from <- make_mean_result(mean_val = 3.0, sd_val = 1.0, n_weighted = 5000)
+  to <- make_mean_result(mean_val = 3.3, sd_val = 1.0, n_weighted = 5000)
+  from$eff_n <- 50
+  to$eff_n <- 50
+  result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
+  # Welch on n = 50 each: SE = sqrt(2 / 50) = .2, t = 1.5, df = 98
+  expect_equal(result$p_value, 2 * pt(-1.5, 98), tolerance = 1e-6)
+  expect_equal(result$sig_code, 0)
+})
+
+test_that("pairwise_significance: NPS uses the closed-form multinomial variance", {
+  # Known answer: promoters 40 / detractors 20 (NPS 20) vs 50 / 15 (NPS 35),
+  # n_eff 200 each. Var1 = 10000 * (.60 - .20^2) / 200 = 28,
+  # Var2 = 10000 * (.65 - .35^2) / 200 = 26.375, SE = 7.374, z = 2.034,
+  # p = .0419. The old worst-case SE of 10 gave z = 1.5 and missed it.
+  from <- list(available = TRUE, nps = 20, promoters_pct = 40, detractors_pct = 20,
+               n_weighted = 200, n_unweighted = 200, eff_n = 200)
+  to <- list(available = TRUE, nps = 35, promoters_pct = 50, detractors_pct = 15,
+             n_weighted = 200, n_unweighted = 200, eff_n = 200)
+  result <- calculate_pairwise_significance(from, to, METRIC_TYPES$NPS)
+  expect_equal(result$p_value, 0.0419, tolerance = 0.001)
+  expect_equal(result$sig_code, 1)
 })
 
 
