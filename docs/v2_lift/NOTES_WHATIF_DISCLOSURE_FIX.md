@@ -67,7 +67,8 @@ Script: the session scratchpad's `cost_counts.R`, not kept in the repo. The coun
 
 ## For Duncan
 
-- Pooling in Build a ... is unchanged, as instructed. A level pooled because it has fewer than k respondents is absent from the shipped level lists, so a reader who knows the population learns that level had under k. That is a bound, not a count. Whether the bound is acceptable, or pooling should follow declared merges in the config only, is your decision. Nothing in this branch decides it.
+- Pooling in Build a ... is unchanged. A level pooled because it has fewer than k respondents is absent from the shipped level lists, so a reader who knows the population learns that level had under k. That is a bound, not a count. DECIDED by Duncan, 24 Sep 2026: the bound is acceptable. Pooling stays as it is.
+- Context, also from Duncan on 24 Sep 2026: this is all planning. No What if report has been distributed or used anywhere except in mockups, so nothing shipped carries the leaks the review found.
 - The SACAP 2025 What if config is not on this machine (searched `~/Library/CloudStorage/OneDrive-Personal/DB Files`, including TurasProjects/SACAP, for any WhatIf workbook). No real-data run, so the "282 groups before" figure has no after.
 - This needs an independent re-review before anything client-safe goes to SACAP. The brute force in the property test shares the atom idea with the engine, even though it tests explicit candidates by least squares rather than searching a null space.
 
