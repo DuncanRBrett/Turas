@@ -38,6 +38,10 @@ whatif_group_masks <- function(context, defs) {
 }
 
 
+#' Coverage of the Refit Range Shown Everywhere (Tab, Workbook, Island)
+WHATIF_RANGE_LEVEL <- 0.90
+
+
 #' Summarise Draws as Point and 90 Percent Range
 #'
 #' @param d Numeric vector: main fit first, then refits
@@ -46,7 +50,8 @@ whatif_group_masks <- function(context, defs) {
 whatif_summarise_draws <- function(d) {
   boot <- d[-1]
   if (!length(boot) || all(is.na(boot))) return(c(est = d[1], lo = NA_real_, hi = NA_real_))
-  q <- stats::quantile(boot, c(0.05, 0.95), type = 7, names = FALSE, na.rm = TRUE)
+  tail <- (1 - WHATIF_RANGE_LEVEL) / 2
+  q <- stats::quantile(boot, c(tail, 1 - tail), type = 7, names = FALSE, na.rm = TRUE)
   c(est = d[1], lo = q[1], hi = q[2])
 }
 

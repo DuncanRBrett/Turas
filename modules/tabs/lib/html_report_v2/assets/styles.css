@@ -1711,6 +1711,65 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 .cd-insights li { margin: 3px 0; }
 .cd-diagnostics summary { cursor: pointer; font-size: .9rem; font-weight: 600; }
 
+/* What if (TR.WI). wi- prefix. Live on respondent records in a full report, */
+/* published groups only in a client-safe one. The score line is the         */
+/* Economist-style strip: a hollow dot for the comparison, a filled dot for  */
+/* the estimate, a band for its 90% range.                                   */
+.wi-view { max-width: 1100px; }
+.wi-view h2 { margin: 0 0 4px; }
+.wi-panel { margin: 18px 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.wi-panel h3 { margin: 0; font-size: 1.05rem; }
+.wi-panel h4 { margin: 14px 0 4px; font-size: .95rem; }
+.wi-panel > summary { cursor: pointer; font-weight: 600; font-size: 1rem; }
+.wi-cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
+.wi-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; vertical-align: middle; }
+.wi-live { background: #e7f4ec; color: #1f6b3a; }
+.wi-safe { background: #eceaf7; color: var(--brand); }
+.wi-prov { margin: 4px 0; font-size: .9rem; }
+.wi-note, .wi-lead { margin: 4px 0 10px; font-size: .86rem; color: var(--muted); line-height: 1.45; }
+.wi-warn { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #c2410c; background: #fff7ed; font-size: .88rem; }
+.wi-ok { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #15803d; background: #f0fdf4; font-size: .88rem; }
+.wi-kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.wi-kpi { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-width: 120px; }
+.wi-kpi b { display: block; font-size: 1.5rem; color: var(--brand); }
+.wi-kpi span { font-size: .8rem; color: var(--muted); }
+.wi-picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.wi-lbl { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
+.wi-lbl-note { font-size: .8rem; color: var(--muted); }
+.wi-chip { background: var(--soft, #f1f0fb); border: 1px solid var(--line); border-radius: 999px; padding: 3px 6px 3px 12px; font-size: 12px; }
+.wi-chip button { border: 0; background: transparent; cursor: pointer; color: var(--muted); }
+.wi-table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+.wi-table th, .wi-table td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; font-size: .88rem; vertical-align: top; }
+.wi-table thead th { font-weight: 600; border-bottom: 1px solid #cfcfd6; }
+.wi-table .num { text-align: right; white-space: nowrap; }
+.wi-table small { display: block; color: var(--muted); font-size: .78rem; }
+.wi-rng { display: block; color: var(--muted); font-size: .76rem; }
+.wi-tag { margin-left: 6px; font-size: .7rem; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.wi-unclear td { color: #9aa1ad; }
+.wi-barcol { width: 18%; min-width: 90px; }
+.wi-bar { height: 9px; background: #eef0f4; border-radius: 2px; }
+.wi-bar i { display: block; height: 9px; border-radius: 2px; background: var(--brand, #323367); }
+.wi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 14px; margin: 8px 0; }
+.wi-grid label { display: flex; flex-direction: column; gap: 3px; font-size: .84rem; }
+.wi-grid select, .wi-picker select, .wi-sentence select { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; max-width: 100%; }
+.wi-scenres { font-size: .95rem; margin: 10px 0 4px; }
+.wi-sentence { font-size: 1.05rem; line-height: 2.2; margin: 8px 0; }
+.wi-sentence select { font-size: .95rem; margin: 0 2px; }
+.wi-headline { font-size: 1rem; font-weight: 600; margin: 8px 0; }
+.wi-btnrow { display: flex; gap: 8px; margin: 6px 0; }
+.wi-btn { border: 1px solid var(--brand); color: var(--brand); background: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: .85rem; }
+.wi-list { margin: 6px 0 0 18px; padding: 0; font-size: .86rem; }
+.wi-list li { margin: 4px 0; }
+.wi-line { position: relative; height: 58px; margin: 6px 12px 4px; }
+.wi-track { position: absolute; left: 0; right: 0; top: 26px; height: 2px; background: #cfd4dc; }
+.wi-band { position: absolute; top: 20px; height: 14px; background: rgba(50, 51, 103, .18); border-radius: 7px; }
+.wi-tick { position: absolute; top: 40px; transform: translateX(-50%); font-size: 10px; color: var(--muted); }
+.wi-dot { position: absolute; top: 15px; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%; font-size: 10px; line-height: 24px; text-align: center; font-weight: 700; }
+.wi-hollow { border: 2px solid var(--ink); background: #fff; }
+.wi-fill { background: var(--brand); color: #fff; }
+.wi-cap { position: absolute; top: 0; transform: translateX(-50%); font-size: 10.5px; color: var(--ink); white-space: nowrap; }
+@media (max-width: 640px) { .wi-barcol { display: none; } }
+
 /* The bar track. The bar is the estimate; the whisker is its interval, drawn
    over the bar so a wide interval reads as uncertainty rather than as size. */
 .kd-track { position: relative; width: 38%; min-width: 150px; height: 20px; }

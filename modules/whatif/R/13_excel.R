@@ -15,6 +15,8 @@
 #   Model               lever and baseline coefficients with refit ranges
 #   Profile             "Build a ..." coefficients
 #   Symptoms            apparent effects of rows marked Include = Symptom
+#   Privacy             groups refused, crossing cells hidden and profile
+#                       levels pooled for the client-safe file (never in it)
 #
 # Saved with turas_saveWorkbook() (never openxlsx::saveWorkbook: CLAUDE.md,
 # Excel I/O).
@@ -111,6 +113,22 @@ whatif_write_excel <- function(run, log, proposed, path) {
                                 stringsAsFactors = FALSE))
   }
   sheet("Symptoms", if (NROW(run$symptoms)) transform(run$symptoms, effect = round(effect, 1)) else NULL)
+
+  # What the client-safe file leaves out, and why. For the analyst only: the
+  # contribution file never names these.
+  pub <- run$publish
+  pooled <- attr(run$safe_profile, "pooled")
+  privacy <- rbind(
+    if (NROW(pub$refused)) data.frame(What = "Group not published", Detail = pub$refused$group,
+                                      Why = pub$refused$why, stringsAsFactors = FALSE),
+    if (NROW(pub$hidden)) data.frame(What = "Crossing cell hidden", Detail = paste0(pub$hidden$family, ": ",
+                                     pub$hidden$level1, ", ", pub$hidden$level2),
+                                     Why = "under the minimum, or hidden to protect one that is",
+                                     stringsAsFactors = FALSE),
+    if (length(pooled)) do.call(rbind, lapply(names(pooled), function(k) data.frame(
+      What = "Build a ... level pooled", Detail = paste0(k, ": ", names(pooled[[k]]), " counted as ", unlist(pooled[[k]])),
+      Why = paste("under", s$min_group, "respondents"), stringsAsFactors = FALSE))))
+  sheet("Privacy", privacy)
 
   res <- turas_save_workbook_atomic(wb, path, module = "WHATIF", verbose = FALSE)
   if (!isTRUE(res$success)) {

@@ -404,6 +404,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # keydriver module): named, the report gains a Key drivers tab.
     keydriver_island = get_config_value(config, "keydriver_island", ""),
     catdriver_island = get_config_value(config, "catdriver_island", ""),
+    # And for a What if study ({output_name}_whatif_island.json, written by the
+    # whatif module): named, the report gains a What if tab. The file carries an
+    # open and a client-safe part; the build embeds the one this report's
+    # delivery mode allows (.read_whatif_contribution in run_crosstabs.R).
+    whatif_island = get_config_value(config, "whatif_island", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
     # Must be populated here. Config_obj is an explicit whitelist, not the raw settings.
     qual_tag_dimensions = get_config_value(config, "qual_tag_dimensions", ""),
@@ -1872,7 +1877,7 @@ TABS_KNOWN_SETTINGS <- c(
   # Weighting
   # Module contributions
   "conjoint_island", "maxdiff_island", "pricing_island", "keydriver_island",
-  "catdriver_island",
+  "catdriver_island", "whatif_island",
   # Weighting
   "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
   "show_weighted_base", "weight_label",

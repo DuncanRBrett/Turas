@@ -44,7 +44,7 @@ function eq(a, b, msg) {
 }
 
 function withState(state, fn) {
-  const keys = ["CJ", "MD", "PR", "QUAL", "conjoint", "maxdiff", "pricing", "qual"];
+  const keys = ["CJ", "MD", "PR", "QUAL", "WI", "conjoint", "maxdiff", "pricing", "qual", "whatif"];
   const saved = {};
   keys.forEach((k) => { saved[k] = TR[k]; TR[k] = state[k] || null; });
   try { return fn(); } finally { keys.forEach((k) => { TR[k] = saved[k]; }); }
@@ -76,6 +76,15 @@ for (const [island, renderer, name] of [["CJ", "conjoint", "conjoint"],
     withState(state, () => eq(TR.shell._missingRenderers(), [], name));
   });
 }
+
+// What if joins the same rule: its island arrives only when a What if study
+// was contributed, and then its renderer must travel with it.
+run("a What if island with no renderer is reported", () => {
+  withState({ WI: {} }, () => eq(TR.shell._missingRenderers(), ["whatif"], "whatif"));
+});
+run("a What if island with its renderer is complete", () => {
+  withState({ WI: {}, whatif: {} }, () => eq(TR.shell._missingRenderers(), [], "whatif present"));
+});
 
 run("several missing renderers are all reported, not just the first", () => {
   withState({ CJ: {}, MD: {}, PR: {}, QUAL: {} },

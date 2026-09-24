@@ -107,3 +107,20 @@ test_that("symptom effects are reported and never enter the model", {
   expect_length(res$payload$model$symptoms, 1)
   expect_false("called" %in% vapply(res$model$spec$levers, `[[`, "", "key"))
 })
+
+test_that("the client-safe block never names a level it does not publish", {
+  p3 <- test_project(n = 160, seed = 4)
+  r3 <- quietly(run_whatif(p3$config, verbose = FALSE))
+  j <- jsonlite::fromJSON(r3$files$island, simplifyVector = FALSE)
+  expect_false(any(c("refused", "hidden", "hidden_cells") %in% names(j$safe)))
+  expect_null(j$safe$profile$pooled)
+  refused <- r3$publish$refused$group
+  expect_true(length(refused) > 0 || nrow(r3$publish$hidden) > 0)
+  published <- unique(unlist(lapply(j$safe$groups, function(g) unlist(g$def))))
+  safe_text <- jsonlite::toJSON(j$safe, auto_unbox = TRUE)
+  small_levels <- sub("^[^:]+: ", "", refused[grepl("under", r3$publish$refused$why)])
+  for (lv in setdiff(small_levels, c(published, unlist(lapply(j$safe$profile$keys, function(k) unlist(k$levels)))))) {
+    expect_false(grepl(paste0('"', lv, '"'), safe_text, fixed = TRUE), info = lv)
+  }
+  expect_true("Privacy" %in% readxl::excel_sheets(r3$files$excel))
+})

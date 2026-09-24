@@ -81,12 +81,12 @@ run_whatif_impl <- function(config_file, verbose = TRUE) {
   whatif_say(sprintf("client-safe: %d groups published at a minimum of %d (%d crossing cells hidden, %d groups hidden by the nesting check)",
                      nrow(publish$groups), s$min_group, nrow(publish$hidden), publish$audit$nesting_hidden),
              verbose = verbose)
-  safe_profile <- if (!is.null(model$profile)) whatif_safe_profile(model, s$min_group, prep, verbose) else NULL
+  sentence <- whatif_sentence(cfg, model)
+  safe_profile <- if (!is.null(model$profile)) whatif_safe_profile(model, s$min_group, prep, sentence, verbose) else NULL
 
   warnings <- c(model$warnings, log$Message[log$Severity == "Warning" & log$Check != "Sign check" & log$Check != "Model"])
   run_status <- if (length(warnings)) "PARTIAL" else "PASS"
   notes <- whatif_notes(model, prep, s)
-  sentence <- whatif_sentence(cfg, model)
 
   run <- list(cfg = cfg, prep = prep, model = model, calibration = cal, calibration_ratings_only = cal_ratings,
               symptoms = symptoms, publish = publish, safe_results = safe_results, safe_profile = safe_profile,
@@ -138,7 +138,7 @@ whatif_print_preflight <- function(log, verbose = TRUE) {
 #' a handful of people.
 #'
 #' @keywords internal
-whatif_safe_profile <- function(model, k, prep, verbose = TRUE) {
+whatif_safe_profile <- function(model, k, prep, sentence = NULL, verbose = TRUE) {
   spec <- model$spec
   pm <- model$profile
   pooled <- list()
@@ -179,10 +179,9 @@ whatif_safe_profile <- function(model, k, prep, verbose = TRUE) {
                      length(keys), sum(lengths(pooled)), length(combos), k), verbose = verbose)
   level_n <- lapply(keys, function(key) as.integer(table(factor(ctx[[key]]$values, spm$levels[[key]]))))
   names(level_n) <- keys
-  packed <- whatif_pack_profile(spm, ctx, NULL, prep$context_order, level_n)
-  packed$sentence <- NULL
+  packed <- whatif_pack_profile(spm, ctx, sentence, prep$context_order, level_n)
   packed$combos <- combos
-  packed$pooled <- pooled
+  attr(packed, "pooled") <- pooled
   packed
 }
 

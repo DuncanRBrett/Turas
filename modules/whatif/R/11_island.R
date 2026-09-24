@@ -94,7 +94,7 @@ whatif_island_payload <- function(run) {
     weighted = isTRUE(spec$weighted), n = n,
     n_by_outcome = whatif_arr(tabulate(spec$y, spec$n_cat)),
     actual = round(actual, 2),
-    min_group = s$min_group, reliability_floor = s$reliability_floor,
+    min_group = s$min_group, reliability_floor = s$reliability_floor, range_level = WHATIF_RANGE_LEVEL,
     id_variable = s$id_variable,
     scale = list(min = spec$scale$min, max = spec$scale$max, centre = spec$scale$centre,
                  good = spec$scale$good, step = s$scale_step,
@@ -164,6 +164,9 @@ whatif_cal_summary <- function(cal) {
 
 #' The Client-Safe Block
 #'
+#' Nothing in it names a level that is not itself published (see the note at
+#' the end of the function).
+#'
 #' Group results carry est, lo and hi only, never the refit draws: 291 groups
 #' by 8 levers by 7 moves by 101 draws would be about 6 MB, and every draw is
 #' one more number a determined reader could combine. A counted "need" under
@@ -203,11 +206,14 @@ whatif_safe_block <- function(run, keys) {
     crossings = lapply(seq_len(NROW(pub$crossings)), function(i) as.list(pub$crossings[i, ])),
     declared = lapply(run$crossings, whatif_arr),
     groups = groups,
-    refused = lapply(seq_len(NROW(pub$refused)), function(i) as.list(pub$refused[i, ])),
-    hidden_cells = NROW(pub$hidden),
     audit = pub$audit,
     profile = run$safe_profile
   )
+  # Deliberately absent: which levels were refused, which cells were hidden,
+  # and which profile levels were pooled. Naming them tells a client that a
+  # campus or course had fewer than the minimum respondents, which for a list
+  # study can point at people. They are listed in the analyst workbook's
+  # Privacy sheet instead.
 }
 
 
