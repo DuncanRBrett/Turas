@@ -6,8 +6,10 @@
 # Writes the two study configs the prototypes defined in code
 # (prototypes/nps-simulator/study_sacap.py and study_ccpb.py), as What if
 # config workbooks the analyst can open and edit. The data paths point at the
-# project folders; nothing is written there. The configs land in the folder
-# given as the first argument.
+# project folders (hardcoded, like the prototypes: this is a dev script); it
+# reads nothing and writes nothing there. The configs land in the folder given
+# as the first argument. Output folders are relative to wherever the config is
+# saved: SACAP writes to 04_Analysis/WhatIf beside 04_Analysis/Crosstabs.
 #
 # Usage, from the Turas root:
 #   Rscript modules/whatif/dev/build_study_configs.R <output folder>
@@ -32,7 +34,7 @@ sacap <- generate_whatif_config_template(
     brand_name = "SACAP", unit_noun = "student", units_noun = "students",
     data_file = file.path(sacap_root, "03_Data/SACAP_Student_Annual-2025_Data.xlsx"),
     structure_file = file.path(sacap_root, "SACAP_Student_Annual-2025_Survey_Structure v2.xlsx"),
-    output_folder = "output", output_name = "SACAP_Student_Annual-2025_WhatIf",
+    output_folder = "04_Analysis/WhatIf", output_name = "SACAP_Student_Annual-2025_WhatIf",
     id_variable = "ID", base_filter_variable = "Q001", base_filter_values = "Complete; Converted",
     outcome_question = "Q017", outcome_text = "Would you recommend SACAP to others as a place to study? (Q017)",
     scale_min = 1, scale_max = 5, scale_centre = 3, scale_good = 4, scale_step = "notch",
@@ -95,7 +97,7 @@ ccpb <- generate_whatif_config_template(
     brand_name = "CCPB", unit_noun = "outlet", units_noun = "outlets",
     data_file = file.path(ccpb_root, "02 Data/CCPB_CSAT_2026.xlsx"),
     structure_file = file.path(ccpb_root, "CCPB_CSAT_W2026_Survey_Structure short.xlsx"),
-    output_folder = "output", output_name = "CCPB_CSAT_W2026_WhatIf", id_variable = "Response ID",
+    output_folder = "WhatIf", output_name = "CCPB_CSAT_W2026_WhatIf", id_variable = "Response ID",
     outcome_question = "Q79",
     outcome_text = "Would you recommend Coca-Cola Peninsula Beverages as a distributor? (Q79)",
     scale_min = 1, scale_max = 10, scale_centre = 8, scale_good = 8, scale_step = "point",

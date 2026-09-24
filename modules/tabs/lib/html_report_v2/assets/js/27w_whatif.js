@@ -421,7 +421,7 @@
       ' reached</th><th class="wi-barcol"></th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var lv = r.lv, sub = r.unclear ? "Effect unclear: points the wrong way in " + Math.round(100 * md.sign[lv.key]) + "% of refits" : lv.sub;
-      var needTxt = r.cnt === null || r.cnt === undefined ? "under " + M.min_group : String(r.cnt);
+      var needTxt = r.cnt === null || r.cnt === undefined ? "not shown" : String(r.cnt);
       h += "<tr" + (r.unclear ? ' class="wi-unclear"' : "") + "><td>" + esc(lv.label) +
         '<span class="wi-tag">' + (lv.kind === "coverage" ? "coverage" : "rating") + "</span>" +
         (sub ? "<small>" + esc(sub) + "</small>" : "") + "</td>";
@@ -440,7 +440,7 @@
       esc(unit) + " below " + esc(good) + " up to " + esc(good) + ". Coverage: slipping withdraws it from every " + esc(unit) +
       " who has it; fixing extends it to everyone without it. Points of " + esc(M.score_label || "score") +
       ", with the " + rangeName() + " across the refits underneath. " +
-      (G.exact ? "" : "A count under " + esc(M.min_group) + " is not shown.") + "</p>";
+      (G.exact ? "" : "A count is not shown when it, or the rest of the group, is under " + esc(M.min_group) + ".") + "</p>";
     return h + "</div>";
   }
 
@@ -734,11 +734,13 @@
       }).join("") + "</ul>";
     }
     if (!wi.live() && W0.safe) {
-      var a = W0.safe.audit || {}, ok = a.line_failures === 0 && a.differencing_failures === 0 &&
+      var a = W0.safe.audit || {}, ok = a.recoverable_failures === 0 && a.differencing_failures === 0 &&
         W0.safe.groups.every(function (g) { return g.n >= W0.safe.min_group; });
       h += "<h4>Privacy</h4><p class=\"" + (ok ? "wi-ok" : "wi-warn") + "\">" + (ok
-        ? "Checked in this browser: " + W0.safe.groups.length + " published groups, all with at least " + W0.safe.min_group + " " +
-          units + "; no hidden group can be worked out by subtraction within a breakdown or between two published groups; no individual answers in the file."
+        ? "Prepared so that every published group has at least " + W0.safe.min_group + " " + units +
+          " and no smaller group, single or crossed, can be worked out by adding or subtracting published ones. " +
+          "Checked when this file was built; this browser confirms the " + W0.safe.groups.length +
+          " groups it holds each have at least " + W0.safe.min_group + ". No individual answers are in the file."
         : "Privacy check failed. Do not send this file.") + "</p>";
     }
     return h + "</details>";

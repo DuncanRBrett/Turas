@@ -105,15 +105,28 @@ test_that("a full report gets the open part, lined up with its own records, and 
   expect_equal(v_emb[seq_along(ids)], rev(v_fix))
 })
 
-test_that("a client-safe report gets only the published groups", {
+test_that("a client-safe report gets only the published groups and the client-safe model", {
   for (mode in c("cube", "none")) {
     wi <- read_wi(mode)
     expect_equal(wi$meta$mode, "safe")
     expect_null(wi$open)
     expect_null(wi$profile)
     expect_null(wi$meta$id_variable)
+    expect_null(wi$safe$model)
+    expect_false(any(vapply(wi$model$design, function(c) isTRUE(c$context), logical(1))))
+    expect_true(any(vapply(fx$model$design, function(c) isTRUE(c$context), logical(1))))
     expect_equal(length(wi$safe$groups), length(fx$safe$groups))
+    expect_false(any(vapply(wi$safe$profile$keys, function(k) !is.null(k$n), logical(1))))
   }
+})
+
+test_that("a contribution file from before the client-safe model block is not embedded", {
+  old <- fx
+  old$safe$model <- NULL
+  f <- tempfile(fileext = ".json")
+  writeLines(as.character(jsonlite::toJSON(old, auto_unbox = TRUE, null = "null", na = "null", digits = NA)), f)
+  out <- capture.output(res <- .read_whatif_contribution(list(whatif_island = f), "cube", survey_data))
+  expect_null(res)
 })
 
 test_that("open rows that cannot be lined up fall back to the client-safe part", {
@@ -187,4 +200,38 @@ test_that("the release audit passes the client-safe part and catches a planted s
   named <- as.character(jsonlite::toJSON(safe, auto_unbox = TRUE, null = "null", na = "null", digits = NA))
   a3 <- turas_release_audit(build_probe(named), client_safe = TRUE, refuse = FALSE)
   expect_true(any(grepl("names the groups", a3$whatif$violations)))
+})
+
+test_that("the release audit catches leaks it can see from the island alone", {
+  base <- read_wi("cube")
+  audit_of <- function(w) {
+    txt <- as.character(jsonlite::toJSON(w, auto_unbox = TRUE, null = "null", na = "null", digits = NA))
+    turas_release_audit(build_probe(txt), client_safe = TRUE, refuse = FALSE)$whatif$violations
+  }
+  expect_length(audit_of(base), 0)
+  # A hidden level of 3: the whole sample is 3 more than one variable's
+  # published levels.
+  w <- base
+  defs <- lapply(w$safe$groups, function(g) unlist(g$def))
+  key <- names(defs[[which(lengths(defs) == 1)[1]]])
+  singles_n <- sum(vapply(seq_along(defs), function(i)
+    if (length(defs[[i]]) == 1 && names(defs[[i]]) == key) w$safe$groups[[i]]$n else 0, 0))
+  w$safe$groups[[which(lengths(defs) == 0)]]$n <- singles_n + 3
+  expect_true(any(grepl("leaves fewer than", audit_of(w))))
+  # A context-baseline coefficient back in the model.
+  w <- base
+  w$model$design[[length(w$model$design) + 1]] <- list(lever = "campus", part = "Tiny", context = TRUE)
+  expect_true(any(grepl("context-baseline", audit_of(w))))
+  # A need count of 3.
+  w <- base
+  w$safe$groups[[1]]$need[[1]] <- 3
+  expect_true(any(grepl("need count", audit_of(w))))
+  # Per-level counts in Build a ... .
+  w <- base
+  w$safe$profile$keys[[1]]$n <- list(3, 100)
+  expect_true(any(grepl("per-level counts", audit_of(w))))
+  # A list about as long as the study.
+  w <- base
+  w$safe$extra <- as.list(seq_len(w$meta$n - 1))
+  expect_true(any(grepl("about as long as the study", audit_of(w))))
 })

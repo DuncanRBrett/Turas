@@ -55,6 +55,8 @@ function safeIsland() {
   delete w.meta.id_variable;
   delete w.open;
   delete w.profile;
+  w.model = w.safe.model;          // the client-safe model block, no context baselines
+  delete w.safe.model;
   return w;
 }
 
@@ -173,7 +175,7 @@ run("the client-safe view has its own picker, published groups only, and a priva
   const html = render(sandbox(safeIsland()));
   has(html, "Client-safe: published groups only");
   has(html, "data-wi-addfilter");
-  has(html, "Checked in this browser");
+  has(html, "Prepared so that every published group has at least");
   FX.safe.groups.filter((g) => g.def && Object.keys(g.def).length === 1).forEach((g) => {
     const k = Object.keys(g.def)[0];
     has(html, k + "\u0001" + g.def[k], "offers " + g.id);
@@ -228,6 +230,16 @@ run("client-safe Build a ... keeps to combinations the minimum group shares", ()
     const code = P.keys.map((k) => k.levels.indexOf(prof[k.key])).join(",");
     assert(P.combos.some((cb) => cb.join(",") === code), "repaired to an offered combination");
   }
+});
+
+run("the client-safe model carries no context-baseline terms and still renders every panel", () => {
+  const w = safeIsland();
+  assert(w.model.design.every((c) => !c.context), "no context rows in the design");
+  assert(w.model.fits.every((f) => f.b.length === w.model.design.length), "coefficients match the design");
+  assert(FX.model.design.some((c) => c.context), "the open model does have them (fixture has baselines)");
+  const html = render(sandbox(w));
+  ["Where to direct effort", "Build a scenario", "Rate ", "How this works"].forEach((t) => has(html, t));
+  lacks(html, "NaN");
 });
 
 run("the scores follow the cumulative logit (probabilities sum to one)", () => {

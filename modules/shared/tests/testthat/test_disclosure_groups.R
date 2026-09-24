@@ -142,3 +142,91 @@ test_that("the result does not depend on the order respondents arrive in", {
 test_that("levels sort the same way everywhere (byte order, not the locale)", {
   expect_equal(disclosure_levels(c("b", "B", "a", "A")), c("A", "B", "a", "b"))
 })
+
+# ---------------------------------------------------------------- recoverability
+# An attack written independently of the code under test: projection onto the
+# published groups' span by singular value decomposition, over respondents
+# (not atoms), on every single level and every two-way cell under k.
+attack <- function(context, groups_df, members, k) {
+  keys <- names(context)
+  sv <- svd(members * 1)
+  keep <- sv$d > 1e-9 * max(sv$d)
+  U <- sv$u[, keep, drop = FALSE]
+  in_span <- function(v) max(abs(v - U %*% crossprod(U, v))) < 1e-7
+  hits <- character(0)
+  for (key in keys) for (lv in unique(context[[key]]$values)) {
+    m <- context[[key]]$values == lv
+    if (sum(m) > 0 && sum(m) < k && in_span(as.numeric(m))) hits <- c(hits, paste0(key, "=", lv))
+  }
+  for (i in seq_along(keys)) for (j in seq_along(keys)) if (i < j) {
+    for (a in unique(context[[keys[i]]]$values)) for (b in unique(context[[keys[j]]]$values)) {
+      m <- context[[keys[i]]]$values == a & context[[keys[j]]]$values == b
+      if (sum(m) > 0 && sum(m) < k && in_span(as.numeric(m))) hits <- c(hits, paste0(keys[i], "=", a, "|", keys[j], "=", b))
+    }
+  }
+  hits
+}
+
+test_that("a small level cannot be recovered as the whole sample minus the other levels", {
+  set.seed(8)
+  n <- 300
+  campus <- c(rep("East", 3), sample(c("North", "South", "West"), n - 3, TRUE))
+  year <- sample(c("Y1", "Y2", "Y3"), n, TRUE)
+  ctx <- list(campus = list(label = "Campus", values = campus), year = list(label = "Year", values = year))
+  p <- disclosure_publish_groups(ctx, list(c("campus", "year")), 10, "All")
+  expect_length(attack(ctx, p$groups, p$members, 10), 0)
+  expect_false("campus=East" %in% p$groups$id)
+  expect_gte(p$audit$recovery_hidden, 1L)
+  published_campus <- sum(p$groups$n[!is.na(p$groups$key1) & p$groups$key1 == "campus" & is.na(p$groups$key2)])
+  expect_true(n - published_campus == 0 || n - published_campus >= 10)
+})
+
+test_that("a chain of subtractions across a crossing cannot recover a small cell", {
+  # The reviewer's case: a row total minus its shown cells gives a hidden cell
+  # of k or more, which then solves a column down to a small cell.
+  set.seed(3)
+  fails <- 0
+  for (it in 1:60) {
+    n <- sample(150:400, 1)
+    mk <- function(L) sample(paste0("L", 1:L), n, TRUE, prob = rexp(L) + 0.3)
+    ctx <- list(a = list(label = "A", values = mk(sample(3:5, 1))), b = list(label = "B", values = mk(sample(3:5, 1))),
+                c = list(label = "C", values = mk(3)))
+    p <- disclosure_publish_groups(ctx, list(c("a", "b"), c("b", "c")), 10, "All")
+    fails <- fails + length(attack(ctx, p$groups, p$members, 10))
+  }
+  expect_equal(fails, 0)
+})
+
+test_that("the reviewer's fuzz: 150 random studies publish nothing a small group can be recovered from", {
+  set.seed(1)
+  leaks <- 0
+  runs <- 0
+  for (it in 1:150) {
+    n <- sample(150:400, 1)
+    mk <- function(L) sample(paste0("L", 1:L), n, TRUE, prob = rexp(L)^2)
+    ctx <- list(a = list(label = "A", values = mk(sample(3:6, 1))), b = list(label = "B", values = mk(sample(3:5, 1))),
+                c = list(label = "C", values = mk(sample(2:4, 1))))
+    p <- disclosure_publish_groups(ctx, list(c("a", "b"), c("b", "c")), 10, "All")
+    runs <- runs + 1
+    leaks <- leaks + (length(attack(ctx, p$groups, p$members, 10)) > 0)
+    a <- disclosure_audit_groups(p$members, 10, ctx,
+      lapply(seq_len(nrow(p$groups)), function(i) {
+        g <- p$groups[i, ]; d <- character(0)
+        if (!is.na(g$key1)) d[g$key1] <- g$level1
+        if (!is.na(g$key2)) d[g$key2] <- g$level2
+        d
+      }))
+    expect_true(a$ok)
+  }
+  expect_equal(runs, 150)
+  expect_equal(leaks, 0)
+})
+
+test_that("the audit finds a recoverable group the publisher would have hidden", {
+  n <- 100
+  ctx <- list(g = list(label = "G", values = c(rep("tiny", 3), rep("x", 50), rep("y", 47))))
+  members <- cbind(all = rep(TRUE, n), x = ctx$g$values == "x", y = ctx$g$values == "y")
+  a <- disclosure_audit_groups(members, 5, ctx, list(character(0), c(g = "x"), c(g = "y")))
+  expect_false(a$ok)
+  expect_equal(a$recoverable, "g=tiny")
+})

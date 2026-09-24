@@ -805,7 +805,9 @@ format_output_value <- function(value, type = "frequency",
 #'
 #' @param config_obj The tabs config object.
 #' @param interactivity The resolved mode: "records", "cube" or "none".
-#' @param survey_data This run's survey data, in microdata row order.
+#' @param survey_data This run's survey data. Its row order is the microdata's
+#'   row order (build_microdata iterates nrow(survey_data)), which is what lets
+#'   the open rows be lined up with the report's filter masks.
 #' @return A single JSON string, or NULL.
 #' @keywords internal
 .read_whatif_contribution <- function(config_obj, interactivity, survey_data) {
@@ -819,7 +821,8 @@ format_output_value <- function(value, type = "frequency",
   }
   wi <- tryCatch(jsonlite::fromJSON(paste(readLines(path, warn = FALSE), collapse = ""),
                                     simplifyVector = FALSE), error = function(e) NULL)
-  if (is.null(wi) || !identical(wi$meta$kind, "whatif") || is.null(wi$model) || is.null(wi$safe)) {
+  if (is.null(wi) || !identical(wi$meta$kind, "whatif") || is.null(wi$model) || is.null(wi$safe) ||
+      is.null(wi$safe$model)) {
     say("\n[WARNING] %s is not a What if contribution file.\n  The report is built without the What if tab.\n",
         basename(path))
     return(NULL)
@@ -840,7 +843,10 @@ format_output_value <- function(value, type = "frequency",
     wi$meta$mode <- "safe"
     wi$meta$id_variable <- NULL
     say("  What if tab: client-safe, %d published groups%s.", length(wi$safe$groups), note)
-    list(meta = wi$meta, model = wi$model, safe = wi$safe)
+    # The client-safe model block (no context baselines) replaces the full one.
+    model <- wi$safe$model
+    wi$safe$model <- NULL
+    list(meta = wi$meta, model = model, safe = wi$safe)
   }
   payload <- NULL
   if (identical(interactivity, "records")) {

@@ -150,7 +150,7 @@ whatif_island_payload <- function(run) {
   names(open$val) <- keys
 
   list(meta = meta, model = model_block, profile = profile, open = open,
-       safe = whatif_safe_block(run, keys))
+       safe = whatif_safe_block(run, keys, model_block))
 }
 
 
@@ -173,7 +173,7 @@ whatif_cal_summary <- function(cal) {
 #' the minimum group is published as null.
 #'
 #' @keywords internal
-whatif_safe_block <- function(run, keys) {
+whatif_safe_block <- function(run, keys, model_block) {
   k <- run$cfg$settings$min_group
   pub <- run$publish
   res <- run$safe_results
@@ -189,21 +189,26 @@ whatif_safe_block <- function(run, keys) {
       }, numeric(1)))
     })
     need <- vapply(keys, function(key) lv$need[lv$key == key][1], numeric(1))
+    # A count under k on either side is hidden: "3 need it" and "3 do not"
+    # describe 3 people equally.
+    need[need < k | (g$n - need) < k] <- NA
     def <- list()
     if (!is.na(g$key1)) def[[g$key1]] <- g$level1
     if (!is.na(g$key2)) def[[g$key2]] <- g$level2
     list(id = g$id, family = g$family, label = g$label, def = def, n = g$n,
          actual = round(r$actual, 2),
-         need = whatif_arr(ifelse(need < k, NA_integer_, as.integer(need))),
+         need = whatif_arr(as.integer(need)),
          est = grid("est"), lo = grid("lo"), hi = grid("hi"),
          bundles = lapply(seq_len(NROW(r$bundles)), function(b)
            whatif_arr(round(unlist(r$bundles[b, c("est", "lo", "hi")]), 2))))
   })
   list(
     min_group = k,
+    model = whatif_safe_model(model_block, k, length(run$model$spec$y)),
     filters = lapply(run$filter_keys, function(key) list(
       key = key, label = run$model$spec$context[[key]]$label)),
-    crossings = lapply(seq_len(NROW(pub$crossings)), function(i) as.list(pub$crossings[i, ])),
+    crossings = lapply(seq_len(NROW(pub$crossings)), function(i)
+      list(family = pub$crossings$family[i], shown = pub$crossings$shown[i])),
     declared = lapply(run$crossings, whatif_arr),
     groups = groups,
     audit = pub$audit,
@@ -227,4 +232,25 @@ whatif_write_island <- function(payload, path) {
   txt <- jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null", null = "null", digits = NA)
   writeLines(txt, path, useBytes = TRUE)
   invisible(path)
+}
+
+
+#' The Model Block a Client-Safe Report Carries
+#'
+#' Without the context baselines: each context level has its own coefficient,
+#' and a level with few respondents would ship something close to their
+#' average (and its name). Client-safe views never need them: group results
+#' are precomputed, and Rate as one uses ctx_offset, the average baseline. A
+#' symptom whose flagged or unflagged side is under k is dropped.
+#'
+#' @keywords internal
+whatif_safe_model <- function(mb, k, n) {
+  keep <- !vapply(mb$design, function(c) isTRUE(c$context), logical(1))
+  mb$design <- mb$design[keep]
+  mb$fits <- lapply(mb$fits, function(f) { f$b <- whatif_arr(unlist(f$b)[keep]); f })
+  levers_col <- cumsum(keep) - 1L
+  mb$levers <- lapply(mb$levers, function(lv) { lv$col <- levers_col[lv$col + 1L]; lv })
+  mb$symptoms <- Filter(function(sm) sm$n >= k && (n - sm$n) >= k, mb$symptoms)
+  mb$baselines$penalty <- NULL
+  mb
 }

@@ -180,6 +180,9 @@ whatif_safe_profile <- function(model, k, prep, sentence = NULL, verbose = TRUE)
   level_n <- lapply(keys, function(key) as.integer(table(factor(ctx[[key]]$values, spm$levels[[key]]))))
   names(level_n) <- keys
   packed <- whatif_pack_profile(spm, ctx, sentence, prep$context_order, level_n)
+  # Level counts stay out of the client-safe file: set against a published
+  # group's n, they show how many were pooled into it.
+  packed$keys <- lapply(packed$keys, function(kk) { kk$n <- NULL; kk })
   packed$combos <- combos
   attr(packed, "pooled") <- pooled
   packed

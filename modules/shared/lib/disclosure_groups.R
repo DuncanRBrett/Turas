@@ -15,9 +15,22 @@
 #   3. Nesting check. Two published groups where one contains the other and
 #      they differ by fewer than k respondents give that difference away by
 #      subtraction (for example "Online Access, Honours year" against "Online
-#      Access, BSocSci Honours"). The inner group is hidden, and the whole
-#      procedure repeats until no such pair remains. Longer chains across three
-#      or more tables are not checked.
+#      Access, BSocSci Honours"). The inner group is hidden.
+#   4. Recoverability check. Rules 2 and 3 look at one table or one pair at a
+#      time; subtraction can chain across them (the whole sample minus every
+#      other level gives a small level back; a row total minus its shown cells
+#      gives a hidden cell, which then solves a column). A group can be worked
+#      out exactly when its membership is a linear combination of the published
+#      groups' memberships, so every small candidate (each single level and
+#      each cell of every two-way crossing of the variables, declared or not,
+#      with 1 to k-1 respondents) is tested against the published groups by
+#      least squares. When one is recoverable, the smallest published group in
+#      its combination is hidden, and everything repeats until none is. This is
+#      a practical bound, not a proof: a small set of any other shape (a
+#      three-way cell, a union of cells from different rows) is not tested.
+#
+# Rule 4 was added after an independent review on 24 Sep 2026: with rules 1
+# to 3 only, 117 of 150 random studies leaked a count of 1 to 9.
 #
 # First built for the What if simulator (modules/whatif), in the shared layer
 # so the tabs cube can adopt it: the same differencing problem is the known
@@ -104,6 +117,82 @@ disclosure_line_failures <- function(tab, hide, k) {
 }
 
 
+#' Small Groups a Reader Might Try to Recover
+#'
+#' Every single level and every cell of every two-way crossing of the context
+#' variables (declared or not) with 1 to k-1 respondents.
+#'
+#' @param context Named list of list(label, values)
+#' @param k Minimum group
+#' @return List of candidate definitions list(id, def = named character, n)
+#' @export
+disclosure_candidates <- function(context, k) {
+  out <- list()
+  keys <- names(context)
+  for (key in keys) {
+    tab <- table(context[[key]]$values)
+    for (lev in names(tab)[tab > 0 & tab < k]) {
+      out[[length(out) + 1]] <- list(id = paste0(key, "=", lev), def = stats::setNames(lev, key), n = tab[[lev]])
+    }
+  }
+  if (length(keys) > 1) for (i in seq_len(length(keys) - 1)) for (j in (i + 1):length(keys)) {
+    tab <- table(context[[keys[i]]]$values, context[[keys[j]]]$values)
+    hit <- which(tab > 0 & tab < k, arr.ind = TRUE)
+    for (r in seq_len(nrow(hit))) {
+      a <- rownames(tab)[hit[r, 1]]
+      b <- colnames(tab)[hit[r, 2]]
+      out[[length(out) + 1]] <- list(id = paste0(keys[i], "=", a, "|", keys[j], "=", b),
+                                     def = stats::setNames(c(a, b), keys[c(i, j)]), n = tab[a, b])
+    }
+  }
+  out
+}
+
+
+#' Which Small Candidates Can Be Worked Out From the Published Groups
+#'
+#' Works on atoms (the distinct combinations of every context variable), where
+#' every group is a union of atoms. A candidate is recoverable when its atom
+#' indicator lies in the span of the published groups' indicators (least
+#' squares residual under 1e-8).
+#'
+#' @param context Named list of list(label, values)
+#' @param published List of named character definitions (empty = everyone)
+#' @param candidates From disclosure_candidates()
+#' @return List: recoverable (logical per candidate), coef (matrix, published by
+#'   recoverable candidates; the combination that recovers each)
+#' @export
+disclosure_recoverable <- function(context, published, candidates) {
+  if (!length(candidates)) return(list(recoverable = logical(0), coef = NULL))
+  keys <- names(context)
+  combo <- do.call(paste, c(lapply(keys, function(k) context[[k]]$values), sep = "\r"))
+  atoms <- unique(combo)
+  parts <- do.call(rbind, strsplit(atoms, "\r", fixed = TRUE))
+  if (!is.matrix(parts)) parts <- matrix(parts, ncol = length(keys))
+  colnames(parts) <- keys
+  indicator <- function(def) {
+    m <- rep(TRUE, length(atoms))
+    for (k in names(def)) m <- m & parts[, k] == def[[k]]
+    as.numeric(m)
+  }
+  A <- vapply(published, indicator, numeric(length(atoms)))
+  if (!is.matrix(A)) A <- matrix(A, ncol = length(published))
+  Tm <- vapply(candidates, function(cn) indicator(cn$def), numeric(length(atoms)))
+  if (!is.matrix(Tm)) Tm <- matrix(Tm, ncol = length(candidates))
+  q <- qr(A, tol = 1e-10)
+  res <- qr.resid(q, Tm)
+  if (!is.matrix(res)) res <- matrix(res, ncol = length(candidates))
+  rec <- apply(abs(res), 2, max) < 1e-8
+  coef <- NULL
+  if (any(rec)) {
+    coef <- qr.coef(q, Tm[, rec, drop = FALSE])
+    if (!is.matrix(coef)) coef <- matrix(coef, ncol = sum(rec))
+    coef[is.na(coef)] <- 0
+  }
+  list(recoverable = rec, coef = coef)
+}
+
+
 #' Pairs of Groups That Give Away a Small Difference
 #'
 #' @param members Logical matrix, respondents by groups
@@ -138,7 +227,9 @@ disclosure_differencing_pairs <- function(members, k) {
 #'   \item{hidden}{data frame family, key1, level1, key2, level2 (crossing cells hidden)}
 #'   \item{refused}{data frame group, why (single levels not published)}
 #'   \item{crossings}{data frame family, cells, shown, small, protecting}
-#'   \item{audit}{list line_failures, differencing_failures, nesting_hidden, rounds, k}
+#'   \item{audit}{list line_failures (diagnostic only), differencing_failures,
+#'     recoverable_failures, candidates_checked, nesting_hidden, recovery_hidden,
+#'     rounds, k}
 #' @export
 disclosure_publish_groups <- function(context, crossings, k, all_label = "All respondents") {
   n <- length(context[[1]]$values)
@@ -205,30 +296,55 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
     m
   }
 
+  def_of <- function(g) {
+    d <- character(0)
+    if (!is.na(g$key1)) d[g$key1] <- g$level1
+    if (!is.na(g$key2)) d[g$key2] <- g$level2
+    d
+  }
+  candidates <- disclosure_candidates(context, k)
+  stuck <- function(problem) {
+    turas_refuse(
+      code = "CALC_DISCLOSURE_RECOVERABLE", title = "A small group could still be worked out",
+      problem = problem,
+      why_it_matters = "A client could recover a group smaller than the minimum from the published ones.",
+      how_to_fix = c("Declare fewer crossings, or raise the minimum group.", "Report this case."),
+      module = "DISCLOSURE")
+  }
   forced <- character(0)
+  by_nesting <- character(0)
+  by_recovery <- character(0)
   rounds <- 0L
   repeat {
     rounds <- rounds + 1L
+    if (rounds > 2000L) stuck("The groups to publish were still changing after 2000 rounds of checks.")
     singles <- Filter(function(g) !g$id %in% forced, singles_all)
     cx <- build_crossings(forced)
     published <- c(singles, cx$pub)
+    ids <- vapply(published, `[[`, "", "id")
     members <- vapply(published, member_of, logical(n))
     if (!is.matrix(members)) members <- matrix(members, nrow = n)
+    sizes <- colSums(members)
     pairs <- disclosure_differencing_pairs(members, k)
-    ids <- vapply(published, `[[`, "", "id")
     new <- setdiff(setdiff(unique(ids[pairs$inner]), "all"), forced)
-    if (!nrow(pairs) || !length(new)) break
+    if (length(new)) {
+      by_nesting <- c(by_nesting, new)
+      forced <- c(forced, new)
+      next
+    }
+    rc <- disclosure_recoverable(context, lapply(published, def_of), candidates)
+    if (!any(rc$recoverable)) break
+    for (j in seq_len(ncol(rc$coef))) {
+      used <- which(abs(rc$coef[, j]) > 1e-8 & ids != "all" & !ids %in% forced)
+      if (length(used)) new <- c(new, ids[used[which.min(sizes[used])]])
+    }
+    new <- setdiff(unique(new), forced)
+    if (!length(new)) {
+      stuck(sprintf("%d group(s) under %d respondents can be worked out and nothing more can be hidden.",
+                    sum(rc$recoverable), k))
+    }
+    by_recovery <- c(by_recovery, new)
     forced <- c(forced, new)
-  }
-  if (nrow(pairs)) {
-    turas_refuse(
-      code = "CALC_DISCLOSURE_NESTING",
-      title = "Nesting check could not close every gap",
-      problem = sprintf("%d pairs of published groups still differ by fewer than %d respondents.", nrow(pairs), k),
-      why_it_matters = "A client could recover a group smaller than the minimum by subtraction.",
-      how_to_fix = c("Declare fewer crossings, or raise the minimum group.",
-                     "Report this case: the check is meant to close every such pair."),
-      module = "DISCLOSURE")
   }
   for (g in singles_all) {
     if (g$id %in% forced) {
@@ -249,7 +365,9 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
     refused = if (length(refused)) do.call(rbind, refused) else data.frame(group = character(0), why = character(0)),
     crossings = if (length(cx$summ)) do.call(rbind, cx$summ) else data.frame(),
     audit = list(line_failures = cx$fails, differencing_failures = nrow(pairs),
-                 nesting_hidden = length(forced), rounds = rounds, k = k)
+                 recoverable_failures = 0L, candidates_checked = length(candidates),
+                 nesting_hidden = length(by_nesting), recovery_hidden = length(by_recovery),
+                 rounds = rounds, k = k)
   )
 }
 
@@ -257,17 +375,29 @@ disclosure_publish_groups <- function(context, crossings, k, all_label = "All re
 #' Audit a Set of Published Groups
 #'
 #' Independent re-check of what disclosure_publish_groups() promises, for use
-#' before a file is released: every group at or above k, and no pair of groups
-#' that differ by 1 to k-1 respondents with one inside the other.
+#' before a file is released: every group at or above k, no pair of groups that
+#' differ by 1 to k-1 respondents with one inside the other, and, when the
+#' context is given, no small candidate recoverable from the groups.
 #'
 #' @param members Logical matrix, respondents by groups
 #' @param k Minimum group
-#' @return List ok (logical), small (group ids under k), pairs (differencing pairs)
+#' @param context Optional named context list, for the recoverability check
+#' @param defs Optional list of named character definitions, one per column of
+#'   members (needed with context)
+#' @return List ok (logical), small (group ids under k), pairs (differencing
+#'   pairs), recoverable (candidate ids that can be worked out)
 #' @export
-disclosure_audit_groups <- function(members, k) {
+disclosure_audit_groups <- function(members, k, context = NULL, defs = NULL) {
   n <- colSums(members)
   pairs <- disclosure_differencing_pairs(members, k)
-  list(ok = all(n >= k) && nrow(pairs) == 0,
+  recoverable <- character(0)
+  if (!is.null(context) && !is.null(defs)) {
+    cand <- disclosure_candidates(context, k)
+    rc <- disclosure_recoverable(context, defs, cand)
+    recoverable <- vapply(cand, `[[`, "", "id")[rc$recoverable]
+  }
+  list(ok = all(n >= k) && nrow(pairs) == 0 && !length(recoverable),
        small = colnames(members)[n < k],
-       pairs = pairs)
+       pairs = pairs,
+       recoverable = recoverable)
 }
