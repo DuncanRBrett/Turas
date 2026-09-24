@@ -916,3 +916,40 @@ test_that("banner trend sheet writes multi-mention option and any-mention rows",
   expect_equal(as.numeric(df[which(df[[1]] == "Q30_2")[1], 2:5]), c(20, 20, 20, 20))
   expect_equal(as.numeric(df[which(df[[1]] == "% Mentioning Any")[1], 2:5]), c(70, 80, 65, 75))
 })
+
+
+# ==============================================================================
+# A segment with no one giving an answer Total has (robustness review 24 Sep)
+# ==============================================================================
+# Shares are a named numeric vector; `[[code]]` on a missing name stops R. A
+# banner run with a segment where nobody chose one answer crashed every
+# workbook ("subscript out of bounds" in write_banner_metric_rows).
+
+prop_result <- function(props_w1, props_w2) {
+  wr <- function(p) list(available = TRUE, n_unweighted = 40, eff_n = 30, proportions = p)
+  list(question_code = "AWARE", question_text = "Aware", question_type = "Single_Response",
+       metric_type = "proportions", response_codes = c("Yes", "No", "Maybe"),
+       wave_results = list(W1 = wr(props_w1), W2 = wr(props_w2)),
+       changes = list(), significance = list())
+}
+
+test_that("banner sheet survives a segment missing an answer, leaving it blank", {
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "AWARE")
+  segs <- list(Total = prop_result(c(Yes = 40, No = 50, Maybe = 10), c(Yes = 45, No = 45, Maybe = 10)),
+               Region_South = prop_result(c(Yes = 50, No = 50), c(Yes = 60, No = 40)))
+  expect_no_error(write_banner_trend_table(wb, "AWARE", segs, c("W1", "W2"), make_mock_config(),
+                                           create_tracker_styles(), 1))
+  df <- sheet_cells(wb, "AWARE")
+  expect_equal(as.numeric(df[which(df[[1]] == "Maybe")[1], 2:5]), c(10, 10, NA, NA))
+})
+
+test_that("flat trend sheet and wave history survive a wave missing an answer", {
+  res <- prop_result(c(Yes = 40, No = 60), c(Yes = 45, No = 45, Maybe = 10))
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "AWARE")
+  expect_no_error(write_proportions_trend_table(wb, "AWARE", res, c("W1", "W2"),
+                                                make_mock_config(), create_tracker_styles(), 1))
+  expect_true(is.na(extract_metric_value_by_key(res$wave_results$W1, "proportion:Maybe",
+                                                "proportions")))
+})

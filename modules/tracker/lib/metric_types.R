@@ -40,6 +40,24 @@ VALID_METRIC_TYPES <- unlist(METRIC_TYPES, use.names = FALSE)
 # VALIDATION FUNCTIONS
 # ------------------------------------------------------------------------------
 
+#' One Answer's Share From a Wave Result's Proportions
+#'
+#' Shares are a named numeric vector, and `[[code]]` on a name that is not
+#' there stops R. A wave or banner segment where nobody gave an answer that
+#' another wave or Total has is ordinary data, so this returns NA instead.
+#'
+#' @param proportions Named numeric vector (or list) of shares, or NULL
+#' @param code Character. The answer code
+#' @return Numeric scalar, NA when the code is not present
+#' @keywords internal
+proportion_value <- function(proportions, code) {
+  code <- as.character(code)
+  if (is.null(proportions) || !(code %in% names(proportions))) return(NA_real_)
+  v <- proportions[[code]]
+  if (is.null(v) || length(v) != 1) NA_real_ else as.numeric(v)
+}
+
+
 #' Storage Key for a Rating / Composite Metric Spec
 #'
 #' The one place that decides the name a TrackingSpec is stored under in a

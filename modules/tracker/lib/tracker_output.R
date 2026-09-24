@@ -578,7 +578,7 @@ write_proportions_trend_table <- function(wb, sheet_name, result, wave_ids, conf
       wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
 
       if (isTRUE(wave_result$available)) {
-        pct <- wave_result$proportions[[as.character(code)]]
+        pct <- proportion_value(wave_result$proportions, code)
         code_values[i] <- round(pct, decimal_places)
       } else {
         code_values[i] <- NA

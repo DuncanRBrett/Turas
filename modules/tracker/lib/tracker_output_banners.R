@@ -248,7 +248,7 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
           wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
 
           if (isTRUE(wave_result$available) && !is.null(wave_result$proportions)) {
-            pct <- wave_result$proportions[[as.character(code)]]
+            pct <- proportion_value(wave_result$proportions, code)
             code_values[idx] <- if (!is.null(pct) && !is.na(pct)) round(pct, decimal_places) else NA_real_
           } else {
             code_values[idx] <- NA_real_

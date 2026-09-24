@@ -508,10 +508,7 @@ extract_metric_value <- function(wave_result, metric_type, metric_name) {
       return(wave_result$metrics[[metric_name]])
     }
     # Check proportions
-    if (!is.null(wave_result$proportions) && !is.null(wave_result$proportions[[metric_name]])) {
-      return(wave_result$proportions[[metric_name]])
-    }
-    return(NA_real_)
+    return(proportion_value(wave_result$proportions, metric_name))
   }
 
   # Fallback

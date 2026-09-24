@@ -797,9 +797,8 @@ extract_metric_value_by_key <- function(wave_result, metric_key, question_metric
   } else if (startsWith(metric_key, "proportion:")) {
     # Extract proportion for specific response code
     code <- sub("proportion:", "", metric_key)
-    if (!is.null(wave_result$proportions) && !is.null(wave_result$proportions[[code]])) {
-      return(wave_result$proportions[[code]])
-    }
+    v <- proportion_value(wave_result$proportions, code)
+    if (!is.na(v)) return(v)
   } else if (startsWith(metric_key, "mention:")) {
     # Extract mention proportion for specific column
     col_name <- sub("mention:", "", metric_key)
