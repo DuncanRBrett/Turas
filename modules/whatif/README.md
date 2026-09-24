@@ -1,8 +1,20 @@
 # What if module
 
-Status: engine only (session 1 of `docs/v2_lift/BRIEF_WHATIF_SIMULATOR.md`).
-There is no config workbook, no report tab and no client-safe output yet. The
-module stands apart from the other modules for now: nothing else sources it.
+Status: sessions 1 to 4 of `docs/v2_lift/BRIEF_WHATIF_SIMULATOR.md` built
+(engine, config and preflight, the tabs report tab, client-safe). Session 5
+(stats pack, client guide, SACAP dry run) is still to do. Notes:
+`docs/v2_lift/NOTES_WHATIF_SESSION_1.md` and `NOTES_WHATIF_SESSIONS_2_4.md`.
+
+## How to run it
+
+1. A What if config beside the project (the What If tile can create a blank
+   one). Its Levers sheet decides which areas the model uses.
+2. `launch_turas()` then the **What If** tile, or
+   `source("modules/whatif/source_whatif.R"); run_whatif("<config>.xlsx")`.
+3. Set the tabs setting `whatif_island` to the `{output_name}_whatif_island.json`
+   it writes, and rebuild the tabs report. A full report gets the live tab; a
+   client-safe report gets published groups only. The `.json` itself holds
+   respondent rows: keep it with the project, never send it.
 
 ## What it does
 
@@ -33,7 +45,10 @@ an area WILL add points.
 | `R/05_groups.R` | `whatif_group_results()`: actual score and every move's change for a group, with 90% ranges |
 | `R/06_profile.R` | Profile model; `whatif_profile_predict()` refuses a profile the Structure rules block |
 | `R/07_calibration.R` | `whatif_calibration()`: held-out predicted against actual score by context group |
-| `dev/verify_sacap_2025.R` | One-off check against the Python prototype on SACAP 2025. Reads client data; not part of the suite |
+| `R/08_config.R` to `R/13_excel.R` | Config reader, data preparation, preflight, contribution file, `run_whatif()`, analyst workbook |
+| `lib/generate_config_template.R` | Blank or filled What if config workbook |
+| `run_whatif_gui.R` | The What If tile in `launch_turas()` |
+| `dev/` | One-off checks against the prototypes on SACAP 2025 and CCPB 2026 (read client data; not in the suite), the study config builder and the tabs fixture builder |
 
 ## Lever kinds
 
