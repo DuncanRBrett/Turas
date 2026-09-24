@@ -18,7 +18,8 @@
 # and renamed banner columns are handled. Metric titles + segment values are the
 # canonical keys the renderer matches on (tracking_norm).
 #
-# DEPENDS ON: the tracker calculators (statistical_core.R) being loaded.
+# DEPENDS ON: the tracker calculators (statistical_core.R), tracking_norm()
+# (tracking_island.R) and .twv_excluded() (tracking_wave_values.R) being loaded.
 # ==============================================================================
 
 if (!exists("%||%", mode = "function")) {
@@ -64,19 +65,34 @@ tracking_reset_unweighted_notices <- function() {
 #     the items the respondent answered), exactly how the data-layer composite
 #     (mean of its items) is computed.
 # Returns NULL when the metric is absent this wave (its column(s) missing).
-.tsc_metric_vector <- function(m, wid, d) {
+#
+# `options` is that wave's Survey_Structure Options body, or NULL. For a mean or
+# NPS metric, any answer whose option is flagged ExcludeFromIndex = Y (a "don't
+# know" coded 99, say) becomes NA before scoring, per source column for a
+# composite. Without this a numeric DK was averaged into every mean and scored
+# as an NPS promoter (review 24 Sep 2026). Proportions keep DK in the base.
+.tsc_metric_vector <- function(m, wid, d, options = NULL) {
+  score_kind <- !identical(m$type %||% "mean", "proportions")
+  column <- function(cn) {
+    v <- d[[cn]]
+    if (score_kind && !is.null(options)) {
+      drop <- .twv_excluded(options, cn)
+      if (length(drop)) v[!is.na(v) & tracking_norm(v) %in% drop] <- NA
+    }
+    v
+  }
   if (!is.null(m$sources)) {
     scols <- m$sources[[wid]]
     scols <- scols[!is.na(scols) & nzchar(scols) & scols %in% names(d)]
     if (length(scols) == 0) return(NULL)
-    mat <- vapply(scols, function(cn) suppressWarnings(as.numeric(d[[cn]])),
+    mat <- vapply(scols, function(cn) suppressWarnings(as.numeric(column(cn))),
                   numeric(nrow(d)))
     if (is.null(dim(mat))) mat <- matrix(mat, ncol = 1)
     return(suppressWarnings(rowMeans(mat, na.rm = TRUE)))   # all-NA row -> NaN (filtered downstream)
   }
   mcol <- m$cols[[wid]]
   if (is.null(mcol) || !(mcol %in% names(d))) return(NULL)
-  d[[mcol]]
+  column(mcol)
 }
 
 # One wave_result (the tracker calculator output + available=TRUE), or NULL.
@@ -107,8 +123,11 @@ tracking_reset_unweighted_notices <- function() {
 
 #' Compute per-segment wave trends from per-respondent wave data
 #'
-#' @param waves List of `list(id = <wave id>, data = <per-respondent data.frame>)`,
-#'   oldest first.
+#' @param waves List of `list(id = <wave id>, data = <per-respondent data.frame>,
+#'   options = <that wave's Survey_Structure Options body, optional>)`, oldest
+#'   first. With `options`, answers flagged ExcludeFromIndex = Y leave that
+#'   wave's means and NPS. Without it nothing is excluded, so a numeric "don't
+#'   know" code would be scored.
 #' @param metrics List of tracked metrics, each
 #'   `list(code = <stable id>, title = <canonical question text>,
 #'         type = "mean" | "nps" | "proportions",
@@ -131,6 +150,7 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
   if (!is.list(waves) || length(waves) == 0) return(list(trend_results = list(), segments_meta = list()))
   wave_ids <- vapply(waves, function(w) as.character(w$id), character(1))
   wdata <- stats::setNames(lapply(waves, function(w) w$data), wave_ids)
+  wopts <- stats::setNames(lapply(waves, function(w) w$options), wave_ids)
 
   # Enumerate segments: Total + every value of each dimension seen in any wave.
   segments_meta <- list(Total = list(is_total = TRUE))
@@ -160,7 +180,7 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
         # The metric's per-respondent value vector this wave: a single data
         # column, or, for a composite/index, the row-mean of several source
         # columns (an engagement index = mean of its 12 items).
-        metric_vec <- .tsc_metric_vector(m, wid, d)
+        metric_vec <- .tsc_metric_vector(m, wid, d, wopts[[wid]])
         if (is.null(metric_vec)) next                               # metric absent this wave
         rows <- rep(TRUE, nrow(d))
         if (!isTRUE(seg$is_total)) {

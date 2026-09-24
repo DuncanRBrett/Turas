@@ -177,3 +177,58 @@ test_that("a weighted wave carries each segment's Kish effective base into the i
   expect_equal(prop_q$eff_bases[["cape town"]], 3.2)
   expect_equal(prop_q$eff_base, 6.125)
 })
+
+# ==============================================================================
+# "Don't know" codes flagged ExcludeFromIndex leave means and NPS (24 Sep 2026)
+# ==============================================================================
+# compute_segment_trends() used to read the raw column with as.numeric() and no
+# structure, so a DK coded 99 was averaged into every mean and scored as a
+# PROMOTER in NPS. Each wave may now carry its own Survey_Structure Options body
+# (the same ExcludeFromIndex flag the crosstab engine honours); what a wave
+# excludes is a fact about that wave's questionnaire.
+#
+# Hand values, one wave, Total segment:
+#   Q1  = 4, 5, 99, 3, 99   -> mean without the DKs = (4 + 5 + 3) / 3 = 4
+#                              (with them: 210 / 5 = 42)
+#   REC = 10, 99, 6, 9, 8   -> promoters 10, 9; detractor 6; passive 8; n = 4
+#                              NPS = (2 - 1) / 4 * 100 = 25   (with the 99: 40)
+#   IDX = row mean of Q1 and Q2, each without its DKs; Q2 = 3, 99, 5, 1, 2
+#         rows: (4+3)/2, 5, 5, 3+1 -> 2, 2   -> (3.5 + 5 + 5 + 2 + 2) / 5 = 3.5
+source(file.path(root, "modules/tabs/lib/tracking_wave_values.R"))    # .twv_excluded
+
+dk_opts <- data.frame(
+  QuestionCode = c(rep("Q1", 6), rep("Q2", 6), rep("REC", 12)),
+  OptionText = c(as.character(1:5), "99", as.character(1:5), "99",
+                 as.character(0:10), "99"),
+  ExcludeFromIndex = c(rep("", 5), "Y", rep("", 5), "Y", rep("", 11), "Y"),
+  stringsAsFactors = FALSE)
+dk_wave <- data.frame(Q1 = c(4, 5, 99, 3, 99), Q2 = c(3, 99, 5, 1, 2),
+                      REC = c(10, 99, 6, 9, 8), stringsAsFactors = FALSE)
+dk_metrics <- list(
+  list(code = "M", title = "Mean item", type = "mean", cols = list("2025" = "Q1")),
+  list(code = "N", title = "Recommend", type = "nps", cols = list("2025" = "REC")),
+  list(code = "I", title = "Index", type = "mean", sources = list("2025" = c("Q1", "Q2"))))
+
+test_that("a DK flagged ExcludeFromIndex leaves the mean, the NPS and a composite", {
+  ct_dk <- compute_segment_trends(
+    list(list(id = "2025", data = dk_wave, options = dk_opts)), dk_metrics, list())
+  wr <- function(code) ct_dk$trend_results[[code]]$Total$wave_results[["2025"]]
+  expect_equal(wr("M")$mean, 4)
+  expect_equal(wr("M")$n_unweighted, 3)
+  expect_equal(wr("N")$nps, 25)
+  expect_equal(wr("N")$n_unweighted, 4)
+  expect_equal(wr("I")$mean, 3.5)
+})
+
+test_that("each wave excludes by its OWN structure", {
+  # 2024 flags nothing, so its 99 is a real score there; 2025 flags it.
+  plain <- dk_opts; plain$ExcludeFromIndex <- ""
+  ct2 <- compute_segment_trends(
+    list(list(id = "2024", data = dk_wave, options = plain),
+         list(id = "2025", data = dk_wave, options = dk_opts)),
+    list(list(code = "M", title = "Mean item", type = "mean",
+              cols = list("2024" = "Q1", "2025" = "Q1"))), list())
+  wr <- ct2$trend_results$M$Total$wave_results
+  expect_equal(wr[["2024"]]$mean, 42)
+  expect_equal(wr[["2025"]]$mean, 4)
+})
