@@ -893,43 +893,77 @@ total) / grand total.
 
 ### Z-Test for Proportions
 
-Used for comparing two proportions.
+Used for comparing two proportions (`weighted_z_test_proportions()`,
+weighting.R). Counts and bases are design-weighted; the SE rides the base
+the test is sized on: the raw count unweighted, the Kish effective base
+weighted, multiplied by the finite population correction when a population
+is configured.
 
 ``` r
-p1 <- count1 / base1
+p1 <- count1 / base1                          # weighted count / weighted base
 p2 <- count2 / base2
-p_pool <- (count1 + count2) / (base1 + base2)
-se <- sqrt(p_pool * (1 - p_pool) * (1/base1 + 1/base2))
+p_pool <- (count1 + count2) / (base1 + base2) # pooled on the weighted totals
+n1 <- n_eff1 * fpc_mul1                       # raw base when unweighted
+n2 <- n_eff2 * fpc_mul2
+se <- sqrt(p_pool * (1 - p_pool) * (1/n1 + 1/n2))
 z <- (p1 - p2) / se
 p_value <- 2 * pnorm(-abs(z))
 ```
 
+Not tested when either corrected base is under `significance_min_base`, when
+n * p_pool or n * (1 - p_pool) is under 5 in either column, or when a column
+is a census (FPC multiplier Inf). Letters use alpha / choose(k, 2) across the
+banner group's k columns when `bonferroni_correction` is on. The v2 report
+recomputes letters under a filter with the same pooled p (21_stats.js propZ).
+
 ### T-Test for Means
 
-Used for comparing means (Welch's t-test with unequal variances).
+Used for comparing means, NPS scores, NET POSITIVE scores, allocation items
+and numeric questions: Welch's t-test with Welch-Satterthwaite df
+(`weighted_t_test_means()`, weighting.R). With unit weights it is exactly
+`t.test(var.equal = FALSE)`.
 
 ``` r
-mean1 <- weighted.mean(values1, weights1)
-mean2 <- weighted.mean(values2, weights2)
-var1 <- weighted.var(values1, weights1)
-var2 <- weighted.var(values2, weights2)
-n1_eff <- base1 / deff1
-n2_eff <- base2 / deff2
-se <- sqrt(var1/n1_eff + var2/n2_eff)
+mean1 <- sum(w1 * x1) / sum(w1)
+n_eff1 <- sum(w1)^2 / sum(w1^2)                        # Kish
+var1 <- sum(w1 * (x1 - mean1)^2) / sum(w1) * n_eff1 / (n_eff1 - 1)
+n1 <- n_eff1 * fpc_mul1                                # FPC when configured
+# ... the same for column 2
+se <- sqrt(var1/n1 + var2/n2)
 t <- (mean1 - mean2) / se
-df <- welch_satterthwaite_df(var1, var2, n1_eff, n2_eff)
+df <- (var1/n1 + var2/n2)^2 / ((var1/n1)^2/(n1 - 1) + (var2/n2)^2/(n2 - 1))
 p_value <- 2 * pt(-abs(t), df)
 ```
+
+The variance is the unbiased reliability-weighted variance, the printed
+Standard Deviation squared (`weighted_variance_unbiased()`), which does not
+change when every weight is multiplied by a constant. The test runs on the
+values the printed statistic uses: options flagged ExcludeFromIndex = Y are
+left out of means, indices and NPS; NPS answers outside 0 to 10 are left
+out; numeric values outside Min_Value / Max_Value (and outliers when
+`exclude_outliers_from_stats` is on) are left out; a NET POSITIVE score is
++100 top box, -100 bottom box, 0 any other answer, over the answered base.
+The v2 report runs the same Welch test with a Student-t tail (21_stats.js
+stats.welch).
+
+### Standard Deviation Row
+
+``` r
+sd <- sqrt(sum(w * (x - mean)^2) / sum(w) * n_eff / (n_eff - 1))
+```
+
+Equal to `sd()` unweighted and to `stats::cov.wt(method = "unbiased")`
+weighted. Blank when fewer than two answers or n_eff <= 1.
 
 ### Design Effect
 
 ``` r
-weight_mean <- mean(weights)
-weight_sd <- sd(weights)
-cv <- weight_sd / weight_mean
-deff <- 1 + cv^2
-n_effective <- n_weighted / deff
+n_effective <- sum(weights)^2 / sum(weights^2)   # Kish (calculate_effective_n)
+deff <- length(weights) / n_effective            # = 1 + CV^2, CV with the
+                                                 #   population (divide by n) SD
 ```
+
+Effective bases are carried unrounded; the workbook prints them at 0 dp.
 
 ------------------------------------------------------------------------
 

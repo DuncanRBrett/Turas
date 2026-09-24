@@ -1943,7 +1943,10 @@ blank shows them.
 ### Column: ExcludeFromIndex
 
 **What it does:** Controls whether this option is excluded from
-mean/index calculations.
+mean, index and NPS calculations, and from their significance tests. The
+option still shows as a row, and still counts in the percentage base.
+It also applies to Tracking tab segment trends backfilled from each wave's
+own Survey_Structure.
 
 **Required:** No
 
