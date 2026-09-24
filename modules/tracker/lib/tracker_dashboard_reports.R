@@ -181,6 +181,97 @@ format_change_value_display <- function(change, metric_type, decimal_places = 1)
 }
 
 
+#' The Dashboard's Headline Metric for One Question
+#'
+#' The Trend Dashboard and the Significance Matrix show one figure per
+#' question. The calculators store it in different places by question type:
+#'   rating / composite  metrics[[first tracked spec]] (mean, top2_box,
+#'                       range_4_5, ...), with sd and eff_n alongside
+#'   multi-mention       mention_proportions[[first tracked option]]
+#'   single choice, NPS  at the top level already
+#' This names which one, and the metric type its test and format follow.
+#'
+#' @param q_result List. One question's result from the calculators
+#' @return List with $source ("flat", "metrics" or "mention"), $key and
+#'   $metric_type (the type the value is tested and formatted as)
+#' @keywords internal
+dashboard_primary_key <- function(q_result) {
+  mt <- q_result$metric_type
+  if (identical(mt, METRIC_TYPES$RATING_ENHANCED) || identical(mt, METRIC_TYPES$COMPOSITE_ENHANCED)) {
+    keys <- vapply(as.character(q_result$tracking_specs), metric_storage_key, character(1))
+    keys <- keys[keys != "distribution"]
+    key <- if (length(keys) > 0) unname(keys[1]) else "mean"
+    return(list(source = "metrics", key = key,
+                metric_type = if (key == "mean") METRIC_TYPES$MEAN else METRIC_TYPES$PROPORTIONS))
+  }
+  if (identical(mt, METRIC_TYPES$MULTI_MENTION)) {
+    return(list(source = "mention", key = q_result$tracked_columns[1],
+                metric_type = METRIC_TYPES$PROPORTIONS))
+  }
+  if (identical(mt, METRIC_TYPES$CATEGORY_MENTIONS)) {
+    return(list(source = "mention", key = q_result$response_categories[1],
+                metric_type = METRIC_TYPES$PROPORTIONS))
+  }
+  list(source = "flat", key = NULL, metric_type = mt)
+}
+
+
+#' One Wave Result Reduced to the Dashboard's Headline Metric
+#'
+#' Returns a flat wave result ($mean / $sd, or $proportions, plus $eff_n and
+#' $n_unweighted) that extract_primary_metric() and
+#' calculate_pairwise_significance() read, so the Dashboard tests exactly the
+#' figure the trend sheet tests, on the same effective base.
+#'
+#' @param q_result List. One question's result
+#' @param wave_result List. One wave's result for that question
+#' @return List with $result (the flat wave result) and $metric_type
+#' @keywords internal
+dashboard_primary_view <- function(q_result, wave_result) {
+  pk <- dashboard_primary_key(q_result)
+  if (pk$source == "flat" || is.null(wave_result) || !isTRUE(wave_result$available)) {
+    return(list(result = wave_result, metric_type = pk$metric_type))
+  }
+  view <- list(available = TRUE, eff_n = wave_result$eff_n,
+               n_unweighted = wave_result$n_unweighted, n_weighted = wave_result$n_weighted)
+  value <- if (pk$source == "metrics") wave_result$metrics[[pk$key]] else
+    wave_result$mention_proportions[[pk$key]]
+  if (is.null(value) || length(value) != 1) value <- NA_real_
+  if (pk$metric_type == METRIC_TYPES$MEAN) {
+    view$mean <- value
+    view$sd <- wave_result$metrics$sd
+  } else {
+    view$proportions <- as.numeric(value)
+  }
+  list(result = view, metric_type = pk$metric_type)
+}
+
+
+#' One Question Ready for the Dashboard and Significance Matrix
+#'
+#' With banners on, a question's entry is a list of segments; the Dashboard
+#' and Sig Matrix report the Total segment, as the Change Summary does. Every
+#' wave result is reduced to the headline metric (dashboard_primary_view()).
+#'
+#' @param entry List. trend_results[[q_code]], flat or banner-nested
+#' @return The question result with flat wave results and the headline
+#'   metric's type, or NULL when there is nothing to show
+#' @keywords internal
+dashboard_flatten_question <- function(entry) {
+  if (is.null(entry)) return(NULL)
+  if (is.null(entry$wave_results) && !is.null(entry[["Total"]]$wave_results)) {
+    entry <- entry[["Total"]]
+  }
+  if (is.null(entry$wave_results)) return(NULL)
+  pk <- dashboard_primary_key(entry)
+  entry$wave_results <- lapply(entry$wave_results, function(wr) {
+    dashboard_primary_view(entry, wr)$result
+  })
+  entry$metric_type <- pk$metric_type
+  entry
+}
+
+
 #' Extract Primary Metric Value from Wave Result
 #'
 #' Extracts the main metric value from a wave result based on metric type.
@@ -770,10 +861,10 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
   }
 
   for (q_code in names(trend_results)) {
-    q_result <- trend_results[[q_code]]
+    q_result <- dashboard_flatten_question(trend_results[[q_code]])
 
     # Skip if no wave_results
-    if (is.null(q_result$wave_results)) {
+    if (is.null(q_result)) {
       message(paste0("    Skipping ", q_code, ": no wave_results"))
       next
     }
@@ -1122,10 +1213,10 @@ write_all_significance_matrices <- function(wb, trend_results, config) {
   }
 
   for (q_code in names(trend_results)) {
-    q_result <- trend_results[[q_code]]
+    q_result <- dashboard_flatten_question(trend_results[[q_code]])
 
     # Skip if no wave_results
-    if (is.null(q_result$wave_results)) {
+    if (is.null(q_result)) {
       message(paste0("    Skipping ", q_code, ": no wave_results"))
       next
     }
