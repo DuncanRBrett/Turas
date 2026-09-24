@@ -131,3 +131,54 @@ test_that("reference: weighted mean test is Welch on the unbiased variance and K
   got <- weighted_t_test_means(x, y, wx, wy, min_base = 2, alpha = 0.05)
   expect_equal(got$p_value, welch(x, wx, y, wy), tolerance = 1e-10)
 })
+
+# ==============================================================================
+# NPS: a "don't know" is never a promoter
+# ==============================================================================
+#
+# Hand example. Answers 10, 9, 99, 6, 8, 99, with 99 the don't-know code.
+#   promoters (9-10): 10, 9 = 2;  detractors (0-6): 6 = 1;  passive: 8;  n = 4
+#   NPS = (2 - 1) / 4 * 100 = 25
+# The engine scored 99 as a promoter (v >= 9), giving (4 - 1) / 6 * 100 = 50,
+# whether or not the option was flagged ExcludeFromIndex.
+
+.rs_nps_opts <- function(flag) {
+  data.frame(QuestionCode = "N", OptionText = c(as.character(0:10), "99"),
+             DisplayText = c(as.character(0:10), "Don't know"),
+             ExcludeFromIndex = c(rep(NA, 11), if (flag) "Y" else NA),
+             stringsAsFactors = FALSE)
+}
+.rs_nps_data <- data.frame(N = c(10, 9, 99, 6, 8, 99))
+
+test_that("reference: nps_bucket_score scores 0 to 10 only", {
+  expect_equal(nps_bucket_score(10), 100)
+  expect_equal(nps_bucket_score(9), 100)
+  expect_equal(nps_bucket_score(7), 0)
+  expect_equal(nps_bucket_score(0), -100)
+  expect_true(is.na(nps_bucket_score(99)))
+  expect_true(is.na(nps_bucket_score(11)))
+  expect_true(is.na(nps_bucket_score(-1)))
+})
+
+test_that("reference: an NPS DK flagged ExcludeFromIndex leaves the score and its base", {
+  qi <- data.frame(QuestionCode = "N", Variable_Type = "NPS", stringsAsFactors = FALSE)
+  r <- calculate_summary_statistic(.rs_nps_data, qi, .rs_nps_opts(TRUE), rep(1, 6))
+  expect_equal(r$value, 25)
+  expect_equal(length(r$values), 4)
+})
+
+test_that("reference: an unflagged out-of-range code still leaves the NPS base", {
+  qi <- data.frame(QuestionCode = "N", Variable_Type = "NPS", stringsAsFactors = FALSE)
+  r <- calculate_summary_statistic(.rs_nps_data, qi, .rs_nps_opts(FALSE), rep(1, 6))
+  expect_equal(r$value, 25)
+})
+
+test_that("reference: a DK flagged ExcludeFromIndex with an in-range code leaves NPS", {
+  # A study that codes don't-know as 10 on an 11-point scale would be unusual,
+  # but the flag, not the number, is what decides: flagged means excluded.
+  opts <- .rs_nps_opts(FALSE); opts$ExcludeFromIndex[opts$OptionText == "0"] <- "Y"
+  qi <- data.frame(QuestionCode = "N", Variable_Type = "NPS", stringsAsFactors = FALSE)
+  r <- calculate_summary_statistic(data.frame(N = c(10, 0, 6, 9)), qi, opts, rep(1, 4))
+  # 0 excluded: promoters 10, 9; detractor 6; n = 3 -> (2 - 1) / 3 * 100
+  expect_equal(r$value, 100 / 3)
+})

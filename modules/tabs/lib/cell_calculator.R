@@ -320,7 +320,7 @@ calculate_summary_statistic <- function(data, question_info, options_info, weigh
   
   # NPS QUESTIONS - Calculate Net Promoter Score
   if (var_type == "NPS") {
-    return(calculate_nps_score(data, question_col, weights))
+    return(calculate_nps_score(data, question_col, weights, options_info))
   }
   
   return(NULL)
@@ -481,31 +481,38 @@ calculate_likert_index <- function(data, question_col, options_info, weights) {
 #' @param data Survey data
 #' @param question_col Question column name
 #' @param weights Weight vector
+#' @param options_info Optional Options rows for the question; answers whose
+#'   option is flagged ExcludeFromIndex = Y leave the score and its base.
 #' @return List with statistic info or NULL. \code{$values} are +-100 bucket
 #'   scores (100 promoter / 0 passive / -100 detractor), one per respondent in
 #'   the NPS base.
 #' @export
-calculate_nps_score <- function(data, question_col, weights) {
+calculate_nps_score <- function(data, question_col, weights, options_info = NULL) {
   
   if (!question_col %in% names(data)) {
     return(NULL)
   }
   
   all_responses <- data[[question_col]]
-  
-  # Filter out ONLY non-numeric responses (DK, NA, blank)
+
+  # Options flagged ExcludeFromIndex = Y (a don't-know, whatever its code) leave
+  # the score and its base, the same flag calculate_rating_mean() honours. This
+  # function used to ignore the Options sheet, so a DK coded 99 was a promoter
+  # (review 24 Sep 2026).
+  excluded <- character(0)
+  if (!is.null(options_info) && all(c("OptionText", "ExcludeFromIndex") %in% names(options_info))) {
+    flag <- toupper(trimws(as.character(options_info$ExcludeFromIndex)))
+    excluded <- trimws(as.character(options_info$OptionText[!is.na(flag) & flag == "Y"]))
+  }
+
+  # Filter out non-numeric responses (DK, NA, blank) and flagged options.
   # IMPORTANT: Keep 0 as it's a valid NPS score (detractor)
-  valid_responses <- all_responses[
-    !is.na(all_responses) & 
+  keep <- !is.na(all_responses) &
     all_responses != "" &
-    !all_responses %in% c("DK", "Don't know", "Not applicable", "NA")
-  ]
-  
-  valid_weights <- weights[
-    !is.na(all_responses) & 
-    all_responses != "" &
-    !all_responses %in% c("DK", "Don't know", "Not applicable", "NA")
-  ]
+    !all_responses %in% c("DK", "Don't know", "Not applicable", "NA") &
+    !(trimws(as.character(all_responses)) %in% excluded)
+  valid_responses <- all_responses[keep]
+  valid_weights <- weights[keep]
   
   if (length(valid_responses) == 0) {
     return(NULL)

@@ -329,7 +329,9 @@
         if (w !== undefined && w !== null) score = w;
       } else {
         var v = parseFloat(r.label);
-        if (isFinite(v)) {
+        // An NPS answer is 0-10; a label outside it (a don't-know shown as
+        // "99") is not scored, matching R's nps_bucket_score (24 Sep 2026).
+        if (isFinite(v) && (type !== "nps" || (v >= 0 && v <= 10))) {
           score = type === "nps" ? (v >= 9 ? 100 : v >= 7 ? 0 : -100) : v;
         }
       }

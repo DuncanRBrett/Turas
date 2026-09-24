@@ -38,11 +38,15 @@ option_numeric_value <- function(qopt) {
 #' (%promoters - %detractors), so the engine's indexMeans reproduces NPS with
 #' no bespoke NET arithmetic.
 #'
+#' A value outside 0-10 is not an NPS answer (a don't-know coded 99, a stray
+#' 11) and scores NA, so it leaves the NPS base. It used to score 99 as a
+#' promoter because only the lower bound was checked (review 24 Sep 2026).
+#'
 #' @param v Numeric 0-10 value
 #' @return 100, 0, -100, or NA
 #' @export
 nps_bucket_score <- function(v) {
-  if (is.na(v)) return(NA_real_)
+  if (is.na(v) || v > 10) return(NA_real_)
   if (v >= 9) return(100)
   if (v >= 7) return(0)
   if (v >= 0) return(-100)
