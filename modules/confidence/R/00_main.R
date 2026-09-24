@@ -1140,7 +1140,7 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config) 
     # Step 5: Dispatch CI calculations (using shared module)
     ci_results <- dispatch_proportion_ci(
       p = stats$proportion,
-      n_eff = stats$n_eff,
+      n_eff = stats$n_eff_exact,
       values = prep$values,
       categories = categories,
       weights = prep$weights,
@@ -1200,7 +1200,7 @@ process_mean_question <- function(q_row, survey_data, weight_var, config) {
     ci_results <- dispatch_mean_ci(
       mean_val = stats$mean,
       sd_val = stats$sd,
-      n_eff = stats$n_eff,
+      n_eff = stats$n_eff_exact,
       values = prep$values,
       weights = prep$weights,
       q_row = q_row,

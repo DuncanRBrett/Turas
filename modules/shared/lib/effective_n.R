@@ -89,13 +89,12 @@ calculate_effective_n <- function(weights) {
 
 #' Kish Effective Sample Size, Rounded
 #'
-#' [calculate_effective_n()] rounded to a whole number. Some callers — the
-#' confidence module's standard-error and degrees-of-freedom paths among them —
-#' have always worked from an integer n_eff, and that contract is preserved
-#' here rather than changed underneath them.
+#' [calculate_effective_n()] rounded to a whole number, for display: the
+#' confidence module shows it in its outputs and study summary. Its intervals
+#' use the fractional value since review 2026-09-24.
 #'
-#' Prefer the fractional [calculate_effective_n()] for new code: rounding
-#' before a variance calculation loses precision for no benefit.
+#' Prefer the fractional [calculate_effective_n()] for any calculation:
+#' rounding before a variance calculation loses precision for no benefit.
 #'
 #' @param weights Numeric vector of weights.
 #' @return Integer. Effective sample size; 0L when no usable weight remains.

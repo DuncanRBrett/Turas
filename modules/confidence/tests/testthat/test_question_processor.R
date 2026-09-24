@@ -403,3 +403,22 @@ test_that("process_question_data with require_numeric fails on text", {
 # ==============================================================================
 # END OF TEST SUITE
 # ==============================================================================
+
+test_that("base stats keep a whole-number n_eff for display and the exact one for intervals", {
+  # Review 2026-09-24. n_eff = 35^2 / 65 = 18.846: shown as 19, computed as 18.846.
+  weights <- c(rep(1, 20), rep(3, 5))
+  stats <- calculate_proportion_stats(c(rep(1, 10), rep(0, 15)), 1, weights)
+  expect_equal(stats$n_eff, 19)
+  expect_equal(stats$n_eff_exact, 35^2 / 65)
+
+  mstats <- calculate_mean_stats(rep(c(4, 6), length.out = 25), weights)
+  expect_equal(mstats$n_eff, 19)
+  expect_equal(mstats$n_eff_exact, 35^2 / 65)
+
+  nstats <- calculate_nps_stats(rep(c(10, 0, 8), length.out = 25), 9:10, 0:6, weights)
+  expect_equal(nstats$n_eff, 19)
+  expect_equal(nstats$n_eff_exact, 35^2 / 65)
+
+  unweighted <- calculate_proportion_stats(c(rep(1, 10), rep(0, 15)), 1)
+  expect_equal(unweighted$n_eff_exact, 25)
+})

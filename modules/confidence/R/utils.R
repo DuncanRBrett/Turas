@@ -257,6 +257,33 @@ validate_sample_size <- function(n, param_name = "n", min_n = 1) {
 }
 
 
+#' Validate an Effective Sample Size
+#'
+#' An interval's n may be the raw count or the Kish effective n, which is a
+#' real number (35^2 / 65 = 18.846). validate_sample_size() refuses a
+#' non-integer because it checks counts. This validator checks what an
+#' interval needs: a finite number no smaller than `min_n`. Rounding n before
+#' the variance lost precision for nothing (review 2026-09-24).
+#'
+#' @param n Numeric. Sample size or effective sample size
+#' @param param_name Character. Parameter name for error messages
+#' @param min_n Numeric. Minimum allowed value (default 1)
+#' @return Invisible TRUE; refuses (turas_refusal) when invalid
+#' @keywords internal
+validate_effective_n <- function(n, param_name = "n", min_n = 1) {
+  if (!is.numeric(n) || any(is.na(n)) || any(!is.finite(n)) || any(n < min_n)) {
+    confidence_refuse(
+      code = "DATA_INVALID_EFFECTIVE_N",
+      title = "Invalid Effective Sample Size",
+      problem = sprintf("%s must be a finite number of at least %s", param_name, min_n),
+      why_it_matters = "Confidence intervals are sized on this number.",
+      how_to_fix = sprintf("Check the weights behind %s: they must be positive and finite", param_name)
+    )
+  }
+  invisible(TRUE)
+}
+
+
 #' Validate confidence level
 #'
 #' Checks if a value is a valid confidence level (between 0 and 1)
@@ -412,7 +439,7 @@ validate_question_limit <- function(n_questions, max_questions = 200) {
 #'
 #' Issues appropriate warnings for small sample sizes
 #'
-#' @param n Integer. Sample size
+#' @param n Numeric. Sample size, or a fractional effective sample size
 #' @param threshold_critical Integer. Critical threshold (default 30)
 #' @param threshold_warning Integer. Warning threshold (default 50)
 #'
@@ -420,10 +447,14 @@ validate_question_limit <- function(n_questions, max_questions = 200) {
 #'
 #' @keywords internal
 check_small_sample <- function(n, threshold_critical = 30, threshold_warning = 50) {
+  # %s of a value rounded to 1 dp, not %d: an interval's n can be the Kish
+  # effective n (18.846), and %d refuses a fractional number. A whole n prints
+  # exactly as before ("n=25").
+  n_label <- format(round(n, 1))
   if (n < threshold_critical) {
-    return(sprintf("Very small base (n=%d) - results may be unstable", n))
+    return(sprintf("Very small base (n=%s) - results may be unstable", n_label))
   } else if (n < threshold_warning) {
-    return(sprintf("Small base (n=%d) - interpret with caution", n))
+    return(sprintf("Small base (n=%s) - interpret with caution", n_label))
   } else {
     return("")
   }

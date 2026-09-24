@@ -97,7 +97,7 @@ source_if_exists("03_study_level.R")
 calculate_proportion_ci_normal <- function(p, n, conf_level = 0.95) {
   # Input validation
   validate_proportion(p, "p")
-  validate_sample_size(n, "n")
+  validate_effective_n(n, "n")
   validate_conf_level(conf_level)
 
   # Calculate critical value (z-score)
@@ -188,7 +188,7 @@ calculate_proportion_ci_normal <- function(p, n, conf_level = 0.95) {
 calculate_proportion_ci_wilson <- function(p, n, conf_level = 0.95) {
   # Input validation
   validate_proportion(p, "p")
-  validate_sample_size(n, "n")
+  validate_effective_n(n, "n")
   validate_conf_level(conf_level)
 
   # Calculate critical value
@@ -496,7 +496,7 @@ credible_interval_proportion <- function(p, n, conf_level = 0.95,
                                          prior_mean = NULL, prior_n = NULL) {
   # Input validation
   validate_proportion(p, "p")
-  validate_sample_size(n, "n")
+  validate_effective_n(n, "n")
   validate_conf_level(conf_level)
 
   # Determine prior type and parameters
@@ -610,7 +610,7 @@ analyze_proportion <- function(data, categories, weights = NULL,
 
     p <- sum(valid_weights[valid_in_category]) / sum(valid_weights)
     n_actual <- length(valid_weights)
-    n_eff <- calculate_effective_n_int(valid_weights)
+    n_eff <- calculate_effective_n(valid_weights)
   } else {
     in_category <- data %in% categories
     valid_data <- in_category[!is.na(data)]

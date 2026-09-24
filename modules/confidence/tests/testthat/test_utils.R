@@ -230,3 +230,11 @@ test_that("create_timestamp returns formatted string", {
 # ==============================================================================
 # END OF TEST SUITE
 # ==============================================================================
+
+test_that("check_small_sample prints a fractional effective n (review 2026-09-24)", {
+  # An interval's n can be the Kish effective n. %d refused it and the whole
+  # question failed with "invalid format '%d'".
+  expect_equal(check_small_sample(18.846), "Very small base (n=18.8) - results may be unstable")
+  expect_equal(check_small_sample(25), "Very small base (n=25) - results may be unstable")
+  expect_equal(check_small_sample(40), "Small base (n=40) - interpret with caution")
+})

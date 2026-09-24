@@ -276,7 +276,8 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
 
   conf_level <- as.numeric(config$study_settings$Confidence_Level)
   q_id <- q_row$Question_ID
-  n_eff <- nps_stats$n_eff
+  # The exact effective n sizes the interval; n_eff is the rounded display copy
+  n_eff <- if (!is.null(nps_stats$n_eff_exact)) nps_stats$n_eff_exact else nps_stats$n_eff
   nps_score <- nps_stats$nps_score
   pct_promoters <- nps_stats$pct_promoters
   pct_detractors <- nps_stats$pct_detractors

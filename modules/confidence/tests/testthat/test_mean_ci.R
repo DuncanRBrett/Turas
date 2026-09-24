@@ -356,3 +356,15 @@ test_that("calculate_mean_ci: 100 calculations under 1 second", {
 
   expect_true(elapsed < 1.0)
 })
+
+test_that("calculate_mean_ci uses the exact effective n for SE and df (review 2026-09-24)", {
+  # 20 respondents weighted 1 and 5 weighted 3: n_eff = 35^2 / 65 = 18.846,
+  # which used to be rounded to 19 before the SE and df were computed.
+  weights <- c(rep(1, 20), rep(3, 5))
+  values <- c(rep(c(4, 6), 10), c(3, 5, 7, 9, 5))
+  n_eff <- 35^2 / 65
+  result <- calculate_mean_ci(values, weights, conf_level = 0.95)
+  expect_equal(result$n_effective, n_eff)
+  expect_equal(result$df, n_eff - 1)
+  expect_equal(result$se, result$sd / sqrt(n_eff))
+})

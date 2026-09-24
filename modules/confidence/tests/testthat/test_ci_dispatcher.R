@@ -206,3 +206,35 @@ test_that("dispatch_nps_ci: bootstrap returns valid CI", {
   expect_true("bootstrap" %in% names(result))
   expect_true(result$bootstrap$lower < result$bootstrap$upper)
 })
+
+# ==============================================================================
+# END TO END: the question pipeline sizes intervals on the exact n_eff
+# ==============================================================================
+
+test_that("a weighted proportion question shows n_eff 19 and sizes its MOE on 18.846", {
+  # Review 2026-09-24: 20 respondents weighted 1 and 5 weighted 3 give
+  # n_eff = 35^2 / 65 = 18.846. The output still shows the whole number, the
+  # interval now uses the exact value. p = (8 + 6) / 35 = 0.4.
+  survey_data <- data.frame(
+    Q1 = c(rep(1, 8), rep(0, 12), rep(1, 2), rep(0, 3)),
+    wt = c(rep(1, 20), rep(3, 5)))
+  q_row <- make_q_row(run_moe = "Y")
+  q_row$Categories <- "1"
+
+  # 00_main.R loads its component files itself and cannot be sourced whole
+  # under testthat (setup.R notes the failure), so take just this function's
+  # definition from the shipped file.
+  main_exprs <- parse(file.path(dirname(dirname(getwd())), "R", "00_main.R"))
+  is_def <- vapply(main_exprs, function(e) {
+    is.call(e) && identical(e[[1]], as.name("<-")) &&
+      identical(e[[2]], as.name("process_proportion_question"))
+  }, logical(1))
+  expect_equal(sum(is_def), 1)
+  eval(main_exprs[[which(is_def)]])
+
+  out <- process_proportion_question(q_row, survey_data, "wt", make_config())
+
+  expect_equal(out$result$n_eff, 19)
+  expect_equal(out$result$moe$moe, qnorm(0.975) * sqrt(0.4 * 0.6 / (35^2 / 65)),
+               tolerance = 1e-10)
+})

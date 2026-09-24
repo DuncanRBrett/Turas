@@ -407,5 +407,41 @@ test_that("normal and Wilson are fast (100 calls < 1 second)", {
 })
 
 # ==============================================================================
+# FRACTIONAL EFFECTIVE N (review 2026-09-24)
+# ==============================================================================
+# The Kish effective n was rounded to a whole number before any standard error
+# or interval was computed, and the interval functions refused a non-integer n.
+# Intervals now use the exact n_eff; displayed counts stay whole numbers.
+
+# 20 respondents weighted 1 and 5 weighted 3: n_eff = 35^2 / 65 = 18.846,
+# which used to be rounded to 19.
+FRACTIONAL_WEIGHTS <- c(rep(1, 20), rep(3, 5))
+FRACTIONAL_N_EFF <- 35^2 / 65
+
+test_that("the normal interval accepts a fractional effective n (known answer)", {
+  # MOE = 1.959964 * sqrt(0.3 * 0.7 / 25.4) = 1.959964 * 0.0909272 = 0.178214
+  result <- calculate_proportion_ci_normal(0.3, 25.4, 0.95)
+  expect_equal(result$moe, 0.178214, tolerance = 1e-5)
+})
+
+test_that("the Wilson interval accepts a fractional effective n", {
+  exact <- calculate_proportion_ci_wilson(0.3, 25.4, 0.95)
+  rounded <- calculate_proportion_ci_wilson(0.3, 25, 0.95)
+  expect_true(exact$upper - exact$lower < rounded$upper - rounded$lower)
+})
+
+test_that("analyze_proportion sizes the interval on the exact effective n", {
+  # 10 of the 25 are in the category: 8 weighted 1 and 2 weighted 3,
+  # so p = (8 + 6) / 35 = 0.4
+  data <- c(rep(1, 8), rep(0, 12), rep(1, 2), rep(0, 3))
+  result <- analyze_proportion(data, categories = 1, weights = FRACTIONAL_WEIGHTS,
+                               methods = "moe", use_wilson_if_extreme = FALSE)
+  expect_equal(result$proportion, 0.4)
+  expect_equal(result$n_effective, FRACTIONAL_N_EFF)
+  expect_equal(result$moe$moe, qnorm(0.975) * sqrt(0.4 * 0.6 / FRACTIONAL_N_EFF),
+               tolerance = 1e-10)
+})
+
+# ==============================================================================
 # END OF TEST SUITE
 # ==============================================================================

@@ -215,7 +215,8 @@ prepare_question_data <- function(values, weights = NULL, require_numeric = FALS
 #'     \item{success}{Logical. TRUE if calculation succeeded}
 #'     \item{proportion}{Numeric. Observed proportion}
 #'     \item{n_raw}{Integer. Raw sample size}
-#'     \item{n_eff}{Numeric. Effective sample size}
+#'     \item{n_eff}{Numeric. Effective sample size, rounded for display}
+#'     \item{n_eff_exact}{Numeric. Effective sample size the intervals use}
 #'     \item{message}{Character. Warning message if failed}
 #'   }
 #'
@@ -240,17 +241,20 @@ calculate_proportion_stats <- function(values, categories, weights = NULL) {
         proportion = NA,
         n_raw = length(values),
         n_eff = NA,
+        n_eff_exact = NA,
         message = "Total weight is zero or negative"
       ))
     }
 
     success_w <- sum(weights[in_category])
     p <- success_w / total_w
-    n_eff <- calculate_effective_n_int(weights)
+    n_eff <- calculate_effective_n_int(weights)        # shown
+    n_eff_exact <- calculate_effective_n(weights)      # sizes the intervals
     n_raw <- length(values)
   } else {
     p <- mean(in_category)
     n_eff <- length(values)
+    n_eff_exact <- n_eff
     n_raw <- length(values)
   }
 
@@ -260,6 +264,7 @@ calculate_proportion_stats <- function(values, categories, weights = NULL) {
       proportion = NA,
       n_raw = n_raw,
       n_eff = n_eff,
+      n_eff_exact = n_eff_exact,
       message = "Proportion could not be calculated (NA)"
     ))
   }
@@ -269,6 +274,7 @@ calculate_proportion_stats <- function(values, categories, weights = NULL) {
     proportion = p,
     n_raw = n_raw,
     n_eff = n_eff,
+    n_eff_exact = n_eff_exact,
     message = ""
   ))
 }
@@ -288,7 +294,8 @@ calculate_proportion_stats <- function(values, categories, weights = NULL) {
 #'     \item{mean}{Numeric. Observed mean}
 #'     \item{sd}{Numeric. Standard deviation}
 #'     \item{n_raw}{Integer. Raw sample size}
-#'     \item{n_eff}{Numeric. Effective sample size}
+#'     \item{n_eff}{Numeric. Effective sample size, rounded for display}
+#'     \item{n_eff_exact}{Numeric. Effective sample size the intervals use}
 #'     \item{message}{Character. Warning message if failed}
 #'   }
 #'
@@ -304,6 +311,7 @@ calculate_mean_stats <- function(values, weights = NULL) {
         sd = NA,
         n_raw = length(values),
         n_eff = NA,
+        n_eff_exact = NA,
         message = "Total weight is zero or negative"
       ))
     }
@@ -318,12 +326,14 @@ calculate_mean_stats <- function(values, weights = NULL) {
       weighted_var <- sum(weights * (values - mean_val)^2) / total_w
     }
     sd_val <- sqrt(weighted_var)
-    n_eff <- calculate_effective_n_int(weights)
+    n_eff <- calculate_effective_n_int(weights)        # shown
+    n_eff_exact <- calculate_effective_n(weights)      # sizes the intervals
     n_raw <- length(values)
   } else {
     mean_val <- mean(values)
     sd_val <- sd(values)
     n_eff <- length(values)
+    n_eff_exact <- n_eff
     n_raw <- length(values)
   }
 
@@ -333,6 +343,7 @@ calculate_mean_stats <- function(values, weights = NULL) {
     sd = sd_val,
     n_raw = n_raw,
     n_eff = n_eff,
+    n_eff_exact = n_eff_exact,
     message = ""
   ))
 }
@@ -356,7 +367,8 @@ calculate_mean_stats <- function(values, weights = NULL) {
 #'     \item{pct_detractors}{Numeric. Percentage of detractors}
 #'     \item{pct_passives}{Numeric. Percentage of passives}
 #'     \item{n_raw}{Integer. Raw sample size}
-#'     \item{n_eff}{Numeric. Effective sample size}
+#'     \item{n_eff}{Numeric. Effective sample size, rounded for display}
+#'     \item{n_eff_exact}{Numeric. Effective sample size the intervals use}
 #'     \item{message}{Character. Warning message if failed}
 #'   }
 #'
@@ -377,18 +389,21 @@ calculate_nps_stats <- function(values, promoter_codes, detractor_codes, weights
         pct_passives = NA,
         n_raw = length(values),
         n_eff = NA,
+        n_eff_exact = NA,
         message = "Total weight is zero or negative"
       ))
     }
 
     pct_promoters <- 100 * sum(weights[is_promoter]) / total_w
     pct_detractors <- 100 * sum(weights[is_detractor]) / total_w
-    n_eff <- calculate_effective_n_int(weights)
+    n_eff <- calculate_effective_n_int(weights)        # shown
+    n_eff_exact <- calculate_effective_n(weights)      # sizes the intervals
     n_raw <- length(values)
   } else {
     pct_promoters <- 100 * mean(is_promoter)
     pct_detractors <- 100 * mean(is_detractor)
     n_eff <- length(values)
+    n_eff_exact <- n_eff
     n_raw <- length(values)
   }
 
@@ -403,6 +418,7 @@ calculate_nps_stats <- function(values, promoter_codes, detractor_codes, weights
     pct_passives = pct_passives,
     n_raw = n_raw,
     n_eff = n_eff,
+    n_eff_exact = n_eff_exact,
     message = ""
   ))
 }
