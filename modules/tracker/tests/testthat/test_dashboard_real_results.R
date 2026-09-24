@@ -161,3 +161,44 @@ test_that("with banners the Dashboard and Sig Matrix use the Total segment", {
   suppressMessages(write_all_significance_matrices(wb, nested, rr$config))
   expect_true(all(paste0(c("SAT", "REC", "AWARE", "CHAN"), "_SigMatrix") %in% names(wb)))
 })
+
+
+# ------------------------------------------------------------------------------
+# An untested pair must not read as "no significant change"
+# ------------------------------------------------------------------------------
+# A pair under minimum_base, or a wave without the figure, is not tested. It
+# used to get sig_code 0 and print the same "\u2192" as a tested pair that did
+# not move, and the row's status said "Stable". It now shows the placeholder
+# and the status says "Not tested". Placeholders are an en dash (Duncan's rule:
+# no em dashes in anything a client reads).
+
+test_that("an untested pair returns NA, not 0", {
+  small <- function(p) list(available = TRUE, proportions = c(Yes = p), eff_n = 20, n_unweighted = 20)
+  r <- calculate_pairwise_significance(small(20), small(80), METRIC_TYPES$PROPORTIONS, min_base = 30)
+  expect_true(is.na(r$sig_code))
+  expect_true(is.na(r$p_value))
+  expect_identical(sig_to_arrow(NA), "\u2013")
+})
+
+test_that("Dashboard shows an untested question as not tested, not stable", {
+  rr <- real_results()
+  cfg <- rr$config
+  cfg$settings$minimum_base <- 1000   # nothing in the fixture reaches this
+  body <- dashboard_sheet(rr$results, cfg)
+  expect_true(all(body$Sig == "\u2013"))
+  expect_true(all(body$Status == "Not tested"))
+  expect_false(any(grepl("\u2014", unlist(body)), na.rm = TRUE))
+})
+
+test_that("Sig Matrix marks untested cells as untested and uses no em dash", {
+  rr <- real_results()
+  cfg <- rr$config
+  cfg$settings$minimum_base <- 1000
+  wb <- openxlsx::createWorkbook()
+  suppressMessages(write_all_significance_matrices(wb, rr$results["SAT"], cfg))
+  cells <- unlist(openxlsx::read.xlsx(wb, "SAT_SigMatrix", colNames = FALSE, skipEmptyRows = FALSE))
+  matrix_cells <- cells[!grepl("=", cells)]   # the legend explains each mark
+  expect_false(any(grepl("\u2192", matrix_cells), na.rm = TRUE))
+  expect_true(any(grepl("\u2013$", matrix_cells), na.rm = TRUE))
+  expect_false(any(grepl("\u2014", cells), na.rm = TRUE))
+})

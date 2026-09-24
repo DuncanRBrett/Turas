@@ -35,7 +35,7 @@
 #'
 #' @keywords internal
 sig_to_arrow <- function(sig_code) {
-  if (is.na(sig_code) || is.null(sig_code)) return("\u2014")  # em-dash
+  if (is.null(sig_code) || is.na(sig_code)) return("\u2013")  # en dash: not tested
   if (sig_code > 0) return("\u2191")   # up arrow
   if (sig_code < 0) return("\u2193")   # down arrow
   return("\u2192")                      # right arrow (no change)
@@ -66,6 +66,7 @@ get_sig_style <- function(sig_code, styles) {
 #'   - Alert: baseline significantly down
 #'   - Watch: recent (prev wave) significantly down
 #'   - Good: baseline significantly up
+#'   - Not tested: neither comparison could be tested
 #'   - Stable: all other cases
 #'
 #' @param prev_sig Numeric. Previous wave significance code
@@ -86,6 +87,11 @@ determine_trend_status <- function(prev_sig, base_sig, styles) {
   # Good: improving from baseline
   if (!is.na(base_sig) && base_sig > 0) {
     return(list(label = "Good", style = styles$status_good))
+  }
+  # Not tested: neither comparison could be tested, so "Stable" would be a
+  # claim no test made
+  if (is.na(prev_sig) && is.na(base_sig)) {
+    return(list(label = "Not tested", style = styles$status_stable))
   }
   # Stable: everything else
   return(list(label = "Stable", style = styles$status_stable))
@@ -139,7 +145,7 @@ format_metric_type_display <- function(metric_type) {
 #'
 #' @keywords internal
 format_metric_value_display <- function(value, metric_type, decimal_places = 1) {
-  if (is.na(value) || is.null(value)) return("\u2014")  # em-dash
+  if (is.null(value) || is.na(value)) return("\u2013")  # en dash placeholder
 
   # Validate metric type
   validate_metric_type(metric_type, context = "format_metric_value_display")
@@ -169,7 +175,7 @@ format_metric_value_display <- function(value, metric_type, decimal_places = 1) 
 #'
 #' @keywords internal
 format_change_value_display <- function(change, metric_type, decimal_places = 1) {
-  if (is.na(change) || is.null(change)) return("\u2014")  # em-dash
+  if (is.null(change) || is.na(change)) return("\u2013")  # en dash placeholder
 
   # Validate metric type
   validate_metric_type(metric_type, context = "format_change_value_display")
@@ -468,7 +474,9 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
                                             alpha = 0.05,
                                             min_base = DEFAULT_MINIMUM_BASE) {
 
-  default_return <- list(sig_code = 0, p_value = NA)
+  # Not tested is NA, never 0: 0 prints as "no significant change", a claim
+  # only a test can make
+  default_return <- list(sig_code = NA_real_, p_value = NA)
 
   if (is.null(from_result) || is.null(to_result)) return(default_return)
   if (!isTRUE(from_result$available) || !isTRUE(to_result$available)) return(default_return)
@@ -763,7 +771,7 @@ write_dashboard_data_row <- function(wb, sheet_name, q_result, wave_ids, n_waves
   # Wave values
   for (i in seq_along(wave_ids)) {
     wave_val <- wave_values[i]
-    wave_display <- if (!is.na(wave_val)) round(wave_val, decimal_places) else "\u2014"
+    wave_display <- if (!is.na(wave_val)) round(wave_val, decimal_places) else "\u2013"
     openxlsx::writeData(wb, sheet_name, wave_display,
                         startRow = current_row, startCol = col)
     openxlsx::addStyle(wb, sheet_name, styles$wave_col,
@@ -890,7 +898,7 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
   legend_row <- current_row + 2
 
   legend_lines <- c(
-    paste0("Legend: \u2191 Significant increase | \u2193 Significant decrease | \u2192 No significant change"),
+    paste0("Legend: \u2191 Significant increase | \u2193 Significant decrease | \u2192 No significant change | \u2013 Not tested"),
     "Status: Good (improving from baseline) | Stable | Watch (recent decline) | Alert (declining from baseline)"
   )
 
@@ -965,7 +973,7 @@ write_matrix_data_cells <- function(wb, sheet_name, wave_ids, wave_values,
 
       if (i == j) {
         # Diagonal - same wave
-        openxlsx::writeData(wb, sheet_name, "\u2014",
+        openxlsx::writeData(wb, sheet_name, "",
                             startRow = current_row, startCol = col_idx)
         openxlsx::addStyle(wb, sheet_name, styles$diagonal,
                            rows = current_row, cols = col_idx)
@@ -1165,8 +1173,9 @@ write_significance_matrix <- function(wb, q_result, config, wave_ids) {
     "Cell shows: Change from ROW wave to COLUMN wave",
     paste0("\u2191 = Significant increase (p < ", alpha, ")"),
     paste0("\u2193 = Significant decrease (p < ", alpha, ")"),
-    "\u2192 = Not statistically significant",
-    "\u2014 = Same wave (diagonal)",
+    "\u2192 = Tested, not statistically significant",
+    "\u2013 = Not tested (a base under the minimum, or the figure is missing)",
+    "Grey diagonal = same wave",
     "N/A = Data not available"
   )
 

@@ -349,7 +349,7 @@ test_that("a pair tests at effective n 30 and not at 29.99, trend and Dashboard 
   expect_equal(dash_at$p_value, trend_at$A_vs_B$p_value, tolerance = 1e-12)
   expect_equal(dash_at$sig_code, 1)
   expect_true(is.na(dash_under$p_value))
-  expect_equal(dash_under$sig_code, 0)
+  expect_true(is.na(dash_under$sig_code))
 })
 
 test_that("the base gate reads effective n, not the weighted total", {
@@ -361,7 +361,7 @@ test_that("the base gate reads effective n, not the weighted total", {
   trend <- perform_significance_tests_proportions(waves, c("A", "B"), cfg, "Yes")
   expect_identical(trend$A_vs_B$reason, "insufficient_base_or_unavailable")
   dash <- calculate_pairwise_significance(waves$A, waves$B, "proportions", min_base = 30)
-  expect_equal(dash$sig_code, 0)
+  expect_true(is.na(dash$sig_code))
 })
 
 

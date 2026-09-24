@@ -406,14 +406,14 @@ test_that("pairwise_significance: NPS non-significant for small change", {
 test_that("pairwise_significance: NULL from_result returns default", {
   to <- make_mean_result()
   result <- calculate_pairwise_significance(NULL, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
   expect_true(is.na(result$p_value))
 })
 
 test_that("pairwise_significance: NULL to_result returns default", {
   from <- make_mean_result()
   result <- calculate_pairwise_significance(from, NULL, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
   expect_true(is.na(result$p_value))
 })
 
@@ -421,42 +421,42 @@ test_that("pairwise_significance: unavailable from_result returns default", {
   from <- make_mean_result(available = FALSE)
   to <- make_mean_result()
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: unavailable to_result returns default", {
   from <- make_mean_result()
   to <- make_mean_result(available = FALSE)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: zero sample size returns default", {
   from <- make_mean_result(n_weighted = 0)
   to <- make_mean_result(n_weighted = 100)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: n=1 for numeric returns default (insufficient df)", {
   from <- make_mean_result(n_weighted = 1)
   to <- make_mean_result(n_weighted = 100)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: NA in mean returns default", {
   from <- make_mean_result(mean_val = NA)
   to <- make_mean_result()
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: NA in sd returns default", {
   from <- make_mean_result(sd_val = NA)
   to <- make_mean_result()
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: zero SE for proportions returns default", {
@@ -472,7 +472,7 @@ test_that("pairwise_significance: zero SE for numeric returns default", {
   from <- make_mean_result(mean_val = 3.0, sd_val = 0)
   to <- make_mean_result(mean_val = 3.0, sd_val = 0)
   result <- calculate_pairwise_significance(from, to, METRIC_TYPES$MEAN)
-  expect_equal(result$sig_code, 0)
+  expect_true(is.na(result$sig_code))  # not tested: NA, never 0
 })
 
 test_that("pairwise_significance: custom alpha respected", {
@@ -612,7 +612,7 @@ test_that("pairwise_significance: bases under the minimum are not tested", {
     make_sized_proportion(66.7, 15000, 3, eff_n = 3),
     make_sized_proportion(80, 25000, 5, eff_n = 5),
     METRIC_TYPES$PROPORTIONS)
-  expect_equal(tiny$sig_code, 0)
+  expect_true(is.na(tiny$sig_code))  # not tested: NA, never 0
   expect_true(is.na(tiny$p_value))
 
   # A configured minimum above the effective base also suppresses the test
@@ -620,7 +620,7 @@ test_that("pairwise_significance: bases under the minimum are not tested", {
     make_sized_proportion(30, 40, 40, eff_n = 40),
     make_sized_proportion(70, 40, 40, eff_n = 40),
     METRIC_TYPES$PROPORTIONS, min_base = 50)
-  expect_equal(gated$sig_code, 0)
+  expect_true(is.na(gated$sig_code))  # not tested: NA, never 0
   expect_true(is.na(gated$p_value))
 })
 
