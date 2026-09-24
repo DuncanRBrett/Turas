@@ -739,8 +739,12 @@ test_that("the template offers every QuestionMap column the tracker and backfill
 })
 
 test_that("the generated mapping loads through the real reader with a composite row", {
-  skip_if_not(exists("load_question_mapping", mode = "function"),
-              "tracking_island.R not sourced in this run")
+  # load_question_mapping() lives in tracking_island.R. This test used to skip
+  # unless an earlier file had sourced it, which in the runner none did, so it
+  # never ran. Source it here so it runs alone and in any order.
+  if (!exists("load_question_mapping", mode = "function")) {
+    source(file.path(tabs_root, "lib", "tracking_island.R"))
+  }
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 

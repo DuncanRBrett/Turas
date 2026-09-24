@@ -488,8 +488,13 @@ ensure_parity_project <- function(dir = FIXTURE_DIR) {
   invisible(dir)
 }
 
-# Run only when invoked as a script (Rscript ...), not when sourced.
-if (length(grep("^--file=", commandArgs(trailingOnly = FALSE))) > 0) {
+# Run only when invoked as THIS script (Rscript generate_parity_project.R), not
+# when sourced. Any --file= used to count, so a child Rscript that sourced the
+# generator (the pipeline gate does) wrote six workbooks into its working
+# directory and overwrote the caller's variable `d`.
+if (identical(basename(sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE),
+                                                  value = TRUE)[1])),
+              "generate_parity_project.R")) {
   d <- generate_parity_project()
   cat("Parity fixture written to:", d, "\n")
   cat("Files:", paste(basename(list.files(d, pattern = "[.]xlsx$")), collapse = ", "), "\n")
