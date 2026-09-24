@@ -444,6 +444,11 @@ test_that("whole-sample counts under the minimum are caught in meta, the levers 
     "Sign check: admin points the wrong way in more than 10% of refits.",
     "They correlate at 0.82. Consider averaging them.",
     "The chosen baseline penalty (100) is at the edge of the grid.",
-    "Few students are Detractor. Effects at that end rest on very few people.")))))
+    "Few students are Detractor. Effects at that end rest on very few people.",
+    "More than a tenth of the answers on Q3 Admin were \"Don't know\" and were set to the median rating.",
+    "Few students are 0-6. Effects at that end rest on very few people.")))))
   expect_length(f$violations, 0)
+  # ...while a count at the end of a sentence, or before a comma, still is one.
+  g <- release_audit_whatif(wi_body(model_extra = list(notes = I("Set to the median rating: Teaching 3, Admin 1."))))
+  expect_true(any(grepl("count from 1 to 4", g$violations)))
 })

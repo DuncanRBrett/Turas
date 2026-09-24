@@ -263,7 +263,15 @@ disclosure_small_recoverable <- function(atom_n, A, k, max_work = 500000) {
         module = "DISCLOSURE")
     }
     nc <- length(cand)
+    # Four random directions for the hash keys, drawn from a fixed seed with
+    # the caller's random stream put back afterwards, so this stays a pure
+    # function. A collision only costs a verification; a true zero sum can
+    # never be missed.
+    had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+    saved_seed <- if (had_seed) get(".Random.seed", envir = globalenv(), inherits = FALSE) else NULL
+    set.seed(20260924L)
     G <- matrix(stats::rnorm(ncol(Ns) * 4L), ncol(Ns), 4L)
+    if (had_seed) assign(".Random.seed", saved_seed, envir = globalenv()) else rm(".Random.seed", envir = globalenv())
     V <- Ns[cand, , drop = FALSE] %*% G
     cc <- cnt[cand]
     levels <- list(list(idx = matrix(seq_len(nc), ncol = 1), proj = V, tot = cc))

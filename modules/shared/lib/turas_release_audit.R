@@ -223,9 +223,12 @@ release_audit_whatif <- function(body) {
   }
   txt <- c(unlist(wi$meta$warnings), unlist(mdl$notes))
   if (length(txt)) {
+    # A count stands on its own: start or a space before it, a space, full
+    # stop, comma, semicolon, colon or bracket after it. "Q3", "0-6", "(100)"
+    # and "12%" are labels, ranges, penalties and shares, not counts.
     plain <- gsub("[0-9]+(\\.[0-9]+)?%", "", txt)
     plain <- gsub("[0-9]+\\.[0-9]+", "", plain)
-    nums <- suppressWarnings(as.numeric(unlist(regmatches(plain, gregexpr("[0-9]+", plain)))))
+    nums <- suppressWarnings(as.numeric(unlist(regmatches(plain, gregexpr("(?<![^\\s])[0-9]+(?=[\\s.,;:)]|$)", plain, perl = TRUE)))))
     if (any(small(nums))) {
       out$violations <- c(out$violations, sprintf("a What if warning or note carries a count from 1 to %s", k - 1))
     }

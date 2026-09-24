@@ -408,4 +408,9 @@ test_that("the engine reports what it found and refuses past its work cap rather
   # Nothing published beyond the whole sample: nothing to combine.
   r0 <- disclosure_small_recoverable(c(2L, 3L, 40L), matrix(1, 3, 1), 5)
   expect_length(r0$sets, 0)
+  # A pure function: the caller's random stream is where it was.
+  set.seed(77); before <- .Random.seed
+  invisible(disclosure_small_recoverable(c(1L, 1L, 1L, 1L), A, 5))
+  expect_identical(.Random.seed, before)
+  expect_equal(stats::runif(1), { set.seed(77); stats::runif(1) })
 })
