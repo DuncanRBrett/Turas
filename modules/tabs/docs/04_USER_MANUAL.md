@@ -516,7 +516,9 @@ Write the report's Background, Executive summary and any other summary
 screens in Word, save the file in the project folder, and name it in the
 Settings sheet's `narrative_file` (a path relative to the config file). Leave
 the setting blank and the Comments sheet's `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
-rows are used exactly as before.
+rows are used exactly as before. For how to write the document so each screen
+fits a slide, with measured screen sizes and a worked example, see
+[NARRATIVE_WORD_GUIDE.md](NARRATIVE_WORD_GUIDE.md).
 
 **How the document is read.** Each Heading 1 starts a screen, and its text is
 the screen's title. A house heading style built on Heading 1 counts as Heading 1.
