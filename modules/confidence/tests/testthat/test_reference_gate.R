@@ -138,6 +138,20 @@ test_that("informed Bayesian proportion matches the conjugate Beta posterior", {
   expect_equal(out$result$bayesian$upper, qbeta(0.975, 50, 30), tolerance = 1e-12)
 })
 
+test_that("weighted Bayesian proportion uses p x n_eff successes, unrounded", {
+  d <- balanced_data()
+  out <- process_proportion_question(
+    ref_q_row("y", categories = "1", run_moe = "N", run_credible = "Y"), d, "w", ref_config())
+  # p = 2/3, n_eff = 50: 33.333 weighted successes and 16.667 failures.
+  # Beta(1,1) prior -> Beta(34.333, 17.667). The code rounded the successes
+  # to 33 first (review 2026-09-24, decided by Duncan: drop the rounding).
+  a <- 1 + (2 / 3) * 50
+  b <- 1 + (1 / 3) * 50
+  expect_equal(out$result$bayesian$post_mean, a / (a + b), tolerance = 1e-12)
+  expect_equal(out$result$bayesian$lower, qbeta(0.025, a, b), tolerance = 1e-12)
+  expect_equal(out$result$bayesian$upper, qbeta(0.975, a, b), tolerance = 1e-12)
+})
+
 test_that("proportion bootstrap agrees with boot::boot percentile interval", {
   set.seed(7)
   n <- 400

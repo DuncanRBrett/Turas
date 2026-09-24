@@ -525,8 +525,12 @@ credible_interval_proportion <- function(p, n, conf_level = 0.95,
     prior_type <- "Informed"
   }
 
-  # Calculate successes and failures from observed data
-  successes <- round(p * n)
+  # Successes and failures on the (effective) sample. Not rounded: with
+  # weights n is the Kish n_eff (50, or 18.846), p * n is fractional, and
+  # qbeta takes fractional shapes. Rounding the successes but not n moved the
+  # posterior by up to half a respondent (review 2026-09-24). Unweighted,
+  # p * n is already the whole count.
+  successes <- p * n
   failures <- n - successes
 
   # Posterior parameters (Beta conjugate update)
