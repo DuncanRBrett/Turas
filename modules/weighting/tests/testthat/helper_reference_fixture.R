@@ -192,6 +192,10 @@ ref_rim_target_rows <- function(name, targets = ref_rim_targets()) {
 #' out. Returns the exit status and the console text.
 ref_run_child <- function(config_path, turas_root) {
   script <- file.path(turas_root, "modules", "weighting", "run_weighting.R")
+  # The CLI locates its module from the working directory, as it does when
+  # run from the Turas root.
+  old_wd <- setwd(turas_root)
+  on.exit(setwd(old_wd), add = TRUE)
   out <- suppressWarnings(system2(
     file.path(R.home("bin"), "Rscript"),
     args = c(shQuote(script), shQuote(config_path)),
@@ -209,9 +213,16 @@ ref_read_sheet <- function(path, sheet) {
                       skipEmptyRows = FALSE, skipEmptyCols = FALSE)
 }
 
-#' Value in column 2 of the row whose column 1 equals `label`.
-ref_kv <- function(sheet_df, label, col = 2) {
-  hit <- which(trimws(as.character(sheet_df[[1]])) == label)
-  if (length(hit) == 0) return(NA_character_)
-  as.character(sheet_df[[col]][hit[1]])
+#' The first filled cell to the right of the cell that equals `label`.
+#'
+#' Sheets place their labels in different columns (the stats pack Declaration
+#' uses B and D), so the label is found wherever it sits.
+ref_kv <- function(sheet_df, label) {
+  m <- as.matrix(sheet_df)
+  hit <- which(trimws(m) == label, arr.ind = TRUE)
+  if (nrow(hit) == 0) return(NA_character_)
+  r <- hit[1, "row"]
+  right <- m[r, seq_len(ncol(m)) > hit[1, "col"]]
+  right <- right[!is.na(right) & nzchar(trimws(right))]
+  if (length(right) == 0) NA_character_ else trimws(as.character(right[1]))
 }
