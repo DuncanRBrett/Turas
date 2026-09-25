@@ -97,3 +97,53 @@ test_that("blank segment cells leave every other segment's results intact", {
   }
   expect_false(any(grepl("PRICE_SEGMENT_REFUSED", r$log)))
 })
+
+# ------------------------------------------------------------------------------
+# Monadic designs the pre-flight guard warns about
+# ------------------------------------------------------------------------------
+karoo_monadic_variant <- function(d) {
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(d, csv, row.names = FALSE, na = "")
+  pricing_pipeline_run("Karoo_Pricing_Config_Monadic.xlsx", data_file = csv,
+                       edits = "cfg$monadic$bootstrap_iterations <- 20")
+}
+
+karoo_monadic_ref <- function(d) {
+  d <- d[d$Weight > 0 & !is.na(d$MON_Price) & !is.na(d$MON_Intent), ]
+  d$buy <- as.numeric(d$MON_Intent >= 4)
+  g <- suppressWarnings(glm(buy ~ MON_Price, family = binomial, data = d,
+                            weights = Weight / mean(Weight)))
+  grid <- seq(min(d$MON_Price), max(d$MON_Price), length.out = 100)
+  list(n = nrow(d), opt = grid[which.max(grid * plogis(coef(g)[1] + coef(g)[2] * grid))])
+}
+
+test_that("a two-cell monadic design (an A/B price test) runs and matches glm", {
+  # Fewer than three prices is a pre-flight warning, not a refusal. Printing
+  # that warning crashed the run: the shared guard_warn() stores plain
+  # strings and the pricing printer read w$category.
+  root <- pricing_repo_root()
+  skip_if_not(file.exists(file.path(root, "examples", "pricing", "Karoo_Pricing_Data.xlsx")),
+              "examples/pricing/Karoo_Pricing_Data.xlsx is missing")
+  d <- openxlsx::read.xlsx(file.path(root, "examples", "pricing", "Karoo_Pricing_Data.xlsx"))
+  d <- d[d$MON_Price %in% c(70, 130), ]
+  r <- karoo_monadic_variant(d)
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 8), collapse = "\n"))
+  ref <- karoo_monadic_ref(d)
+  op <- pricing_sheet(r$workbook, "Mon_Optimal_Price", colNames = FALSE)
+  expect_equal(as.numeric(op$X2[which(op$X1 == "Revenue-Maximizing Price")]), ref$opt, tolerance = 1e-9)
+  expect_true(any(grepl("Only 2 distinct prices", r$log, fixed = TRUE)))
+})
+
+test_that("a monadic cell of 10 to 29 respondents runs with its warning printed", {
+  root <- pricing_repo_root()
+  skip_if_not(file.exists(file.path(root, "examples", "pricing", "Karoo_Pricing_Data.xlsx")),
+              "examples/pricing/Karoo_Pricing_Data.xlsx is missing")
+  d <- openxlsx::read.xlsx(file.path(root, "examples", "pricing", "Karoo_Pricing_Data.xlsx"))
+  drop <- which(d$MON_Price == 130)[-(1:20)]          # the R130 cell keeps 20
+  d <- d[-drop, ]
+  r <- karoo_monadic_variant(d)
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 8), collapse = "\n"))
+  ob <- pricing_sheet(r$workbook, "Mon_Observed_Data")
+  expect_equal(ob$n[ob$price == 130], 20)
+  expect_true(any(grepl("Monadic cell n=20 below minimum 30", r$log, fixed = TRUE)))
+})

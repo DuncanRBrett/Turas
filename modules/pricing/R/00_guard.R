@@ -590,8 +590,16 @@ pricing_print_guard_summary <- function(guard, n_respondents = NULL) {
   n_warn <- summary$n_warnings %||% summary$warning_count %||% 0
   if (n_warn > 0) {
     cat(sprintf("   Pre-flight: %d warning(s)\n", n_warn))
+    # The shared guard_warn() (modules/shared/lib/trs_refusal.R) stores each
+    # warning as a plain string; this printer read w$category and w$msg, so the
+    # first pre-flight warning (a monadic cell under Min_Cell_Size, or fewer
+    # than three prices) crashed the whole run (robustness gate, 25 Sep 2026).
     for (w in guard$warnings) {
-      cat(sprintf("     - [%s] %s\n", w$category, w$msg))
+      if (is.list(w)) {
+        cat(sprintf("     - [%s] %s\n", w$category %||% "general", w$msg %||% ""))
+      } else {
+        cat(sprintf("     - %s\n", as.character(w)))
+      }
     }
   }
 
