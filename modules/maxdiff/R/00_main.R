@@ -637,7 +637,13 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   # (plain <- inside error handler creates a local copy that is discarded)
   .warn_env <- new.env(parent = emptyenv())
   .warn_env$warnings_list <- character()
-  add_warning <- function(msg) .warn_env$warnings_list <- c(.warn_env$warnings_list, msg)
+  # A warning may carry its own event code (the element's name); unnamed
+  # ones are logged as MAXD_WARNING.
+  add_warning <- function(msg, code = "MAXD_WARNING") {
+    if (length(msg) == 0) return(invisible(NULL))
+    .warn_env$warnings_list <- c(.warn_env$warnings_list,
+                                 stats::setNames(msg, rep(code, length(msg))))
+  }
 
   # ==========================================================================
   # STEP 2: LOAD DESIGN FILE
@@ -1172,9 +1178,17 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
                         weights = turf_weights, verbose = verbose)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_TURF_FAILED: TURF analysis failed: %s", conditionMessage(e)))
-      add_warning(sprintf("TURF: %s", conditionMessage(e)))
+      add_warning(sprintf("TURF: %s", conditionMessage(e)), code = "MAXD_TURF_FAILED")
       NULL
     })
+  } else if (generate_turf) {
+    # Asked for, but there is nothing to classify appeal on. This used to be
+    # skipped in silence: no TURF sheet, and the run said PASS.
+    .turf_msg <- paste0(
+      "TURF was requested (Generate_TURF = YES) but not run: it needs ",
+      "individual utilities, and this run has none. Set Generate_HB_Model = YES.")
+    cat(sprintf("\n[TRS PARTIAL] MAXD_TURF_SKIPPED: %s\n", .turf_msg))
+    add_warning(.turf_msg, code = "MAXD_TURF_SKIPPED")
   }
 
   # Step 10C: Anchored MaxDiff
@@ -1251,9 +1265,12 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
 
   # TRS: Log PARTIAL events
   if (!is.null(trs_state) && length(warnings_list) > 0) {
-    for (warn in warnings_list) {
+    warn_codes <- names(warnings_list) %||% rep("MAXD_WARNING", length(warnings_list))
+    for (i in seq_along(warnings_list)) {
+      code_i <- if (is.na(warn_codes[i]) || !nzchar(warn_codes[i])) "MAXD_WARNING" else warn_codes[i]
       if (exists("turas_run_state_partial", mode = "function")) {
-        turas_run_state_partial(trs_state, "MAXD_WARNING", "Analysis warning", problem = warn)
+        turas_run_state_partial(trs_state, code_i, "Analysis warning",
+                                problem = unname(warnings_list[i]))
       }
     }
   }
@@ -1295,7 +1312,7 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
     anchor_data = optional$anchor_data,
     discrimination_data = optional$discrimination_data,
     chart_paths = optional$chart_paths,
-    warnings = warnings_list,
+    warnings = unname(warnings_list),
     run_result = run_result
   )
 

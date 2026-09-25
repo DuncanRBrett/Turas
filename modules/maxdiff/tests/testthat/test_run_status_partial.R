@@ -48,3 +48,12 @@ test_that("a refused tabs export makes the Run_Status sheet PARTIAL, not only th
     expect_false(grepl('width="NA"', xml, fixed = TRUE), info = sx)
   }
 })
+
+test_that("TURF asked for but skipped for want of individual utilities is an event", {
+  # Generate_TURF = YES with HB off: nothing to classify appeal on, so no TURF
+  # sheet. Before, the step was silently skipped and nothing said why.
+  expect_false("TURF_RESULTS" %in% openxlsx::getSheetNames(PN$workbook))
+  expect_match(.run_status_sheet(PN$workbook)$text, "MAXD_TURF_SKIPPED", fixed = TRUE)
+  codes <- vapply(PN$run_result$events %||% list(), function(e) e$code %||% "", "")
+  expect_true("MAXD_TURF_SKIPPED" %in% codes)
+})
