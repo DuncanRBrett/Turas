@@ -119,11 +119,13 @@ The module produces several types of scores:
 
 - **HB utilities:** Individual-level posterior means from Hierarchical Bayes estimation. These are the most informative scores — they capture both population-level patterns and individual heterogeneity. The population mean HB utilities approximate the aggregate logit utilities.
 
-- **Rescaled scores:** Utilities transformed to a 0-100 probability scale using the multinomial logit transformation: P(i) = exp(U_i) / sum(exp(U_j)). These sum to 100% across all items and are the most intuitive for client presentations. "Item A has a 15% share of preference" is easier to interpret than "Item A has a utility of 1.23."
+- **Rescaled scores:** The headline utility (HB mean, else logit, else net score) rescaled by `Score_Rescale_Method`. The default, `0_100`, is min-max: the top item scores 100, the bottom 0. `PROBABILITY` is exp(U_i) / sum(exp(U_j)) x 100 on the mean utilities, summing to 100.
+
+- **Preference shares:** The mean, across respondents, of each respondent's own exp(U_i) / sum(exp(U_j)) x 100 on their individual utilities. They sum to 100 and read as "Item A has a 15% share of preference". They are not the same number as the `PROBABILITY` rescaled score, which applies the formula once to the mean utilities.
 
 ### Item rankings
 
-Rankings are derived from rescaled scores. The item with the highest score is ranked #1. Ties are broken by raw utility, then by count scores.
+Rankings are derived from rescaled scores. The item with the highest score is ranked #1. Tied scores share the same (lowest) rank.
 
 ### TURF analysis
 

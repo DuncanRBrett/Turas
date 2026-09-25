@@ -495,7 +495,7 @@ Where:
 - $S$ is the set of items shown in the task
 - $\beta_i$ is the utility parameter for item $i$
 
-**Implementation:** Uses `survival::clogit()` with stratification by respondent-task.
+**Implementation:** Uses `survival::clogit()`. Each respondent-task contributes two strata over the items shown: the best choice, and the worst choice with the item indicators sign-flipped. The worst stratum keeps the item already picked best. On a weighted study the model adds `cluster(resp_id)`, so the SEs are the sandwich variance clustered by respondent and do not move with the weight scale; unweighted SEs are model-based.
 
 **Identification:** One item (anchor) is fixed at $\beta = 0$.
 
@@ -531,7 +531,7 @@ Where:
 |--------|---------|
 | RAW | $u_i$ (no change) |
 | 0_100 | $100 \times \frac{u_i - \min(u)}{\max(u) - \min(u)}$ |
-| PROBABILITY | $\frac{\exp(u_i)}{\sum_j \exp(u_j)}$ |
+| PROBABILITY | $100 \times \frac{\exp(u_i)}{\sum_j \exp(u_j)}$ (sums to 100) |
 
 ---
 
@@ -872,11 +872,11 @@ For datasets > 10,000 respondents:
 | utils.R | `safe_integer()` | Safe type conversion |
 | utils.R | `parse_yes_no()` | Boolean parsing |
 
-| 11_turf.R | `run_turf_analysis()` | TURF portfolio optimisation |
-| 11_turf.R | `classify_appeal()` | Appeal threshold classification |
-| 11_turf.R | `calculate_reach()` | Portfolio reach calculation |
-| 11_turf.R | `calculate_portfolio_reach()` | Custom portfolio reach |
-| 11_turf.R | `compute_reach_sensitivity()` | Cross-method reach comparison |
+| 11_turf.R | `run_turf_analysis()` | MaxDiff wrapper over the shared engine |
+| shared/lib/turf_engine.R | `classify_appeal()` | Appeal threshold classification |
+| shared/lib/turf_engine.R | `calculate_reach()` | Portfolio reach calculation |
+| shared/lib/turf_engine.R | `calculate_portfolio_reach()` | Custom portfolio reach |
+| shared/lib/turf_engine.R | `compute_reach_sensitivity()` | Cross-method reach comparison |
 
 ---
 
@@ -894,7 +894,7 @@ Before computing reach, each respondent's utilities must be converted to a binar
 |--------|------|----------|
 | `ABOVE_MEAN` | Item utility > respondent's mean utility | Default. Identifies items that stand out for each respondent |
 | `TOP_3` | Respondent's top 3 items | Fixed number of appealing items per respondent |
-| `TOP_K` | Respondent's top K items (configurable) | Flexible version of TOP_3 |
+| `TOP_K` | Respondent's top 3 items: K is not read from the config | Same as TOP_3 today |
 | `ABOVE_ZERO` | Item utility > 0 | When zero-centred utilities have a natural threshold |
 
 ### 11.3 Greedy Forward Selection
@@ -906,7 +906,7 @@ The algorithm uses greedy forward selection:
 3. Select the item providing the highest incremental reach
 4. Repeat until the portfolio reaches the maximum size or 100% reach
 
-This is a **greedy approximation** — it is not guaranteed to find the globally optimal combination, but it is optimal for portfolio sizes 1 and 2, and near-optimal for larger sizes. For practical purposes, the greedy solution is sufficient.
+This is a **greedy approximation**. It is optimal for a portfolio of 1 and is not guaranteed to be optimal for any larger size. With A reaching respondents {1,2,3,4}, B {1,2,5,6} and C {3,4,5,6}, greedy takes A first and reaches 4 of 6 with two items, while B + C reaches all 6. Ties go to the item listed first.
 
 ### 11.4 Reach and Frequency
 

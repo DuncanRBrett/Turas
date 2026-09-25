@@ -23,7 +23,7 @@ This approach forces trade-offs and produces more discriminating results than tr
 - Excel-based configuration for non-technical users
 - Balanced Incomplete Block Design (BIBD) generation with D-optimal optimization
 - Multiple scoring methods:
-  - Count-based scores (Best%, Worst%, Net Score, BW Score)
+  - Count-based scores (Best%, Worst%, Net Score)
   - Aggregate conditional logit model (via survival::clogit)
   - Hierarchical Bayes individual-level utilities (via Stan/cmdstanr)
 - **TURF portfolio optimization** — find the item combination that reaches the most people

@@ -618,7 +618,6 @@ Simple descriptive metrics computed directly from the raw choices:
 | Best% | Times chosen best / Times shown | 0-100% | Higher = more preferred |
 | Worst% | Times chosen worst / Times shown | 0-100% | Higher = less preferred |
 | Net Score | Best% - Worst% | -100 to +100 | Positive = net preferred |
-| BW Score | (Best count - Worst count) / Times shown | -1 to +1 | Normalised preference index |
 
 Count scores are always computed first as a baseline. They are easy to
 interpret and serve as a sanity check before fitting statistical models.
@@ -629,19 +628,20 @@ Fits a conditional logit model (via `survival::clogit()`) to estimate
 population-level utilities on an interval scale.
 
 Key outputs: - **Logit utilities** -- interval-scale preference scores
-for each item - **Standard errors and confidence intervals** --
-statistical precision - **Model fit statistics** -- log-likelihood,
-R-squared equivalent
+for each item - **Standard errors** -- statistical precision (no
+confidence interval columns are written) - **Model fit statistics** --
+log-likelihood, R-squared equivalent
 
 Logit utilities represent the average preference structure across all
 respondents.
 
-**Caveat on standard errors (read before quoting them):** the logit SEs
-treat sampling weights as frequency weights and ignore the correlation
-between a respondent's own choices (each respondent contributes many
-observations). Both effects overstate precision, more so under heavy
-weighting. Treat the SEs and p-values as approximate; the point estimates
-are unaffected.
+**How the standard errors are computed:** on a weighted study the logit
+SEs are the sandwich (robust) variance clustered by respondent, so they
+allow for the correlation between one respondent's many choices and do
+not change when the weights are rescaled or grossed to population totals.
+On an unweighted study they are the model-based SEs, which treat every
+choice as independent and so read somewhat narrower than the clustered
+ones would.
 
 #### Hierarchical Bayes (HB)
 
@@ -654,9 +654,13 @@ covariance are estimated simultaneously - Individual estimates are
 "shrunk" toward the population mean, reducing noise
 
 If `cmdstanr` is installed and configured, the module uses full
-Stan-based MCMC sampling. If `cmdstanr` is not available, it falls back
-to an approximate empirical Bayes method that uses James-Stein shrinkage
-applied to respondent-level BW scores.
+Stan-based MCMC sampling. If `cmdstanr` is not available, or the Stan
+model fails to compile or sample, it falls back to an approximate
+empirical Bayes method that uses James-Stein shrinkage applied to
+respondent-level BW scores. The run then finishes PARTIAL with the event
+`MAXD_HB_APPROXIMATE`, and the stats pack reports convergence as not
+applicable. The iteration settings (`HB_Iterations`, `HB_Warmup`,
+`HB_Chains`) are read from OUTPUT_SETTINGS only.
 
 **HB produces:** - Population-level utility means and standard
 deviations - Individual-level utility profiles (one row per respondent,
@@ -671,7 +675,7 @@ After estimation, utilities can be rescaled for easier interpretation:
 |-----------------|------------------|-----------------|--------------------|
 | `RAW` | No transformation | Varies | Technical analysis, model comparison |
 | `0_100` | 100 \* (u - min) / (max - min) | 0-100 | Client reporting, charts, presentation |
-| `PROBABILITY` | exp(u) / sum(exp(u)) | 0-1 (sum = 1) | Share-of-preference interpretation |
+| `PROBABILITY` | 100 \* exp(u) / sum(exp(u)) | 0-100 (sum = 100) | Share-of-preference interpretation on the mean utilities |
 
 The `0_100` method is recommended for most reporting purposes. The
 lowest-scoring item receives 0, the highest receives 100, and all others
@@ -830,11 +834,18 @@ respondent:
 |-------------------|------------------------------|-----------------------|
 | `ABOVE_MEAN` | An item is appealing if its utility is above the respondent's average utility across all items | General-purpose default. Works well for most studies |
 | `TOP_3` | The respondent's top 3 items are classified as appealing | When you want a fixed number of "winners" per person |
-| `TOP_K` | The respondent's top K items are appealing (K configurable) | Flexible version of TOP_3 |
+| `TOP_K` | Currently the same as `TOP_3`: K is not read from the config and is always 3 | Use `TOP_3` |
 | `ABOVE_ZERO` | An item is appealing if its utility is positive | Only meaningful if utilities are centred (anchored MaxDiff) |
 
 Set the threshold method via `TURF_Threshold` in OUTPUT_SETTINGS. The
-default is `ABOVE_MEAN`.
+default is `ABOVE_MEAN`. TURF needs individual utilities, so it runs only
+with `Generate_HB_Model = YES`; asked for without them, the run finishes
+PARTIAL with the event `MAXD_TURF_SKIPPED`.
+
+The standalone simulator's Portfolio tab always counts each respondent's
+top K items (K chosen on the tab) and ignores weights, so its reach
+matches TURF_RESULTS only for an unweighted `TOP_3` run at K = 3. The tab
+says so in a line under its heading.
 
 ### 8.4 Interpreting the Reach Curve
 
