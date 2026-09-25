@@ -160,11 +160,14 @@ In a monadic design, each respondent is randomly assigned to exactly one price c
 
 When multiple methods are available, Turas triangulates findings and produces a single recommendation with a confidence score. The confidence score reflects:
 
-- **Method agreement.** Do VW, GG, and/or monadic point to similar prices?
-- **Sample quality.** Large samples with low violation rates increase confidence.
-- **Range consistency.** Does the recommendation fall within the VW acceptable range?
+- **Method agreement.** Do VW, GG, and/or monadic point to similar prices? One price per method, so Van Westendorp's several points count once.
+- **Sample size.** The largest analysed base across the methods.
+- **Data quality.** The share of the sample whose Van Westendorp answers were out of order, counted before they were dropped or fixed.
+- **Model quality.** For a monadic run, the price effect's p-value and pseudo-R2.
+- **Range consistency.** Does the recommendation fall within the VW optimal zone, or at least the acceptable range?
+- **Method coverage.** How many methods were run.
 
-A confidence score above 80% means the evidence is consistent and the recommendation is actionable. Below 60% means the methods disagree or the data quality is marginal -- present the range rather than a point estimate.
+The score is the mean of the factor scores. 75% or more is HIGH: the evidence is consistent and the recommendation is actionable. Below 55% is LOW: the methods disagree or the data quality is marginal, so present the range rather than a point estimate. The exact table is in `docs/TECHNICAL_REFERENCE.md` section 4.4.
 
 ---
 

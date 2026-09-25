@@ -489,7 +489,9 @@ self-contained file, no Turas needed.
   updating as it moves
 - A scenario comparison table: the raw Revenue and Profit indices, and each as a
   percentage of the revenue-maximising price on its own row
-- A segment toggle, where each segment is drawn on its own prices
+- A segment toggle, where each segment is drawn on its own prices (a
+  Gabor-Granger run with a `Segment_Column`; segments on a run with both
+  methods are Van Westendorp only, so there is no toggle)
 - PNG export
 
 Between the prices that were actually tested, intent is interpolated, so the
@@ -555,9 +557,17 @@ Run pricing analysis across customer segments.
 
 **Configuration (Settings Sheet):**
 ```
-segment_vars = "age_group,income_bracket"
-min_segment_n = 50
+Segment_Column = Segment
+Min_Segment_N  = 50
+Include_Total  = TRUE
 ```
+
+One column; each of its values is a segment. A segment with fewer than
+`Min_Segment_N` respondents after validation is left out, and Run_Status says
+which. Respondents with a blank segment code are in the Total and in no
+segment. Segments run Van Westendorp or Gabor-Granger; on a run with both
+methods they run Van Westendorp only (the workbook and the Pricing tab say
+so), and a monadic run cannot be segmented (Run_Status shows PARTIAL).
 
 **Output**: Separate price points for each segment, enabling:
 - Tiered pricing strategies
@@ -589,11 +599,15 @@ anchor = "Standard"
 Combines all analyses into executive summary.
 
 **Factors Considered:**
-1. Method agreement (Van Westendorp, Gabor-Granger, Monadic, NMS)
+1. Method agreement (one price per method: Van Westendorp, Gabor-Granger, Monadic)
 2. Sample size adequacy
-3. Data quality
-4. Zone fit
-5. Method coverage
+3. Data quality (the sample's Van Westendorp violation rate, before drop or fix)
+4. Monadic model quality (monadic runs only)
+5. Zone fit
+6. Method coverage
+
+The scoring table and the rounding rule are in `docs/TECHNICAL_REFERENCE.md`
+section 4.4.
 
 **Output**:
 - Recommended price with confidence level (HIGH/MEDIUM/LOW)

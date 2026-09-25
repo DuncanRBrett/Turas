@@ -177,58 +177,44 @@ list(
 
 #### Cumulative Distribution Calculation
 
-For each price point P in the response range:
+The price points come from `pricesensitivitymeter` (`psm_analysis`, or
+`psm_analysis_weighted` on a `survey::svydesign` when a weight is configured),
+called with `interpolate = TRUE, interpolation_steps = 0.1`. The package's
+definition, which the reference tests restate independently
+(`tests/testthat/test_reference_vw.R`):
 
 ```
-Curve_TooCheap(P) = Proportion of respondents whose "too cheap" price ≥ P
-Curve_NotCheap(P) = Proportion of respondents whose "cheap" price ≤ P
-Curve_NotExpensive(P) = Proportion of respondents whose "expensive" price ≥ P
-Curve_TooExpensive(P) = Proportion of respondents whose "too expensive" price ≤ P
+grid       = every price any analysed respondent gave, sorted
+F_x(P)     = (weighted) share of respondents with answer x <= P,
+             forced to 0 at or below the lowest answer and 1 at or above the highest
+Too cheap(P)      = 1 - F_toocheap(P)
+Not cheap(P)      = F_cheap(P)          Cheap(P)     = 1 - F_cheap(P)
+Expensive(P)      = F_expensive(P)      Not expensive(P) = 1 - F_expensive(P)
+Too expensive(P)  = F_tooexpensive(P)
 ```
 
-Additionally:
-```
-Curve_Cheap(P) = 1 - Curve_NotCheap(P)
-Curve_Expensive(P) = 1 - Curve_NotExpensive(P)
-```
+The curves are then interpolated linearly on a 0.1 price grid.
 
 #### Intersection Points
 
-**PMC** (Point of Marginal Cheapness):
 ```
-Find P where Curve_TooCheap(P) = Curve_NotCheap(P)
-```
-
-**OPP** (Optimal Price Point):
-```
-Find P where Curve_TooCheap(P) = Curve_TooExpensive(P)
-```
-
-**IDP** (Indifference Price Point):
-```
-Find P where Curve_Cheap(P) = Curve_Expensive(P)
-```
-
-**PME** (Point of Marginal Expensiveness):
-```
-Find P where Curve_NotExpensive(P) = Curve_TooExpensive(P)
+PMC = Too cheap x Not cheap
+OPP = Too cheap x Too expensive
+IDP = Cheap x Expensive
+PME = Too expensive x Not expensive
 ```
 
 #### Intersection Algorithm
 
-Uses linear interpolation between adjacent grid points:
+For each pair, the difference between the two curves is taken on the grid;
+every place its sign changes (including to or from zero) is a crossing,
+located by linear interpolation between the two grid prices around it, and
+the LOWEST crossing is reported (`intersection_method = "min"`).
 
-```r
-find_curve_intersection <- function(x, y1, y2) {
-  diff <- y1 - y2
-  sign_changes <- which(diff[-1] * diff[-length(diff)] < 0)
-  idx <- sign_changes[1]
-
-  # Linear interpolation
-  t <- (y2[idx] - y1[idx]) / ((y1[idx+1] - y1[idx]) - (y2[idx+1] - y2[idx]))
-  x[idx] + (x[idx+1] - x[idx]) * t
-}
-```
+Under `VW_Monotonicity_Behavior = drop` (the default) respondents whose four
+answers are not strictly increasing leave before the curves are built; under
+`fix` their four answers are sorted (a tie still fails the strict rule and is
+set aside); under `flag_only` they stay in (`validate = FALSE`).
 
 #### Bootstrap Confidence Intervals
 
@@ -247,21 +233,34 @@ CI_upper = quantile(boot_results, 1 - α/2)
 
 #### Demand Curve
 
-For each price point P:
+For each rung P, over the respondents analysed (every rung has the same base:
+an incomplete ladder is excluded or refused before this point):
 ```
-Purchase_Intent(P) = (Number willing to buy at P) / (Total respondents)
+Purchase_Intent(P) = sum(w_i × yes_i(P)) / sum(w_i)      (w_i = 1 unweighted)
 ```
+
+#### Smoothing
+
+With `GG_Monotonicity_Behavior = smooth` (the default) and
+`Smoothing_Method = isotonic` (the default), the published curve is the
+non-increasing least-squares fit to the raw acceptance: pool-adjacent-violators
+with equal weight per rung, the same answer as `-isoreg(P, -Purchase_Intent)`.
+Only adjacent violators pool: 0.30, 0.50, 0.35, 0.20 becomes 0.40, 0.40,
+0.35, 0.20. The raw curve is kept as `purchase_intent_raw`. Revenue, profit,
+the optimum and elasticity all use the published (smoothed) curve.
 
 #### Revenue Curve
 
 ```
 Revenue_Index(P) = P × Purchase_Intent(P)
+Profit_Index(P)  = (P - Unit_Cost) × Purchase_Intent(P)
 ```
 
 #### Optimal Price
 
 ```
-Optimal_Price = argmax_P { Revenue_Index(P) }
+Optimal_Price        = argmax_P { Revenue_Index(P) }   (the lowest price on a tie)
+Optimal_Profit_Price = argmax_P { Profit_Index(P) }
 ```
 
 #### Arc Elasticity
@@ -289,7 +288,13 @@ For binary purchase intent Y and price P:
 P(Y=1 | P) = 1 / (1 + exp(-(β₀ + β₁P)))
 ```
 
-Fitted using `glm(intent ~ price, family = binomial(link = "logit"))`.
+Fitted using `glm(intent ~ price, family = binomial(link = "logit"))`. With a
+weight, the weights are normalised to mean 1 and passed to `glm`: the
+coefficients are those of the weighted fit (the same as `survey::svyglm`), and
+the p-value treats the weights as frequency weights, so it is not adjusted for
+the design effect (the workbook says so). Mean weights above 5 (grossing
+weights) refuse. A "don't know" code in `DK_Codes` is recoded to missing in
+the price and intent columns before the fit.
 
 **Log-logistic variant**: Uses `log(price)` as predictor instead of raw price, useful when the price-intent relationship is more linear on the log scale.
 
@@ -324,6 +329,10 @@ Optimal_Revenue_Price = argmax_P { Revenue_Index(P) }
 Optimal_Profit_Price  = argmax_P { Profit_Index(P) }
 ```
 
+over `Prediction_Points` (default 100) evenly spaced prices from the lowest to
+the highest tested price, so the reported optimum is within one grid step of
+the continuous one and never outside the tested range.
+
 #### Arc Elasticity
 
 Sampled at regular intervals (every ~5% of the price range):
@@ -345,6 +354,36 @@ Calculate percentile CIs from successful iterations:
 CI_lower = quantile(boot_results, α/2, na.rm = TRUE)
 CI_upper = quantile(boot_results, 1 - α/2, na.rm = TRUE)
 ```
+
+### 4.4 Recommendation
+
+The anchor price is the first available of: the Gabor-Granger revenue
+optimum, the monadic revenue optimum, the Van Westendorp OPP-IDP midpoint.
+It is clamped to any configured floor or ceiling and rounded:
+
+```
+P < 10         floor(P) + 0.99
+10 <= P < 100  b = floor(P / 5) × 5;  b - 0.01 if P - b < 2.5, else b + 4.99
+P >= 100       round(P / 5) × 5 - 0.01
+```
+
+unless the rounding moves the price more than 10%, when it is kept to the
+cent. The price ladder's tiers use their own `Round_To` ending
+(floor(P) + ending) under the same 10% rule.
+
+The confidence score is the mean of these factor scores:
+
+| Factor | 1.0 | 0.7 | 0.6 | 0.4 | 0.3 |
+|---|---|---|---|---|---|
+| Method agreement (CV of one price per method: VW midpoint, GG optimum, monadic optimum) | CV < 8% | 8-15% | | >= 15% | |
+| Sample size (largest base across methods) | >= 300 | 100-299 | | < 100 | |
+| Data quality (VW violations in the sample, counted before drop or fix) | < 5% | 5-15% | | >= 15% | |
+| Monadic model (if run) | p <= 0.01 and pseudo-R2 >= 0.05 | p <= 0.05 | | | p > 0.05 |
+| Zone fit (VW) | inside OPP-IDP | | inside PMC-PME | | outside |
+| Method coverage | 3+ methods | 2 methods | | 1 method | |
+
+HIGH at 0.75 or more, MEDIUM at 0.55 or more, LOW below (an unassessable
+monadic model scores 0.5).
 
 ---
 
