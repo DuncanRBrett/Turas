@@ -206,7 +206,7 @@ One row per weight to calculate:
 
 - `weight_name` — Unique name for the weight column added to your data
 - `method` — `design`, `rim`, `rake`, or `cell`
-- `apply_trimming` — `Y` or `N`. Design and cell weights only; a rim weight with `Y` is refused (`CFG_TRIM_USE_CAP`); put the cap in `weight_bounds` in Advanced_Settings instead
+- `apply_trimming`: `Y` or `N`. Design and cell weights only; a rim weight with `Y` is refused (`CFG_TRIM_USE_CAP`); put the cap in `weight_bounds` in Advanced_Settings instead
 - `trim_method` — `cap` (absolute maximum) or `percentile` (percentile range)
 - `trim_value` — For cap: maximum weight (e.g., 5). For percentile: a proportion strictly between 0 and 1 (e.g., `0.95`) — **not** 95
 
@@ -541,7 +541,7 @@ This is a rim weight, so the cap belongs in Advanced_Settings, not in Weight_Spe
 
 Do **not** set `apply_trimming = Y` here. That caps the weights after raking has finished, which breaks the margins you just calibrated to; the module refuses it with `CFG_TRIM_USE_CAP` and points you back to this setting.
 
-Re-run. `weight_bounds` reaches `survey::calibrate()` as the bounds, so no weight exceeds 4 by construction, the weighted margins still match your Stats SA targets, and DEFF falls because the tail has been pulled in. If the run now refuses with `MODEL_NO_CONVERGENCE`, the cap is too tight for these targets — either relax it or set `calibration_method = logit`, which the refusal message will suggest.
+Re-run. `weight_bounds` reaches `survey::calibrate()` as the bounds, so no weight exceeds 4 by construction, the weighted margins still match your Stats SA targets, and DEFF falls because the tail has been pulled in. If the run now refuses with `MODEL_NO_CONVERGENCE`, the cap is too tight for these targets. Either relax it or set `calibration_method = logit`, which the refusal message will suggest.
 
 ---
 

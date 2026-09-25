@@ -340,7 +340,7 @@ generate_weight_config_template <- function(output_path) {
       name = "apply_trimming",
       width = 16,
       required = FALSE,
-      description = "Whether to cap extreme weights AFTER calculation. Y or N. Design and cell weights only — a rim weight is refused, because capping afterwards breaks the margins raking just calibrated. For rim, put the cap in weight_bounds in Advanced_Settings, which caps DURING calibration and keeps the margins.",
+      description = "Whether to cap extreme weights AFTER calculation. Y or N. Design and cell weights only. A rim weight is refused, because capping afterwards breaks the margins raking just calibrated. For rim, put the cap in weight_bounds in Advanced_Settings, which caps DURING calibration and keeps the margins.",
       dropdown = c("Y", "N")
     ),
     list(
