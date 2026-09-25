@@ -137,9 +137,13 @@ run_segmented_analysis <- function(data, config, method) {
       segment_results[[seg]]$segment_name <- seg
       segment_results[[seg]]$segment_n <- nrow(seg_data)
     }, error = function(e) {
-      warning(sprintf("Error in segment '%s': %s", seg, e$message), call. = FALSE)
+      # A refusal's conditionMessage is the whole console box; its problem
+      # line is what a Run_Status row can carry (00_main.R records it).
+      reason <- if (inherits(e, "turas_refusal") && !is.null(e$problem)) e$problem else conditionMessage(e)
+      warning(sprintf("Error in segment '%s': %s", seg, reason), call. = FALSE)
       segment_results[[seg]] <<- list(
-        error = e$message,
+        error = reason,
+        error_code = if (inherits(e, "turas_refusal")) e$code else NULL,
         segment_name = seg,
         segment_n = nrow(seg_data)
       )

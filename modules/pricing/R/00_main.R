@@ -248,6 +248,29 @@ run_pricing_analysis_from_config <- function(config) {
   guard <- pricing_guard_init()
   warnings_list <- character()
 
+  # Steps 4 to 6 (segments, ladder, recommendation) run inside a catch so one
+  # failure does not lose the workbook. The catch used to print a line and
+  # nothing else, so a run missing its segments or its ladder still closed
+  # at PASS on the Run_Status sheet, the banner and the stats pack
+  # (robustness gate, 25 Sep 2026). Every such loss is recorded here. A
+  # refusal keeps its own code; any other error gets the step's code.
+  step_partial <- function(code, title, problem) {
+    cat(sprintf("   ! %s: %s\n", title, problem))
+    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+      turas_run_state_partial(trs_state, code, title, problem = problem)
+    } else {
+      message(sprintf("[TRS PARTIAL] %s: %s", code, problem))
+    }
+    invisible(NULL)
+  }
+  step_failed <- function(e, fallback_code, title) {
+    if (inherits(e, "turas_refusal")) {
+      step_partial(e$code %||% fallback_code, title, e$problem %||% conditionMessage(e))
+    } else {
+      step_partial(fallback_code, title, conditionMessage(e))
+    }
+  }
+
   # --------------------------------------------------------------------------
   # STEP 1: Configuration (already loaded)
   # --------------------------------------------------------------------------
@@ -453,9 +476,31 @@ run_pricing_analysis_from_config <- function(config) {
         }
       }
     }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] PRICE_SEGMENT_FAILED: Segment analysis failed: %s", e$message))
-      cat(sprintf("   ! Segment analysis failed: %s\n", e$message))
+      step_failed(e, "PRICE_SEGMENT_FAILED", "Segment analysis not produced")
     })
+
+    # Segments the table leaves out, or shows blank, are part of the report
+    # that is missing: say which, and why.
+    if (!is.null(segment_results)) {
+      skipped <- segment_results$diagnostics$segments_skipped
+      if (length(skipped) > 0) {
+        counts <- segment_results$diagnostics$segment_counts
+        step_partial(
+          "PRICE_SEGMENTS_SKIPPED", "Segments below Min_Segment_N not analysed",
+          sprintf("Min_Segment_N is %s, so these segments were left out: %s.",
+                  format(segment_results$diagnostics$min_n_threshold),
+                  paste(sprintf("%s (n=%s)", skipped, unlist(counts[skipped])), collapse = ", ")))
+      }
+      for (nm in names(segment_results$segment_results)) {
+        sr <- segment_results$segment_results[[nm]]
+        if (!is.null(sr$error)) {
+          step_partial(
+            "PRICE_SEGMENT_REFUSED", "A segment's analysis did not complete",
+            sprintf("Segment '%s' (n=%d) has no results: %s", nm, as.integer(sr$segment_n),
+                    sr$error))
+        }
+      }
+    }
   }
 
   # --------------------------------------------------------------------------
@@ -480,8 +525,7 @@ run_pricing_analysis_from_config <- function(config) {
                     ladder_results$tier_table$price[i]))
       }
     }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] PRICE_LADDER_FAILED: Price ladder generation failed: %s", e$message))
-      cat(sprintf("   ! Price ladder generation failed: %s\n", e$message))
+      step_failed(e, "PRICE_LADDER_FAILED", "Price ladder not produced")
     })
   }
 
@@ -507,8 +551,7 @@ run_pricing_analysis_from_config <- function(config) {
                 synthesis$recommendation$confidence,
                 synthesis$recommendation$confidence_score * 100))
   }, error = function(e) {
-    message(sprintf("[TRS PARTIAL] PRICE_SYNTHESIS_FAILED: Recommendation synthesis failed: %s", e$message))
-    cat(sprintf("   ! Synthesis failed: %s\n", e$message))
+    step_failed(e, "PRICE_SYNTHESIS_FAILED", "Recommendation not produced")
   })
 
   # --------------------------------------------------------------------------
