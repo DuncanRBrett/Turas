@@ -244,6 +244,40 @@ test_that("weight_bounds is the setting that caps rim weights", {
 
 
 # ==============================================================================
+# A rim variable with a single category
+# ==============================================================================
+
+test_that("a single-category rim variable at 100% is met, not a crash", {
+  # Every respondent is Country = ZA, target 100%, alongside Gender 48/52.
+  # model.matrix() cannot build contrasts for a one-level factor, so the run
+  # died as BUG_INTERNAL_ERROR and wrote nothing. The 100% target is met by
+  # every respondent by construction, so the weights are the Gender rake
+  # alone: Male 0.48 x 200/120 = 0.8, Female 0.52 x 200/80 = 1.3.
+  data <- ref_survey()
+  data$Country <- "ZA"
+  run <- adv_run(
+    "single_category", data = data,
+    specs = ref_spec("rw", "rim"),
+    rim_targets = ref_rim_target_rows("rw", list(Country = c(ZA = 1),
+                                                 Gender = c(Male = 0.48, Female = 0.52)))
+  )
+  expect_equal(run$status, 0L, info = run$console)
+  expect_false(grepl("BUG_INTERNAL_ERROR", run$console, fixed = TRUE))
+  skip_if_not(file.exists(run$lookup), "no lookup file written")
+
+  lk <- adv_lookup(run)
+  expect_equal(lk$rw, unname(c(Male = 0.8, Female = 1.3)[data$Gender]), tolerance = 1e-6)
+
+  # The margins table still reports the single category, achieved at 100%.
+  s <- ref_read_sheet(run$diagnostics, "rw")
+  hdr <- which(s[[1]] == "variable")[1]
+  m <- s[(hdr + 1):(hdr + 3), 1:4]
+  expect_equal(m[[2]], c("ZA", "Male", "Female"))
+  expect_equal(as.numeric(m[[4]]), c(100, 48, 52), tolerance = 1e-5)
+})
+
+
+# ==============================================================================
 # A base under 30
 # ==============================================================================
 

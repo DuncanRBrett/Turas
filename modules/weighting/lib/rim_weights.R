@@ -352,9 +352,24 @@ calculate_rim_weights <- function(data,
     weights = starting_weights         # Start from base weights (or 1)
   )
 
+  # A variable with a single category carries a 100% target that every
+  # respondent in the calibration already meets: prepare_rim_data() refused any
+  # value outside the targets. It adds no constraint, and model.matrix() cannot
+  # build contrasts for a one-level factor, so leaving it in crashed the run as
+  # an internal error and wrote nothing. It stays in target_list, so the margins
+  # table still reports it, achieved at 100%.
+  single_level <- names(target_list)[vapply(target_list, length, integer(1)) == 1]
+  calibration_vars <- setdiff(names(target_list), single_level)
+  if (length(single_level) > 0) {
+    cat(sprintf(
+      "  [INFO] %s has a single category at 100%%, met by every respondent, so it adds no constraint and is left out of the calibration.\n",
+      paste(sprintf("'%s'", single_level), collapse = ", ")
+    ))
+  }
+
   # Build calibration formula
   # Format: ~var1 + var2 + ...
-  formula <- as.formula(paste("~", paste(names(target_list), collapse = " + ")))
+  formula <- as.formula(paste("~", paste(c("1", calibration_vars), collapse = " + ")))
 
   # CRITICAL FIX: Use actual sample size as base, not hard-coded 1000
   # This ensures sum of final weights = sum of starting weights
