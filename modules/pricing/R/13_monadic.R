@@ -64,8 +64,27 @@ run_monadic_analysis <- function(data, config) {
   intent_type <- mon$intent_type %||% "binary"
   scale_threshold <- mon$scale_threshold %||% 4
 
-  # Extract columns
-  prices <- data[[price_col]]
+  # Extract columns. A price column with one stray text cell arrives as
+  # character, and glm() fits a character predictor as a factor: the model
+  # was then a per-cell step, the prediction on the numeric grid died, and a
+  # value such as "R60" became NA and killed the price range. Text that reads
+  # as a number is taken as that number; anything else refuses by name
+  # (robustness gate, 25 Sep 2026).
+  prices_raw <- data[[price_col]]
+  prices <- if (is.numeric(prices_raw)) prices_raw else
+    suppressWarnings(as.numeric(trimws(as.character(prices_raw))))
+  bad_price <- !is.na(prices_raw) & nzchar(trimws(as.character(prices_raw))) & is.na(prices)
+  if (any(bad_price)) {
+    pricing_refuse(
+      code = "DATA_MONADIC_PRICE_NOT_NUMERIC",
+      title = "The Monadic Price Column Holds Values That Are Not Numbers",
+      problem = sprintf("Column '%s' holds %d value(s) that do not read as a price: %s",
+                        price_col, sum(bad_price),
+                        paste(head(unique(as.character(prices_raw[bad_price])), 6), collapse = ", ")),
+      why_it_matters = "Each respondent's price is the model's only predictor; a price that is not a number cannot be placed on the demand curve.",
+      how_to_fix = "Remove currency symbols, thousands separators and text from the price column so it holds plain numbers."
+    )
+  }
   intents_raw <- data[[intent_col]]
 
   # Convert intent to binary (0/1)
