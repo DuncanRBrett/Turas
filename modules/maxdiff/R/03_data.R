@@ -746,7 +746,7 @@ compute_study_summary <- function(long_data, config, verbose = TRUE) {
     # global "weighted" flag and no disclosure.
     weighting_by_engine = if (has_weights) list(
       counts = "weighted",
-      logit = "weighted (frequency-weight approximation; see manual on SEs)",
+      logit = "weighted (SEs are the sandwich variance clustered by respondent)",
       hb = "UNWEIGHTED - neither the Stan model nor the EB fallback has a weight term",
       turf = "weighted (respondent weights passed to the reach engine)"
     ) else list(

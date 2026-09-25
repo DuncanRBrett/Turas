@@ -697,8 +697,10 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     weighted = weighted,
     effectiveN = if (weighted) num(ss$effective_n) else NULL,
     weightingNote = if (weighted) {
-      paste0("Count scores are weighted by ", ps$Weight_Variable %||% "the weight variable",
-             ". The utilities are estimated unweighted.")
+      paste0("Count scores, the logit utilities and TURF reach are weighted by ",
+             ps$Weight_Variable %||% "the weight variable",
+             ". The HB utilities, and the shares and head-to-head built on them, ",
+             "are estimated unweighted.")
     } else "Unweighted.",
     frozen = TRUE,
     filterNote = paste0(

@@ -231,7 +231,8 @@ test_that("the rendered v2 MaxDiff tab shows the workbook's numbers", {
                     jsonlite::fromJSON(PW$island)$scores$itemId)
   rows <- regmatches(html, gregexpr("<tr><td>[^<]*<span class=\"md-tag\">.*?</tr>", html, perl = TRUE))[[1]]
   expect_equal(length(rows), nrow(sc))
-  num <- function(r) as.numeric(gsub("[%,]", "", regmatches(r, gregexpr('(?<=<td class="md-num">)[^<]*', r, perl = TRUE))[[1]]))
+  # The reference item prints a dash for its spread and SE; those read as NA.
+  num <- function(r) suppressWarnings(as.numeric(gsub("[%,]", "", regmatches(r, gregexpr('(?<=<td class="md-num">)[^<]*', r, perl = TRUE))[[1]])))
   for (r in rows) {
     label <- trimws(sub("^<tr><td>([^<]*)<span.*$", "\\1", r))
     k <- match(label, sc$Item_Label)
@@ -262,4 +263,21 @@ test_that("the simulator engine reproduces TURF_RESULTS and the shares when the 
   island <- jsonlite::fromJSON(PU$island)$scores
   expect_equal(js$shares$share[match(island$itemId, js$shares$itemId)],
                as.numeric(island$share), tolerance = 1e-3)
+})
+
+test_that("the weighting disclosures say which numbers are weighted", {
+  # Counts, the logit and TURF are weighted; the HB utilities and the shares
+  # built on them are not. The island note used to say "The utilities are
+  # estimated unweighted" beside a weighted logit, and the SUMMARY sheet
+  # called the logit a frequency-weight approximation after its SEs became
+  # the respondent-clustered sandwich.
+  note <- jsonlite::fromJSON(PW$island)$meta$weightingNote
+  expect_match(note, "logit utilities", fixed = TRUE)
+  expect_match(note, "TURF", fixed = TRUE)
+  expect_match(note, "HB utilities", fixed = TRUE)
+  expect_false(grepl("The utilities are estimated unweighted", note, fixed = TRUE))
+  sm <- openxlsx::read.xlsx(PW$workbook, sheet = "SUMMARY", colNames = FALSE, skipEmptyRows = FALSE)
+  txt <- paste(unlist(sm)[!is.na(unlist(sm))], collapse = "\n")
+  expect_match(txt, "clustered by respondent", fixed = TRUE)
+  expect_false(grepl("frequency-weight approximation", txt, fixed = TRUE))
 })
