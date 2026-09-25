@@ -160,9 +160,17 @@ make_np_banner <- function(data, weights = NULL) {
   indices_result <- create_banner_row_indices(data, banner)
   if (is.null(weights)) weights <- rep(1, nrow(data))
   is_w <- !all(weights == 1)
-  bases <- calculate_banner_bases(indices_result, weights, is_weighted = is_w)
+  bases <- np_production_bases(data, indices_result$row_indices, weights)
   list(banner = banner, indices = indices_result$row_indices,
        weights = weights, bases = bases, is_weighted = is_w)
+}
+
+# The base production computes for this question: prepare_question_data()
+# calls calculate_weighted_base() per banner column, which counts ANSWERED rows.
+np_production_bases <- function(data, row_indices, weights) {
+  lapply(row_indices, function(i) {
+    calculate_weighted_base(data[i, , drop = FALSE], np_question_info, weights[i])
+  })
 }
 
 np_question_info <- data.frame(
@@ -257,21 +265,24 @@ test_that("the score is +100 top box, -100 bottom box, 0 otherwise", {
   expect_equal(unname(s[data$Q == 1][1]), -100)
 })
 
-test_that("a respondent outside every box scores 0, so the mean IS the printed net", {
+test_that("a non-answerer leaves the test, so the mean IS the printed net", {
   # This is the whole argument for the method: the score's weighted mean over
-  # the column's base equals (top - bottom) / base, the published figure.
-  # Non-answerers score 0 because the published row percentages them into the
-  # denominator too (banner bases are the base-filtered column, not the
-  # answered base): score and printed row must share one denominator.
+  # the column's base equals (top - bottom) / base, the published figure. The
+  # published base is the ANSWERED base (calculate_single_response_base), so a
+  # non-answerer scores NA and leaves the test. This test used to pin a score
+  # of 0 against a base of 60, built with calculate_banner_bases(), a helper no
+  # production path calls; the real base here is 55 (review 24 Sep 2026).
   data <- make_np_data()
   data$Q[data$Grp == "A"][1:5] <- NA          # five A respondents did not answer
   r <- np_run(data = data)
   s <- net_positive_scores(data, np_question_info, np_question_options,
                            "Top 2 Box", "Bottom 2 Box")
   a_rows <- which(data$Grp == "A")
-  expect_true(all(s[a_rows][1:5] == 0))
-  # A now: top 12, bottom 0, base still 60 -> +20.0; mean of scores = 1200/60 = 20
-  expect_equal(mean(s[a_rows]), as.numeric(r$value[[r$key("A")]]))
+  expect_true(all(is.na(s[a_rows][1:5])))
+  # A now: top 12, bottom 0, answered base 55 -> 12/55*100 = 21.82 printed;
+  # mean of the answered scores = 1200/55 = 21.82
+  expect_equal(mean(s[a_rows], na.rm = TRUE), 1200 / 55)
+  expect_equal(round(mean(s[a_rows], na.rm = TRUE)), as.numeric(r$value[[r$key("A")]]))   # 0dp: 22
 })
 
 # ==============================================================================
@@ -394,7 +405,7 @@ test_that("an EMPTY banner column drops out without shifting anyone's letters", 
   banner <- create_banner_structure(selection_df, survey_structure)
   idx <- create_banner_row_indices(data, banner)
   weights <- rep(1, nrow(data))
-  bases <- calculate_banner_bases(idx, weights, is_weighted = FALSE)
+  bases <- np_production_bases(data, idx$row_indices, weights)
   config <- np_config()
   box <- add_boxcategory_summaries(data, np_question_info, np_question_options,
                                    banner, idx$row_indices, weights, bases, config)

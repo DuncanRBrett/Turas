@@ -18,7 +18,8 @@ const JS_DIR = path.join(HERE, "..", "assets", "js");
 const sandbox = { console };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-for (const f of ["00_namespace.js", "01_format.js", "27da_takeout_stats.js",
+// 21_stats.js now carries the Student-t tail 27da_takeout_stats.js aliases.
+for (const f of ["00_namespace.js", "01_format.js", "21_stats.js", "27da_takeout_stats.js",
   "27e_takeout_engine.js", "27g_takeout_components.js"]) {
   vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), sandbox, { filename: f });
 }

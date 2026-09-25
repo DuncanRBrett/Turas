@@ -23,9 +23,11 @@
  *         fixture, JS-computed proportion letters == R's carried letters at
  *         both alphas. propZ and the Bonferroni divisor are formula-identical
  *         to R's, so any difference is a bug, not a tolerance.
- *   JS-3  DOCUMENTED divergence: the JS mean test is a z-test where R runs a
- *         Welch t. Decisions must agree outside a band around alpha; pairs
- *         inside the band are logged, not failed.
+ *   JS-3  Mean letters rebuilt from the island's ROUNDED percentages. Both
+ *         engines now run Welch's t (24 Sep 2026), but an SD rebuilt from 0dp
+ *         percentages is approximate, so decisions must agree outside a band
+ *         around alpha and pairs inside it are logged. The exact R-vs-JS mean
+ *         parity, on the respondent island, is tests/js/test_mean_welch_t.mjs.
  *   JS-5  NET POSITIVE (I5): the published view renders R's net-based letters
  *         verbatim, and a recompute scores the same +-100 per respondent.
  *
@@ -431,11 +433,12 @@ run("the census column is excluded by BOTH engines", () => {
 // JS-3. DOCUMENTED DIVERGENCE ON MEANS
 // ============================================================================
 //
-// The JS engine's meanZ is a NORMAL test; R runs a Welch t with Satterthwaite
-// df. On the bases this fixture uses the two are very close but not identical,
-// and a t-inverse in JS is not worth the code (spec D6). So the contract is:
-// the two engines must reach the SAME decision except for pairs whose p-value
-// sits within EPS of the threshold, which are logged rather than failed.
+// Both engines run Welch's t with Satterthwaite df (the JS side compared the
+// Welch statistic with the normal curve until 24 Sep 2026). This test rebuilds
+// each column's SD from the island's ROUNDED category percentages, which is
+// approximate, so the contract stays: the SAME decision except for pairs whose
+// p-value sits within EPS of the threshold, which are logged rather than
+// failed. Exact parity on the respondent island: tests/js/test_mean_welch_t.mjs.
 //
 // EPS is expressed on the z scale: the t and z critical values differ by well
 // under 0.05 for df above ~50, and this fixture's smallest tested effective
@@ -574,10 +577,8 @@ run("a NET POSITIVE recompute scores the same +-100 the R engine does", () => {
 // uses, so the two engines are working from identical numbers, and the letters
 // are compared against what R actually carried into the committed island.
 //
-// R runs a Welch t and this engine runs a z on the same means and bases (the
-// documented divergence in JS-3), so the two agree except within a band around
-// alpha. Q6's two engineered pairs sit well clear of both critical values on
-// either distribution, which is why they can be asserted exactly.
+// Both engines run Welch's t on the same means and bases. Q6's two engineered
+// pairs sit well clear of the critical values, so they are asserted exactly.
 
 console.log("\nCross-engine parity. JS-6: allocation questions:");
 

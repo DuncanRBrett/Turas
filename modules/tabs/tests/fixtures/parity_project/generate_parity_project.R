@@ -187,14 +187,12 @@ Q5_DIST <- rbind(
 #     the FPC, between the adjusted 80% and 95% critical values. An 80%-ONLY
 #     letter, the case a single-alpha test shows as no difference at all.
 #
-# The Retailer spread is 17 rather than a rounder 15 for a specific reason. R
-# runs a Welch t and the v2 reader runs a z on the same means and bases, so
-# their critical values differ slightly (about 2.68 vs 2.638 at the adjusted
-# primary level). At spread 15 this pair computed to ~2.665, which falls BETWEEN
-# them: R said no letter, the reader said a letter, and the parity gate could
-# only log the disagreement instead of pinning it. At 17 the statistic sits
-# clear of both engines' thresholds in the same direction, so both must letter
-# it at 80% and neither at 95%. Do not round it back.
+# The Retailer spread is 17 rather than a rounder 15 for a historical reason.
+# Until 24 Sep 2026 the v2 reader judged the Welch statistic against the normal
+# curve while R used Student-t (about 2.638 vs 2.68 at the adjusted primary
+# level), and at spread 15 this pair fell between them. Both engines now run
+# Welch's t, so the spread no longer has to dodge that gap, but 17 keeps the
+# pair clear of the threshold and the committed islands stable.
 # Every respondent allocates: the empty-form base rule (D3) is pinned in the
 # unit suites, and an exact hand-derivable mean is what this fixture is for.
 Q6_MEAN1 <- c(Alpha = 50, Beta = 50, Gamma = 30, Delta = 50)
@@ -488,8 +486,13 @@ ensure_parity_project <- function(dir = FIXTURE_DIR) {
   invisible(dir)
 }
 
-# Run only when invoked as a script (Rscript ...), not when sourced.
-if (length(grep("^--file=", commandArgs(trailingOnly = FALSE))) > 0) {
+# Run only when invoked as THIS script (Rscript generate_parity_project.R), not
+# when sourced. Any --file= used to count, so a child Rscript that sourced the
+# generator (the pipeline gate does) wrote six workbooks into its working
+# directory and overwrote the caller's variable `d`.
+if (identical(basename(sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE),
+                                                  value = TRUE)[1])),
+              "generate_parity_project.R")) {
   d <- generate_parity_project()
   cat("Parity fixture written to:", d, "\n")
   cat("Files:", paste(basename(list.files(d, pattern = "[.]xlsx$")), collapse = ", "), "\n")

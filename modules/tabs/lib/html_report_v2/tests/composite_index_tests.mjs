@@ -30,7 +30,8 @@ const sandbox = { console };
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-const files = ["00_namespace.js", "01_format.js", "20_data.js", "27_views.js"]
+// 21_stats.js carries the Student-t tail 27da_takeout_stats.js aliases.
+const files = ["00_namespace.js", "01_format.js", "20_data.js", "21_stats.js", "27_views.js"]
   .concat(readdirSync(JS_DIR).filter((f) => /takeout.*\.js$/.test(f)).sort());
 for (const file of files) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
@@ -98,7 +99,16 @@ run("the pre-existing exclusions still hold (NPS, wide scales, no scores)", () =
   assert(eligible(byCode("QN"), TR.MICRO) === false, "NPS stays out (±100 buckets)");
   assert(eligible(byCode("Q100"), TR.MICRO) === false, "a >10 scale stays out");
   assert(eligible(byCode("Q1"), { scores: {} }) === false, "no scores -> not eligible");
-  assert(eligible(byCode("Q1"), null) === false, "no microdata -> not eligible");
+  // With no source argument the family asks TR.stats for the installed one, so
+  // "no microdata" means no TR.MICRO. It used to pass only because this file did
+  // not load 21_stats.js at all; it now must (the Student-t tail lives there).
+  const savedMicro = TR.MICRO;
+  TR.MICRO = null;
+  try {
+    assert(eligible(byCode("Q1"), null) === false, "no microdata -> not eligible");
+  } finally {
+    TR.MICRO = savedMicro;
+  }
 });
 
 run("a report with no composites behaves exactly as before", () => {

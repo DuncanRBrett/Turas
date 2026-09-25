@@ -26,9 +26,9 @@
  *         JS-2 and JS-3). Proportion letters on the unweighted fixture are
  *         exact against a same-rule recompute of R's published counts. Mean
  *         rows, and the weighted fixture, must agree outside a band around
- *         alpha; pairs inside the band are LOGGED, not failed, because the JS
- *         mean test is a z where R runs a Welch t. That divergence is
- *         documented, not a bug to chase.
+ *         alpha; pairs inside the band are LOGGED, not failed. (Both engines run
+ *         Welch's t since 24 Sep 2026; exact mean-letter parity on this
+ *         respondent island is tests/js/test_mean_welch_t.mjs.)
  *         One further documented difference: the published path carries R's
  *         FPC-corrected letters, the computed path deliberately does not
  *         correct (a filtered sub-population's universe is unknown), so the
@@ -244,7 +244,8 @@ function publishedLetters(TR, pub, row, dual) {
       return { x: null, base: null };
     }
     const denom = c.baseW != null ? c.baseW : c.base;
-    return { x: (cell.n / denom) * size, base: size };
+    // wbase: pool on the weighted counts, R's rule (21_stats.js propZ).
+    return { x: (cell.n / denom) * size, base: size, wbase: c.baseW != null ? c.baseW : undefined };
   });
   return TR.stats.sigLetters(cells, letters, pub.lowBaseThreshold ||
     TR.AGG.project.low_base_threshold || 30, false, dual);

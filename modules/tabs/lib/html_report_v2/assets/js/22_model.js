@@ -79,7 +79,7 @@
     var x = count || 0;
     if (base && base.nWeighted > 0 && base.nEff > 0) {
       var p = x / base.nWeighted;
-      return { x: p * base.nEff, base: base.nEff };
+      return { x: p * base.nEff, base: base.nEff, wbase: base.nWeighted };
     }
     return { x: x, base: base ? base.n : 0 };
   }
@@ -304,10 +304,11 @@
       var cells = tabs.map(function (tab) {
         var wcount = tab.counts[ri] || 0;
         return { wcount: wcount, p: tab.wbase ? wcount / tab.wbase : null,
-          effBase: tab.effBase };
+          effBase: tab.effBase, wbase: tab.wbase };
       });
+      // wbase lets propZ pool on the weighted counts, as R does.
       var sigCells = cells.map(function (c) {
-        return { x: c.p === null ? 0 : c.p * c.effBase, base: c.effBase };
+        return { x: c.p === null ? 0 : c.p * c.effBase, base: c.effBase, wbase: c.wbase };
       });
       var sigs = TR.stats.sigLetters(sigCells, letters, threshold, false, dual);
       return rowModel(r, cells.map(function (cell, i) {
@@ -344,7 +345,7 @@
   function netRowFromCounts(r, counts, letters, threshold, dual) {
     var sigCells = counts.map(function (c) {
       var p = c.wbase ? c.n / c.wbase : null;
-      return { x: p === null ? 0 : p * c.effBase, base: c.effBase };
+      return { x: p === null ? 0 : p * c.effBase, base: c.effBase, wbase: c.wbase };
     });
     var sigs = TR.stats.sigLetters(sigCells, letters, threshold, false, dual);
     return rowModel(r, counts.map(function (c, i) {
@@ -401,7 +402,7 @@
     var counts = TR.stats.netCounts(q, members, columns, mask);
     var sigCells = counts.map(function (c) {
       var p = c.wbase ? c.n / c.wbase : null;
-      return { x: p === null ? 0 : p * c.effBase, base: c.effBase };
+      return { x: p === null ? 0 : p * c.effBase, base: c.effBase, wbase: c.wbase };
     });
     var sigs = TR.stats.sigLetters(sigCells, letters, threshold, false, dual);
     return rowModel(r, counts.map(function (c, i) {

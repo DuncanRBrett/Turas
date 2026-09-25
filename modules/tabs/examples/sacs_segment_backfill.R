@@ -40,9 +40,17 @@ TURAS   <- Sys.getenv("TURAS_HOME", "/Users/duncan/Dev/Turas")
 # Per-study data-file locator: SACS keeps each wave at ../SACS-<year>/03_Data/.
 data_path <- function(year)
   file.path(dirname(PROJECT), sprintf("SACS-%s", year), "03_Data", sprintf("SACS-%s_data.xlsx", year))
+# Each wave's own Survey_Structure, for its ExcludeFromIndex flags: a "don't
+# know" coded as a number must leave that wave's means and NPS (review 24 Sep
+# 2026). Override the location with SACS_STRUCTURE_PATTERN, a sprintf pattern
+# taking the year twice, relative to the folder above the project.
+STRUCTURE_PATTERN <- Sys.getenv("SACS_STRUCTURE_PATTERN", "SACS-%s/SACS-%s_Survey_Structure.xlsx")
+structure_path <- function(year)
+  file.path(dirname(PROJECT), sprintf(STRUCTURE_PATTERN, year, year))
 
 source(file.path(TURAS, "modules/tracker/lib/statistical_core.R"))
 source(file.path(TURAS, "modules/tabs/lib/tracking_island.R"))
+source(file.path(TURAS, "modules/tabs/lib/tracking_wave_values.R"))   # .twv_excluded
 source(file.path(TURAS, "modules/tabs/lib/tracking_segment_compute.R"))
 source(file.path(TURAS, "modules/tabs/lib/tracking_segment_bridge.R"))
 
@@ -85,8 +93,28 @@ years <- sub("^Wave", "", prior_cols)
 cat("Mapping:", nrow(qm), "metrics |", length(prior_cols), "prior waves:", paste(years, collapse = ", "),
     "| live wave:", sub("^Wave", "", utils::tail(wave_cols, 1)), "\n")
 
+# A wave's Options body, read with readxl as text (openxlsx leaks xml:space
+# into padded OptionText and turns the literal "NA" into a missing cell; see
+# tracking_wave_values.R). NULL, with a boxed warning, when the file is absent:
+# that wave then excludes nothing, and the console says so.
+read_wave_options <- function(year) {
+  p <- structure_path(year)
+  if (!file.exists(p)) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ No Survey_Structure for wave", year, "at:\n")
+    cat("│  ", p, "\n")
+    cat("│ Its means and NPS will INCLUDE any numeric don't-know code.\n")
+    cat("│ How to fix: set SACS_STRUCTURE_PATTERN to where it lives.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    return(NULL)
+  }
+  as.data.frame(readxl::read_excel(p, sheet = "Options", col_types = "text",
+                                   na = character(0)))
+}
+
 waves <- lapply(seq_along(prior_cols), function(i)
-  list(id = years[i], data = read.xlsx(data_path(years[i]), sheet = 1)))
+  list(id = years[i], data = read.xlsx(data_path(years[i]), sheet = 1),
+       options = read_wave_options(years[i])))
 
 per_wave <- function(row) setNames(lapply(prior_cols, function(c) as.character(row[[c]])), years)
 blankna  <- function(v) { v <- trimws(as.character(v)); if (nzchar(v) && !identical(tolower(v), "na")) v else NA_character_ }

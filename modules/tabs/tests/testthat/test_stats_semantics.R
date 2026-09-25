@@ -883,11 +883,24 @@ test_that("the standard and numeric processors now agree on the same situation",
   expect_equal(is.na(row$One), is.na(numeric_equivalent))
 })
 
-test_that("a weighted column whose total weight cannot carry Bessel gives NA", {
-  # denom = sum(w) - 1 <= 0 leaves the sample variance undefined; it used to
-  # collapse to sqrt(0) = 0.
+test_that("small weights do not change the weighted SD (review 24 Sep 2026)", {
+  # This test used to pin NA here: the old divisor sum(w) - 1 was negative for
+  # weights 0.3 and 0.4, although the same answers weighted 3 and 4 had an SD.
+  # The SD now uses n_eff / (n_eff - 1), which does not depend on the scale.
+  #   mean = (0.3*4 + 0.4*6) / 0.7 = 5.142857
+  #   population variance = (0.3*1.306122 + 0.4*0.734694) / 0.7 = 0.979592
+  #   n_eff = 0.7^2 / (0.09 + 0.16) = 1.96;  variance = 0.979592 * 1.96/0.96 = 2
+  #   SD = sqrt(2) = 1.414 -> 1.4 at one decimal place
   row <- ma_sd_row(list(Tiny = c(4, 6)), weights = list(Tiny = c(0.3, 0.4)))
-  expect_true(is.na(row$Tiny))
+  big <- ma_sd_row(list(Tiny = c(4, 6)), weights = list(Tiny = c(3, 4)))
+  expect_equal(as.numeric(row$Tiny), 1.4)
+  expect_equal(row$Tiny, big$Tiny)
+})
+
+test_that("a weighted column with an effective base of 1 or less gives NA", {
+  # One positive weight: n_eff = 1, so no sample variance exists. NA, not 0.
+  row <- ma_sd_row(list(One = c(4, 6)), weights = list(One = c(0.5, 0)))
+  expect_true(is.na(row$One))
 })
 
 context("stats semantics: zero-variance comparisons are untestable (M-B)")

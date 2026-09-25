@@ -218,12 +218,17 @@
       if (i === 0 || means[i].mean === null || !means[i].k || means[i].k < floor) return;
       var rm = TR.stats.indexMeans(q, [TR.stats.restOf(col)], mask)[0];
       if (!rm || rm.mean === null || !rm.k || rm.k < floor) return;
-      var z = TR.stats.meanZ(means[i].mean, means[i].sd, means[i].k, rm.mean, rm.sd, rm.k);
-      if (z === null) return;
-      var az = Math.abs(z);
+      var wt = TR.stats.welch(means[i].mean, means[i].sd, means[i].k, rm.mean, rm.sd, rm.k);
+      if (wt === null) return;
+      // Gate on Welch's t (p against alpha, via its normal equivalent), the
+      // test R runs; it was the raw statistic against the normal curve (review
+      // 24 Sep 2026). The finding SCORE still reads the raw |t|, so the ranking
+      // of findings that pass the gate does not move.
+      var gz = Math.abs(TR.stats.meanZ(means[i].mean, means[i].sd, means[i].k, rm.mean, rm.sd, rm.k));
+      var az = Math.abs(wt.t);
       var zHi = TR.stats.zPrimary(1), zLo = TR.stats.zSecondary(1);
-      if (az <= zLo) return;                      // not different from the rest at all
-      var soft = az <= zHi;                       // secondary but not primary, "nearly significant"
+      if (gz <= zLo) return;                      // not different from the rest at all
+      var soft = gz <= zHi;                       // secondary but not primary, "nearly significant"
       if (soft && !dual) return;                  // soft findings only when dual-sig is on
       var gap = means[i].mean - rm.mean;
       out.push({ code: q.code, title: q.title, category: q.category,
