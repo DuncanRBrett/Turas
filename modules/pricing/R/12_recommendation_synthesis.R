@@ -411,9 +411,17 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
     scores <- c(scores, 0.4)
   }
 
-  # Factor 3: Data quality (VW violations)
+  # Factor 3: Data quality (VW violations). The rate is the sample's, counted
+  # before drop or fix handled the violators. The rate on the data the engine
+  # received is 0 by construction under "drop" (the default), so every run
+  # scored "Good data quality" whatever share of the sample answered
+  # illogically (robustness gate, 25 Sep 2026; review F5 made the same point
+  # for the stats pack).
   if (!is.null(vw_results)) {
-    violation_rate <- vw_results$diagnostics$violation_rate
+    violation_rate <- vw_results$diagnostics$violation_rate_before_handling
+    if (is.null(violation_rate) || is.na(violation_rate)) {
+      violation_rate <- vw_results$diagnostics$violation_rate
+    }
     if (is.null(violation_rate) || is.na(violation_rate)) violation_rate <- 0
 
     if (violation_rate < 0.05) {
@@ -710,7 +718,10 @@ identify_pricing_risks <- function(recommended_price, vw_results,
     "Market conditions unchanged since data collection"
   )
 
-  vr <- if (!is.null(vw_results)) vw_results$diagnostics$violation_rate else NULL
+  # The sample's rate, before drop or fix; see assess_recommendation_confidence().
+  vr <- if (!is.null(vw_results)) {
+    vw_results$diagnostics$violation_rate_before_handling %||% vw_results$diagnostics$violation_rate
+  } else NULL
   if (!is.null(vr) && !is.na(vr) && vr > 0.10) {
     risks$assumptions <- c(risks$assumptions,
       sprintf("%.0f%% of respondents gave inconsistent prices - may affect reliability",
