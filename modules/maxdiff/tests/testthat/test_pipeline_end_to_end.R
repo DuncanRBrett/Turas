@@ -207,3 +207,59 @@ test_that("the simulator's TURF panel says how its rule differs from TURF_RESULT
   expect_match(note, "TURF_RESULTS", fixed = TRUE)
   expect_match(note, "weighted by Wt", fixed = TRUE)
 })
+
+# ------------------------------------------------------------------------------
+# Consistency: the v2 MaxDiff tab and the simulator against the workbook
+# ------------------------------------------------------------------------------
+
+.node <- unname(Sys.which("node"))
+
+.sim_data_file <- function(p) {
+  h <- paste(readLines(p$simulator, warn = FALSE), collapse = "\n")
+  m <- regmatches(h, regexpr('(?s)<script type="application/json" id="sim-data">.*?</script>', h, perl = TRUE))
+  f <- tempfile(fileext = ".json")
+  writeLines(sub("(?s)^<script[^>]*>", "", sub("</script>$", "", m), perl = TRUE), f)
+  f
+}
+
+test_that("the rendered v2 MaxDiff tab shows the workbook's numbers", {
+  skip_if(!nzchar(.node), "node not on PATH")
+  renderer <- file.path(TURAS_ROOT, "modules", "tabs", "tests", "js", "render_maxdiff_island.mjs")
+  html <- paste(system2(.node, c(shQuote(renderer), shQuote(PW$island)), stdout = TRUE), collapse = "\n")
+  sc <- .item_scores(PW)
+  share <- setNames(jsonlite::fromJSON(PW$island)$scores$share,
+                    jsonlite::fromJSON(PW$island)$scores$itemId)
+  rows <- regmatches(html, gregexpr("<tr><td>[^<]*<span class=\"md-tag\">.*?</tr>", html, perl = TRUE))[[1]]
+  expect_equal(length(rows), nrow(sc))
+  num <- function(r) as.numeric(gsub("[%,]", "", regmatches(r, gregexpr('(?<=<td class="md-num">)[^<]*', r, perl = TRUE))[[1]]))
+  for (r in rows) {
+    label <- trimws(sub("^<tr><td>([^<]*)<span.*$", "\\1", r))
+    k <- match(label, sc$Item_Label)
+    expect_false(is.na(k), info = label)
+    v <- num(r)  # Share, Best, Worst, Net, Utility, Spread, Mean SE, Score
+    expect_equal(v[1], round(share[[sc$Item_ID[k]]], 1), tolerance = 0.051, info = label)
+    expect_equal(v[2], sc$Best_Pct[k], tolerance = 0.051, info = label)
+    expect_equal(v[3], sc$Worst_Pct[k], tolerance = 0.051, info = label)
+    expect_equal(v[4], sc$Net_Score[k], tolerance = 0.051, info = label)
+    expect_equal(v[5], sc$HB_Utility_Mean[k], tolerance = 0.0051, info = label)
+    expect_equal(v[8], sc$Rescaled_Score[k], tolerance = 0.51, info = label)
+  }
+})
+
+# An unweighted TOP_3 run: here the simulator's rule and the workbook's
+# coincide, so the shipped engine must reproduce TURF_RESULTS and the shares.
+PU <- md_pipe_run(n = 60, weighted = FALSE, output_settings = FAST_HB)
+
+test_that("the simulator engine reproduces TURF_RESULTS and the shares when the rules coincide", {
+  skip_if(!nzchar(.node), "node not on PATH")
+  expect_equal(PU$status, "PASS", info = paste(tail(PU$log, 30), collapse = "\n"))
+  runner <- file.path(TURAS_ROOT, "modules", "maxdiff", "tests", "js", "run_engine_on_simdata.mjs")
+  js <- jsonlite::fromJSON(paste(system2(.node, c(shQuote(runner), shQuote(.sim_data_file(PU)), "5", "3"),
+                                         stdout = TRUE), collapse = ""))
+  turf <- .turf_steps(PU)
+  expect_equal(js$turf$itemId, turf$Item_ID)
+  expect_equal(js$turf$reach, as.numeric(turf$Reach_Pct))
+  island <- jsonlite::fromJSON(PU$island)$scores
+  expect_equal(js$shares$share[match(island$itemId, js$shares$itemId)],
+               as.numeric(island$share), tolerance = 1e-3)
+})
