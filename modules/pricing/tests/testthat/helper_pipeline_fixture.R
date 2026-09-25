@@ -80,6 +80,9 @@ pricing_simulator_data <- function(path) {
 #' Render the v2 Pricing tab from an island with the shipped 27z_pricing.js
 #' and return its visible text.
 pricing_render_tab <- function(island_path) {
+  if (!nzchar(Sys.which("node"))) {
+    testthat::skip("node is not on the PATH; rendering the v2 Pricing tab needs it")
+  }
   root <- pricing_repo_root()
   js <- file.path(root, "modules", "pricing", "tests", "js", "render_pricing_tab.mjs")
   out <- system2("node", c(shQuote(js), shQuote(island_path)), stdout = TRUE, stderr = TRUE)
