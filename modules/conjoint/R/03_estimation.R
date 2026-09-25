@@ -505,28 +505,14 @@ extract_mlogit_results <- function(model, data, config) {
   # Log-likelihoods
   ll_fitted <- as.numeric(logLik(model))
 
-  # Extract null log-likelihood from mlogit model
-  # In mlogit, this is stored in model$logLik with name "null"
-  if (!is.null(attr(logLik(model), "null"))) {
-    ll_null <- attr(logLik(model), "null")
-  } else if (!is.null(model$logLik.null)) {
-    ll_null <- model$logLik.null
-  } else {
-    # Fallback: try to get it from the model summary
-    ll_null <- tryCatch({
-      summary(model)$logLik["null"]
-    }, error = function(e) {
-      # Last resort: calculate analytically
-      # For a null model with J alternatives, LL_null = n * log(1/J)
-      message("[TRS INFO] CONJ_NULL_LL_ESTIMATED: Could not extract null log-likelihood - calculating analytically")
-      n_chosen <- sum(data[[config$chosen_column]] == 1)
-      # Count alternatives per choice set from the data
-      n_alts_per_set <- table(paste(data[[config$respondent_id_column]],
-                                     data[[config$choice_set_column]], sep = "_"))
-      avg_alts <- mean(n_alts_per_set)
-      n_chosen * log(1 / avg_alts)
-    })
-  }
+  # Null log-likelihood: every alternative in a set equally likely, i.e. the
+  # model at b = 0, sum over sets of log(1 / n_alternatives). That is the
+  # null of a no-constant model and what the clogit path reports. mlogit's
+  # own logLik "null" fits a constant per alternative position, so the same
+  # study used to get a different McFadden R-squared from each engine.
+  set_key <- paste(data[[config$respondent_id_column]],
+                   data[[config$choice_set_column]], sep = "_")
+  ll_null <- -sum(log(as.numeric(table(set_key))))
 
   # Sample info
   n_obs <- nrow(data)
