@@ -1303,8 +1303,9 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
   # branch): before this, a blocked path printed "Output saved" and the run
   # closed [TRS PASS] with no workbook on disk. Both a refusal from the
   # writer and a plain error land in the fold-in with the path named.
+  wb_keep <- new.env()
   output_path <- tryCatch({
-    generate_maxdiff_output(results, config, verbose, run_result)
+    generate_maxdiff_output(results, config, verbose, run_result, keep_workbook = wb_keep)
   }, turas_refusal = function(e) {
     cat(conditionMessage(e))
     note_late(sprintf("Excel output not written: %s", e$code %||% "refused"),
@@ -1483,7 +1484,9 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
 
   # Fold the late events into the run state so the banner, the GUI and the
   # returned run_result all tell the truth (review F2). The Run_Status sheet
-  # was written before these steps and is not rewritten.
+  # was written before these steps, so it is replaced in the workbook still
+  # held in memory and saved again: the sheet the client opens used to say
+  # PASS over a PARTIAL run.
   if (length(late_events) > 0) {
     if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
       for (ev in late_events) {
@@ -1494,6 +1497,10 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       }
     }
     results$warnings <- c(results$warnings, late_warnings)
+    if (!is.null(output_path) && exists("wb", envir = wb_keep, inherits = FALSE)) {
+      rewrite_maxdiff_run_status(get("wb", envir = wb_keep), output_path,
+                                 results$run_result, verbose = verbose)
+    }
   }
 
   results
