@@ -183,6 +183,7 @@ build_simulator_data <- function(hb_results, logit_results, config,
   est <- .md_sim_estimator(hb_results, logit_results)
 
   list(
+    turf_note = .md_sim_turf_note(config),
     project_name = config$project_settings$Project_Name %||% "MaxDiff",
     brand_colour = brand_colour,
     items = item_list,
@@ -221,4 +222,38 @@ build_simulator_data <- function(hb_results, logit_results, config,
   }
   list(code = "aggregate_logit", label = "Aggregate logit", approximate = FALSE,
        note = "One conditional logit fitted to the whole sample; no individual utilities.")
+}
+
+
+#' One sentence for the simulator's TURF panel: how its rule relates to the
+#' workbook's TURF_RESULTS
+#'
+#' The simulator counts each respondent's top K items (K chosen on the panel)
+#' and never sees weights. The workbook's TURF uses TURF_Threshold and, on a
+#' weighted study, the respondent weights. Without this line a client could
+#' find two reach figures for one portfolio that disagree, with nothing to
+#' say why.
+#'
+#' @param config Module configuration.
+#' @return Character, one sentence.
+#' @keywords internal
+.md_sim_turf_note <- function(config) {
+  os <- config$output_settings %||% list()
+  own <- "Appeal here is each respondent's top K items, the setting below, unweighted."
+  if (!isTRUE(as.logical(os$Generate_TURF %||% FALSE)) &&
+      !identical(toupper(as.character(os$Generate_TURF %||% "")), "YES")) {
+    return(own)
+  }
+  method <- toupper(as.character(os$TURF_Threshold %||% "ABOVE_MEAN"))
+  rule <- switch(method,
+    ABOVE_MEAN = "counts the items above each respondent's own mean utility",
+    TOP_3 = "counts each respondent's top 3 items",
+    TOP_K = "counts each respondent's top 3 items",
+    ABOVE_ZERO = , BINARY = "counts the items with a utility above zero",
+    sprintf("uses the %s rule", method))
+  wv <- config$project_settings$Weight_Variable
+  weighted <- !is.null(wv) && length(wv) == 1 && !is.na(wv) && nzchar(wv)
+  paste0(own, " The workbook's TURF_RESULTS sheet ", rule,
+         if (weighted) paste0(", weighted by ", wv) else ", unweighted",
+         ", so its reach can differ from the figures here.")
 }

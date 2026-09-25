@@ -163,6 +163,7 @@ build_simulator_page <- function(sim_data, ...) {
           %s
         </div>
         <div id="turf-callout"></div>
+        <p class="sim-turf-method-note">%s</p>
         %s
         <div class="sim-portfolio-controls">
           <div class="sim-portfolio-options">
@@ -228,6 +229,7 @@ build_simulator_page <- function(sim_data, ...) {
     toolbar("h2h"),
     seg_filter_h2h,
     toolbar("portfolio"),
+    htmlEscape(sim_data$turf_note %||% ""),
     seg_filter_turf,
     portfolio_checks,
     pin_toolbar("diagnostics"),
@@ -470,6 +472,7 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
 .sim-portfolio-options { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .sim-portfolio-options select { padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: white; }
 .sim-turf-count { font-size: 13px; color: #64748b; font-weight: 500; }
+.sim-turf-method-note { font-size: 12px; color: #64748b; margin: 4px 0 12px; }
 .sim-portfolio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 16px; }
 .sim-check-label { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: background 0.1s; }
 .sim-check-label:hover { background: #f8fafc; }

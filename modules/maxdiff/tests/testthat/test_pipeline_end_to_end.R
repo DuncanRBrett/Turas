@@ -195,3 +195,15 @@ test_that("the stats pack reports the Stan fit's convergence, not NOT CONVERGED"
   expect_gte(ess, meta$minEss - 1)
   expect_match(md_pipe_stats_value(PW$stats_pack, "Quality Score"), "^[0-9]+/100$")
 })
+
+test_that("the simulator's TURF panel says how its rule differs from TURF_RESULTS", {
+  # The simulator counts each respondent's top K items, unweighted. This run's
+  # workbook TURF is TOP_3 weighted by Wt, so the two can differ, and the
+  # panel has to say so rather than leave two reach figures to disagree.
+  h <- paste(readLines(PW$simulator, warn = FALSE), collapse = "\n")
+  note <- regmatches(h, regexpr('<p class="sim-turf-method-note">[^<]*</p>', h))
+  expect_length(note, 1)
+  expect_match(note, "unweighted", fixed = TRUE)
+  expect_match(note, "TURF_RESULTS", fixed = TRUE)
+  expect_match(note, "weighted by Wt", fixed = TRUE)
+})
