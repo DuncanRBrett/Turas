@@ -555,8 +555,8 @@ These settings apply only when `estimation_method = "latent_class"`.
 | Setting | Default | Description | Valid Values |
 |----|----|----|----|
 | `generate_market_simulator` | `TRUE` | Include an interactive market simulator sheet in the Excel output | `TRUE` or `FALSE` |
-| `simulation_method` | `logit` | Method for computing predicted market shares | `logit`, `first_choice`, or `rfc` |
-| `rfc_draws` | `1000` | Number of random draws for the Randomised First Choice method | Integer \>= 100 |
+| `simulation_method` | `logit` | Validated but not read by any output. The standalone simulator's method is chosen on the page. | `logit`, `first_choice`, or `rfc` |
+| `rfc_draws` | `1000` | Validated but not read by any output. The standalone simulator's RFC uses 2000 draws. | Integer \>= 100 |
 
 #### Revenue Simulator
 
@@ -677,15 +677,16 @@ Part-worth utilities are the core output of conjoint analysis. Each attribute le
 
 **Statistical significance:**
 
--   Check the `p_value` column. A value below 0.05 indicates that the utility is statistically significantly different from zero.
--   If a level's confidence interval crosses zero, the preference is not statistically distinguishable from the baseline.
--   Samsung's p-value of 0.092 in the example above means we cannot be confident at the 95% level that Samsung is preferred over the average.
+-   When utilities are zero-centred (the default), `Std_Error`, `CI_Lower`, `CI_Upper` and `p_value` describe the centred value printed on that row: the level against its attribute's average. They come from the full covariance of the attribute's estimates, so every level, the baseline included, has its own SE and interval.
+-   A `p_value` below 0.05, or an interval that does not cross zero, means the level differs from the attribute average.
+-   `SE_vs_Baseline` is the SE of the level against the first (baseline) level, which is what the model estimates directly and what WTP uses. The Raw Coefficients sheet tests each level against the baseline.
+-   Samsung's p-value of 0.092 in the example above means we cannot be confident at the 95% level that Samsung differs from the average brand.
 
 ### Attribute Importance
 
 Attribute importance scores tell you how much each attribute influences choice, expressed as a percentage that sums to 100%.
 
-**Calculation method:** Importance is calculated from the range of utilities within each attribute (maximum utility minus minimum utility). The range for each attribute is expressed as a percentage of the total range across all attributes.
+**Calculation method:** Importance is calculated from the range of utilities within each attribute (maximum utility minus minimum utility). The range for each attribute is expressed as a percentage of the total range across all attributes. For an aggregate model (mlogit, clogit) this is done once on the aggregate utilities. For HB and latent class it is done for each respondent on their own part-worths and then averaged, which is also what the tabs export carries; that average is not the same as the importance of the averaged part-worths.
 
 ```         
 Importance_i = Range_i / Sum(all ranges) * 100%
@@ -710,7 +711,7 @@ The Model_Summary sheet provides fit statistics that indicate how well the model
 
 #### McFadden R-squared
 
-McFadden's pseudo R-squared measures the improvement in log-likelihood over a null (random choice) model. It does not follow the same scale as ordinary R-squared:
+McFadden's pseudo R-squared measures the improvement in log-likelihood over a null model in which every alternative in a set is equally likely (the sum over sets of log(1 / alternatives)). Both aggregate engines use that null, so the same study gets the same figure from mlogit and clogit. It does not follow the same scale as ordinary R-squared:
 
 | McFadden R-squared | Interpretation                                       |
 |--------------------|------------------------------------------------------|
@@ -766,6 +767,8 @@ When using latent class analysis:
 | **Class sizes** | Percentage of respondents in each class. Very small classes (\<5%) may be artefacts. |
 | **Entropy R-squared** | Classification quality. Values above 0.7 indicate good class separation. |
 | **Class membership probabilities** | For each respondent, the probability of belonging to each class. |
+
+**Caution:** classes come from bayesm's mixture of normal distributions over the HB part-worths. With a full covariance, one wide component can absorb distinct segments. On a clean two-segment test study (300 respondents) every respondent fell in one class and the run refused with CALC_LC_NO_COMPARABLE_SOLUTION. Treat a latent class result, or a refusal, with that in mind.
 
 **Interpreting class profiles:** Each class has its own set of part-worth utilities and attribute importances. Compare these across classes to understand how the segments differ. For example, one class might be price-sensitive while another is brand-loyal.
 
@@ -921,7 +924,7 @@ The simulator supports four methods. You can switch between them in the HTML rep
 |----|----|----|
 | **Logit (MNL)** | Shares proportional to exp(utility). The standard and most commonly used method. Accounts for similarity between products. | Yes |
 | **First Choice** | Each respondent is assigned 100% to the product with the highest utility. Simple but ignores the degree of preference. | Yes |
-| **Randomised First Choice (RFC)** | Adds random error to utilities before applying first-choice rule. Produces more realistic shares than pure first choice. | Yes |
+| **Randomised First Choice (RFC)** | Adds Gumbel error to each product's total utility and counts first choices over 2000 draws. In expectation this equals the logit share, with some simulation noise; it is not the Sawtooth RFC, which puts the error on the part-worths. | Yes |
 | **Purchase Likelihood** | Converts each product's utility to an independent purchase probability. Useful when products are not direct substitutes (e.g., add-on services). | **No** -- each product gets its own probability independently |
 
 **Logit share formula:**
@@ -1111,7 +1114,7 @@ The price coefficient (Beta_price) is estimated by regressing the price utilitie
 
 ### Confidence Intervals
 
-WTP confidence intervals are computed via the delta method (for MNL) or from the posterior distribution (for HB). These intervals are often wide -- this is normal and reflects the inherent uncertainty in translating utilities to money.
+WTP confidence intervals are computed by the delta method on the covariance of the estimates: the model's covariance for MNL, the posterior covariance of the population mean for HB. They carry the uncertainty in the level and in the price slope, and the covariance between them. The price slope is a least-squares line through the price part-worths, so WTP assumes price acts linearly. These intervals are often wide; that reflects the real uncertainty in translating utilities to money.
 
 ### Configuration
 

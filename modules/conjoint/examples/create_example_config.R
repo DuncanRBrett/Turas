@@ -160,7 +160,7 @@ instructions <- c(
   "  example_results_simulator.html       the standalone market simulator",
   "",
   "The data was simulated from known utilities (see README.md); the HB run should recover their order.",
-  "50 respondents is small for HB, so expect a convergence warning and a PARTIAL status. That is honest, not a fault."
+  "Expect a PARTIAL status with two data warnings: product combinations never chosen, and 50 respondents below the sample-size rule of thumb. HB also prints a convergence note; that is not what makes the run PARTIAL."
 )
 openxlsx::addWorksheet(wb, "Instructions")
 openxlsx::writeData(wb, "Instructions", data.frame(Instructions = instructions),

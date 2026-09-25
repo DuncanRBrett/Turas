@@ -41,9 +41,11 @@ seconds and writes into `output/`:
 | `example_results_tabs_importance.xlsx` | `generate_tabs_export`. Each respondent's attribute importance as a tabs Allocation question (`CJIMP_1` .. `CJIMP_5`), with the QuestionMap and Options rows to paste. Needs `hb` or `latent_class`. |
 | `example_results_simulator.html` | `generate_html_simulator`. The standalone market simulator. |
 
-Fifty respondents is small for HB. Expect a convergence warning and a
-PARTIAL status; that is the module being honest about the sample, not a
-fault in the example.
+The example finishes PARTIAL with two events, both data warnings: 173
+product combinations in the design were never chosen, and 50 respondents
+is below the 375 the sample-size rule of thumb asks for. HB also prints a
+convergence note (Geweke, and ESS under 400 for some parameters), but that
+is a console message, not an event, and it is not why the run is PARTIAL.
 
 ## What to expect
 

@@ -268,7 +268,8 @@ WTP estimation with confidence intervals:
 calculate_wtp(utilities, config) -> data.frame
 # Auto-computed when price attribute detected (via wtp_price_attribute config
 # or auto-detected from attribute names containing "price", "cost", or "fee")
-# Delta-method CIs
+# Delta-method CIs on the model's covariance (HB: posterior covariance);
+# the price slope is the least-squares line through the price part-worths.
 ```
 
 WTP is auto-computed in the main analysis flow when a price attribute is detected, not just as a standalone call.

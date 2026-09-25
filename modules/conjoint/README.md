@@ -44,7 +44,7 @@ When a price attribute is detected, the standalone simulator includes a **Revenu
 
 ### Willingness to Pay (WTP)
 
-WTP is **auto-computed** when a price attribute is detected (either via `wtp_price_attribute` config setting or auto-detected from attribute names containing "price", "cost", or "fee"). Uses the delta method for confidence intervals.
+WTP is **auto-computed** when a price attribute is detected (either via `wtp_price_attribute` config setting or auto-detected from attribute names containing "price", "cost", or "fee"). Confidence intervals use the delta method on the model's covariance (the posterior covariance for HB). A WTP that is asked for and refused (a positive or zero price slope, prices that do not parse) makes the run PARTIAL.
 
 ### Confidence Intervals on Simulated Shares
 
@@ -189,8 +189,8 @@ Key-value format with columns: **Setting | Value | Required? | Description | Val
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `generate_market_simulator` | `TRUE` | Include interactive simulator sheet in Excel |
-| `simulation_method` | `logit` | `logit`, `first_choice`, or `rfc` |
-| `rfc_draws` | `1000` | Number of random draws for RFC simulation |
+| `simulation_method` | `logit` | Validated, not read by any output (the simulator page chooses its method) |
+| `rfc_draws` | `1000` | Validated, not read by any output (the simulator's RFC uses 2000 draws) |
 
 #### Revenue Simulator
 
