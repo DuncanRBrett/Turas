@@ -130,7 +130,12 @@ run_segmented_analysis <- function(data, config, method) {
   segment_results <- list()
 
   for (seg in run_segments) {
-    seg_data <- data[data[[seg_col]] == seg, , drop = FALSE]
+    # which(): a blank segment cell compares NA, and a logical index with NA
+    # in it adds an all-NA row per blank, to every segment. Fifteen blanks
+    # made every segment refuse and emptied the whole Segment_Comparison
+    # table (robustness gate, 25 Sep 2026). Respondents with no segment code
+    # stay in the Total and in no segment.
+    seg_data <- data[which(as.character(data[[seg_col]]) == seg), , drop = FALSE]
 
     tryCatch({
       segment_results[[seg]] <- run_pricing_method(seg_data, config, method)
