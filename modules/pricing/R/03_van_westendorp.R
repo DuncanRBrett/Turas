@@ -739,6 +739,30 @@ run_van_westendorp <- function(data, config, validate = TRUE, validation = NULL)
 }
 
 
+#' Say So When The Optimal Range Is Inverted
+#'
+#' Van Westendorp's optimal price point can sit above the indifference price
+#' point on real data (Karoo's Budget segment: OPP R75.00, IDP R71.69), and
+#' the optimal range then prints with a negative width and no explanation.
+#' One sentence, used by the segment insights, the VW_Price_Points sheet and
+#' the Pricing tab (robustness follow-up, 25 Sep 2026).
+#'
+#' @param opp,idp The two price points.
+#' @param currency Currency symbol.
+#' @return The sentence, or NULL when OPP is not above IDP.
+#' @keywords internal
+pricing_vw_inverted_note <- function(opp, idp, currency = "") {
+  if (is.null(opp) || is.null(idp) || length(opp) != 1 || length(idp) != 1 ||
+      is.na(opp) || is.na(idp) || opp <= idp) return(NULL)
+  sprintf(paste0(
+    "the optimal price point is above the indifference price point (%s%.2f against %s%.2f), ",
+    "so the optimal range is inverted and its width is negative. The too-cheap and ",
+    "too-expensive curves cross above the point where cheap and expensive balance; read ",
+    "the acceptable range rather than the optimal one."),
+    currency, opp, currency, idp)
+}
+
+
 #' Fit The Price Sensitivity Meter, Weighted Or Not
 #'
 #' One place that decides which pricesensitivitymeter estimator runs. With

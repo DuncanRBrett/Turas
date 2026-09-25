@@ -464,13 +464,15 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
     optimalLower = .pricing_scalar(synthesis$optimal_zone$lower),
     optimalUpper = .pricing_scalar(synthesis$optimal_zone$upper),
     methodSpreadPct = if (is.null(cv)) NULL else cv * 100,
-    # How many method price points the spread was taken across. Four on a
-    # both-methods run: the Van Westendorp OPP and IDP, the midpoint of its
-    # optimal zone, and the Gabor-Granger optimum. Not four methods, and the
-    # price ladder is not one of them (review F14).
+    # How many METHODS the spread was taken across: one price per method
+    # (method_family_prices(), the same set the spread is computed on), so
+    # two on a both-methods run. It used to count the entries of
+    # method_prices (OPP, IDP, their midpoint and the GG optimum: four) and
+    # the tab read "across 4 estimates" beside a spread taken across two
+    # (robustness follow-up, 25 Sep 2026).
     nMethodPrices = {
       mp <- synthesis$method_prices
-      if (is.null(mp)) NULL else length(mp)
+      if (is.null(mp)) NULL else length(method_family_prices(mp))
     }
   ))
 }
@@ -552,6 +554,13 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
         sprintf("That was %d respondents (%.1f%%).",
                 as.integer(n_before), (d$violation_rate_before_handling %||% 0) * 100)
       })
+    }
+  }
+  if (has_vw) {
+    inverted <- pricing_vw_inverted_note(vw$price_points$OPP, vw$price_points$IDP,
+                                         as.character(config$currency_symbol %||% ""))
+    if (!is.null(inverted)) {
+      notes$vw <- paste(notes$vw, paste0(toupper(substr(inverted, 1, 1)), substring(inverted, 2)))
     }
   }
   if (has_gg) {

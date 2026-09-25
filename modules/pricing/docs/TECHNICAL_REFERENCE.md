@@ -54,9 +54,8 @@ modules/pricing/
 │   ├── 04_gabor_granger.R      # Gabor-Granger implementation
 │   ├── 05_visualization.R      # Plot generation
 │   ├── 06_output.R             # Excel output generation
-│   ├── 07_wtp_distribution.R   # Willingness-to-pay analysis
-│   ├── 08_competitive_scenarios.R  # Competitive scenario analysis
-│   ├── 09_price_volume_optimisation.R  # Price-volume optimisation
+│   ├── 07_wtp_distribution.R   # Per-respondent WTP for the tabs export
+│   ├── 09_price_volume_optimisation.R  # compute_point_elasticity() (direct API)
 │   ├── 10_segmentation.R       # Segment analysis
 │   ├── 11_price_ladder.R       # Good/Better/Best tier generation
 │   ├── 12_recommendation_synthesis.R  # Multi-method synthesis
@@ -368,8 +367,9 @@ P >= 100       round(P / 5) × 5 - 0.01
 ```
 
 unless the rounding moves the price more than 10%, when it is kept to the
-cent. The price ladder's tiers use their own `Round_To` ending
-(floor(P) + ending) under the same 10% rule.
+cent. The price ladder's anchor tier shows this recommended price; the other
+tiers are stepped from the unrounded anchor towards PMC and PME and use their
+own `Round_To` ending (floor(P) + ending) under the same 10% rule.
 
 The confidence score is the mean of these factor scores:
 
@@ -379,7 +379,7 @@ The confidence score is the mean of these factor scores:
 | Sample size (largest base across methods) | >= 300 | 100-299 | | < 100 | |
 | Data quality (VW violations in the sample, counted before drop or fix) | < 5% | 5-15% | | >= 15% | |
 | Monadic model (if run) | p <= 0.01 and pseudo-R2 >= 0.05 | p <= 0.05 | | | p > 0.05 |
-| Zone fit (VW) | inside OPP-IDP | | inside PMC-PME | | outside |
+| Zone fit (VW), judged on the anchor before rounding | inside OPP-IDP | | inside PMC-PME | | outside |
 | Method coverage | 3+ methods | 2 methods | | 1 method | |
 
 HIGH at 0.75 or more, MEDIUM at 0.55 or more, LOW below (an unassessable

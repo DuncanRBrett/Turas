@@ -39,12 +39,19 @@
   if (!identical(tolower(config$analysis_method %||% ""), "both")) {
     return(list(gg_base = NULL, segments = NULL))
   }
-  n_excluded <- as.integer(validation$n_excluded %||% 0L)
-  gg_base <- if (n_excluded > 0) {
+  # Only the exclusions a Gabor-Granger-only run would not have made: out of
+  # order, incomplete or out-of-range Van Westendorp answers. A respondent
+  # with an unusable weight leaves every run, so is not counted here.
+  reasons <- validation$exclusion_reasons %||% character(0)
+  mask <- validation$exclusion_mask %||% rep(FALSE, length(reasons))
+  vw_reason <- grepl("vw_non_monotone|out of range|incomplete VW", reasons)
+  weight_reason <- grepl("invalid_weight|zero_weight", reasons)
+  n_vw <- sum(mask & vw_reason & !weight_reason)
+  gg_base <- if (n_vw > 0) {
     sprintf(paste0(
       "On a run with both methods, Gabor-Granger is read on the respondents Van ",
-      "Westendorp validation keeps: the %d respondents excluded at validation are not ",
-      "in the Gabor-Granger base either."), n_excluded)
+      "Westendorp validation keeps: the %d respondents excluded for their Van Westendorp ",
+      "answers are not in the Gabor-Granger base either."), as.integer(n_vw))
   } else NULL
   seg_col <- config$segmentation$segment_column %||% NA_character_
   segments <- if (!is.na(seg_col) && nzchar(as.character(seg_col))) {
@@ -266,6 +273,14 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                        rows = (range_start_row + 1):(range_start_row + 2),
                        cols = 2:3, gridExpand = TRUE)
 
+    inverted <- pricing_vw_inverted_note(vw_results$price_points$OPP, vw_results$price_points$IDP,
+                                         config$currency_symbol %||% "")
+    if (!is.null(inverted)) {
+      openxlsx::writeData(wb, "VW_Price_Points",
+                          pricing_escape_cell(paste0("Note: ", inverted)),
+                          startRow = range_start_row + 4)
+    }
+
     # Confidence Intervals (if calculated)
     if (!is.null(vw_results$confidence_intervals)) {
       openxlsx::addWorksheet(wb, "VW_Confidence_Intervals")
@@ -478,7 +493,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         sprintf("%.2f", ms$null_deviance),
         sprintf("%.2f", ms$residual_deviance),
         sprintf("%.4f", ms$pseudo_r2),
-        sprintf("%.6f", ms$price_coefficient_p)
+        pricing_format_p(ms$price_coefficient_p, digits = 6)
       ),
       stringsAsFactors = FALSE
     )

@@ -350,7 +350,7 @@ test_that("GG segments: the sheet and the simulator's segment curves equal each 
 # Disclosure on a both-methods run (Duncan's decisions, 25 Sep 2026): the
 # behaviour stays, the reader is told
 # ------------------------------------------------------------------------------
-GG_BASE_NOTE <- "the 44 respondents excluded at validation are not in the Gabor-Granger base either"
+GG_BASE_NOTE <- "the 44 respondents excluded for their Van Westendorp answers are not in the Gabor-Granger base either"
 SEGMENTS_NOTE <- "Segments on a run with both methods are analysed with Van Westendorp only"
 
 test_that("both-methods run: the shared base and the VW-only segments are disclosed where they are read", {
@@ -370,4 +370,92 @@ test_that("both-methods run: the shared base and the VW-only segments are disclo
   isl_m <- jsonlite::fromJSON(MON$island)
   expect_false(grepl("Gabor-Granger base", paste(unlist(isl_m$meta), collapse = " "), fixed = TRUE))
   expect_false(grepl(SEGMENTS_NOTE, isl_m$meta$filterNote, fixed = TRUE))
+})
+
+# ------------------------------------------------------------------------------
+# Display follow-ups (25 Sep 2026)
+# ------------------------------------------------------------------------------
+test_that("the method spread names the methods it is taken across", {
+  # The spread is the CV of one price per method (VW midpoint, GG optimum),
+  # so on a both-methods run it is across 2 methods, not the 4 entries of
+  # method_prices (OPP, IDP, midpoint, GG).
+  isl <- jsonlite::fromJSON(BOTH$island)
+  expect_equal(isl$recommendation$nMethodPrices, 2L)
+  vw_mid <- (REF_VW[["OPP"]] + REF_VW[["IDP"]]) / 2
+  cv <- sd(c(vw_mid, REF_GG$opt)) / mean(c(vw_mid, REF_GG$opt))
+  expect_equal(isl$recommendation$methodSpreadPct, 100 * cv, tolerance = 1e-6)
+  txt <- pricing_render_tab(BOTH$island)
+  expect_true(grepl(sprintf("spread %.1f%% across 2 methods", 100 * cv), txt, fixed = TRUE))
+  expect_false(grepl("estimates", txt, fixed = TRUE))
+})
+
+test_that("a p-value below the printed precision says so instead of printing zero", {
+  # Karoo's monadic price effect has p = 4e-13 (glm, above), which "%.6f"
+  # printed as 0.000000 on the sheet and "%.4f" as p=0.0000 in the
+  # confidence factor.
+  expect_lt(summary(REF_MON$g)$coefficients[2, 4], 1e-6)
+  ms <- pricing_kv(MON$workbook, "Mon_Model_Summary")
+  expect_equal(unname(ms["Price Coefficient p-value"]), "< 0.000001")
+  sp <- pricing_kv(MON$stats_pack, "Assumptions")
+  expect_equal(unname(sp["Mon: price_coef_p"]), "< 0.000001")
+  ex <- paste(unlist(pricing_sheet(MON$workbook, "Executive_Summary", colNames = FALSE)), collapse = " ")
+  expect_false(grepl("p=0.0000", ex, fixed = TRUE))
+  expect_true(grepl("p < 0.0001", ex, fixed = TRUE))
+  # Ordinary values keep their digits.
+  expect_equal(pricing_format_p(0.0123), "0.012300")
+  expect_equal(pricing_format_p(0.0123, digits = 4), "0.0123")
+  expect_equal(pricing_format_p(NA_real_), "not available")
+})
+
+test_that("an optimal range with OPP above IDP is explained where it is shown", {
+  # Karoo's Budget segment: OPP R75.00 above IDP R71.69, so the
+  # Segment_Comparison optimal_width is -3.31 with no word of explanation.
+  inverted <- "optimal price point is above the indifference price point"
+  sc_text <- paste(unlist(pricing_sheet(BOTH$workbook, "Segment_Comparison", colNames = FALSE)), collapse = " ")
+  expect_true(grepl(paste0("Budget: the ", inverted, " (R75.00 against R71.69)"), sc_text, fixed = TRUE))
+  expect_false(grepl("Premium: the optimal price point", sc_text, fixed = TRUE))
+  # The Budget respondents on their own: the total is inverted, so the
+  # VW_Price_Points sheet and the Pricing tab say it too.
+  b <- KAROO[KAROO$Segment == "Budget", ]
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(b, csv, row.names = FALSE, na = "")
+  r <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx", data_file = csv,
+                            edits = c(FAST, "cfg$analysis_method <- 'van_westendorp'",
+                                      "cfg$segmentation$segment_column <- NA_character_",
+                                      "cfg$generate_simulator <- FALSE"))
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 20), collapse = "\n"))
+  pp <- pricing_sheet(r$workbook, "VW_Price_Points", colNames = FALSE)
+  pts <- setNames(as.numeric(pp$X3[2:5]), pp$X1[2:5])
+  expect_gt(pts[["OPP"]], pts[["IDP"]])
+  expect_true(grepl(inverted, paste(unlist(pp), collapse = " "), fixed = TRUE))
+  expect_true(grepl(inverted, pricing_render_tab(r$island), fixed = TRUE))
+})
+
+test_that("the GG-base note counts only the respondents excluded for their VW answers", {
+  # Two respondents whose VW answers are valid lose their weight. Validation
+  # now excludes 46, but only the 44 with illogical VW answers are the ones a
+  # Gabor-Granger-only run would have kept; a blank weight excludes a
+  # respondent from any run.
+  d <- KAROO
+  ok_rows <- which(karoo_vw_keep(d))[1:2]
+  d$Weight[ok_rows] <- NA
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(d, csv, row.names = FALSE, na = "")
+  r <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx", data_file = csv,
+                            edits = c(FAST, "cfg$generate_simulator <- FALSE"))
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 20), collapse = "\n"))
+  val <- pricing_kv(r$workbook, "Validation")
+  expect_equal(as.numeric(val["Excluded Cases"]), 46)
+  txt <- paste(unlist(pricing_sheet(r$workbook, "Validation", colNames = FALSE)), collapse = " ")
+  expect_true(grepl(GG_BASE_NOTE, txt, fixed = TRUE))
+})
+
+test_that("the ladder's anchor tier shows the recommended price", {
+  # Karoo both-methods: the anchor is the GG optimum R100.00; the
+  # recommendation shows R99.99 and the Standard tier printed R100.99.
+  lad <- pricing_sheet(BOTH$workbook, "Price_Ladder")
+  rec <- pricing_sheet(BOTH$workbook, "Recommendation", colNames = FALSE)
+  shown <- rec$X2[which(rec$X1 == "Recommended Price")]
+  std <- lad[which(lad[[1]] == "Standard"), ]
+  expect_equal(sprintf("R%.2f", as.numeric(std$price)), shown)
 })

@@ -220,9 +220,8 @@ modules/pricing/
 │   ├── 04_gabor_granger.R      # Gabor-Granger analysis
 │   ├── 05_visualization.R      # Plot generation
 │   ├── 06_output.R             # Excel output
-│   ├── 07_wtp_distribution.R   # Willingness-to-pay analysis
-│   ├── 08_competitive_scenarios.R  # Competitive analysis
-│   ├── 09_price_volume_optimisation.R  # Optimization
+│   ├── 07_wtp_distribution.R   # Per-respondent WTP for the tabs export
+│   ├── 09_price_volume_optimisation.R  # compute_point_elasticity() (direct API)
 │   ├── 10_segmentation.R       # Segment analysis
 │   ├── 11_price_ladder.R       # Tier generation
 │   ├── 12_recommendation_synthesis.R  # Synthesis

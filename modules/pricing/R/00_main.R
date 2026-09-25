@@ -77,8 +77,7 @@ if (file.exists(.guard_path)) {
   base_dir <- .get_script_dir_for_guard()
   files <- c("01_config.R", "02_validation.R", "03_van_westendorp.R",
              "04_gabor_granger.R", "05_visualization.R", "06_output.R",
-             "07_wtp_distribution.R", "08_competitive_scenarios.R",
-             "09_price_volume_optimisation.R", "10_segmentation.R",
+             "07_wtp_distribution.R", "09_price_volume_optimisation.R", "10_segmentation.R",
              "11_price_ladder.R", "12_recommendation_synthesis.R", "13_monadic.R",
              "14_v2_island.R", "15_tabs_export.R")
   for (f in files) {
@@ -995,7 +994,7 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     method_results[["Mon: model_type"]] <- monadic_results$model_summary$model_type
     method_results[["Mon: pseudo_R2"]] <- sprintf("%.4f", monadic_results$model_summary$pseudo_r2)
     method_results[["Mon: AIC"]] <- sprintf("%.1f", monadic_results$model_summary$aic)
-    method_results[["Mon: price_coef_p"]] <- sprintf("%.6f", monadic_results$model_summary$price_coefficient_p)
+    method_results[["Mon: price_coef_p"]] <- pricing_format_p(monadic_results$model_summary$price_coefficient_p, digits = 6)
     if (!is.null(monadic_results$model_summary$p_value_caveat)) {
       method_results[["Mon: price_coef_p_caveat"]] <- monadic_results$model_summary$p_value_caveat
     }

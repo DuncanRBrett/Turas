@@ -138,17 +138,17 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
   # STEP 3: Determine anchor price
   # ============================================================================
 
-  # Priority: NMS revenue optimal > GG optimal > VW midpoint
-  if (!is.null(reference_prices$nms_optimal)) {
-    anchor_price <- reference_prices$nms_optimal
-    anchor_source <- "NMS revenue optimal"
-  } else if (!is.null(reference_prices$gg_optimal)) {
-    anchor_price <- reference_prices$gg_optimal
-    anchor_source <- "Gabor-Granger optimal"
-  } else if (!is.null(reference_prices$vw_optimal)) {
-    anchor_price <- reference_prices$vw_optimal
-    anchor_source <- "Van Westendorp OPP-IDP midpoint"
-  } else {
+  # The anchor is the recommendation's own (pricing_recommended_price(),
+  # 12_recommendation_synthesis.R): NMS, then the Gabor-Granger optimum, then
+  # the Van Westendorp OPP-IDP midpoint, within the synthesis floor and
+  # ceiling. The anchor tier then shows the recommended price itself, so the
+  # workbook carries one number for one anchor (Duncan, 25 Sep 2026: the
+  # Standard tier printed R100.99 beside a R99.99 recommendation).
+  rec <- pricing_recommended_price(vw_results = vw_results, gg_results = gg_results,
+                                   config = config)
+  anchor_price <- rec$anchor_price
+  anchor_source <- rec$source
+  if (is.null(anchor_price) || length(anchor_price) != 1 || !is.finite(anchor_price)) {
     pricing_refuse(
       code = "DATA_NO_ANCHOR_PRICE",
       title = "Cannot Determine Anchor Price",
@@ -218,6 +218,7 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
   # ============================================================================
 
   tier_prices_rounded <- apply_price_rounding(tier_prices, round_to)
+  tier_prices_rounded[anchor_tier_idx] <- rec$price
 
   # ============================================================================
   # STEP 6: Calculate gaps and validate

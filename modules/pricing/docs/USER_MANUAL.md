@@ -968,7 +968,7 @@ if (result$status == "PASS") {
 ### 15.4 Methodology Scope
 
 - **No conjoint integration**: Pricing module operates independently from the conjoint module; cross-method integration is planned but not yet implemented
-- **No cross-price elasticity**: Only own-price elasticity is calculated; competitive dynamics require the competitive scenarios module (`08_competitive_scenarios.R`) for multi-brand simulation
+- **No cross-price elasticity**: Only own-price elasticity is calculated; there is no multi-brand competitive simulation in this module; choice between competing products needs a conjoint study
 - **No Bayesian methods**: All estimation is frequentist (MLE via GLM); Bayesian priors are not supported
 - **Point elasticity requires 3+ price points**: The monotone spline interpolator needs at least 3 non-NA data points to compute derivatives
 

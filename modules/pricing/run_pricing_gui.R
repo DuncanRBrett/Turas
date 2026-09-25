@@ -130,8 +130,7 @@ run_pricing_gui <- function() {
   pricing_source_files <- c(
     "00_guard.R", "00_main.R", "01_config.R", "02_validation.R",
     "03_van_westendorp.R", "04_gabor_granger.R", "05_visualization.R",
-    "06_output.R", "07_wtp_distribution.R", "08_competitive_scenarios.R",
-    "09_price_volume_optimisation.R", "10_segmentation.R",
+    "06_output.R", "07_wtp_distribution.R", "09_price_volume_optimisation.R", "10_segmentation.R",
     "11_price_ladder.R", "12_recommendation_synthesis.R", "13_monadic.R"
   )
 
