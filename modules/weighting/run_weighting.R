@@ -585,7 +585,7 @@ run_weighting <- function(config_file,
             "Calibration returned, but the weighted margins are off target by up to %.2f pp (tolerance %.2f pp). Worst: %s",
             worst, res$rim_result$margin_tolerance, detail
           ),
-          fix = "Widen weight_bounds / raise cap_weights, set calibration_method = logit, or soften the target that needs the largest stretch. Raise margin_tolerance only if you accept the gap.",
+          fix = "Widen weight_bounds, set calibration_method = logit, or soften the target that needs the largest stretch. Raise margin_tolerance only if you accept the gap.",
           stage = "weight_calculation"
         )
       }

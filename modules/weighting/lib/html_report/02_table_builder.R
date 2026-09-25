@@ -233,7 +233,7 @@ build_cell_table <- function(cell_summary) {
 
   callout <- '<div class="wt-callout" style="margin-bottom:12px;">
     Each cell represents a unique combination of the interlocking variables.
-    The weight for each cell is: (target %% &times; total N) &divide; cell count.
+    The weight for each cell is: (target share &times; respondents carrying a weight) &divide; cell count. If a target cell has nobody in it and allow_empty_targets is set, its share is first spread across the populated cells in proportion to their targets.
     Cells with very few respondents will receive large weights &mdash; consider combining sparse
     categories if any single cell has fewer than ~10 respondents.
   </div>'

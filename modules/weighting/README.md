@@ -104,7 +104,7 @@ One row per weight to calculate:
 - `method` — One of: `design`, `rim`, `rake`, `cell`
 - `apply_trimming` — `Y` or `N`. Caps extreme weights after calculation. **Design and cell weights only.** A rim weight with `apply_trimming = Y` is refused (`CFG_TRIM_USE_CAP`) — see below.
 - `trim_method` — `cap` (absolute cap) or `percentile` (trim to percentile range)
-- `trim_value` — For `cap`: maximum weight value (e.g., 5). For `percentile`: a proportion strictly between 0 and 1 (e.g., `0.95` for the 95th percentile) — **not** 95.
+- `trim_value`: for `cap`, maximum weight value (e.g., 5), on the weight's own scale. It must be above the mean weight (1 for a weight normalised to the sample), or the run refuses with `CFG_TRIM_CAP_BELOW_MEAN`; for a grossed weight use `percentile`. For `percentile`: a proportion strictly between 0 and 1 (e.g., `0.95` for the 95th percentile), **not** 95.
 
 ### Method-Specific Sheets
 
@@ -256,13 +256,13 @@ Every weight run produces diagnostic metrics:
 
 Trim when max weight exceeds 5, design effect exceeds 2.0, or a small number of respondents carry disproportionate influence. How you trim depends on the method, and the two routes are not interchangeable.
 
-**Rim weights — use `cap_weights`, never `apply_trimming`.** Raking calibrates the weights so the weighted margins hit your targets and the weights sum to n. Capping them afterwards breaks both, and nothing re-rakes them: the run would report the raked margins as achieved while shipping weights that no longer meet them. `apply_trimming = Y` on a rim or rake spec is therefore refused with `CFG_TRIM_USE_CAP`.
+**Rim weights: use `weight_bounds`, never `apply_trimming`.** Raking calibrates the weights so the weighted margins hit your targets and the weights sum to n. Capping them afterwards breaks both, and nothing re-rakes them: the run would report the raked margins as achieved while shipping weights that no longer meet them. `apply_trimming = Y` on a rim or rake spec is therefore refused with `CFG_TRIM_USE_CAP`.
 
-Set `cap_weights` in Advanced_Settings instead. It is passed to `survey::calibrate()` as the upper weight bound, so the cap applies *during* calibration and the margins still come out right. `weight_bounds` sets both ends.
+Set `weight_bounds` in Advanced_Settings instead, as `lower,upper` (for example `0.3,5`). It is passed to `survey::calibrate()` as the weight bounds, so the cap applies *during* calibration and the margins still come out right. If raking cannot reach the targets inside the bounds, set `calibration_method = logit`. There is no `cap_weights` setting: a config that sets one is refused (`CFG_CAP_WEIGHTS_NOT_READ`), because it used to be ignored without a word.
 
 **Design and cell weights — `apply_trimming = Y` is the right route.** These methods have no calibrated margins to break. The weights are capped, then rescaled so they sum to what they summed to before, which keeps the weighted base honest. Rescaling pushes the capped weights back above the nominal cap; the run says so on the console (`CALC_TRIM_RESCALED_ABOVE_CAP`) and the diagnostics carry the rescale factor and both sums.
 
-Trimming trades a little bias for less variance. For design and cell weights that is usually worth it. For rim weights the same trade is available without the bias, through `cap_weights`.
+Trimming trades a little bias for less variance. For design and cell weights that is usually worth it. For rim weights the same trade is available without the bias, through `weight_bounds`.
 
 ---
 

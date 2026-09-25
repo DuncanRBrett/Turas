@@ -153,9 +153,9 @@ trim_weights <- function(weights,
 #'   \item \strong{rim/rake} — refused. Raking calibrates the weights so the
 #'     weighted margins hit the targets and the weights sum to n. Capping
 #'     afterwards destroys both, and nothing re-rakes. The correct mechanism
-#'     already exists: \code{cap_weights} is passed to \code{survey::calibrate}
-#'     as \code{bounds}, so the cap holds \emph{during} calibration and the
-#'     margins still come out right.
+#'     already exists: the \code{weight_bounds} advanced setting is passed to
+#'     \code{survey::calibrate} as \code{bounds}, so the cap holds \emph{during}
+#'     calibration and the margins still come out right.
 #'   \item \strong{design/cell} — applied, then rescaled to restore the original
 #'     sum, and disclosed. These methods have no calibrated margins to break,
 #'     but an uncorrected trim still shrinks the weighted base.
@@ -209,7 +209,7 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_thre
         weight_method
       ),
       why_it_matters = "The run would report the raked margins as achieved while shipping weights that no longer meet them. Every weighted base and percentage in the tabs report built on those weights would be wrong, with nothing on the face of the report to show it.",
-      how_to_fix = "Set apply_trimming = N and use cap_weights instead. cap_weights is passed to survey::calibrate() as the upper weight bound, so the cap applies DURING calibration and the margins still come out right. If you also need a floor, set weight_bounds."
+      how_to_fix = "Set apply_trimming = N and put the cap in weight_bounds in Advanced_Settings, as 'lower,upper' (e.g. '0.3,5'). weight_bounds is passed to survey::calibrate() as the weight bounds, so the cap applies DURING calibration and the margins still come out right. If raking cannot reach the targets inside those bounds, set calibration_method = logit."
     )
   }
 
@@ -227,6 +227,31 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_thre
       threshold = NA_real_,
       trimming_applied = FALSE
     ))
+  }
+
+  # A cap at or below the mean weight cannot be honoured. The rescale below
+  # restores the original sum, so the mean after trimming is the mean before
+  # it, and at least one weight must sit at or above the mean, above the cap.
+  # What such a cap actually does is flatten the weights: on a grossed design
+  # weight (mean 500) a cap of 5, written with sample-scale weights in mind,
+  # capped every respondent to 5 and the rescale lifted them all to 500. The
+  # design weighting was erased and the run said PASS.
+  valid_for_cap <- weights[!is.na(weights) & is.finite(weights) & weights > 0]
+  if (tolower(as.character(method)) == "cap" && length(valid_for_cap) > 0 &&
+      value <= mean(valid_for_cap)) {
+    weighting_refuse(
+      code = "CFG_TRIM_CAP_BELOW_MEAN",
+      title = "Trim cap is at or below the mean weight",
+      problem = sprintf(
+        "Weight '%s' has trim_method = cap with trim_value = %s, but its mean weight is %s (%s). Capping at or below the mean flattens the weights rather than trimming them: after the rescale that restores the total, no weight can sit at or below the cap.",
+        if (is.null(spec$weight_name)) "(unnamed)" else as.character(spec$weight_name)[1],
+        format(value, big.mark = ",", scientific = FALSE),
+        format(signif(mean(valid_for_cap), 6), big.mark = ",", scientific = FALSE),
+        if (mean(valid_for_cap) > 1 + 1e-9) "this weight is on population scale, e.g. grossing = Y" else "sample scale"
+      ),
+      why_it_matters = "The weights would move towards uniform, undoing the weighting itself, while the run reported success. Every weighted base and percentage built on them would drift back towards the unweighted figures.",
+      how_to_fix = "Express the cap on the scale of this weight: above its mean weight, which is 1 for a weight normalised to the sample size. For a grossed weight either set grossing = N and cap on the sample scale, or use trim_method = percentile, which does not depend on scale."
+    )
   }
 
   if (verbose) {

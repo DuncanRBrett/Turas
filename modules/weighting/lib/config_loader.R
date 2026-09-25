@@ -85,6 +85,7 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
 
   # Load optional sheets
   advanced_settings <- load_optional_sheet(config_file, "Advanced_Settings", available_sheets, verbose)
+  refuse_unread_cap_weights(advanced_settings)
   notes <- load_weighting_notes(config_file, available_sheets, verbose)
 
   # Build config
@@ -541,6 +542,39 @@ resolve_config_path <- function(path, base_path) {
   # Resolve relative to base path
   full_path <- file.path(base_path, path)
   return(normalizePath(full_path, winslash = "/", mustWork = FALSE))
+}
+
+#' Refuse a cap_weights Column in Advanced_Settings
+#'
+#' The README, RUNBOOK, TEMPLATE_REFERENCE and the CFG_TRIM_USE_CAP refusal all
+#' told operators to cap rim weights with a \code{cap_weights} setting, but the
+#' config path never read one: only \code{weight_bounds} reaches
+#' \code{survey::calibrate()}. A config that followed the advice ran on the
+#' default 0.3,3.0 bounds and said nothing, so its weights could sit above the
+#' cap the operator set. A value there is refused rather than guessed at.
+#'
+#' @param advanced_settings Data frame from the Advanced_Settings sheet, or NULL
+#' @return Invisible NULL; refuses when any row sets cap_weights
+#' @keywords internal
+refuse_unread_cap_weights <- function(advanced_settings) {
+  if (is.null(advanced_settings) || !"cap_weights" %in% names(advanced_settings)) {
+    return(invisible(NULL))
+  }
+  values <- advanced_settings$cap_weights
+  set <- !is.na(values) & nzchar(trimws(as.character(values)))
+  if (!any(set)) return(invisible(NULL))
+
+  weighting_refuse(
+    code = "CFG_CAP_WEIGHTS_NOT_READ",
+    title = "cap_weights is not a setting the weighting module reads",
+    problem = sprintf(
+      "Advanced_Settings sets cap_weights for %s. Nothing reads that column: rim weights take their bounds from weight_bounds, and design and cell weights are capped through apply_trimming.",
+      paste(sprintf("'%s' (%s)", advanced_settings$weight_name[set],
+                    as.character(values[set])), collapse = ", ")
+    ),
+    why_it_matters = "The run would ignore the cap and use the default weight_bounds of 0.3,3.0, so the weights could sit above the cap you set while nothing said so.",
+    how_to_fix = "For a rim weight, delete the cap_weights column and put the cap in weight_bounds as 'lower,upper', e.g. '0.3,5'. For a design or cell weight, use apply_trimming = Y with trim_method = cap on Weight_Specifications."
+  )
 }
 
 #' Get Advanced Setting for Weight

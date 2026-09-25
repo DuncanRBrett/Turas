@@ -499,10 +499,25 @@ generate_weighting_report <- function(weighting_results, output_file,
       openxlsx::freezePane(wb, "Summary", firstRow = TRUE)
 
       # ---- Per-weight sheets ----
+      # Excel compares sheet names without case and caps them at 31
+      # characters, so two weights sharing their first 31 characters, two that
+      # differ only in punctuation, or a weight called "summary" all mapped to
+      # a sheet that already existed. addWorksheet() then failed and the whole
+      # diagnostics workbook, HTML report and stats pack were lost. The fixed
+      # sheets are reserved and a clash takes a numbered suffix; the weight's
+      # full name is always cell A1 of its sheet.
+      used_sheet_names <- c("Summary", "Configuration", "Notes", "Run_Status")
       for (weight_name in weighting_results$weight_names) {
         result <- weighting_results$weight_results[[weight_name]]
-        sheet_name <- gsub("[^A-Za-z0-9_]", "_", weight_name)
-        sheet_name <- substr(sheet_name, 1, 31)
+        sheet_name <- substr(gsub("[^A-Za-z0-9_]", "_", weight_name), 1, 31)
+        suffix_n <- 1
+        while (tolower(sheet_name) %in% tolower(used_sheet_names)) {
+          suffix_n <- suffix_n + 1
+          suffix <- paste0("_", suffix_n)
+          sheet_name <- paste0(substr(gsub("[^A-Za-z0-9_]", "_", weight_name), 1,
+                                      31 - nchar(suffix)), suffix)
+        }
+        used_sheet_names <- c(used_sheet_names, sheet_name)
 
         openxlsx::addWorksheet(wb, sheet_name)
         row_num <- 1

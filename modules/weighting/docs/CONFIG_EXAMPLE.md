@@ -73,7 +73,7 @@ If creating manually, your Excel file can have up to 7 sheets:
 **Column Meanings:**
 - `weight_name`: Name for the weight column (will be added to your data)
 - `method`: `design`, `rim` (or `rake`), or `cell`
-- `apply_trimming`: "Y" or "N" - cap extreme weights after calculation. Design and cell weights only; a rim spec with "Y" is refused (`CFG_TRIM_USE_CAP`) because capping after raking breaks the calibrated margins. Cap a rim weight with `cap_weights` in Advanced_Settings instead.
+- `apply_trimming`: "Y" or "N" - cap extreme weights after calculation. Design and cell weights only; a rim spec with "Y" is refused (`CFG_TRIM_USE_CAP`) because capping after raking breaks the calibrated margins. Cap a rim weight with `weight_bounds` in Advanced_Settings instead, as `lower,upper`.
 - `trim_method`: "cap" (hard maximum) or "percentile"
 - `trim_value`: for cap, the maximum weight value (e.g. 5). For percentile, a proportion strictly between 0 and 1 (e.g. 0.95), not 95.
 
