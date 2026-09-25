@@ -278,6 +278,38 @@ test_that("a single-category rim variable at 100% is met, not a crash", {
 
 
 # ==============================================================================
+# Rim variable names that are not R names
+# ==============================================================================
+
+test_that("rim variables named with spaces, hyphens or a leading digit rake by hand", {
+  # The calibration formula was pasted from the variable names, so
+  # "Home Region" was a parse error, "Age-Band" parsed as Age minus Band, and
+  # "2024 Gender" a parse error: BUG_INTERNAL_ERROR and no files. Excel data
+  # keeps such headers verbatim (read.csv would have renamed them first).
+  # The weights must equal the hand raking loop on the same data.
+  data <- ref_survey()
+  hand <- ref_hand_rake(data, ref_rim_targets())
+  names(data)[names(data) == "Region"] <- "Home-Region Now"
+  names(data)[names(data) == "Gender"] <- "2024 Gender"
+  targets <- ref_rim_targets()
+  names(targets) <- c("Home-Region Now", "2024 Gender")
+
+  run <- adv_run("odd_names", data = data, data_ext = "xlsx",
+                 specs = ref_spec("rw", "rim"),
+                 rim_targets = ref_rim_target_rows("rw", targets))
+  expect_equal(run$status, 0L, info = run$console)
+  expect_false(grepl("BUG_INTERNAL_ERROR", run$console, fixed = TRUE))
+  skip_if_not(file.exists(run$lookup), "no lookup file written")
+
+  expect_equal(adv_lookup(run)$rw, hand, tolerance = 1e-6)
+  s <- ref_read_sheet(run$diagnostics, "rw")
+  hdr <- which(s[[1]] == "variable")[1]
+  expect_equal(s[[1]][(hdr + 1):(hdr + 5)],
+               c(rep("Home-Region Now", 3), rep("2024 Gender", 2)))
+})
+
+
+# ==============================================================================
 # A base under 30
 # ==============================================================================
 

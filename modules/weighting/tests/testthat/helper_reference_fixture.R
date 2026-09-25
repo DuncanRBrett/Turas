@@ -116,18 +116,25 @@ ref_build_config <- function(dir, specs, design_targets = NULL,
                              rim_targets = NULL, cell_targets = NULL,
                              advanced = NULL, data = ref_survey(),
                              html = TRUE, stats_pack = TRUE,
-                             lookup_ext = "xlsx") {
+                             lookup_ext = "xlsx", data_ext = "csv") {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   paths <- list(
     config      = file.path(dir, "Weight_Config.xlsx"),
-    data        = file.path(dir, "survey.csv"),
+    data        = file.path(dir, paste0("survey.", data_ext)),
     lookup      = file.path(dir, paste0("weights.", lookup_ext)),
     diagnostics = file.path(dir, "weight_diagnostics.xlsx"),
     html        = file.path(dir, "weight_report.html")
   )
   paths$stats_pack <- file.path(dir, "weights_stats_pack.xlsx")
 
-  utils::write.csv(data, paths$data, row.names = FALSE, fileEncoding = "UTF-8")
+  if (data_ext == "xlsx") {
+    dwb <- openxlsx::createWorkbook()
+    openxlsx::addWorksheet(dwb, "Data")
+    openxlsx::writeData(dwb, "Data", data)
+    turas_saveWorkbook(dwb, paths$data, overwrite = TRUE)
+  } else {
+    utils::write.csv(data, paths$data, row.names = FALSE, fileEncoding = "UTF-8")
+  }
 
   general <- data.frame(
     Setting = c("project_name", "data_file", "id_column", "output_file",

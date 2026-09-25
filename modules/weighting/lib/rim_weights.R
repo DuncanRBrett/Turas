@@ -345,13 +345,6 @@ calculate_rim_weights <- function(data,
   complete_idx <- prep$complete_idx
   starting_weights <- prep$starting_weights
 
-  # Create survey design object with starting weights
-  svy_design <- survey::svydesign(
-    ids = ~1,                          # No clustering (simple random sample)
-    data = rake_data,
-    weights = starting_weights         # Start from base weights (or 1)
-  )
-
   # A variable with a single category carries a 100% target that every
   # respondent in the calibration already meets: prepare_rim_data() refused any
   # value outside the targets. It adds no constraint, and model.matrix() cannot
@@ -367,9 +360,29 @@ calculate_rim_weights <- function(data,
     ))
   }
 
+  # Calibrate on internal copies with safe names. The formula is pasted
+  # together from these names, and a data header such as "Home Region",
+  # "Age-Band" or "2024 Gender" (kept verbatim from Excel) was a parse error or,
+  # worse, parsed as arithmetic: "Age-Band" is Age minus Band. Each copy is
+  # named ".rimv<i>_", and no such name is a prefix of another, so two
+  # variable/category pairs cannot collide in the model-matrix column names.
+  # The original columns stay in rake_data for the margins table.
+  safe_names <- setNames(paste0(".rimv", seq_along(calibration_vars), "_"),
+                         calibration_vars)
+  for (var in calibration_vars) {
+    rake_data[[safe_names[[var]]]] <- rake_data[[var]]
+  }
+
+  # Create survey design object with starting weights
+  svy_design <- survey::svydesign(
+    ids = ~1,                          # No clustering (simple random sample)
+    data = rake_data,
+    weights = starting_weights         # Start from base weights (or 1)
+  )
+
   # Build calibration formula
-  # Format: ~var1 + var2 + ...
-  formula <- as.formula(paste("~", paste(c("1", calibration_vars), collapse = " + ")))
+  # Format: ~1 + .rimv1_ + .rimv2_ + ...
+  formula <- as.formula(paste("~", paste(c("1", safe_names), collapse = " + ")))
 
   # CRITICAL FIX: Use actual sample size as base, not hard-coded 1000
   # This ensures sum of final weights = sum of starting weights
@@ -387,14 +400,14 @@ calculate_rim_weights <- function(data,
   population["(Intercept)"] <- base_n
 
   # Fill in target totals for each variable level
-  for (var in names(target_list)) {
+  for (var in calibration_vars) {
     target_props <- target_list[[var]]
     target_levels <- names(target_props)
 
     for (level in target_levels) {
       # Find matching column in model matrix
       # survey uses make.names() so we need to match syntactic names
-      col_name <- paste0(var, level)
+      col_name <- paste0(safe_names[[var]], level)
       col_name_syntactic <- make.names(col_name)
 
       # Check both the raw name and syntactic name
