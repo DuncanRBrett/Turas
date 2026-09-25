@@ -38,4 +38,13 @@ test_that("a refused tabs export makes the Run_Status sheet PARTIAL, not only th
   expect_equal(sum(sheets == "Run_Status"), 1L)
   sc <- md_pipe_sheet(PN$workbook, "ITEM_SCORES")
   expect_true(all(is.finite(sc$Logit_Utility[!is.na(sc$Item_ID)])))
+  # Saving one openxlsx workbook object twice writes width="NA" on every
+  # auto-width column, which Excel treats as a damaged file. The sheet must
+  # come from a fresh write, not a second save.
+  parts <- utils::unzip(PN$workbook, list = TRUE)$Name
+  sheets_xml <- grep("^xl/worksheets/sheet[0-9]+[.]xml$", parts, value = TRUE)
+  for (sx in sheets_xml) {
+    xml <- paste(readLines(unz(PN$workbook, sx), warn = FALSE), collapse = "")
+    expect_false(grepl('width="NA"', xml, fixed = TRUE), info = sx)
+  }
 })

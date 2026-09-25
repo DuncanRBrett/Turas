@@ -71,15 +71,10 @@ OUTPUT_VERSION <- "11.2"
 #' @param config List. Configuration object
 #' @param verbose Logical. Print progress messages
 #' @param run_result List. Optional TRS run result for Run_Status sheet
-#' @param keep_workbook Environment or NULL. When given, the saved workbook
-#'   object is kept in it as `wb`, so the orchestrator can replace the
-#'   Run_Status sheet if later steps raise events (see
-#'   rewrite_maxdiff_run_status()).
 #'
 #' @return Character. Path to output file
 #' @export
-generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result = NULL,
-                                    keep_workbook = NULL) {
+generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result = NULL) {
 
   if (verbose) {
     cat("\n")
@@ -268,51 +263,7 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result 
     log_message(sprintf("Output saved: %s", output_path), "INFO", verbose)
   }
 
-  if (is.environment(keep_workbook)) assign("wb", wb, envir = keep_workbook)
-
   return(output_path)
-}
-
-
-#' Replace the Run_Status sheet of a saved MaxDiff workbook
-#'
-#' The workbook is written before the tabs export, island, simulator and HTML
-#' report, and each of those can still raise an event. Before this, the
-#' Run_Status sheet the client opens said PASS, "No events recorded", over a
-#' run whose banner and returned status said PARTIAL. The orchestrator calls
-#' this after folding in the late events. It works on the workbook object
-#' still in memory (never loadWorkbook() on the file) and saves it again
-#' through the atomic saver.
-#'
-#' @param wb openxlsx workbook object from generate_maxdiff_output().
-#' @param output_path Character. Path the workbook was saved to.
-#' @param run_result List. The final TRS run result.
-#' @param verbose Logical.
-#' @return Logical. TRUE when the sheet was rewritten and saved.
-#' @keywords internal
-rewrite_maxdiff_run_status <- function(wb, output_path, run_result, verbose = TRUE) {
-  if (is.null(wb) || is.null(run_result) || is.null(output_path)) return(FALSE)
-  if ("Run_Status" %in% names(wb)) openxlsx::removeWorksheet(wb, "Run_Status")
-  if (exists("turas_write_run_status_sheet", mode = "function")) {
-    turas_write_run_status_sheet(wb, run_result)
-  } else {
-    write_run_status_sheet(wb, run_result, create_output_styles())
-  }
-  ok <- if (exists("turas_save_workbook_atomic", mode = "function")) {
-    isTRUE(turas_save_workbook_atomic(wb, output_path, run_result = run_result,
-                                      module = "MAXD")$success)
-  } else {
-    isTRUE(tryCatch({ openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE); TRUE },
-                    error = function(e) FALSE))
-  }
-  if (!ok) {
-    cat("\n[TRS WARNING] MAXD_RUN_STATUS_NOT_UPDATED: the workbook's Run_Status sheet ",
-        "could not be updated with the events raised after it was written. ",
-        "The console banner and the stats pack carry the final status.\n", sep = "")
-  } else if (verbose) {
-    log_message("Run_Status sheet updated with the later events", "INFO", verbose)
-  }
-  ok
 }
 
 

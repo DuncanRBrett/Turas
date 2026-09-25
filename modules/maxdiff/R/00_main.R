@@ -1303,9 +1303,8 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
   # branch): before this, a blocked path printed "Output saved" and the run
   # closed [TRS PASS] with no workbook on disk. Both a refusal from the
   # writer and a plain error land in the fold-in with the path named.
-  wb_keep <- new.env()
   output_path <- tryCatch({
-    generate_maxdiff_output(results, config, verbose, run_result, keep_workbook = wb_keep)
+    generate_maxdiff_output(results, config, verbose, run_result)
   }, turas_refusal = function(e) {
     cat(conditionMessage(e))
     note_late(sprintf("Excel output not written: %s", e$code %||% "refused"),
@@ -1484,9 +1483,10 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
 
   # Fold the late events into the run state so the banner, the GUI and the
   # returned run_result all tell the truth (review F2). The Run_Status sheet
-  # was written before these steps, so it is replaced in the workbook still
-  # held in memory and saved again: the sheet the client opens used to say
-  # PASS over a PARTIAL run.
+  # was written before these steps, so the workbook is written again from the
+  # same results with the final run result: the sheet the client opens used
+  # to say PASS over a PARTIAL run. A fresh write, never a second save of the
+  # same openxlsx object, which puts width="NA" on every auto-width column.
   if (length(late_events) > 0) {
     if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
       for (ev in late_events) {
@@ -1497,9 +1497,17 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       }
     }
     results$warnings <- c(results$warnings, late_warnings)
-    if (!is.null(output_path) && exists("wb", envir = wb_keep, inherits = FALSE)) {
-      rewrite_maxdiff_run_status(get("wb", envir = wb_keep), output_path,
-                                 results$run_result, verbose = verbose)
+    if (!is.null(output_path) && !is.null(results$run_result)) {
+      tryCatch(
+        generate_maxdiff_output(results, config, verbose = FALSE,
+                                run_result = results$run_result),
+        error = function(e) {
+          cat(sprintf(paste0(
+            "\n[TRS WARNING] MAXD_RUN_STATUS_NOT_UPDATED: the workbook's ",
+            "Run_Status sheet could not be updated with the events raised ",
+            "after it was written (%s). The console banner and the stats pack ",
+            "carry the final status.\n"), conditionMessage(e)))
+        })
     }
   }
 
