@@ -310,6 +310,43 @@ test_that("rim variables named with spaces, hyphens or a leading digit rake by h
 
 
 # ==============================================================================
+# Weight names that map to the same diagnostics sheet
+# ==============================================================================
+
+test_that("weights whose sheet names collide each get their own diagnostics sheet", {
+  # A per-weight sheet is named from the weight with punctuation turned into
+  # "_" and cut to Excel's 31 characters, and Excel compares sheet names
+  # without case. Two weights sharing their first 31 characters, or a weight
+  # called "summary" beside the Summary sheet, made addWorksheet() fail: the
+  # run refused with IO_DIAGNOSTICS_WRITE_FAILED and wrote no diagnostics,
+  # HTML report or stats pack. All three are the same design weight here, so
+  # each sheet must show the hand Effective N of 172.
+  names3 <- c("population_weight_for_wave_one_a", "population_weight_for_wave_one_b",
+              "summary")
+  run <- adv_run(
+    "sheet_names",
+    specs = do.call(rbind, lapply(names3, ref_spec, method = "design")),
+    design_targets = do.call(rbind, lapply(names3, ref_design_targets))
+  )
+  expect_equal(run$status, 0L, info = run$console)
+  expect_false(grepl("IO_DIAGNOSTICS_WRITE_FAILED", run$console, fixed = TRUE))
+  skip_if_not(file.exists(run$diagnostics), "no diagnostics workbook written")
+
+  sheets <- openxlsx::getSheetNames(run$diagnostics)
+  expect_equal(length(unique(tolower(sheets))), length(sheets))
+  titles <- character(0)
+  for (s in setdiff(sheets, c("Summary", "Configuration", "Notes", "Run_Status"))) {
+    df <- ref_read_sheet(run$diagnostics, s)
+    titles <- c(titles, as.character(df[[1]][1]))
+    expect_equal(ref_kv(df, "Effective N"), "172", info = s)
+  }
+  expect_setequal(titles, names3)
+  expect_true(file.exists(run$html))
+  expect_true(file.exists(run$stats_pack))
+})
+
+
+# ==============================================================================
 # A base under 30
 # ==============================================================================
 
