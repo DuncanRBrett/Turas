@@ -80,3 +80,67 @@ test_that("the default smoothed ladder, its revenue and its optimum match the ha
   expect_equal(r$optimal_price$price, 20)
   expect_equal(r$optimal_price$purchase_intent, 0.40, tolerance = 1e-12)
 })
+
+# Six respondents, three rungs, weights 1, 1, 2, 2, 0.5, 0.5 (sum 7).
+#   id  w    R20 R40 R60
+#   1   1     1   1   0
+#   2   1     1   0   0
+#   3   2     1   1   1
+#   4   2     0   0   0
+#   5   0.5   1   1   1
+#   6   0.5   1   0   0
+# Weighted acceptance = sum(w * yes) / sum(w):
+#   R20: (1 + 1 + 2 + 0.5 + 0.5) / 7 = 5/7   = 0.714286
+#   R40: (1 + 2 + 0.5) / 7           = 3.5/7 = 0.5
+#   R60: (2 + 0.5) / 7               = 2.5/7 = 0.357143
+# Unweighted: 5/6, 3/6, 2/6.
+# Revenue (weighted): 14.2857, 20.0000, 21.4286 -> optimum R60.
+# Revenue (unweighted): 16.667, 20.000, 20.000 -> tie at R40 and R60; the first
+# (R40) is taken.
+# Profit at unit cost R25 (weighted): (20-25)*5/7 = -3.571, 15*0.5 = 7.5,
+# 35*2.5/7 = 12.5 -> profit optimum R60.
+# Arc elasticity (weighted), R20 -> R40:
+#   dQ/avgQ = (0.5 - 5/7) / ((0.5 + 5/7)/2) = -0.352941
+#   dP/avgP = 20 / 30 = 0.666667  ->  E = -0.529412
+six_ladder <- function() {
+  data.frame(respondent_id = 1:6, w = c(1, 1, 2, 2, 0.5, 0.5),
+             g20 = c(1, 1, 1, 0, 1, 1), g40 = c(1, 0, 1, 0, 1, 0), g60 = c(0, 0, 1, 0, 1, 0))
+}
+
+test_that("weighted and unweighted demand equal the hand calculation", {
+  d <- six_ladder()
+  cols <- c("g20", "g40", "g60"); prices <- c(20, 40, 60)
+  we <- quiet(run_gabor_granger(d, ref_gg_cfg(cols, prices, weight_var = "w", behavior = "diagnostic_only")))
+  un <- quiet(run_gabor_granger(d, ref_gg_cfg(cols, prices, behavior = "diagnostic_only")))
+  expect_equal(we$demand_curve$purchase_intent, c(5/7, 0.5, 2.5/7), tolerance = 1e-12)
+  expect_equal(we$demand_curve$weighted_n, rep(7, 3))
+  expect_equal(we$demand_curve$n_respondents, rep(6L, 3))
+  expect_equal(un$demand_curve$purchase_intent, c(5/6, 3/6, 2/6), tolerance = 1e-12)
+  # Independent: stats::weighted.mean on each column.
+  for (k in seq_along(cols)) {
+    expect_equal(we$demand_curve$purchase_intent[k], weighted.mean(d[[cols[k]]], d$w), tolerance = 1e-12)
+  }
+  expect_equal(we$revenue_curve$revenue_index, prices * c(5/7, 0.5, 2.5/7), tolerance = 1e-12)
+  expect_equal(we$optimal_price$price, 60)
+  expect_equal(un$optimal_price$price, 40)   # first of the tied maxima
+})
+
+test_that("profit optimum and arc elasticity equal the hand calculation", {
+  d <- six_ladder()
+  cols <- c("g20", "g40", "g60"); prices <- c(20, 40, 60)
+  r <- quiet(run_gabor_granger(d, ref_gg_cfg(cols, prices, weight_var = "w",
+                                             behavior = "diagnostic_only", unit_cost = 25)))
+  expect_equal(r$revenue_curve$profit_index, (prices - 25) * c(5/7, 0.5, 2.5/7), tolerance = 1e-12)
+  expect_equal(r$optimal_price_profit$price, 60)
+  expect_equal(r$optimal_price_profit$profit_index, 12.5, tolerance = 1e-12)
+  expect_equal(r$elasticity$arc_elasticity[1], -0.352941176 / (2/3), tolerance = 1e-8)
+  # R40 -> R60: dQ/avgQ = (2.5/7 - 0.5) / ((2.5/7 + 0.5)/2) = -0.333333;
+  # dP/avgP = 20/50 = 0.4; E = -0.833333.
+  expect_equal(r$elasticity$arc_elasticity[2], -0.8333333, tolerance = 1e-6)
+  # Unweighted the two optima part: revenue ties R40 and R60 (first taken, R40),
+  # profit at R25 is 15 x 3/6 = 7.5 at R40 and 35 x 2/6 = 11.667 at R60.
+  un <- quiet(run_gabor_granger(d, ref_gg_cfg(cols, prices, behavior = "diagnostic_only", unit_cost = 25)))
+  expect_equal(un$optimal_price$price, 40)
+  expect_equal(un$optimal_price_profit$price, 60)
+  expect_equal(un$optimal_price_profit$profit_index, 35 * 2 / 6, tolerance = 1e-12)
+})
