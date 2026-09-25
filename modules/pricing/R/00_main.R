@@ -995,7 +995,7 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     method_results[["Mon: model_type"]] <- monadic_results$model_summary$model_type
     method_results[["Mon: pseudo_R2"]] <- sprintf("%.4f", monadic_results$model_summary$pseudo_r2)
     method_results[["Mon: AIC"]] <- sprintf("%.1f", monadic_results$model_summary$aic)
-    method_results[["Mon: price_coef_p"]] <- sprintf("%.6f", monadic_results$model_summary$price_coefficient_p)
+    method_results[["Mon: price_coef_p"]] <- pricing_format_p(monadic_results$model_summary$price_coefficient_p, digits = 6)
     if (!is.null(monadic_results$model_summary$p_value_caveat)) {
       method_results[["Mon: price_coef_p_caveat"]] <- monadic_results$model_summary$p_value_caveat
     }

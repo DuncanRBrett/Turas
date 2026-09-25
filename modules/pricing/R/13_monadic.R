@@ -586,6 +586,26 @@ code_monadic_binary_intent <- function(x, coding = "ZERO_ONE", col_name = "inten
 }
 
 
+#' Format A p-Value For A Deliverable
+#'
+#' A p-value below the printed precision says so: "%.6f" printed Karoo's
+#' 4e-13 as 0.000000 on the Mon_Model_Summary sheet and in the stats pack,
+#' and "%.4f" as p=0.0000 in the confidence factor (robustness follow-up,
+#' 25 Sep 2026).
+#'
+#' @param p The p-value.
+#' @param digits Decimal places to print.
+#' @return "< 0.000001" style text below the precision, the value to
+#'   `digits` places otherwise, "not available" when missing.
+#' @keywords internal
+pricing_format_p <- function(p, digits = 6) {
+  if (is.null(p) || length(p) != 1 || is.na(p) || !is.finite(p)) return("not available")
+  floor_p <- 10^(-digits)
+  if (p < floor_p) return(paste0("< ", formatC(floor_p, format = "f", digits = digits)))
+  formatC(p, format = "f", digits = digits)
+}
+
+
 #' Fit A glm Without The Non-Integer Successes Warning
 #'
 #' Fractional case weights are intended; every other warning passes through.

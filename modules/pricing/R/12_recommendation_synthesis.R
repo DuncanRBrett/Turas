@@ -442,14 +442,18 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
     pseudo_r2 <- monadic_results$model_summary$pseudo_r2
 
     if (!is.null(p_val) && !is.na(p_val) && !is.null(pseudo_r2) && !is.na(pseudo_r2)) {
+      # "p < 0.0001" below the printed precision, "p=0.0123" otherwise
+      # (pricing_format_p(), 13_monadic.R).
+      p_txt <- pricing_format_p(p_val, digits = 4)
+      p_txt <- if (startsWith(p_txt, "<")) paste0("p ", p_txt) else paste0("p=", p_txt)
       if (p_val <= 0.01 && pseudo_r2 >= 0.05) {
-        factors$model_quality <- sprintf("Strong monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
+        factors$model_quality <- sprintf("Strong monadic model (%s, pseudo-R2=%.3f)", p_txt, pseudo_r2)
         scores <- c(scores, 1.0)
       } else if (p_val <= 0.05) {
-        factors$model_quality <- sprintf("Adequate monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
+        factors$model_quality <- sprintf("Adequate monadic model (%s, pseudo-R2=%.3f)", p_txt, pseudo_r2)
         scores <- c(scores, 0.7)
       } else {
-        factors$model_quality <- sprintf("Weak monadic model (p=%.4f) - price effect not significant", p_val)
+        factors$model_quality <- sprintf("Weak monadic model (%s) - price effect not significant", p_txt)
         scores <- c(scores, 0.3)
       }
     } else {

@@ -388,3 +388,21 @@ test_that("the method spread names the methods it is taken across", {
   expect_true(grepl(sprintf("spread %.1f%% across 2 methods", 100 * cv), txt, fixed = TRUE))
   expect_false(grepl("estimates", txt, fixed = TRUE))
 })
+
+test_that("a p-value below the printed precision says so instead of printing zero", {
+  # Karoo's monadic price effect has p = 4e-13 (glm, above), which "%.6f"
+  # printed as 0.000000 on the sheet and "%.4f" as p=0.0000 in the
+  # confidence factor.
+  expect_lt(summary(REF_MON$g)$coefficients[2, 4], 1e-6)
+  ms <- pricing_kv(MON$workbook, "Mon_Model_Summary")
+  expect_equal(unname(ms["Price Coefficient p-value"]), "< 0.000001")
+  sp <- pricing_kv(MON$stats_pack, "Assumptions")
+  expect_equal(unname(sp["Mon: price_coef_p"]), "< 0.000001")
+  ex <- paste(unlist(pricing_sheet(MON$workbook, "Executive_Summary", colNames = FALSE)), collapse = " ")
+  expect_false(grepl("p=0.0000", ex, fixed = TRUE))
+  expect_true(grepl("p < 0.0001", ex, fixed = TRUE))
+  # Ordinary values keep their digits.
+  expect_equal(pricing_format_p(0.0123), "0.012300")
+  expect_equal(pricing_format_p(0.0123, digits = 4), "0.0123")
+  expect_equal(pricing_format_p(NA_real_), "not available")
+})

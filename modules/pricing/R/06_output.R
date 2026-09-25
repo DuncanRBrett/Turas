@@ -478,7 +478,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         sprintf("%.2f", ms$null_deviance),
         sprintf("%.2f", ms$residual_deviance),
         sprintf("%.4f", ms$pseudo_r2),
-        sprintf("%.6f", ms$price_coefficient_p)
+        pricing_format_p(ms$price_coefficient_p, digits = 6)
       ),
       stringsAsFactors = FALSE
     )
