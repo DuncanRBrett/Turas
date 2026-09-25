@@ -205,6 +205,45 @@ test_that("a cap above the mean weight still trims as before", {
 
 
 # ==============================================================================
+# cap_weights in Advanced_Settings
+# ==============================================================================
+
+test_that("cap_weights in Advanced_Settings is refused, because nothing reads it", {
+  # The README, RUNBOOK, TEMPLATE_REFERENCE and the CFG_TRIM_USE_CAP refusal
+  # all told operators to cap rim weights with cap_weights. The config path
+  # only ever read weight_bounds, so any cap_weights value ran on the default
+  # 0.3,3.0 bounds and said nothing. On the fixture the hand raking weights
+  # run to 1.7475, so a cap of 1.6 binds; ignoring it ships weights above the
+  # cap the operator set.
+  run <- adv_run(
+    "cap_weights",
+    specs = ref_spec("rw", "rim"),
+    rim_targets = ref_rim_target_rows("rw"),
+    advanced = data.frame(weight_name = "rw", cap_weights = 1.6)
+  )
+  expect_true(grepl("CFG_CAP_WEIGHTS_NOT_READ", run$console, fixed = TRUE), info = run$console)
+  expect_true(grepl("weight_bounds", run$console, fixed = TRUE))
+  expect_false(file.exists(run$lookup))
+})
+
+test_that("weight_bounds is the setting that caps rim weights", {
+  # weight_bounds = 0.3,1.6 with logit: every rim weight lands inside
+  # [0.3, 1.6], below the unbounded 1.7475.
+  run <- adv_run(
+    "weight_bounds",
+    specs = ref_spec("rw", "rim"),
+    rim_targets = ref_rim_target_rows("rw"),
+    advanced = data.frame(weight_name = "rw", weight_bounds = "0.3,1.6",
+                          calibration_method = "logit")
+  )
+  lk <- adv_lookup(run)
+  expect_equal(run$status, 0L, info = run$console)
+  expect_true(max(lk$rw) <= 1.6 + 1e-8)
+  expect_true(min(lk$rw) >= 0.3 - 1e-8)
+})
+
+
+# ==============================================================================
 # A base under 30
 # ==============================================================================
 

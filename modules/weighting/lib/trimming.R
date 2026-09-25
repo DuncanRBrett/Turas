@@ -153,9 +153,9 @@ trim_weights <- function(weights,
 #'   \item \strong{rim/rake} — refused. Raking calibrates the weights so the
 #'     weighted margins hit the targets and the weights sum to n. Capping
 #'     afterwards destroys both, and nothing re-rakes. The correct mechanism
-#'     already exists: \code{cap_weights} is passed to \code{survey::calibrate}
-#'     as \code{bounds}, so the cap holds \emph{during} calibration and the
-#'     margins still come out right.
+#'     already exists: the \code{weight_bounds} advanced setting is passed to
+#'     \code{survey::calibrate} as \code{bounds}, so the cap holds \emph{during}
+#'     calibration and the margins still come out right.
 #'   \item \strong{design/cell} — applied, then rescaled to restore the original
 #'     sum, and disclosed. These methods have no calibrated margins to break,
 #'     but an uncorrected trim still shrinks the weighted base.
@@ -209,7 +209,7 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_thre
         weight_method
       ),
       why_it_matters = "The run would report the raked margins as achieved while shipping weights that no longer meet them. Every weighted base and percentage in the tabs report built on those weights would be wrong, with nothing on the face of the report to show it.",
-      how_to_fix = "Set apply_trimming = N and use cap_weights instead. cap_weights is passed to survey::calibrate() as the upper weight bound, so the cap applies DURING calibration and the margins still come out right. If you also need a floor, set weight_bounds."
+      how_to_fix = "Set apply_trimming = N and put the cap in weight_bounds in Advanced_Settings, as 'lower,upper' (e.g. '0.3,5'). weight_bounds is passed to survey::calibrate() as the weight bounds, so the cap applies DURING calibration and the margins still come out right. If raking cannot reach the targets inside those bounds, set calibration_method = logit."
     )
   }
 

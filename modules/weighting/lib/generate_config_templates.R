@@ -340,7 +340,7 @@ generate_weight_config_template <- function(output_path) {
       name = "apply_trimming",
       width = 16,
       required = FALSE,
-      description = "Whether to cap extreme weights AFTER calculation. Y or N. Design and cell weights only — a rim weight is refused, because capping afterwards breaks the margins raking just calibrated. For rim, use cap_weights in Advanced_Settings, which caps DURING calibration and keeps the margins.",
+      description = "Whether to cap extreme weights AFTER calculation. Y or N. Design and cell weights only — a rim weight is refused, because capping afterwards breaks the margins raking just calibrated. For rim, put the cap in weight_bounds in Advanced_Settings, which caps DURING calibration and keeps the margins.",
       dropdown = c("Y", "N")
     ),
     list(
@@ -363,7 +363,7 @@ generate_weight_config_template <- function(output_path) {
       weight_name = "wgt_demo",
       method = "rim",
       description = "Demographic rim weighting",
-      # A rim weight caps during calibration via cap_weights in
+      # A rim weight caps during calibration via weight_bounds in
       # Advanced_Settings, never afterwards. apply_trimming = Y on a rim spec
       # is refused, so the example must not show it.
       apply_trimming = "N",

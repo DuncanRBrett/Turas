@@ -94,7 +94,7 @@ test_that("apply_trimming_from_config refuses post-hoc trimming on rim weights",
                 info = paste("method:", m))
     # It must name the setting that does this correctly, or the refusal is a
     # dead end for whoever hits it.
-    expect_true(grepl("cap_weights", conditionMessage(err), fixed = TRUE),
+    expect_true(grepl("weight_bounds", conditionMessage(err), fixed = TRUE),
                 info = paste("method:", m))
   }
 })

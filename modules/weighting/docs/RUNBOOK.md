@@ -169,7 +169,8 @@ own `how_to_fix`; this is the index.
 
 | Code | Fix |
 |---|---|
-| `CFG_TRIM_USE_CAP` | `apply_trimming = Y` on a rim weight. Capping after raking breaks the margins raking just calibrated. Set `apply_trimming = N` and use `cap_weights` in Advanced_Settings, which caps during calibration. |
+| `CFG_TRIM_USE_CAP` | `apply_trimming = Y` on a rim weight. Capping after raking breaks the margins raking just calibrated. Set `apply_trimming = N` and put the cap in `weight_bounds` in Advanced_Settings, which caps during calibration. |
+| `CFG_CAP_WEIGHTS_NOT_READ` | Advanced_Settings has a `cap_weights` column. Nothing reads it, so it used to be ignored silently. Rim: move the cap into `weight_bounds` as `lower,upper`. Design or cell: use `apply_trimming = Y` with `trim_method = cap`. |
 | `CFG_INVALID_CAP`, `CFG_INVALID_PERCENTILE` | `trim_value` must be positive for `cap`, and a proportion strictly between 0 and 1 for `percentile` — `0.95`, not `95`. |
 
 ### Output and environment
@@ -189,9 +190,9 @@ own `how_to_fix`; this is the index.
 **A rim weight cannot be trimmed after the fact.** Every other module in the
 market treats trimming as a post-processing step; here it is refused for rim,
 because the module has already calibrated the margins and capping would unpick
-them without saying so. `cap_weights` is the setting you want, and it does the
-job better — the cap holds during calibration and the margins still come out
-right.
+them without saying so. `weight_bounds` is the setting you want, and it does
+the job better: the cap holds during calibration and the margins still come
+out right.
 
 **Design weights are normalised by default.** A design weight is population over
 sample, so it naturally arrives at population scale — mean 20 on a 1-in-20

@@ -540,8 +540,8 @@ calculate_rim_weights <- function(data,
       cat("│ cannot be confirmed.\n")
     }
     cat("│ How to fix: the weight bounds are probably binding. Widen\n")
-    cat("│ weight_bounds / raise cap_weights, set calibration_method =\n")
-    cat("│ logit, or soften the target that needs the largest stretch.\n")
+    cat("│ weight_bounds, set calibration_method = logit, or soften\n")
+    cat("│ the target that needs the largest stretch.\n")
     cat("│ Raise margin_tolerance only if you accept the gap.\n")
     cat("└───────────────────────────────────────────────────────┘\n\n")
   }

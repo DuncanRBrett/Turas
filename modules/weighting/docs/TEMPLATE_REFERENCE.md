@@ -126,7 +126,7 @@ Paths are resolved in this order:
 
 `apply_trimming` caps weights **after** they were calculated. That is correct for `design` and `cell` weights and wrong for `rim`/`rake`, which calibrate the weights so the margins hit the targets — a post-hoc cap breaks that calibration and nothing re-rakes. A rim spec with `apply_trimming = Y` is refused with `CFG_TRIM_USE_CAP`.
 
-**Rim weights:** set `cap_weights` (or `weight_bounds`) in Advanced_Settings. Those reach `survey::calibrate()` as bounds, so the cap applies during calibration and the margins survive it.
+**Rim weights:** set `weight_bounds` in Advanced_Settings, as `lower,upper`. It reaches `survey::calibrate()` as the bounds, so the cap applies during calibration and the margins survive it. There is no `cap_weights` setting; a config that sets one is refused with `CFG_CAP_WEIGHTS_NOT_READ`.
 
 **When apply_trimming = Y (design and cell only):**
 
