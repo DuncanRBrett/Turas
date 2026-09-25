@@ -428,10 +428,13 @@ var SimEngine = (function() {
 
   function filterRespondents(respUtils, segmentKey) {
     if (!segmentKey || !data.segments) return respUtils;
-    var parts = segmentKey.split(":");
-    if (parts.length !== 2) return respUtils;
-    var segVar = parts[0];
-    var segVal = parts[1];
+    // The key is "Variable:Value" (01_simulator_data_transformer.R). Split at
+    // the FIRST colon only: a value may contain one ("Shift: Night"), and a
+    // split on every colon used to give up and return the whole sample.
+    var cut = segmentKey.indexOf(":");
+    if (cut < 1) return respUtils;
+    var segVar = segmentKey.slice(0, cut);
+    var segVal = segmentKey.slice(cut + 1);
     return respUtils.filter(function(r) {
       return r.segments && r.segments[segVar] === segVal;
     });

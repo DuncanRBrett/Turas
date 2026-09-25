@@ -7,7 +7,8 @@
  *   - shares: mean of each respondent's softmax, x 100
  *   - head-to-head: mean of each respondent's two-item logit, x 100
  *   - TURF: greedy on top-K appeal, ties to the earlier item
- *   - a segment filter picks that segment's respondents
+ *   - a segment filter picks that segment's respondents, including a segment
+ *     value that contains a colon
  *
  * e = 2.718282, 1/e = 0.367879.
  *
@@ -65,6 +66,11 @@ function loadEngine(simData) {
   // Segment "Shift:Day" is R1 alone: shares 66.524, 24.473, 9.003.
   const day = eng.computeShares("Shift:Day");
   check("segment Day share A", day[0].share, 66.524, 1e-3);
+  // Segment "Shift:Night: late" is R2 alone: 33.333 each. Its value contains
+  // a colon, and the filter used to split the key on every colon, give up on
+  // three parts and return the WHOLE sample, so this segment showed 49.929.
+  const night = eng.computeShares("Shift:Night: late");
+  check("segment with a colon in its value share A", night[0].share, 100 / 3, 1e-3);
 }
 
 // --- TURF, top-2 appeal -----------------------------------------------------
