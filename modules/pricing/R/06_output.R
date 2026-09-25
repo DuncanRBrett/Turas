@@ -22,6 +22,40 @@
 }
 
 
+#' The Two Things A Both-Methods Run Must Tell Its Reader
+#'
+#' Duncan's decisions of 25 Sep 2026: on `Analysis_Method = both` the
+#' Gabor-Granger ladder is read on the respondents Van Westendorp validation
+#' keeps, and segments run Van Westendorp only. Both behaviours stay; both are
+#' now said wherever the numbers are read (the Validation and
+#' Segment_Comparison sheets, and the Pricing tab through the island). One
+#' wording, built here.
+#'
+#' @param config The loaded configuration.
+#' @param validation The result of validate_pricing_data().
+#' @return A list with `gg_base` and `segments`, each a sentence or NULL.
+#' @keywords internal
+.pricing_both_methods_notes <- function(config, validation) {
+  if (!identical(tolower(config$analysis_method %||% ""), "both")) {
+    return(list(gg_base = NULL, segments = NULL))
+  }
+  n_excluded <- as.integer(validation$n_excluded %||% 0L)
+  gg_base <- if (n_excluded > 0) {
+    sprintf(paste0(
+      "On a run with both methods, Gabor-Granger is read on the respondents Van ",
+      "Westendorp validation keeps: the %d respondents excluded at validation are not ",
+      "in the Gabor-Granger base either."), n_excluded)
+  } else NULL
+  seg_col <- config$segmentation$segment_column %||% NA_character_
+  segments <- if (!is.na(seg_col) && nzchar(as.character(seg_col))) {
+    paste0("Segments on a run with both methods are analysed with Van Westendorp only. ",
+           "For Gabor-Granger by segment, and the simulator's segment view, run ",
+           "Gabor-Granger on its own.")
+  } else NULL
+  list(gg_base = gg_base, segments = segments)
+}
+
+
 #' Write Pricing Analysis Output
 #'
 #' Generates comprehensive Excel output file with analysis results.
@@ -629,6 +663,15 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       }
     }
 
+    both_notes <- .pricing_both_methods_notes(config, validation)
+    if (!is.null(both_notes$gg_base)) {
+      current_row <- current_row + 1
+      openxlsx::writeData(wb, "Validation", "GABOR-GRANGER BASE", startRow = current_row)
+      openxlsx::addStyle(wb, "Validation", subheader_style, rows = current_row, cols = 1)
+      openxlsx::writeData(wb, "Validation", pricing_escape_cell(both_notes$gg_base),
+                          startRow = current_row + 2)
+    }
+
     openxlsx::setColWidths(wb, "Validation", cols = 1:2, widths = c(30, 60))
   }
 
@@ -703,6 +746,16 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                             pricing_escape_cell(paste0(i, ". ", segment_results$insights[i])),
                             startRow = insight_start + 1 + i)
       }
+    }
+
+    seg_note <- .pricing_both_methods_notes(config, validation)$segments
+    if (!is.null(seg_note)) {
+      note_row <- nrow(segment_results$comparison_table) + 4 +
+        (if (length(segment_results$insights) > 0) length(segment_results$insights) + 3 else 0)
+      openxlsx::writeData(wb, "Segment_Comparison", "NOTE", startRow = note_row)
+      openxlsx::addStyle(wb, "Segment_Comparison", subheader_style, rows = note_row, cols = 1)
+      openxlsx::writeData(wb, "Segment_Comparison", pricing_escape_cell(seg_note),
+                          startRow = note_row + 1)
     }
   }
 

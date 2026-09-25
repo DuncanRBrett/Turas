@@ -345,3 +345,29 @@ test_that("GG segments: the sheet and the simulator's segment curves equal each 
   tot <- ref_gg(KAROO, gg_cols, prices, cost = 38)
   expect_equal(sim$optimal_price, tot$opt)
 })
+
+# ------------------------------------------------------------------------------
+# Disclosure on a both-methods run (Duncan's decisions, 25 Sep 2026): the
+# behaviour stays, the reader is told
+# ------------------------------------------------------------------------------
+GG_BASE_NOTE <- "the 44 respondents excluded at validation are not in the Gabor-Granger base either"
+SEGMENTS_NOTE <- "Segments on a run with both methods are analysed with Van Westendorp only"
+
+test_that("both-methods run: the shared base and the VW-only segments are disclosed where they are read", {
+  sheet_text <- function(sheet) {
+    x <- pricing_sheet(BOTH$workbook, sheet, colNames = FALSE)
+    paste(unlist(x), collapse = " ")
+  }
+  expect_true(grepl(GG_BASE_NOTE, sheet_text("Validation"), fixed = TRUE))
+  expect_true(grepl(SEGMENTS_NOTE, sheet_text("Segment_Comparison"), fixed = TRUE))
+  isl <- jsonlite::fromJSON(BOTH$island)
+  expect_true(grepl(GG_BASE_NOTE, isl$meta$estimationNote$gg, fixed = TRUE))
+  expect_true(grepl(SEGMENTS_NOTE, isl$meta$filterNote, fixed = TRUE))
+  txt <- pricing_render_tab(BOTH$island)
+  expect_true(grepl(GG_BASE_NOTE, txt, fixed = TRUE))
+  expect_true(grepl(SEGMENTS_NOTE, txt, fixed = TRUE))
+  # A single-method run says neither.
+  isl_m <- jsonlite::fromJSON(MON$island)
+  expect_false(grepl("Gabor-Granger base", paste(unlist(isl_m$meta), collapse = " "), fixed = TRUE))
+  expect_false(grepl(SEGMENTS_NOTE, isl_m$meta$filterNote, fixed = TRUE))
+})

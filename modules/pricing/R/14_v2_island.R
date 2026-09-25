@@ -585,6 +585,8 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
         paste0("Unanswered rungs were imputed: ", imputation, ".")
       })
     }
+    base_note <- .pricing_both_methods_notes(config, validation)$gg_base
+    if (!is.null(base_note)) bits <- paste(bits, base_note)
     notes$gg <- bits
   }
   if (has_mon) {
@@ -632,11 +634,11 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
     weightingNote = weighting_note,
     estimationNote = if (length(notes)) notes else NULL,
     frozen = TRUE,
-    filterNote = paste0(
+    filterNote = paste(c(paste0(
       "Pricing results are estimated once on the whole sample. They do not ",
       "respond to the audience filter. To break acceptance by audience, use ",
-      "the crosstab export (Generate_Tabs_Export)."
-    ),
+      "the crosstab export (Generate_Tabs_Export)."),
+      .pricing_both_methods_notes(config, validation)$segments), collapse = " "),
     simulatorFile = .pricing_island_simulator_file(results, config),
     generated = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   ))
