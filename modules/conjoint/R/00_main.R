@@ -565,6 +565,7 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
     # named price/cost/fee is auto-detected. wtp_enabled = N is the off switch,
     # and the template and guard text now say so.
     wtp_result <- NULL
+    wtp_event <- NULL
     if (isTRUE(config$wtp_enabled) && exists("calculate_wtp", mode = "function")) {
       # Auto-detect price attribute from config
       price_attr <- config$price_attribute %||% NULL
@@ -587,7 +588,13 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
           if (verbose) cat("   \u2713 WTP calculated\n")
           result
         }, error = function(e) {
+          # A refusal (a positive or zero price slope, prices that do not
+          # parse) or a failure: WTP was asked for (wtp_enabled defaults to
+          # on) and is not in the output, so it is an event, not a console
+          # line under a PASS.
           if (verbose) cat(sprintf("   WTP calculation skipped: %s\n", conditionMessage(e)))
+          wtp_event <<- list(code = e$code %||% "CONJ_WTP_FAILED",
+                             problem = e$problem %||% conditionMessage(e))
           NULL
         })
       }
@@ -602,6 +609,7 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       config = config,
       data_list = data_list,
       wtp_result = wtp_result,
+      wtp_event = wtp_event,
       trs_state = trs_state,
       start_time = start_time,
       verbose = verbose
@@ -659,7 +667,19 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 conjoint_generate_outputs <- function(utilities, importance, diagnostics,
                                        model_result, config, data_list,
                                        wtp_result, trs_state, start_time,
-                                       verbose = TRUE) {
+                                       verbose = TRUE, wtp_event = NULL) {
+
+  # Record an event on the run state. Every step below that can fail or
+  # refuse after being asked for goes through here, so the returned status,
+  # the banner, the Run_Status sheet and the stats pack all see it. Before,
+  # the status was the count of config and data warnings, the run result
+  # was copied before the Excel write, and a refused tabs export printed
+  # "[TRS PARTIAL]" above a "[TRS PASS] COMPLETED SUCCESSFULLY" banner.
+  .event <- function(code, title, problem) {
+    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+      turas_run_state_partial(trs_state, code, title, problem = problem)
+    }
+  }
 
   if (verbose) cat("\n7. Generating Excel output...\n")
 
@@ -690,11 +710,16 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     }
   }
 
+  if (!is.null(wtp_event)) {
+    .event(wtp_event$code, "Willingness to pay not produced", wtp_event$problem)
+  }
+
   run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
     turas_run_state_result(trs_state)
   } else {
     NULL
   }
+  n_events_at_write <- length(run_result$events)
 
   write_conjoint_output(
     utilities = utilities, importance = importance,
@@ -722,10 +747,12 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
       ),
       turas_refusal = function(e) {
         cat(conditionMessage(e))
-        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
-          turas_run_state_partial(trs_state, e$code, "Tabs export not produced",
-                                  problem = e$problem)
-        }
+        .event(e$code, "Tabs export not produced", e$problem)
+        NULL
+      },
+      error = function(e) {
+        cat(sprintf("\n[TRS PARTIAL] CONJ_TABS_EXPORT_FAILED: %s\n", conditionMessage(e)))
+        .event("CONJ_TABS_EXPORT_FAILED", "Tabs export failed", conditionMessage(e))
         NULL
       }
     )
@@ -748,9 +775,15 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
         ),
         verbose = verbose
       ),
-      turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        .event(e$code %||% "CONJ_ISLAND_REFUSED", "Interactive-report contribution not produced",
+               e$problem %||% conditionMessage(e))
+        NULL
+      },
       error = function(e) {
-        message(sprintf("[TRS INFO] CONJ_ISLAND_FAILED: %s", conditionMessage(e)))
+        cat(sprintf("\n[TRS PARTIAL] CONJ_ISLAND_FAILED: %s\n", conditionMessage(e)))
+        .event("CONJ_ISLAND_FAILED", "Interactive-report contribution failed", conditionMessage(e))
         NULL
       }
     )
@@ -769,6 +802,8 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
 
     if (!exists("generate_conjoint_simulator", mode = "function")) {
       cat("\n[TRS WARNING] CONJ_SIMULATOR_UNAVAILABLE: the simulator builder is not loaded; no simulator was written.\n\n")
+      .event("CONJ_SIMULATOR_UNAVAILABLE", "Simulator not produced",
+             "The simulator builder is not loaded; no simulator was written.")
     } else {
       sim_path <- sub("\\.xlsx$", "_simulator.html", config$output_file)
       simulator_result <- tryCatch(
@@ -782,7 +817,8 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
           verbose = verbose
         ),
         error = function(e) {
-          message(sprintf("[TRS INFO] CONJ_SIMULATOR_FAILED: %s", conditionMessage(e)))
+          cat(sprintf("\n[TRS PARTIAL] CONJ_SIMULATOR_FAILED: %s\n", conditionMessage(e)))
+          .event("CONJ_SIMULATOR_FAILED", "Simulator failed", conditionMessage(e))
           NULL
         }
       )
@@ -804,12 +840,33 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
         cat("\u2502", simulator_result$message, "\n")
         cat("\u2502 Fix:", simulator_result$how_to_fix, "\n")
         cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
-        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
-          turas_run_state_partial(trs_state, simulator_result$code,
-                                  "Simulator not produced",
-                                  problem = simulator_result$message)
-        }
+        .event(simulator_result$code, "Simulator not produced", simulator_result$message)
       }
+    }
+  }
+
+  # The run result as it stands after every step. If a step after the Excel
+  # write raised an event, the workbook is written again from the same
+  # results so its Run_Status sheet says so: a fresh write, never a second
+  # save of one openxlsx object (that writes width="NA" on auto-width
+  # columns, which Excel treats as a damaged file).
+  if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    run_result <- turas_run_state_result(trs_state)
+    if (length(run_result$events) > n_events_at_write) {
+      tryCatch(
+        write_conjoint_output(
+          utilities = utilities, importance = importance,
+          diagnostics = diagnostics, model_result = model_result,
+          config = config, data_info = data_list,
+          output_file = config$output_file, run_result = run_result
+        ),
+        error = function(e) {
+          cat(sprintf(paste0(
+            "\n[TRS WARNING] CONJ_RUN_STATUS_NOT_UPDATED: the workbook's Run_Status ",
+            "sheet could not be updated with the events raised after it was ",
+            "written (%s). The banner and the stats pack carry the final status.\n"),
+            conditionMessage(e)))
+        })
     }
   }
 
@@ -871,7 +928,7 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     cat("\n")
   }
 
-  top_status <- if (length(all_warnings) == 0) "PASS" else "PARTIAL"
+  top_status <- run_result$status %||% (if (length(all_warnings) == 0) "PASS" else "PARTIAL")
 
   list(
     status = top_status,
