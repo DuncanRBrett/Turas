@@ -485,6 +485,19 @@ maxdiff_extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
     mean_rhat = mean(mu_summary$rhat, na.rm = TRUE),
     min_ess = min(mu_summary$ess_bulk, na.rm = TRUE)
   )
+  # The verdict the stats pack prints (converged, rhat_max, ess_min,
+  # quality_score) comes from the module's own rule on this fit. The pack
+  # read those four fields and nothing wrote them, so every Stan run's pack
+  # said NOT CONVERGED with R-hat and ESS "N/A".
+  verdict <- tryCatch(check_hb_convergence_auto(fit, verbose = FALSE),
+                      error = function(e) NULL)
+  if (!is.null(verdict)) {
+    diagnostics$converged <- isTRUE(verdict$converged)
+    diagnostics$rhat_max <- verdict$rhat_max
+    diagnostics$ess_min <- verdict$ess_min
+    diagnostics$quality_score <- verdict$quality_score
+    diagnostics$recommendations <- verdict$recommendations
+  }
 
   if (verbose) {
     log_message(sprintf(
@@ -901,7 +914,7 @@ check_hb_convergence_auto <- function(fit, parameters = NULL, verbose = TRUE) {
 
     # Check max treedepth
     if ("treedepth__" %in% colnames(sampler_diag)) {
-      diagnostics$n_max_treedepth <- sum(sampler_diag[, "treedepth__"] >= 10)
+      diagnostics$n_max_treedepth <- sum(sampler_diag$treedepth__ >= 10, na.rm = TRUE)
 
       if (diagnostics$n_max_treedepth > 0) {
         diagnostics$quality_score <- diagnostics$quality_score - 5

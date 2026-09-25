@@ -908,7 +908,12 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
 
   # HB convergence diagnostics (when available)
   hb_diag <- if (has_hb) results$hb_results$diagnostics else NULL
-  hb_convergence_items <- if (!is.null(hb_diag)) {
+  hb_is_stan <- identical(results$hb_results$model_fit$method, "cmdstanr")
+  hb_convergence_items <- if (!is.null(hb_diag) && !hb_is_stan) {
+    # The empirical-Bayes fallback has no sampler, so there is no convergence
+    # to report either way. It used to print NOT CONVERGED.
+    list("Convergence Status" = "Not applicable (empirical-Bayes approximation, no sampler)")
+  } else if (!is.null(hb_diag)) {
     list(
       "Convergence Status" = if (isTRUE(hb_diag$converged)) "CONVERGED" else "NOT CONVERGED",
       "R-hat Max" = if (!is.na(hb_diag$rhat_max %||% NA)) sprintf("%.4f", hb_diag$rhat_max) else "N/A",

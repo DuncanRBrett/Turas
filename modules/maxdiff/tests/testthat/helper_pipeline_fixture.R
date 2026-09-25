@@ -125,3 +125,12 @@ md_pipe_long <- function(build, weighted = TRUE) {
   }
   list(long = do.call(rbind, rows), data = data)
 }
+
+#' Read one Field -> Value row from the stats pack's Assumptions sheet.
+md_pipe_stats_value <- function(path, field) {
+  x <- openxlsx::read.xlsx(path, sheet = "Assumptions", colNames = FALSE,
+                           skipEmptyRows = FALSE)
+  hit <- which(x[[1]] == field)
+  if (length(hit) == 0) return(NA_character_)
+  as.character(x[[2]][hit[1]])
+}

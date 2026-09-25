@@ -179,3 +179,19 @@ test_that("the simulator carries the same individual utilities as INDIVIDUAL_UTI
   ref <- as.matrix(iu[match(sim_ids, iu$resp_id), ids])
   expect_equal(unname(sim), unname(ref), tolerance = 1e-3)
 })
+
+test_that("the stats pack reports the Stan fit's convergence, not NOT CONVERGED", {
+  # The run's island carries the sampler's own numbers; the stats pack must
+  # agree with them. Before, the pack read fields the Stan extractor never
+  # wrote, so every Stan run said NOT CONVERGED with R-hat and ESS "N/A".
+  meta <- jsonlite::fromJSON(PW$island)$meta
+  expect_equal(meta$nDivergences, 0)
+  expect_equal(md_pipe_stats_value(PW$stats_pack, "Convergence Status"), "CONVERGED")
+  rhat <- as.numeric(md_pipe_stats_value(PW$stats_pack, "R-hat Max"))
+  ess <- as.numeric(md_pipe_stats_value(PW$stats_pack, "ESS Min"))
+  expect_true(is.finite(rhat) && rhat >= 1 && rhat < 1.05)
+  expect_true(is.finite(ess) && ess >= 100)
+  expect_lte(ess, meta$minEss + 1)
+  expect_gte(ess, meta$minEss - 1)
+  expect_match(md_pipe_stats_value(PW$stats_pack, "Quality Score"), "^[0-9]+/100$")
+})

@@ -79,3 +79,10 @@ test_that("the empirical-Bayes fallback in place of Stan HB is a PARTIAL event",
   expect_equal(sheet$status, "PARTIAL")
   expect_match(sheet$text, "MAXD_HB_APPROXIMATE", fixed = TRUE)
 })
+
+test_that("the stats pack does not call the empirical-Bayes fallback NOT CONVERGED", {
+  # There is no sampler on this path, so no convergence to report either way.
+  expect_true(file.exists(PE$stats_pack))
+  expect_match(md_pipe_stats_value(PE$stats_pack, "Convergence Status"),
+               "^Not applicable", fixed = FALSE)
+})
