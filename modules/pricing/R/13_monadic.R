@@ -151,6 +151,24 @@ run_monadic_analysis <- function(data, config) {
   cell_weighted_n <- tapply(case_weights, price_factor, sum)
   observed_prices <- as.numeric(names(cell_sizes))
 
+  # One price has no slope: glm returns no price coefficient and the run died
+  # on "coefs[2, 4]: subscript out of bounds" (robustness gate, 25 Sep 2026).
+  # Checked after the valid-answer filter, which can also leave one price.
+  if (length(observed_prices) < 2) {
+    pricing_refuse(
+      code = "DATA_MONADIC_ONE_PRICE",
+      title = "A Monadic Test Needs At Least Two Prices",
+      problem = sprintf("After removing missing answers, every respondent in '%s' saw the same price%s.",
+                        price_col,
+                        if (length(observed_prices) == 1) sprintf(" (%s)", format(observed_prices)) else ""),
+      why_it_matters = "The demand curve is the change in intent across prices; one price gives no change to measure.",
+      how_to_fix = c(
+        "Check that Price_Column names the column holding each respondent's assigned price.",
+        "Check that the intent answers are present in more than one price cell."
+      )
+    )
+  }
+
   observed_data <- data.frame(
     price = observed_prices,
     n = as.numeric(cell_sizes),

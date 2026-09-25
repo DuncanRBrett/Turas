@@ -147,3 +147,20 @@ test_that("a monadic cell of 10 to 29 respondents runs with its warning printed"
   expect_equal(ob$n[ob$price == 130], 20)
   expect_true(any(grepl("Monadic cell n=20 below minimum 30", r$log, fixed = TRUE)))
 })
+
+test_that("a monadic design with one price refuses by name instead of crashing", {
+  # One price has no slope to estimate; glm returns no price coefficient and
+  # the run died on "coefs[2, 4]: subscript out of bounds".
+  d <- adv_mon_data()
+  d$price <- 45
+  err <- tryCatch(quiet(run_monadic_analysis(d, adv_mon_cfg())),
+                  turas_refusal = function(e) e, error = function(e) e)
+  expect_s3_class(err, "turas_refusal")
+  expect_equal(err$code, "DATA_MONADIC_ONE_PRICE")
+  # The same when the valid-answer filter is what leaves one price.
+  d2 <- adv_mon_data()
+  d2$buy[d2$price != 20] <- NA
+  err2 <- tryCatch(quiet(run_monadic_analysis(d2, adv_mon_cfg())),
+                   turas_refusal = function(e) e, error = function(e) e)
+  expect_equal(err2$code, "DATA_MONADIC_ONE_PRICE")
+})
