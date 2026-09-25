@@ -316,15 +316,16 @@ apply_price_rounding <- function(prices, round_to) {
   # Round to nearest integer then apply ending
   rounded <- floor(prices) + ending
 
-  # Adjust if rounding pushed price too far from original
-  # (more than 10% change)
+  # An ending that moves the price more than 10% is not applied; the price is
+  # kept to the cent, the rule round_to_psychological() uses for the
+  # recommendation. The old fallback, ceiling(p) + ending - 1, equals
+  # floor(p) + ending for every price that is not a whole number, so the
+  # guard never fired and a R0.60 tier printed as R0.99 (robustness gate,
+  # 25 Sep 2026).
   for (i in seq_along(prices)) {
-    if (abs(rounded[i] - prices[i]) / prices[i] > 0.10) {
-      # Try rounding up instead
-      alt_rounded <- ceiling(prices[i]) + ending - 1
-      if (abs(alt_rounded - prices[i]) < abs(rounded[i] - prices[i])) {
-        rounded[i] <- alt_rounded
-      }
+    if (!is.na(prices[i]) && prices[i] != 0 &&
+        abs(rounded[i] - prices[i]) / abs(prices[i]) > 0.10) {
+      rounded[i] <- round(prices[i], 2)
     }
   }
 

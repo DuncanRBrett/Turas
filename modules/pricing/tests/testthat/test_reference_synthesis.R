@@ -116,3 +116,11 @@ test_that("the price ladder equals the hand calculation from the VW points", {
   expect_equal(lad$tier_table$gap_to_next_pct[1:2],
                c((62.99 / 54.99 - 1) * 100, (72.99 / 62.99 - 1) * 100), tolerance = 1e-9)
 })
+
+test_that("ladder rounding keeps its 10% guard on a low-priced product", {
+  # floor(p) + 0.99 moves R0.60 to R0.99 (+65%) and R2.05 to R2.99 (+46%).
+  # The documented guard ("more than 10% change") then keeps the price to the
+  # cent. R54.25 -> R54.99 is +1.4% and keeps its ending.
+  expect_equal(apply_price_rounding(c(0.60, 2.05, 54.25), "0.99"), c(0.60, 2.05, 54.99))
+  expect_equal(apply_price_rounding(c(0.60, 54.25), "0.95"), c(0.60, 54.95))
+})
