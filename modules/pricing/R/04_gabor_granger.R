@@ -855,44 +855,39 @@ smooth_isotonic <- function(prices, intent, verbose = FALSE) {
 
   if (n <= 1) return(intent)
 
-  # PAVA for monotonically DECREASING function
-  # We want: intent[1] >= intent[2] >= ... >= intent[n] as price increases
-
-  # Initialize with original values
-  y <- intent
-  w <- rep(1, n)  # weights (could be sample sizes if weighted)
-
-  # Pool adjacent violators
-  # Work from left to right, pooling when violation found
-  i <- 1
-  while (i < n) {
-    if (y[i] < y[i + 1]) {
-      # Violation: demand increased with price
-      # Pool blocks
-      j <- i + 1
-
-      # Find extent of violation
-      while (j <= n && y[i] < y[j]) {
-        j <- j + 1
-      }
-      j <- j - 1
-
-      # Pool all points from i to j
-      # Weighted mean of pooled block
-      pooled_sum <- sum(y[i:j] * w[i:j])
-      pooled_weight <- sum(w[i:j])
-      pooled_mean <- pooled_sum / pooled_weight
-
-      # Assign pooled value
-      y[i:j] <- pooled_mean
-      w[i:j] <- pooled_weight / (j - i + 1)
-
-      # Step back to check for new violations
-      if (i > 1) i <- i - 1
-    } else {
-      i <- i + 1
+  # PAVA for a monotonically DECREASING function:
+  # intent[1] >= intent[2] >= ... >= intent[n] as price increases.
+  #
+  # Block form. Each point enters as its own block; while the newest block's
+  # mean is above the one before it (demand rising with price), the two merge
+  # into one block at their weighted mean. Only adjacent violators ever pool.
+  # The old loop compared every later point with the first point's ORIGINAL
+  # value, so 0.30, 0.50, 0.35, 0.20 pooled the first three rungs to 0.383
+  # where the monotone fit is 0.40, 0.40, 0.35, 0.20, and on a real ladder that
+  # moved the revenue optimum (robustness gate, 25 Sep 2026). Rungs carry equal
+  # weight: every rung is answered by the same respondents
+  # (check_gg_rung_bases), so the base is the same at each price.
+  block_mean <- numeric(0)
+  block_weight <- numeric(0)
+  block_size <- integer(0)
+  for (k in seq_len(n)) {
+    block_mean <- c(block_mean, intent[k])
+    block_weight <- c(block_weight, 1)
+    block_size <- c(block_size, 1L)
+    b <- length(block_mean)
+    while (b > 1 && block_mean[b - 1] < block_mean[b]) {
+      w_new <- block_weight[b - 1] + block_weight[b]
+      block_mean[b - 1] <- (block_mean[b - 1] * block_weight[b - 1] +
+                              block_mean[b] * block_weight[b]) / w_new
+      block_weight[b - 1] <- w_new
+      block_size[b - 1] <- block_size[b - 1] + block_size[b]
+      block_mean <- block_mean[-b]
+      block_weight <- block_weight[-b]
+      block_size <- block_size[-b]
+      b <- b - 1
     }
   }
+  y <- rep(block_mean, block_size)
 
   if (verbose) {
     n_adjusted <- sum(abs(y - intent) > 1e-10)
