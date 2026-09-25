@@ -194,3 +194,71 @@ test_that("a DK code on a monadic scale intent is missing, not a purchase", {
   op <- pricing_sheet(r$workbook, "Mon_Optimal_Price", colNames = FALSE)
   expect_equal(as.numeric(op$X2[which(op$X1 == "Revenue-Maximizing Price")]), ref$opt, tolerance = 1e-9)
 })
+
+# ------------------------------------------------------------------------------
+# Weights with a design effect near 2, and grossed weights
+# ------------------------------------------------------------------------------
+test_that("design effect near 2: VW, GG and monadic still equal their references", {
+  # Half the sample at 0.05, half at 1.95: DEFF = mean(w^2) / mean(w)^2
+  # = (0.0025 + 3.8025) / 2 = 1.9025.
+  set.seed(31)
+  n <- 120
+  base <- sample(40:80, n, replace = TRUE)
+  d <- data.frame(respondent_id = 1:n,
+                  tc = base - sample(15:25, n, TRUE), ch = base - sample(3:12, n, TRUE),
+                  ex = base + sample(3:12, n, TRUE), te = base + sample(15:30, n, TRUE),
+                  w = rep(c(0.05, 1.95), length.out = n))
+  expect_equal(mean(d$w^2) / mean(d$w)^2, 1.9025, tolerance = 1e-12)
+  cfg <- list(analysis_method = "van_westendorp", weight_var = "w", dk_codes = numeric(0),
+              currency_symbol = "R",
+              van_westendorp = list(col_too_cheap = "tc", col_cheap = "ch", col_expensive = "ex",
+                                    col_too_expensive = "te", validate_monotonicity = TRUE,
+                                    violation_threshold = 0.5, calculate_confidence = FALSE),
+              vw_monotonicity_behavior = "drop",
+              validation = list(min_completeness = 0.8, min_sample = 5, price_min = 0, price_max = 10000))
+  v <- quiet(validate_pricing_data(d, cfg))
+  r <- quiet(run_van_westendorp(v$clean_data, cfg, validation = v))
+  k <- v$clean_data
+  des <- survey::svydesign(ids = ~1, weights = ~w, data = k)
+  p <- suppressWarnings(pricesensitivitymeter::psm_analysis_weighted(
+    toocheap = "tc", cheap = "ch", expensive = "ex", tooexpensive = "te",
+    design = des, validate = TRUE, interpolate = TRUE, interpolation_steps = 0.1))
+  expect_equal(unname(unlist(r$price_points[c("PMC", "OPP", "IDP", "PME")])),
+               c(p$pricerange_lower, p$opp, p$idp, p$pricerange_upper), tolerance = 1e-9)
+
+  # GG on the same weights, and on the same weights grossed x 10,000.
+  d$g1 <- as.integer(d$ch >= 50); d$g2 <- as.integer(d$ch >= 60); d$g3 <- as.integer(d$ch >= 70)
+  d$w_gross <- d$w * 10000
+  gcfg <- function(wv) list(
+    analysis_method = "gabor_granger", weight_var = wv, dk_codes = numeric(0),
+    id_var = "respondent_id", unit_cost = NA_real_, currency_symbol = "R",
+    gg_monotonicity_behavior = "smooth", gg_stop_early_imputation = "NONE",
+    gabor_granger = list(data_format = "wide", price_sequence = c(50, 60, 70),
+                         response_columns = c("g1", "g2", "g3"), response_type = "binary",
+                         binary_coding = "ZERO_ONE", smoothing_method = "isotonic",
+                         check_monotonicity = FALSE, calculate_elasticity = FALSE,
+                         revenue_optimization = TRUE, confidence_intervals = FALSE),
+    validation = list(min_completeness = 0.8, min_sample = 1, price_min = 0, price_max = 10000))
+  g <- quiet(run_gabor_granger(d, gcfg("w")))
+  gg <- quiet(run_gabor_granger(d, gcfg("w_gross")))
+  ref <- c(weighted.mean(d$g1, d$w), weighted.mean(d$g2, d$w), weighted.mean(d$g3, d$w))
+  expect_equal(g$demand_curve$purchase_intent_raw, ref, tolerance = 1e-12)
+  expect_equal(gg$demand_curve$purchase_intent_raw, ref, tolerance = 1e-12)
+  expect_equal(gg$optimal_price$price, g$optimal_price$price)
+
+  # Monadic at DEFF 1.9: coefficients equal glm with the same weights.
+  m <- adv_mon_data()
+  m$w <- rep(c(0.05, 1.95), length.out = nrow(m))
+  mc <- adv_mon_cfg(); mc$weight_var <- "w"
+  mr <- quiet(run_monadic_analysis(m, mc))
+  gm <- suppressWarnings(glm(buy ~ price, family = binomial, data = m, weights = w))
+  expect_equal(unname(mr$model_summary$coefficients[, 1]), unname(coef(gm)), tolerance = 1e-7)
+})
+
+test_that("monadic grossing weights refuse by name (by design, review H4)", {
+  m <- adv_mon_data()
+  m$w <- 5000
+  mc <- adv_mon_cfg(); mc$weight_var <- "w"
+  err <- tryCatch(quiet(run_monadic_analysis(m, mc)), turas_refusal = function(e) e)
+  expect_equal(err$code, "DATA_MONADIC_GROSSING_WEIGHTS")
+})
