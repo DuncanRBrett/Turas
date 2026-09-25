@@ -57,3 +57,25 @@ test_that("TURF asked for but skipped for want of individual utilities is an eve
   codes <- vapply(PN$run_result$events %||% list(), function(e) e$code %||% "", "")
   expect_true("MAXD_TURF_SKIPPED" %in% codes)
 })
+
+# A library folder holding a broken "cmdstanr" (a DESCRIPTION and nothing
+# else) placed first on the child's library path: requireNamespace("cmdstanr")
+# then returns FALSE and fit_hb_model() takes the empirical-Bayes fallback,
+# exactly as on a machine without cmdstanr.
+.hide_cmdstanr_lib <- function() {
+  lib <- tempfile("no_cmdstanr_")
+  dir.create(file.path(lib, "cmdstanr"), recursive = TRUE)
+  writeLines(c("Package: cmdstanr", "Version: 0.0.0"), file.path(lib, "cmdstanr", "DESCRIPTION"))
+  lib
+}
+
+PE <- md_pipe_run(n = 60, weighted = FALSE, lib_prepend = .hide_cmdstanr_lib())
+
+test_that("the empirical-Bayes fallback in place of Stan HB is a PARTIAL event", {
+  expect_true(file.exists(PE$workbook), info = paste(tail(PE$log, 30), collapse = "\n"))
+  expect_equal(jsonlite::fromJSON(PE$island)$meta$method, "empirical_bayes")
+  expect_equal(PE$status, "PARTIAL")
+  sheet <- .run_status_sheet(PE$workbook)
+  expect_equal(sheet$status, "PARTIAL")
+  expect_match(sheet$text, "MAXD_HB_APPROXIMATE", fixed = TRUE)
+})

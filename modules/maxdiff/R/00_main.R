@@ -1104,9 +1104,24 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
                    config = config, verbose = verbose)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_HB_FAILED: HB model failed: %s", conditionMessage(e)))
-      add_warning(sprintf("HB model: %s", conditionMessage(e)))
+      add_warning(sprintf("HB model: %s", conditionMessage(e)), code = "MAXD_HB_FAILED")
       NULL
     })
+    # HB was asked for and the Stan model did not run: cmdstanr is missing,
+    # or the model failed to compile or sample, and fit_hb_model() fell back
+    # to the count-based empirical-Bayes approximation. The utilities, shares,
+    # TURF and simulator are then built on shrunken best-minus-worst counts,
+    # not a posterior, and the run used to say PASS.
+    .hb_method <- hb_results$model_fit$method %||% NA_character_
+    if (!is.null(hb_results) && !identical(.hb_method, "cmdstanr")) {
+      .hb_msg <- paste0(
+        "Hierarchical Bayes was requested but the Stan model did not run, so ",
+        "the individual utilities are the count-based empirical-Bayes ",
+        "approximation (", .hb_method, "). Install cmdstanr and CmdStan, or ",
+        "see the console for why Stan failed.")
+      cat(sprintf("\n[TRS PARTIAL] MAXD_HB_APPROXIMATE: %s\n", .hb_msg))
+      add_warning(.hb_msg, code = "MAXD_HB_APPROXIMATE")
+    }
     if (!is.null(hb_results) && !is.null(count_scores)) {
       count_scores <- merge(count_scores,
         hb_results$population_utilities[, intersect(c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"),
