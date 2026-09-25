@@ -182,3 +182,12 @@ test_that("the shipped example finishes PARTIAL on its two data warnings, not on
   expect_true(any(grepl("Sample size (50 respondents)", problems, fixed = TRUE)))
   expect_false(any(grepl("onverge", problems)))
 })
+
+test_that("the island's WTP note describes the interval the code computes", {
+  # Since the delta method uses the model's covariance, the interval IS a
+  # sampling interval; the note used to say it was not.
+  note <- jsonlite::fromJSON(PM$island)$wtp$intervalNote
+  expect_false(grepl("not a sampling interval", note, fixed = TRUE))
+  expect_match(note, "covariance", fixed = TRUE)
+  expect_match(note, "linear", fixed = TRUE)
+})

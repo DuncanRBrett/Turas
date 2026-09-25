@@ -139,12 +139,15 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
       ciLower = num(w$WTP_Lower),
       ciUpper = num(w$WTP_Upper),
       isBaseline = as.logical(w$is_baseline),
-      # The interval is a delta-method approximation on a price slope fitted
-      # through a handful of estimated utilities. The reader is told, in the
-      # island, so the view cannot forget to say it.
+      # What the interval is, told in the island so the view cannot forget
+      # to say it. Since 25 Sep 2026 it is the delta method on the model's
+      # covariance (14_willingness_to_pay.R); the price slope is the
+      # least-squares line through the price part-worths.
       intervalNote = paste0(
-        "Approximate: the delta method applied to a price slope fitted ",
-        "through the estimated price utilities, not a sampling interval."
+        "Approximate interval by the delta method on the model's ",
+        "covariance of the part-worths, so it carries the uncertainty in the ",
+        "level and in the price slope. The price slope is a straight line ",
+        "through the price part-worths, so WTP assumes price acts linearly."
       )
     ))
   }

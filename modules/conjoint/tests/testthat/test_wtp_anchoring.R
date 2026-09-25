@@ -113,7 +113,9 @@ test_that("H9: the WTP interval is labelled approximate where the reader sees it
                                           "17_v2_island.R"), warn = FALSE),
                       collapse = "\n")
   expect_true(grepl("intervalNote", island_src, fixed = TRUE))
-  expect_true(grepl("not a sampling interval", island_src, fixed = TRUE))
+  # Still labelled approximate; since the delta method moved onto the model's
+  # covariance (25 Sep 2026) it no longer says "not a sampling interval".
+  expect_true(grepl("Approximate", island_src, fixed = TRUE))
 
   view <- file.path(root, "modules", "tabs", "lib", "html_report_v2",
                     "assets", "js", "27x_conjoint.js")
