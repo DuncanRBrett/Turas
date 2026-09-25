@@ -106,11 +106,21 @@ calculate_wtp <- function(utilities, config, model_result = NULL, verbose = TRUE
     )
   }
 
-  # Estimate price coefficient SE for full delta method
+  # Price slope SE: from the model's covariance when there is one (see the
+  # delta-method note at the end of this file); the lm residual SE only as a
+  # last resort.
   price_coef_se <- estimate_price_coefficient_se(utilities, price_attr)
+  .delta <- .wtp_delta_setup(utilities, price_attr, model_result)
+  if (isTRUE(.delta$full)) {
+    price_coef_se <- sqrt(drop(t(.delta$c) %*%
+      .delta$V[.delta$price_names, .delta$price_names, drop = FALSE] %*% .delta$c))
+  } else if (!is.null(.delta$var_s)) {
+    price_coef_se <- sqrt(.delta$var_s)
+  }
 
   # Calculate aggregate WTP
-  wtp_table <- calculate_aggregate_wtp(utilities, price_attr, price_coef, price_coef_se, config, verbose)
+  wtp_table <- calculate_aggregate_wtp(utilities, price_attr, price_coef, price_coef_se, config, verbose,
+                                       model_result = model_result)
 
   result <- list(
     wtp_table = wtp_table,
@@ -288,7 +298,10 @@ extract_numeric_prices <- function(levels) {
 #' @param verbose Logical
 #' @return Data frame with WTP per attribute level
 #' @keywords internal
-calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coef_se, config, verbose) {
+calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coef_se, config, verbose,
+                                    model_result = NULL) {
+
+  delta <- .wtp_delta_setup(utilities, price_attr, model_result)
 
   # WTP for each non-price attribute level relative to baseline.
   #
@@ -321,6 +334,7 @@ calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coe
     # Var(WTP) ≈ (SE_beta / price_coef)^2 + (beta * SE_price / price_coef^2)^2
     # This accounts for uncertainty in both the attribute coefficient AND the price coefficient
     se_wtp <- NA_real_
+    delta_se <- .wtp_delta_se(delta, row$Attribute, row$Level, beta, price_coef)
     # The SE of the level's contrast with the baseline, which is what WTP is.
     # Std_Error / SE are the SE of the printed (possibly centred) utility, a
     # different quantity; they are used only by tables that predate
@@ -329,7 +343,9 @@ calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coe
               else if (!is.null(row$SE) && !is.na(row$SE)) row$SE
               else if (!is.null(row$Std_Error) && !is.na(row$Std_Error)) row$Std_Error
               else NA_real_
-    if (!is.na(row_se) && row_se > 0 && !is.na(price_coef_se)) {
+    if (!is.na(delta_se)) {
+      se_wtp <- delta_se
+    } else if (!is.na(row_se) && row_se > 0 && !is.na(price_coef_se)) {
       # Full delta method with both sources of variance
       var_from_beta <- (row_se / price_coef)^2
       var_from_price <- (beta * price_coef_se / price_coef^2)^2
@@ -496,3 +512,71 @@ summarize_wtp_distribution <- function(individual_wtp) {
 # ==============================================================================
 
 message(sprintf("TURAS>Conjoint WTP module loaded (v%s)", CONJOINT_WTP_VERSION))
+
+
+# ------------------------------------------------------------------------------
+# WTP standard errors by the delta method
+# ------------------------------------------------------------------------------
+# The price slope is the least-squares line through the price part-worths,
+# a linear function of the price contrasts b_k (b_1 = 0):
+#   s = sum_k c_k b_k,  c_k = (x_k - xbar) / sum_j (x_j - xbar)^2
+# WTP of a level is -b / s, so from the covariance V of all the contrasts
+#   Var(WTP) = Var(b) / s^2 + b^2 Var(s) / s^4 - 2 b Cov(b, s) / s^3
+#   Var(s) = c' V_pp c,  Cov(b, s) = V_bp c.
+# The SE used before took Var(s) from the residuals of lm(part-worth ~ price),
+# which measures non-linearity in price, not how precisely the slope is
+# estimated: it was 0 for linear part-worths and missing with two price
+# levels. V is the model's vcov (aggregate) or the posterior covariance of the
+# population mean (HB). Without one, the contrasts are treated as independent
+# with their SE_vs_Baseline.
+
+#' @keywords internal
+.wtp_coef_name <- function(names_v, attr, level) {
+  cand <- c(paste0(attr, level), paste0("`", attr, "`", level), paste0(attr, "_", level))
+  hit <- cand[cand %in% names_v]
+  if (length(hit)) hit[1] else NA_character_
+}
+
+#' @keywords internal
+.wtp_delta_setup <- function(utilities, price_attr, model_result) {
+  pr <- utilities[utilities$Attribute == price_attr, , drop = FALSE]
+  if (nrow(pr) < 2) return(NULL)
+  x <- extract_numeric_prices(pr$Level)
+  if (anyNA(x)) return(NULL)
+  cc <- (x - mean(x)) / sum((x - mean(x))^2)
+  base <- which(pr$is_baseline %in% TRUE)
+  if (length(base) != 1) return(NULL)
+  V <- model_result$vcov
+  if (is.matrix(V) && !is.null(rownames(V))) {
+    pn <- vapply(pr$Level[-base], function(l) .wtp_coef_name(rownames(V), price_attr, l), "")
+    if (!anyNA(pn)) {
+      return(list(V = V, c = cc[-base], price_names = pn, full = TRUE))
+    }
+  }
+  se <- pr$SE_vs_Baseline[-base]
+  if (is.null(se) || anyNA(se)) return(NULL)
+  list(var_s = sum(cc[-base]^2 * se^2), full = FALSE, utilities = utilities)
+}
+
+#' @keywords internal
+.wtp_delta_se <- function(delta, attr, level, beta, slope) {
+  if (is.null(delta) || !is.finite(slope) || slope == 0) return(NA_real_)
+  if (isTRUE(delta$full)) {
+    nm <- .wtp_coef_name(rownames(delta$V), attr, level)
+    if (is.na(nm)) return(NA_real_)
+    V <- delta$V
+    var_b <- V[nm, nm]
+    var_s <- drop(t(delta$c) %*% V[delta$price_names, delta$price_names, drop = FALSE] %*% delta$c)
+    cov_bs <- drop(V[nm, delta$price_names, drop = FALSE] %*% delta$c)
+  } else {
+    u <- delta$utilities
+    se_b <- u$SE_vs_Baseline[u$Attribute == attr & u$Level == level]
+    if (length(se_b) != 1 || is.na(se_b)) return(NA_real_)
+    var_b <- se_b^2
+    var_s <- delta$var_s
+    cov_bs <- 0
+  }
+  v <- var_b / slope^2 + beta^2 * var_s / slope^4 - 2 * beta * cov_bs / slope^3
+  if (!is.finite(v) || v <= 0) return(NA_real_)
+  sqrt(v)
+}
