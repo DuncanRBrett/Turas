@@ -2,7 +2,8 @@
 # MAXDIFF - ADVERSARIAL GATE
 # ==============================================================================
 # One pipeline run (helper_pipeline_fixture.R) carrying the hard cases:
-#   - weights grossed to integer population totals (500 / 1000 / 2500)
+#   - weights grossed to integer population totals (200 / 500 / 3300 in
+#     equal thirds: design effect 3 x (0.04 + 0.25 + 10.89) / 4^2 = 2.096)
 #   - item labels starting with = - + @ and labels with non-ASCII text
 #   - one task with no best choice, one with no worst choice
 #   - 60 respondents against Min_Respondents_Per_Segment = 30, so most
@@ -28,7 +29,7 @@ ADV_LABELS <- c(FRESH = "=Fresh roast", ORIGIN = "-Origin named", PRICE = "+Pric
                 DELIVERY = "@Home delivery", SUBSCRIBE = "Café crème subscription",
                 GRIND = "Grind für Filter – fine")
 
-PA <- md_pipe_run(n = 60, weighted = TRUE, weight_scale = 1000,
+PA <- md_pipe_run(n = 60, weighted = TRUE, weight_scale = 1000, weight_values = c(0.2, 0.5, 3.3),
                   item_labels = ADV_LABELS, lib_prepend = .no_cmdstanr(),
                   output_settings = c(TURF_Threshold = "TOP_3"),
                   data_edits = "dat$T1_Best[1] <- NA; dat$T2_Worst[2] <- NA")
@@ -38,7 +39,17 @@ test_that("the adversarial run completes and writes its deliverables", {
   expect_true(file.exists(PA$workbook), info = paste(tail(PA$log, 40), collapse = "\n"))
   expect_true(file.exists(PA$island))
   expect_true(file.exists(PA$simulator))
-  expect_equal(range(PA_LONG$data$Wt), c(500, 2500))
+  expect_equal(range(PA_LONG$data$Wt), c(200, 3300))
+})
+
+test_that("effective n on a design effect near 2 is Kish by hand, not rounded early", {
+  # 20 respondents at each of 200, 500, 3300: sum w = 80000,
+  # sum w^2 = 20 x (40000 + 250000 + 10890000) = 223600000,
+  # Kish n_eff = 80000^2 / 223600000 = 28.6225, design effect 60 / 28.6225 = 2.096.
+  w <- PA_LONG$data$Wt
+  kish <- sum(w)^2 / sum(w^2)
+  expect_equal(kish, 28.6225, tolerance = 1e-4)
+  expect_equal(jsonlite::fromJSON(PA$island)$meta$effectiveN, kish, tolerance = 0.5)
 })
 
 test_that("grossed integer weights: counts equal hand tallies, logit SEs stay design-based", {

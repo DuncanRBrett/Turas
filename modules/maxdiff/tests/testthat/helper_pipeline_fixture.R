@@ -38,7 +38,8 @@ md_pipe_stan_ready <- function() {
 md_pipe_run <- function(n = 90, weighted = TRUE,
                         project_settings = c(), output_settings = c(),
                         lib_prepend = character(0),
-                        weight_scale = 1, item_labels = NULL, data_edits = "",
+                        weight_scale = 1, weight_values = c(0.5, 1, 2.5),
+                        item_labels = NULL, data_edits = "",
                         out_dir = tempfile("md_pipe_")) {
   root <- md_pipe_root()
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -52,7 +53,8 @@ md_pipe_run <- function(n = 90, weighted = TRUE,
     "suppressMessages(source('modules/maxdiff/R/00_main.R'))",
     "source('examples/maxdiff/create_maxdiff_example.R')",
     sprintf("resp <- karoo_default_respondents(n = %d, seed = 2026)", n),
-    sprintf("resp$Wt <- c(0.5, 1, 2.5)[(seq_len(nrow(resp)) %%%% 3) + 1] * %s", deparse(weight_scale)),
+    sprintf("resp$Wt <- %s[(seq_len(nrow(resp)) %%%% 3) + 1] * %s",
+            paste(deparse(weight_values), collapse = ""), deparse(weight_scale)),
     sprintf("b <- build_maxdiff_example(%s, %s, respondents = resp, project_name = 'Pipe',",
             deparse(root), deparse(out_dir)),
     sprintf("  file_stem = 'Pipe_MaxDiff', weight_variable = %s, verbose = FALSE)",
