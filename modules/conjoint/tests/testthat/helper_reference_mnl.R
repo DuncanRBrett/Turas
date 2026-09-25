@@ -75,3 +75,38 @@ cj_ref_centred <- function(coef, vcov, attr, levels) {
   V <- Ab %*% vcov[nm, nm, drop = FALSE] %*% t(Ab)
   list(utility = setNames(u, levels), se = setNames(sqrt(diag(V)), levels))
 }
+
+#' Simulate CBC choices with respondent heterogeneity around known part-worths
+#'
+#' @param truth Named contrasts, names attr+level (baseline = first level = 0).
+#' @param indiv_sd SD of each respondent's contrasts around the truth.
+#' @return list(data, config, attributes, indiv) in generate_synthetic_cbc()'s shape
+cj_ref_simulate_hetero <- function(attributes, truth, n = 150, n_tasks = 10, n_alts = 3,
+                                   indiv_sd = 0.4, seed = 5) {
+  set.seed(seed)
+  rows <- list(); k <- 0L
+  indiv <- matrix(rep(truth, each = n), n, length(truth), dimnames = list(NULL, names(truth)))
+  indiv <- indiv + matrix(rnorm(n * length(truth), 0, indiv_sd), n, length(truth))
+  for (r in seq_len(n)) for (t in seq_len(n_tasks)) {
+    alts <- lapply(seq_len(n_alts), function(a) vapply(attributes, function(l) sample(l, 1), ""))
+    v <- vapply(alts, function(al) sum(vapply(names(attributes), function(nm) {
+      key <- paste0(nm, al[[nm]]); if (key %in% colnames(indiv)) indiv[r, key] else 0
+    }, numeric(1))), numeric(1))
+    ch <- sample(seq_len(n_alts), 1, prob = exp(v) / sum(exp(v)))
+    for (a in seq_len(n_alts)) {
+      k <- k + 1L
+      rows[[k]] <- c(list(resp_id = r, task_id = (r - 1) * n_tasks + t, alt_id = a),
+                     as.list(alts[[a]]), list(chosen = as.integer(a == ch)))
+    }
+  }
+  data <- do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
+  attr_df <- data.frame(AttributeName = names(attributes), NumLevels = lengths(attributes),
+                        LevelNames = vapply(attributes, paste, "", collapse = ","),
+                        stringsAsFactors = FALSE)
+  attr_df$levels_list <- unname(attributes)
+  config <- list(respondent_id_column = "resp_id", choice_set_column = "task_id",
+                 alternative_id_column = "alt_id", chosen_column = "chosen",
+                 estimation_method = "hb", analysis_type = "choice", attributes = attr_df,
+                 confidence_level = 0.95, n_alternatives = n_alts)
+  list(data = data, config = config, attributes = attributes, indiv = indiv)
+}
