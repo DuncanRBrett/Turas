@@ -276,53 +276,99 @@ list(
 
 **Formula:**
 ```
-w_i = N_s / n_s
+raw_i = N_s / n_s
 
 Where:
-  w_i = weight for respondent i in stratum s
   N_s = population size of stratum s
-  n_s = sample size of stratum s
+  n_s = respondents in stratum s
+
+grossing = N (default): w_i = raw_i x n_w / sum(raw_j over respondents j with a weight)
+grossing = Y:           w_i = raw_i
 ```
+
+`n_w` is the number of respondents who carry a weight (all of them unless
+`allow_unmatched = Y` left some blank). Normalised weights therefore sum to
+`n_w`, and grossed weights sum to the population of the strata that have
+respondents. The Stratum Details table carries both the applied weight and the
+raw `N_s / n_s`.
 
 ### 4.2 Rim Weighting (Raking)
 
-**Algorithm (Iterative Proportional Fitting):**
+Rim weights come from `survey::calibrate(calfun = "raking")`, starting from
+weights of 1 and calibrating to totals `target_share x n` for every category.
+Without binding bounds this is the unique raking (iterative proportional
+fitting) solution:
+
 ```
 Initialize: w_i = 1 for all i
 
 Repeat until convergence:
   For each target variable v:
     For each category c in v:
-      p_c = Σ w_i[i in c] / Σ w_i
-      a_c = target_c / p_c
-      w_i[i in c] *= a_c
-
-  Check: max(|achieved - target|) < tolerance
+      w_i[i in c] *= target_c x sum(w) / sum(w_i[i in c])
 ```
+
+Differences from the textbook loop:
+- **Bounds.** `weight_bounds` (default `0.3,3.0`) is passed to `calibrate()` as
+  bounds on each weight's ratio to its starting weight, which for a plain rim
+  weight is the weight itself. Bounds that bind can stop raking converging;
+  `calibration_method = logit` is the fallback. `linear` gives the closed-form
+  GREG weights `w = 1 + x'lambda` when no bound binds.
+- **Convergence** is judged on the achieved margins, recomputed from the final
+  weights: every category within `margin_tolerance` percentage points
+  (default 0.5).
+- A variable with a **single category** (target 100%) is met by every
+  respondent and is left out of the calibration; it still appears in the
+  margins table at 100%.
+- Variables are calibrated under internal names, so data headers with spaces,
+  hyphens or a leading digit are safe.
 
 ### 4.3 Cell Weighting
 
 **Formula:**
 ```
-w_c = (target_pct_c / 100) * N / n_c
+w_c = (adjusted_pct_c / 100) x n_w / n_c
+adjusted_pct_c = target_pct_c x 100 / (sum of target_pct over cells with respondents)
 
 Where:
-  w_c = weight for cell c
-  target_pct_c = target percentage for cell c
-  N = total sample size
-  n_c = number of respondents in cell c
+  n_w = respondents who carry a weight (n minus any left blank by allow_unmatched)
+  n_c = respondents in cell c
 ```
 
-### 4.4 Effective Sample Size (Kish Formula)
+With no empty cells the adjustment factor is 1. With `allow_empty_targets = Y`
+the share of empty cells is redistributed pro rata across the populated cells.
+Cell weights sum to `n_w`.
+
+### 4.4 Trimming (design and cell weights only)
 
 ```
-n_eff = (Σ w_i)² / Σ w_i²
+cap:        threshold = trim_value (on the weight's own scale; must exceed the mean weight)
+percentile: threshold = quantile(w, trim_value, type 7)
+
+w_i <- min(w_i, threshold), then every weight x (sum before / sum after capping)
 ```
 
-### 4.5 Design Effect
+The rescale restores the total, which lifts the capped weights back above the
+threshold (reported as `CALC_TRIM_RESCALED_ABOVE_CAP`). A cap at or below the
+mean weight cannot hold after the rescale and is refused
+(`CFG_TRIM_CAP_BELOW_MEAN`). Rim weights are refused post-hoc trimming
+(`CFG_TRIM_USE_CAP`); cap them with `weight_bounds`.
+
+### 4.5 Effective Sample Size (Kish Formula)
 
 ```
-DEFF = n / n_eff
+n_eff = (sum w_i)^2 / sum w_i^2      over respondents with a positive, finite weight
+```
+
+Scale-free: a grossed and a normalised copy of the same weight give the same
+`n_eff`, which is also the effective base tabs prints (shared
+`calculate_effective_n()`).
+
+### 4.6 Design Effect and Efficiency
+
+```
+DEFF       = n_valid / n_eff          n_valid = respondents with a positive, finite weight
+Efficiency = 100 x n_eff / n_valid
 ```
 
 - DEFF = 1: No effect (equal weights)

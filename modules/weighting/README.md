@@ -104,7 +104,7 @@ One row per weight to calculate:
 - `method` — One of: `design`, `rim`, `rake`, `cell`
 - `apply_trimming` — `Y` or `N`. Caps extreme weights after calculation. **Design and cell weights only.** A rim weight with `apply_trimming = Y` is refused (`CFG_TRIM_USE_CAP`) — see below.
 - `trim_method` — `cap` (absolute cap) or `percentile` (trim to percentile range)
-- `trim_value` — For `cap`: maximum weight value (e.g., 5). For `percentile`: a proportion strictly between 0 and 1 (e.g., `0.95` for the 95th percentile) — **not** 95.
+- `trim_value` — For `cap`: maximum weight value (e.g., 5), on the weight's own scale. It must be above the mean weight (1 for a weight normalised to the sample), or the run refuses with `CFG_TRIM_CAP_BELOW_MEAN`; for a grossed weight use `percentile`. For `percentile`: a proportion strictly between 0 and 1 (e.g., `0.95` for the 95th percentile) — **not** 95.
 
 ### Method-Specific Sheets
 

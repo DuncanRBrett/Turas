@@ -347,14 +347,14 @@ generate_weight_config_template <- function(output_path) {
       name = "trim_method",
       width = 18,
       required = FALSE,
-      description = "How to trim weights: cap (fixed multiplier of mean) or percentile (cap at Nth percentile).",
+      description = "How to trim weights: cap (a maximum weight, on the weight's own scale) or percentile (cap at the Nth percentile).",
       dropdown = c("cap", "percentile")
     ),
     list(
       name = "trim_value",
       width = 15,
       required = FALSE,
-      description = "Trimming threshold. For cap: max ratio (e.g. 5 = 5x mean). For percentile: a proportion strictly between 0 and 1 (e.g. 0.95 for the 95th percentile), NOT 95."
+      description = "Trimming threshold. For cap: the maximum weight, e.g. 5. It must be above the mean weight, which is 1 for a weight normalised to the sample, so on a grossed weight use percentile instead. For percentile: a proportion strictly between 0 and 1 (e.g. 0.95 for the 95th percentile), NOT 95."
     )
   )
 

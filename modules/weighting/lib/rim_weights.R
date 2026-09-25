@@ -15,13 +15,15 @@
 # - Better weight bound control during calibration (not just trimming after)
 # - Support for multiple calibration methods (raking, linear, logit)
 # - Foundation for future variance estimation capabilities
-# - Support for base weights (rim on top of design weights)
+# - Support for base weights (rim on top of design weights), through the
+#   base_weights argument only: run_weighting() and the config never pass one
 #
 # USE CASES:
 # - Online panel samples requiring demographic adjustment
 # - Quota samples needing rebalancing to population targets
 # - General population surveys with known demographics
-# - Rim weighting on top of design weights (combined weighting)
+# - Rim weighting on top of design weights (combined weighting), from R code
+#   calling calculate_rim_weights(base_weights = ...); not reachable from a config
 # ==============================================================================
 
 #' Check survey Package Availability

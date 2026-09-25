@@ -1075,7 +1075,8 @@ build_method_documentation <- function(weight_details) {
           <em>w<sub>h</sub> = N<sub>h</sub> / n<sub>h</sub></em>, where N<sub>h</sub> is the population
           size and n<sub>h</sub> is the sample size in stratum h. This ensures each stratum contributes
           to estimates in proportion to its population share, regardless of how many respondents
-          were sampled from it.</p>
+          were sampled from it. Unless grossing is switched on, the weights are then scaled so they sum to the
+          number of respondents carrying a weight; the relative weights, and so every weighted percentage, are unchanged.</p>
           <p>Design weights are appropriate when you have a stratified sample with known population
           counts per stratum. They do not require iteration and produce exact corrections.</p>
         </div>', wn),
@@ -1103,7 +1104,7 @@ build_method_documentation <- function(weight_details) {
           <p>Cell weights (interlocked weights) adjust the sample to match the known joint distribution
           of two or more variables. Unlike rim weighting, which matches marginal distributions independently,
           cell weighting matches the exact cross-tabulated proportions.</p>
-          <p>For each cell: <em>w = (target proportion &times; total N) / cell count</em>.
+          <p>For each cell: <em>w = (target proportion &times; respondents carrying a weight) / cell count</em>, after any empty target cell&rsquo;s share has been spread across the populated cells.
           This requires knowing the population percentage for every combination of variable levels.
           Cell weighting is more precise than rim weighting but requires more population data and
           can produce extreme weights if any cells have very few respondents.</p>
