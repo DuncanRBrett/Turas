@@ -541,11 +541,16 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
   # Column A is a compound key (Attribute|Level) to avoid ambiguous Level-only lookups
   lookup_data <- utilities[, c("Attribute", "Level", "Utility")]
   lookup_data <- lookup_data[order(lookup_data$Attribute, lookup_data$Level), ]
+
+  # Escape user-sourced text (formula injection protection), THEN build the
+  # key from the escaped text. The Market Simulator's attribute and level
+  # cells are written escaped (a leading = + - @ gets an apostrophe), and its
+  # VLOOKUP joins those cells as Attribute & "|" & Level. A key built from the
+  # unescaped text never matched them, IFERROR turned the miss into 0, and
+  # any product with such a level showed the wrong total utility and share.
+  lookup_data <- cj_sim_escape_df(lookup_data)
   lookup_data$Key <- paste0(lookup_data$Attribute, "|", lookup_data$Level)
   lookup_data <- lookup_data[, c("Key", "Attribute", "Level", "Utility")]
-
-  # Escape user-sourced text (formula injection protection)
-  lookup_data <- cj_sim_escape_df(lookup_data)
 
   # Write as formatted table
   writeDataTable(wb, sheet_name,
