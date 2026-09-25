@@ -1,0 +1,192 @@
+# ==============================================================================
+# WEIGHTING - ADVERSARIAL GATE (robustness programme, 25 Sep 2026)
+# ==============================================================================
+# The reference checks again, on the hard cases, end to end: each config runs
+# through run_weighting.R in a fresh Rscript and the numbers are read back from
+# the files. Hand references are written out beside each case.
+#
+#   DEFF exactly 2, at sample scale and grossed
+#   missing strata left unweighted (allow_unmatched), with labels that start
+#     with - + = @ and non-ASCII text
+#   a failed weight inside a multi-weight run
+#   a base under 30
+# ==============================================================================
+
+source(file.path(MODULE_DIR, "tests", "testthat", "helper_reference_fixture.R"),
+       local = FALSE)
+
+skip_if_not_installed("survey")
+skip_if_not_installed("openxlsx")
+
+adv_run <- function(tag, ...) {
+  dir <- file.path(tempdir(), paste0("wadv_", tag))
+  unlink(dir, recursive = TRUE)
+  paths <- ref_build_config(dir, ...)
+  run <- ref_run_child(paths$config, TURAS_ROOT)
+  c(paths, list(status = run$status, console = paste(run$console, collapse = "\n")))
+}
+
+adv_lookup <- function(run) {
+  openxlsx::read.xlsx(run$lookup, sheet = "Weights", skipEmptyRows = FALSE)
+}
+
+
+# ==============================================================================
+# DEFF exactly 2
+# ==============================================================================
+
+test_that("a design weight with DEFF exactly 2 reports it everywhere, grossed or not", {
+  # 160 respondents in A and 40 in B, populations 80,000 and 120,000.
+  # Raw N/n: A 500, B 3000. Normalised by 200/200,000: A 0.5, B 3.
+  # sum w = 80 + 120 = 200; sum w^2 = 160 x 0.25 + 40 x 9 = 400;
+  # n_eff = 200^2 / 400 = 100; DEFF = 200 / 100 = 2; efficiency 50%.
+  data <- data.frame(id = 1:200, Stratum = rep(c("A", "B"), c(160, 40)),
+                     stringsAsFactors = FALSE)
+  pops <- data.frame(stratum_variable = "Stratum", stratum_category = c("A", "B"),
+                     population_size = c(80000, 120000), stringsAsFactors = FALSE)
+  run <- adv_run("deff2", data = data,
+                 specs = rbind(ref_spec("w2", "design"), ref_spec("wg", "design")),
+                 design_targets = rbind(cbind(weight_name = "w2", pops),
+                                        cbind(weight_name = "wg", pops)),
+                 advanced = data.frame(weight_name = "wg", grossing = "Y"))
+  expect_equal(run$status, 0L, info = run$console)
+
+  lk <- adv_lookup(run)
+  expect_equal(lk$w2, rep(c(0.5, 3), c(160, 40)), tolerance = 1e-12)
+  expect_equal(lk$wg, rep(c(500, 3000), c(160, 40)), tolerance = 1e-9)
+
+  for (w in c("w2", "wg")) {
+    s <- ref_read_sheet(run$diagnostics, w)
+    expect_equal(ref_kv(s, "Effective N"), "100", info = w)
+    expect_equal(ref_kv(s, "Design Effect (DEFF)"), "2", info = w)
+    expect_equal(ref_kv(s, "Weighting Efficiency"), "50%", info = w)
+  }
+  a <- ref_read_sheet(run$stats_pack, "Assumptions")
+  per_weight <- ref_kv(a, "Per-weight diagnostics")
+  expect_true(grepl("w2: eff_n=100, DEFF=2.000", per_weight, fixed = TRUE))
+  expect_true(grepl("wg: eff_n=100, DEFF=2.000", per_weight, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# Missing strata, awkward labels, non-ASCII
+# ==============================================================================
+
+test_that("unweighted respondents and - = + @ and non-ASCII labels survive the whole run", {
+  # The reference survey relabelled: North -> "Nörth", South -> "=South",
+  # East -> "-1"; Male -> "Mâle", Female -> "+F". Region is blanked for the
+  # first five respondents (all North Male) and allow_unmatched = Y.
+  #
+  # Design, normalised to the 195 who carry a weight:
+  #   Nörth  30000/95 x 195/100000 = 58.5/95 = 0.615789...
+  #   =South 40000/60 x 195/100000 = 78/60   = 1.3
+  #   -1     30000/40 x 195/100000 = 58.5/40 = 1.4625
+  #   sum 58.5 + 78 + 58.5 = 195
+  # Rim and cell on Gender alone, 48/52 against 120/80:
+  #   Mâle 0.48 x 200/120 = 0.8, +F 0.52 x 200/80 = 1.3
+  data <- ref_survey()
+  data$Region <- unname(c(North = "Nörth", South = "=South", East = "-1")[data$Region])
+  data$Gender <- unname(c(Male = "Mâle", Female = "+F")[data$Gender])
+  data$Region[1:5] <- NA
+
+  run <- adv_run(
+    "labels", data = data,
+    specs = rbind(ref_spec("dw", "design"), ref_spec("rw", "rim"), ref_spec("cw", "cell")),
+    design_targets = ref_design_targets("dw", c(`Nörth` = 30000, `=South` = 40000, `-1` = 30000)),
+    rim_targets = ref_rim_target_rows("rw", list(Gender = c(`Mâle` = 0.48, `+F` = 0.52))),
+    cell_targets = data.frame(weight_name = "cw", Gender = c("Mâle", "+F"),
+                              target_percent = c(48, 52), stringsAsFactors = FALSE),
+    advanced = data.frame(weight_name = "dw", allow_unmatched = "Y")
+  )
+  expect_equal(run$status, 0L, info = run$console)
+
+  lk <- adv_lookup(run)
+  expected_dw <- unname(c(`Nörth` = 58.5 / 95, `=South` = 1.3, `-1` = 1.4625)[data$Region])
+  expect_true(all(is.na(lk$dw[1:5])))
+  expect_equal(lk$dw[-(1:5)], expected_dw[-(1:5)], tolerance = 1e-12)
+  expect_equal(sum(lk$dw, na.rm = TRUE), 195, tolerance = 1e-9)
+  expected_g <- unname(c(`Mâle` = 0.8, `+F` = 1.3)[data$Gender])
+  expect_equal(lk$rw, expected_g, tolerance = 1e-6)
+  expect_equal(lk$cw, expected_g, tolerance = 1e-12)
+
+  # Diagnostics: counts, Kish over the 195, labels written as typed.
+  s <- ref_read_sheet(run$diagnostics, "dw")
+  expect_equal(ref_kv(s, "NA weights"), "5")
+  expect_equal(ref_kv(s, "Valid weights"), "195")
+  expect_equal(as.numeric(ref_kv(s, "Effective N")), round(ref_kish(expected_dw)))
+  # DEFF is n / n_eff over the 195 who carry a weight, not the 200 in the file.
+  expect_equal(as.numeric(ref_kv(s, "Design Effect (DEFF)")),
+               round(195 / ref_kish(expected_dw), 2))
+  hdr <- which(s[[1]] == "stratum")[1]
+  expect_equal(s[[1]][(hdr + 1):(hdr + 3)], c("Nörth", "=South", "-1"))
+  expect_equal(as.numeric(s[[3]][(hdr + 1):(hdr + 3)]), c(95, 60, 40))
+
+  rs <- ref_read_sheet(run$diagnostics, "rw")
+  hdr <- which(rs[[1]] == "variable")[1]
+  expect_equal(rs[[2]][(hdr + 1):(hdr + 2)], c("Mâle", "+F"))
+
+  # The stats pack counts the five respondents the design weight leaves out.
+  d <- ref_read_sheet(run$stats_pack, "Declaration")
+  expect_match(ref_kv(d, "Respondents Analysed"), "^200  \\(5 excluded", perl = TRUE)
+
+  # The HTML report carries the labels, escaped where they must be.
+  html <- paste(readLines(run$html, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  for (lbl in c("Nörth", "=South", "-1", "Mâle", "+F")) {
+    expect_true(grepl(sprintf("<td>%s</td>", lbl), html, fixed = TRUE), info = lbl)
+  }
+})
+
+
+# ==============================================================================
+# A failed weight inside a multi-weight run
+# ==============================================================================
+
+test_that("a failed weight is PARTIAL, absent from the lookup, and named in the stats pack", {
+  # 'bad' rakes on a variable the data does not have, so it refuses; 'dw'
+  # still has to come out exactly as in the reference.
+  run <- adv_run(
+    "failed",
+    specs = rbind(ref_spec("dw", "design"), ref_spec("bad", "rim")),
+    design_targets = ref_design_targets("dw"),
+    rim_targets = data.frame(weight_name = "bad", variable = "Income",
+                             category = c("Low", "High"), target_percent = c(50, 50),
+                             stringsAsFactors = FALSE)
+  )
+  expect_true(grepl("COMPLETED WITH", run$console, fixed = TRUE), info = run$console)
+
+  lk <- adv_lookup(run)
+  expect_equal(names(lk), c("id", "dw"))
+  expect_equal(lk$dw, ref_design_weight(ref_survey()$Region), tolerance = 1e-12)
+
+  a <- ref_read_sheet(run$stats_pack, "Assumptions")
+  expect_true(grepl("bad (failed, not written)", ref_kv(a, "Weights Calculated"), fixed = TRUE))
+  expect_equal(ref_kv(a, "TRS Status"), "PARTIAL")
+  # The headline still describes the weight that was written.
+  expect_equal(ref_kv(a, "Effective N after weighting"), "172")
+})
+
+
+# ==============================================================================
+# A base under 30
+# ==============================================================================
+
+test_that("a base of 20 weights by hand", {
+  # 14 in A and 6 in B, populations 50/50. Raw 50/14 and 50/6; normalised to
+  # 20 by 20/100: A 10/14 = 0.714286, B 10/6 = 1.666667. sum 10 + 10 = 20.
+  # sum w^2 = 14 x 100/196 + 6 x 100/36 = 7.142857 + 16.666667 = 23.809524;
+  # n_eff = 400 / 23.809524 = 16.8; DEFF = 20 / 16.8 = 1.190476.
+  data <- data.frame(id = 1:20, Stratum = rep(c("A", "B"), c(14, 6)),
+                     stringsAsFactors = FALSE)
+  run <- adv_run("n20", data = data, specs = ref_spec("dw", "design"),
+                 design_targets = data.frame(weight_name = "dw", stratum_variable = "Stratum",
+                                             stratum_category = c("A", "B"),
+                                             population_size = c(50, 50),
+                                             stringsAsFactors = FALSE))
+  expect_equal(run$status, 0L, info = run$console)
+  lk <- adv_lookup(run)
+  expect_equal(lk$dw, rep(c(10 / 14, 10 / 6), c(14, 6)), tolerance = 1e-12)
+
+  s <- ref_read_sheet(run$diagnostics, "dw")
+  expect_equal(ref_kv(s, "Effective N"), "17")
+  expect_equal(ref_kv(s, "Design Effect (DEFF)"), "1.19")
+})
