@@ -350,7 +350,7 @@ test_that("GG segments: the sheet and the simulator's segment curves equal each 
 # Disclosure on a both-methods run (Duncan's decisions, 25 Sep 2026): the
 # behaviour stays, the reader is told
 # ------------------------------------------------------------------------------
-GG_BASE_NOTE <- "the 44 respondents excluded at validation are not in the Gabor-Granger base either"
+GG_BASE_NOTE <- "the 44 respondents excluded for their Van Westendorp answers are not in the Gabor-Granger base either"
 SEGMENTS_NOTE <- "Segments on a run with both methods are analysed with Van Westendorp only"
 
 test_that("both-methods run: the shared base and the VW-only segments are disclosed where they are read", {
@@ -429,4 +429,23 @@ test_that("an optimal range with OPP above IDP is explained where it is shown", 
   expect_gt(pts[["OPP"]], pts[["IDP"]])
   expect_true(grepl(inverted, paste(unlist(pp), collapse = " "), fixed = TRUE))
   expect_true(grepl(inverted, pricing_render_tab(r$island), fixed = TRUE))
+})
+
+test_that("the GG-base note counts only the respondents excluded for their VW answers", {
+  # Two respondents whose VW answers are valid lose their weight. Validation
+  # now excludes 46, but only the 44 with illogical VW answers are the ones a
+  # Gabor-Granger-only run would have kept; a blank weight excludes a
+  # respondent from any run.
+  d <- KAROO
+  ok_rows <- which(karoo_vw_keep(d))[1:2]
+  d$Weight[ok_rows] <- NA
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(d, csv, row.names = FALSE, na = "")
+  r <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx", data_file = csv,
+                            edits = c(FAST, "cfg$generate_simulator <- FALSE"))
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 20), collapse = "\n"))
+  val <- pricing_kv(r$workbook, "Validation")
+  expect_equal(as.numeric(val["Excluded Cases"]), 46)
+  txt <- paste(unlist(pricing_sheet(r$workbook, "Validation", colNames = FALSE)), collapse = " ")
+  expect_true(grepl(GG_BASE_NOTE, txt, fixed = TRUE))
 })
