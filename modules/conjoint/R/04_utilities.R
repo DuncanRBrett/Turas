@@ -196,37 +196,50 @@ extract_attribute_utilities <- function(attr, coefs, std_errors, config, model_r
   # honoured the flag, so a study with zero_center_utilities = N produced HB
   # and MNL tables sitting on different anchors.
   utilities_raw <- utilities
-  if (isTRUE(config$zero_center_utilities %||% TRUE)) {
+  centred <- isTRUE(config$zero_center_utilities %||% TRUE)
+  if (centred) {
     utilities <- zero_center_utilities(utilities)
   }
 
-  # Calculate confidence intervals
-  ci_lower <- rep(NA_real_, n_levels)
-  ci_upper <- rep(NA_real_, n_levels)
-  p_values <- rep(NA_real_, n_levels)
-
-  centre <- mean(utilities_raw)
   conf_level <- config$confidence_level
   if (is.null(conf_level)) conf_level <- 0.95
+  z <- qnorm(1 - (1 - conf_level) / 2)
 
-  for (i in seq_along(all_levels)) {
-    if (!is_baseline[i]) {
-      # Calculate CI using raw (pre-centered) coefficient and SE.
-      # unname() matters: utilities_raw[i] carries the level name, and a named
-      # estimate makes calculate_ci() return "lower.Alpha"/"upper.Alpha", so
-      # ci["lower"] was NA and every aggregate-path CI shipped blank.
-      ci <- calculate_ci(
-        unname(utilities_raw[i]),
-        unname(ses[i]),
-        conf_level
-      )
-      ci_lower[i] <- ci["lower"] - centre  # Adjust for centering
-      ci_upper[i] <- ci["upper"] - centre
+  # SE of each level against the baseline: what the model estimates, and
+  # what WTP (a difference from the baseline) needs.
+  se_vs_baseline <- ses
+  se_vs_baseline[is_baseline] <- NA_real_
 
-      # Calculate p-value
-      p_values[i] <- calculate_p_value(unname(utilities_raw[i]), unname(ses[i]))
+  # SE of the value actually printed. A centred level is u = A b with
+  # b = (0, b_2..b_L) and A = I - 11'/L, so Var(u) = A[, -1] V A[, -1]'
+  # from the full covariance of this attribute's coefficients, and the
+  # baseline has an SE too. Duncan's ruling of 25 Sep 2026: before this the
+  # sheet printed the contrast SE beside the centred utility, a contrast CI
+  # shifted by the centring mean, and no CI for the baseline.
+  display_se <- se_vs_baseline
+  vc <- model_result$vcov
+  if (centred && n_levels > 1 && is.matrix(vc) && length(attr_coef_indices) > 0) {
+    level_of_coef <- gsub(paste0("^[`]?", attr_escaped, "[`]?"), "",
+                          names(coefs)[attr_coef_indices])
+    coef_names <- names(coefs)[attr_coef_indices]
+    ok <- level_of_coef %in% all_levels[-1] & coef_names %in% rownames(vc)
+    if (all(all_levels[-1] %in% level_of_coef[ok])) {
+      nm <- coef_names[ok][match(all_levels[-1], level_of_coef[ok])]
+      A <- diag(n_levels) - matrix(1 / n_levels, n_levels, n_levels)
+      Ab <- A[, -1, drop = FALSE]
+      V <- Ab %*% vc[nm, nm, drop = FALSE] %*% t(Ab)
+      display_se <- sqrt(pmax(diag(V), 0))
+      names(display_se) <- all_levels
     }
   }
+
+  # CI and p-value of the printed value: u +/- z SE(u), and u against 0 (for
+  # a centred table, a level against the attribute's average level).
+  has_se <- !is.na(display_se) & display_se > 0
+  ci_lower <- ifelse(has_se, utilities - z * display_se, NA_real_)
+  ci_upper <- ifelse(has_se, utilities + z * display_se, NA_real_)
+  p_values <- ifelse(has_se, 2 * pnorm(-abs(utilities / display_se)), NA_real_)
+  ses <- display_se
 
   # Create data frame.
   # Heterogeneity_SD is NA on the aggregate path by construction: a single
@@ -240,6 +253,7 @@ extract_attribute_utilities <- function(attr, coefs, std_errors, config, model_r
     Utility = utilities,
     Std_Error = ses,
     SE = ses,
+    SE_vs_Baseline = se_vs_baseline,
     Heterogeneity_SD = NA_real_,
     CI_Lower = ci_lower,
     CI_Upper = ci_upper,

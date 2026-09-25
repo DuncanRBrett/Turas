@@ -482,6 +482,9 @@ compute_hb_population_se <- function(hb_output, n_burnin_draws, n_parameters,
   if (!is.null(draws)) {
     return(list(
       std_errors = apply(draws, 2, stats::sd),
+      # The full posterior covariance: a centred part-worth is a linear
+      # combination of the contrasts, and its SE needs the covariances.
+      vcov = stats::cov(draws),
       se_method = "posterior_draws",
       n_se_draws = nrow(draws)
     ))
@@ -581,6 +584,8 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
   )
   aggregate_ses <- se_info$std_errors
   names(aggregate_ses) <- col_names
+  population_vcov <- se_info$vcov
+  if (is.matrix(population_vcov)) dimnames(population_vcov) <- list(col_names, col_names)
 
   log_verbose(sprintf("  ✓ Extracted utilities for %d respondents (%d parameters)",
                        n_respondents, n_parameters), verbose)
@@ -598,7 +603,9 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
     method = "hierarchical_bayes",
     model = hb_output,
     coefficients = aggregate_betas,
-    vcov = NULL,  # Not directly available from HB
+    # Posterior covariance of the population-mean contrasts, from the
+    # mixture-mean draws (NULL on the heterogeneity/sqrt(n) fallback).
+    vcov = population_vcov,
     std_errors = aggregate_ses,
     heterogeneity_sd = heterogeneity_sd,
     se_method = se_info$se_method,
@@ -903,10 +910,10 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
           Attribute = attr,
           Level = level,
           Utility = 0,
-          Std_Error = 0,
+          Std_Error = NA_real_,
           Heterogeneity_SD = 0,
-          CI_Lower = 0,
-          CI_Upper = 0,
+          CI_Lower = NA_real_,
+          CI_Upper = NA_real_,
           p_value = NA_real_,
           is_baseline = TRUE,
           stringsAsFactors = FALSE
@@ -956,14 +963,44 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
   utilities <- do.call(rbind, utilities_list)
   rownames(utilities) <- NULL
 
-  # Zero-center within each attribute if configured
+  # The contrast with the baseline and its SE: what WTP needs.
+  utilities$SE_vs_Baseline <- ifelse(utilities$is_baseline, NA_real_, utilities$Std_Error)
+
+  # Zero-center within each attribute if configured. A centred level is
+  # u = A b with b = (0, b_2..b_L) and A = I - 11'/L, so its SE comes from
+  # A[, -1] V A[, -1]' with V the posterior covariance of the contrasts, and
+  # the baseline has an SE too (Duncan's ruling, 25 Sep 2026). Before, the
+  # contrast SE sat beside the centred utility, its CI was shifted by the
+  # centring mean, and the baseline showed SE 0 with a zero-width CI.
+  # Without a covariance (the fallback, or a latent-class caller with no
+  # SEs) the contrasts are treated as independent.
   if (isTRUE(config$zero_center_utilities)) {
+    vc <- hb_result$vcov
     for (attr in unique(utilities$Attribute)) {
-      mask <- utilities$Attribute == attr
+      mask <- which(utilities$Attribute == attr)
+      L <- length(mask)
       attr_mean <- mean(utilities$Utility[mask])
       utilities$Utility[mask] <- utilities$Utility[mask] - attr_mean
-      utilities$CI_Lower[mask] <- utilities$CI_Lower[mask] - attr_mean
-      utilities$CI_Upper[mask] <- utilities$CI_Upper[mask] - attr_mean
+      new_se <- rep(NA_real_, L)
+      if (L > 1) {
+        nm <- paste0(attr, "_", utilities$Level[mask][-1])
+        V <- if (is.matrix(vc) && all(nm %in% rownames(vc))) {
+          vc[nm, nm, drop = FALSE]
+        } else {
+          se_c <- utilities$SE_vs_Baseline[mask][-1]
+          if (all(is.finite(se_c))) diag(se_c^2, nrow = L - 1) else NULL
+        }
+        if (!is.null(V)) {
+          Ab <- (diag(L) - matrix(1 / L, L, L))[, -1, drop = FALSE]
+          new_se <- sqrt(pmax(diag(Ab %*% V %*% t(Ab)), 0))
+        }
+      }
+      ok <- is.finite(new_se) & new_se > 0
+      u <- utilities$Utility[mask]
+      utilities$Std_Error[mask] <- ifelse(ok, new_se, NA_real_)
+      utilities$CI_Lower[mask] <- ifelse(ok, u - z * new_se, NA_real_)
+      utilities$CI_Upper[mask] <- ifelse(ok, u + z * new_se, NA_real_)
+      utilities$p_value[mask] <- ifelse(ok, 2 * pnorm(-abs(u / new_se)), NA_real_)
     }
   }
 

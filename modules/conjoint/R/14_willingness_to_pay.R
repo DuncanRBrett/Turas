@@ -321,8 +321,12 @@ calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coe
     # Var(WTP) ≈ (SE_beta / price_coef)^2 + (beta * SE_price / price_coef^2)^2
     # This accounts for uncertainty in both the attribute coefficient AND the price coefficient
     se_wtp <- NA_real_
-    # Support both "SE" and "Std_Error" column names (MNL uses Std_Error)
-    row_se <- if (!is.null(row$SE) && !is.na(row$SE)) row$SE
+    # The SE of the level's contrast with the baseline, which is what WTP is.
+    # Std_Error / SE are the SE of the printed (possibly centred) utility, a
+    # different quantity; they are used only by tables that predate
+    # SE_vs_Baseline.
+    row_se <- if (!is.null(row$SE_vs_Baseline) && !is.na(row$SE_vs_Baseline)) row$SE_vs_Baseline
+              else if (!is.null(row$SE) && !is.na(row$SE)) row$SE
               else if (!is.null(row$Std_Error) && !is.na(row$Std_Error)) row$Std_Error
               else NA_real_
     if (!is.na(row_se) && row_se > 0 && !is.na(price_coef_se)) {
