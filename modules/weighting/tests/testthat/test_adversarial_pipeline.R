@@ -167,6 +167,44 @@ test_that("a failed weight is PARTIAL, absent from the lookup, and named in the 
 
 
 # ==============================================================================
+# A cap below the mean weight (grossed design weight)
+# ==============================================================================
+
+test_that("a cap below the mean weight is refused, not applied as a flattening", {
+  # Grossed design weights are 300, 666.67 and 750, mean 500. A cap of 5 is
+  # below every weight, so capping sets all 200 to 5 and the rescale to the
+  # original 100,000 sets all 200 to 500: the design weighting is erased and
+  # every weighted figure reverts to unweighted. After the rescale the mean is
+  # unchanged, so no cap below the mean can hold; this must be refused.
+  run <- adv_run(
+    "grossed_cap",
+    specs = ref_spec("dwg", "design", trim_method = "cap", trim_value = 5),
+    design_targets = ref_design_targets("dwg"),
+    advanced = data.frame(weight_name = "dwg", grossing = "Y")
+  )
+  expect_true(grepl("CFG_TRIM_CAP_BELOW_MEAN", run$console, fixed = TRUE), info = run$console)
+  expect_false(file.exists(run$lookup))
+})
+
+test_that("a cap above the mean weight still trims as before", {
+  # Grossed weights 300 / 666.67 / 750 capped at 700: East 750 -> 700, sum
+  # 100000 - 40 x 50 = 98000, rescaled by 100000/98000:
+  # North 300 x 100/98, South 2000/3 x 100/98, East 700 x 100/98.
+  run <- adv_run(
+    "grossed_cap_ok",
+    specs = ref_spec("dwg", "design", trim_method = "cap", trim_value = 700),
+    design_targets = ref_design_targets("dwg"),
+    advanced = data.frame(weight_name = "dwg", grossing = "Y")
+  )
+  expect_equal(run$status, 0L, info = run$console)
+  lk <- adv_lookup(run)
+  region <- ref_survey()$Region
+  expect_equal(lk$dwg, unname(c(North = 300, South = 2000 / 3, East = 700)[region]) * 100 / 98,
+               tolerance = 1e-9)
+})
+
+
+# ==============================================================================
 # A base under 30
 # ==============================================================================
 

@@ -229,6 +229,31 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_thre
     ))
   }
 
+  # A cap at or below the mean weight cannot be honoured. The rescale below
+  # restores the original sum, so the mean after trimming is the mean before
+  # it, and at least one weight must sit at or above the mean, above the cap.
+  # What such a cap actually does is flatten the weights: on a grossed design
+  # weight (mean 500) a cap of 5, written with sample-scale weights in mind,
+  # capped every respondent to 5 and the rescale lifted them all to 500. The
+  # design weighting was erased and the run said PASS.
+  valid_for_cap <- weights[!is.na(weights) & is.finite(weights) & weights > 0]
+  if (tolower(as.character(method)) == "cap" && length(valid_for_cap) > 0 &&
+      value <= mean(valid_for_cap)) {
+    weighting_refuse(
+      code = "CFG_TRIM_CAP_BELOW_MEAN",
+      title = "Trim cap is at or below the mean weight",
+      problem = sprintf(
+        "Weight '%s' has trim_method = cap with trim_value = %s, but its mean weight is %s (%s). Capping at or below the mean flattens the weights rather than trimming them: after the rescale that restores the total, no weight can sit at or below the cap.",
+        if (is.null(spec$weight_name)) "(unnamed)" else as.character(spec$weight_name)[1],
+        format(value, big.mark = ",", scientific = FALSE),
+        format(signif(mean(valid_for_cap), 6), big.mark = ",", scientific = FALSE),
+        if (mean(valid_for_cap) > 1 + 1e-9) "this weight is on population scale, e.g. grossing = Y" else "sample scale"
+      ),
+      why_it_matters = "The weights would move towards uniform, undoing the weighting itself, while the run reported success. Every weighted base and percentage built on them would drift back towards the unweighted figures.",
+      how_to_fix = "Express the cap on the scale of this weight: above its mean weight, which is 1 for a weight normalised to the sample size. For a grossed weight either set grossing = N and cap on the sample scale, or use trim_method = percentile, which does not depend on scale."
+    )
+  }
+
   if (verbose) {
     message("\nApplying weight trimming...")
   }
