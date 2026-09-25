@@ -406,3 +406,27 @@ test_that("a p-value below the printed precision says so instead of printing zer
   expect_equal(pricing_format_p(0.0123, digits = 4), "0.0123")
   expect_equal(pricing_format_p(NA_real_), "not available")
 })
+
+test_that("an optimal range with OPP above IDP is explained where it is shown", {
+  # Karoo's Budget segment: OPP R75.00 above IDP R71.69, so the
+  # Segment_Comparison optimal_width is -3.31 with no word of explanation.
+  inverted <- "optimal price point is above the indifference price point"
+  sc_text <- paste(unlist(pricing_sheet(BOTH$workbook, "Segment_Comparison", colNames = FALSE)), collapse = " ")
+  expect_true(grepl(paste0("Budget: the ", inverted, " (R75.00 against R71.69)"), sc_text, fixed = TRUE))
+  expect_false(grepl("Premium: the optimal price point", sc_text, fixed = TRUE))
+  # The Budget respondents on their own: the total is inverted, so the
+  # VW_Price_Points sheet and the Pricing tab say it too.
+  b <- KAROO[KAROO$Segment == "Budget", ]
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(b, csv, row.names = FALSE, na = "")
+  r <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx", data_file = csv,
+                            edits = c(FAST, "cfg$analysis_method <- 'van_westendorp'",
+                                      "cfg$segmentation$segment_column <- NA_character_",
+                                      "cfg$generate_simulator <- FALSE"))
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 20), collapse = "\n"))
+  pp <- pricing_sheet(r$workbook, "VW_Price_Points", colNames = FALSE)
+  pts <- setNames(as.numeric(pp$X3[2:5]), pp$X1[2:5])
+  expect_gt(pts[["OPP"]], pts[["IDP"]])
+  expect_true(grepl(inverted, paste(unlist(pp), collapse = " "), fixed = TRUE))
+  expect_true(grepl(inverted, pricing_render_tab(r$island), fixed = TRUE))
+})

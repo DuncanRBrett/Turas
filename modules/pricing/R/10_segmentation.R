@@ -354,6 +354,13 @@ generate_segment_insights <- function(comparison_table, method, currency = "$") 
       }
     }
 
+    # An inverted optimal range (OPP above IDP) prints as a negative
+    # optimal_width; say so for the segment it happens in.
+    for (i in seq_len(nrow(seg_data))) {
+      note <- pricing_vw_inverted_note(seg_data$OPP[i], seg_data$IDP[i], currency)
+      if (!is.null(note)) insights <- c(insights, paste0(seg_data$segment[i], ": ", note))
+    }
+
     # Identify highest and lowest optimal prices
     if (!all(is.na(seg_data$OPP))) {
       max_seg <- seg_data$segment[which.max(seg_data$OPP)]

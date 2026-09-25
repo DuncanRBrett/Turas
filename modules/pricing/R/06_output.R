@@ -266,6 +266,14 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                        rows = (range_start_row + 1):(range_start_row + 2),
                        cols = 2:3, gridExpand = TRUE)
 
+    inverted <- pricing_vw_inverted_note(vw_results$price_points$OPP, vw_results$price_points$IDP,
+                                         config$currency_symbol %||% "")
+    if (!is.null(inverted)) {
+      openxlsx::writeData(wb, "VW_Price_Points",
+                          pricing_escape_cell(paste0("Note: ", inverted)),
+                          startRow = range_start_row + 4)
+    }
+
     # Confidence Intervals (if calculated)
     if (!is.null(vw_results$confidence_intervals)) {
       openxlsx::addWorksheet(wb, "VW_Confidence_Intervals")

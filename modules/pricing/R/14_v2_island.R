@@ -556,6 +556,13 @@ write_pricing_island <- function(results, config, output_file = NULL, verbose = 
       })
     }
   }
+  if (has_vw) {
+    inverted <- pricing_vw_inverted_note(vw$price_points$OPP, vw$price_points$IDP,
+                                         as.character(config$currency_symbol %||% ""))
+    if (!is.null(inverted)) {
+      notes$vw <- paste(notes$vw, paste0(toupper(substr(inverted, 1, 1)), substring(inverted, 2)))
+    }
+  }
   if (has_gg) {
     d <- gg$diagnostics %||% list()
     bits <- sprintf("Acceptance is the share saying they would buy at each rung, coded %s.",
