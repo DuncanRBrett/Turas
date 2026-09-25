@@ -38,6 +38,7 @@ md_pipe_stan_ready <- function() {
 md_pipe_run <- function(n = 90, weighted = TRUE,
                         project_settings = c(), output_settings = c(),
                         lib_prepend = character(0),
+                        weight_scale = 1, item_labels = NULL, data_edits = "",
                         out_dir = tempfile("md_pipe_")) {
   root <- md_pipe_root()
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -51,7 +52,7 @@ md_pipe_run <- function(n = 90, weighted = TRUE,
     "suppressMessages(source('modules/maxdiff/R/00_main.R'))",
     "source('examples/maxdiff/create_maxdiff_example.R')",
     sprintf("resp <- karoo_default_respondents(n = %d, seed = 2026)", n),
-    "resp$Wt <- c(0.5, 1, 2.5)[(seq_len(nrow(resp)) %% 3) + 1]",
+    sprintf("resp$Wt <- c(0.5, 1, 2.5)[(seq_len(nrow(resp)) %%%% 3) + 1] * %s", deparse(weight_scale)),
     sprintf("b <- build_maxdiff_example(%s, %s, respondents = resp, project_name = 'Pipe',",
             deparse(root), deparse(out_dir)),
     sprintf("  file_stem = 'Pipe_MaxDiff', weight_variable = %s, verbose = FALSE)",
@@ -65,6 +66,13 @@ md_pipe_run <- function(n = 90, weighted = TRUE,
     "  if (is.na(i)) { df[nrow(df) + 1, 1] <- k; i <- nrow(df) }; df[i, 2] <- kv[[k]] }; df }",
     sprintf("all$PROJECT_SETTINGS <- set_rows(all$PROJECT_SETTINGS, %s)", dput_chr(as.list(project_settings))),
     sprintf("all$OUTPUT_SETTINGS <- set_rows(all$OUTPUT_SETTINGS, %s)", dput_chr(as.list(output_settings))),
+    sprintf("relabel <- %s", dput_chr(item_labels)),
+    "if (length(relabel)) all$ITEMS$Item_Label[match(names(relabel), all$ITEMS$Item_ID)] <- unname(relabel)",
+    # Edits to the respondent data, applied to the data FILE the run reads.
+    "dat <- openxlsx::read.xlsx(b$data_file, sheet = 1)",
+    data_edits,
+    "dwb <- openxlsx::createWorkbook(); openxlsx::addWorksheet(dwb, 'Data'); openxlsx::writeData(dwb, 'Data', dat)",
+    "turas_saveWorkbook(dwb, b$data_file, overwrite = TRUE)",
     "wb <- openxlsx::createWorkbook()",
     "for (s in sheets) { openxlsx::addWorksheet(wb, s); openxlsx::writeData(wb, s, all[[s]]) }",
     "turas_saveWorkbook(wb, b$config, overwrite = TRUE)",
@@ -119,7 +127,8 @@ md_pipe_long <- function(build, weighted = TRUE) {
       rows[[length(rows) + 1]] <- data.frame(
         resp_id = data$RespID[r], version = v, task = t, item_id = shown,
         position = seq_along(shown),
-        is_best = as.integer(shown == best), is_worst = as.integer(shown == worst),
+        is_best = as.integer(!is.na(best) & shown == best),
+        is_worst = as.integer(!is.na(worst) & shown == worst),
         weight = if (weighted) data$Wt[r] else 1, stringsAsFactors = FALSE)
     }
   }
