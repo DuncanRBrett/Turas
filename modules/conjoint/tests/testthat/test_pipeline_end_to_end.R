@@ -191,3 +191,33 @@ test_that("the island's WTP note describes the interval the code computes", {
   expect_match(note, "covariance", fixed = TRUE)
   expect_match(note, "linear", fixed = TRUE)
 })
+
+test_that("the rendered v2 Conjoint tab shows the workbook's part-worths, SEs and CIs", {
+  node <- unname(Sys.which("node"))
+  skip_if(!nzchar(node), "node not on PATH")
+  renderer <- file.path(Sys.getenv("TURAS_ROOT"), "modules", "conjoint", "tests", "js",
+                        "render_conjoint_island.mjs")
+  html <- paste(system2(node, c(shQuote(renderer), shQuote(PM$island)), stdout = TRUE), collapse = "\n")
+  pw <- .pw(PM)
+  blocks <- regmatches(html, gregexpr('<div class="cj-attr"><h4>.*?</table></div>', html, perl = TRUE))[[1]]
+  expect_equal(length(blocks), length(SIM$attributes))
+  cell <- function(r) regmatches(r, gregexpr("(?<=<td class=\"cj-num\">)[^<]*", r, perl = TRUE))[[1]]
+  for (b in blocks) {
+    a <- sub('^<div class="cj-attr"><h4>([^<]*)</h4>.*$', "\\1", b)
+    rows <- regmatches(b, gregexpr("<tr><td>.*?</tr>", b, perl = TRUE))[[1]]
+    for (r in rows) {
+      lv <- trimws(sub("^<tr><td>([^<]*).*$", "\\1", r))
+      k <- which(pw$Attribute == a & pw$Level == lv)
+      expect_length(k, 1)
+      v <- cell(r)  # Utility, Std. error, CI "lo to hi"
+      expect_equal(as.numeric(v[1]), round(pw$Utility[k], 2), tolerance = 0.0051, info = paste(a, lv))
+      # Every centred level, the baseline included, has an SE and an interval
+      # (Duncan's ruling of 25 Sep 2026); the tab must show them.
+      expect_equal(suppressWarnings(as.numeric(v[2])), round(pw$Std_Error[k], 2), tolerance = 0.0051,
+                   info = paste(a, lv, "SE"))
+      ci <- suppressWarnings(as.numeric(strsplit(v[3], " to ", fixed = TRUE)[[1]]))
+      expect_equal(ci, round(c(pw$CI_Lower[k], pw$CI_Upper[k]), 2), tolerance = 0.0051,
+                   info = paste(a, lv, "CI"))
+    }
+  }
+})

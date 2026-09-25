@@ -115,15 +115,15 @@
       var rows = b.levels.map(function (lv, i) {
         var base = b.isBaseline && b.isBaseline[i];
 
-        // A baseline level is the reference the others are measured against.
-        // It carries no standard error and no interval. The utilities table
-        // stores its bounds equal to its own value, which would print as a
-        // zero-width interval and read like an impossibly precise estimate.
-        var se = base ? "–"
-          : (b.se && b.se[i] != null ? num(b.se[i], 2) : "–");
-        var ci = base ? "–"
-          : ((b.ciLower && b.ciLower[i] != null && b.ciUpper[i] != null)
-              ? num(b.ciLower[i], 2) + " to " + num(b.ciUpper[i], 2) : "–");
+        // Print whatever the island carries. On a zero-centred table every
+        // level, the baseline included, is compared with its attribute's
+        // average and has its own standard error and interval (Duncan's
+        // ruling of 25 Sep 2026); this used to print a dash for the baseline
+        // regardless. Without centring the baseline is the reference and the
+        // island carries no SE or interval for it, so it still shows a dash.
+        var se = (b.se && b.se[i] != null) ? num(b.se[i], 2) : "–";
+        var ci = (b.ciLower && b.ciLower[i] != null && b.ciUpper && b.ciUpper[i] != null)
+          ? num(b.ciLower[i], 2) + " to " + num(b.ciUpper[i], 2) : "–";
         var het = anyHet
           ? '<td class="cj-num">' +
             (base ? "–" : (Array.isArray(b.heterogeneity) ? num(b.heterogeneity[i], 2) : "–")) + "</td>"
