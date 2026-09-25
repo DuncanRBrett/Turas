@@ -164,3 +164,33 @@ test_that("a monadic design with one price refuses by name instead of crashing",
                    turas_refusal = function(e) e, error = function(e) e)
   expect_equal(err2$code, "DATA_MONADIC_ONE_PRICE")
 })
+
+test_that("a DK code on a monadic scale intent is missing, not a purchase", {
+  # Karoo's monadic intent is a 1-5 scale, 4+ = would buy. Forty answers are
+  # recoded to 99 = don't know and DK_Codes = 99 is set. DK codes were
+  # recoded in the Van Westendorp and Gabor-Granger columns only, so 99 >= 4
+  # counted every don't-know as a purchase. Reference: glm and cell means on
+  # the 360 respondents who gave an answer.
+  root <- pricing_repo_root()
+  skip_if_not(file.exists(file.path(root, "examples", "pricing", "Karoo_Pricing_Data.xlsx")),
+              "examples/pricing/Karoo_Pricing_Data.xlsx is missing")
+  d <- openxlsx::read.xlsx(file.path(root, "examples", "pricing", "Karoo_Pricing_Data.xlsx"))
+  set.seed(2)
+  d$MON_Intent[sample(nrow(d), 40)] <- 99
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(d, csv, row.names = FALSE, na = "")
+  r <- pricing_pipeline_run("Karoo_Pricing_Config_Monadic.xlsx", data_file = csv,
+                            edits = c("cfg$monadic$bootstrap_iterations <- 20", "cfg$dk_codes <- 99"))
+  expect_equal(r$status, "PASS", info = paste(tail(r$log, 8), collapse = "\n"))
+  answered <- d[d$MON_Intent != 99, ]
+  ref <- karoo_monadic_ref(answered)
+  ms <- pricing_kv(r$workbook, "Mon_Model_Summary")
+  expect_equal(as.numeric(ms["Observations"]), 360)
+  answered$buy <- as.numeric(answered$MON_Intent >= 4)
+  cells <- vapply(split(answered, answered$MON_Price),
+                  function(s) sum(s$Weight * s$buy) / sum(s$Weight), numeric(1))
+  ob <- pricing_sheet(r$workbook, "Mon_Observed_Data")
+  expect_equal(ob$observed_intent, unname(cells), tolerance = 1e-9)
+  op <- pricing_sheet(r$workbook, "Mon_Optimal_Price", colNames = FALSE)
+  expect_equal(as.numeric(op$X2[which(op$X1 == "Revenue-Maximizing Price")]), ref$opt, tolerance = 1e-9)
+})

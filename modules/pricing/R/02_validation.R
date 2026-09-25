@@ -132,6 +132,13 @@ load_pricing_data <- function(data_file, config) {
       }
     }
 
+    # Monadic columns. Left out, a DK code of 99 on a 1-5 intent scale passed
+    # the ">= Scale_Threshold" test and every don't-know counted as a purchase
+    # (robustness gate, 25 Sep 2026).
+    if (!is.null(config$monadic)) {
+      pricing_cols <- c(pricing_cols, config$monadic$price_column, config$monadic$intent_column)
+    }
+
     # Recode DK codes to NA in pricing columns
     pricing_cols <- unique(pricing_cols[pricing_cols %in% names(data)])
     for (col in pricing_cols) {
