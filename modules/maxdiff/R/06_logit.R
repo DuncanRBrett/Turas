@@ -59,6 +59,7 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
   # clogit() internally calls coxph() and Surv() without namespace qualification,
   # so they must be findable in the calling frame.
   strata <- survival::strata
+  cluster <- survival::cluster
   coxph <- survival::coxph
   Surv <- survival::Surv
 
@@ -119,12 +120,19 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
   formula_str <- paste("choice ~", paste(item_vars, collapse = " + "),
                        "+ strata(choice_set)")
   model_formula <- as.formula(formula_str)
+  use_weights <- weighted && "weight" %in% names(logit_data)
 
   # Fit model
+  # Weighted SEs are the sandwich clustered by respondent. Without the
+  # cluster() term, clogit() reads integer weights as frequency counts, so
+  # every SE shrank by sqrt(weight) (weights grossed to population totals
+  # made every item "significant"), and non-integer weights got a per-row
+  # robust SE that ignored the fact that one respondent answers every task.
+  # The clustered sandwich does not move when the weights are rescaled.
   model <- tryCatch({
-    if (weighted && "weight" %in% names(logit_data)) {
+    if (use_weights) {
       survival::clogit(
-        model_formula,
+        as.formula(paste(formula_str, "+ cluster(resp_id)")),
         data = logit_data,
         weights = logit_data$weight,
         method = "efron"
@@ -214,6 +222,7 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
 
     # Get weight (same for all items in task)
     weight <- task_data$weight[1]
+    resp_id <- as.character(task_data$resp_id[1])
 
     # Skip if no valid choices - but COUNT the skip (M2): these tasks stay
     # in the counts denominators, so counts and logit run on different
@@ -231,6 +240,7 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
         item_id = item,
         choice = as.integer(item == best_item),
         weight = weight,
+        resp_id = resp_id,
         stringsAsFactors = FALSE
       )
     }
@@ -244,6 +254,7 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
         item_id = item,
         choice = as.integer(item == worst_item),
         weight = weight,
+        resp_id = resp_id,
         stringsAsFactors = FALSE
       )
     }
@@ -254,7 +265,7 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
     return(data.frame(
       choice_set = integer(0), choice_type = character(0),
       item_id = character(0), choice = integer(0),
-      weight = numeric(0), sign = numeric(0),
+      weight = numeric(0), resp_id = character(0), sign = numeric(0),
       stringsAsFactors = FALSE
     ))
   }

@@ -87,3 +87,54 @@ test_that("the anchor item sits at exactly 0 with no SE", {
   expect_identical(a$Logit_Utility, 0)
   expect_true(is.na(a$Logit_SE))
 })
+
+# ------------------------------------------------------------------------------
+# Weighted SEs. Before the fix, survival::clogit() read integer weights as
+# frequency counts, so every SE shrank by sqrt(weight): a constant weight of 2
+# took item A from 0.227 to 0.160, and weights grossed to integer population
+# totals took it to 0.006. Non-integer weights gave a per-row robust SE that
+# ignored the respondent. The reference is the respondent-clustered sandwich
+# written out in md_ref_clogit(), which does not move with the weight scale.
+# ------------------------------------------------------------------------------
+
+.weighted_long <- function(seed = 23, scale = 1, integer = FALSE) {
+  long <- .ref_long(seed = seed)
+  set.seed(5)
+  w <- setNames(runif(40, 0.3, 3), paste0("R", 1:40)) * scale
+  if (integer) w <- round(w)
+  long$weight <- unname(w[long$resp_id])
+  long
+}
+
+test_that("weighted logit SEs equal the respondent-clustered sandwich", {
+  skip_if_not(requireNamespace("survival", quietly = TRUE), "survival not installed")
+  long <- .weighted_long()
+  ref <- md_ref_clogit(long, REF_ANCHOR)
+  mod <- md_module_logit(long, md_ref_items(names(REF_UTILS)), REF_ANCHOR, weighted = TRUE)
+  expect_equal(mod$se[names(ref$coef)], ref$se_sandwich, tolerance = 1e-4)
+})
+
+test_that("weighted logit SEs do not move when weights are grossed up", {
+  skip_if_not(requireNamespace("survival", quietly = TRUE), "survival not installed")
+  items_df <- md_ref_items(names(REF_UTILS))
+  base <- md_module_logit(.weighted_long(), items_df, REF_ANCHOR, weighted = TRUE)$se
+  x1000 <- md_module_logit(.weighted_long(scale = 1000), items_df, REF_ANCHOR, weighted = TRUE)$se
+  expect_equal(x1000, base, tolerance = 1e-6)
+
+  # Integer weights grossed to population totals: the reference is computed
+  # on the same rounded weights, so this is exact, not approximate.
+  gl <- .weighted_long(scale = 1000, integer = TRUE)
+  ref <- md_ref_clogit(gl, REF_ANCHOR)
+  gross <- md_module_logit(gl, items_df, REF_ANCHOR, weighted = TRUE)$se
+  expect_equal(gross[names(ref$coef)], ref$se_sandwich, tolerance = 1e-4)
+  expect_gt(min(gross), 0.1)
+})
+
+test_that("a constant integer weight gives the same SEs as a constant weight of 1", {
+  skip_if_not(requireNamespace("survival", quietly = TRUE), "survival not installed")
+  items_df <- md_ref_items(names(REF_UTILS))
+  l1 <- .ref_long(seed = 24); l2 <- l1; l2$weight <- 2
+  se1 <- md_module_logit(l1, items_df, REF_ANCHOR, weighted = TRUE)$se
+  se2 <- md_module_logit(l2, items_df, REF_ANCHOR, weighted = TRUE)$se
+  expect_equal(se2, se1, tolerance = 1e-6)
+})
