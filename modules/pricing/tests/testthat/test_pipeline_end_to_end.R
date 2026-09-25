@@ -320,3 +320,28 @@ test_that("tabs export: VW-only WTP is the cheap/expensive midpoint, and blank w
   expect_equal(x$GGACC_WTP[ok], mid[ok])
   expect_equal(x$pricing_valid[!ok], c(0, 0))
 })
+
+# ------------------------------------------------------------------------------
+# Gabor-Granger with segments: the one route to the simulator's segment view
+# ------------------------------------------------------------------------------
+test_that("GG segments: the sheet and the simulator's segment curves equal each segment's reference", {
+  gs <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx",
+                             edits = c(FAST, "cfg$analysis_method <- 'gabor_granger'"))
+  expect_equal(gs$status, "PASS", info = paste(tail(gs$log, 20), collapse = "\n"))
+  prices <- c(60, 80, 100, 120, 140)
+  sc <- pricing_sheet(gs$workbook, "Segment_Comparison")
+  sc <- sc[!is.na(sc$n), ]
+  sim <- pricing_simulator_data(gs$simulator)
+  for (s in c("Budget", "New Customer", "Premium", "Standard")) {
+    ref <- ref_gg(KAROO[KAROO$Segment == s, ], gg_cols, prices, cost = 38)
+    row <- sc[sc$segment == s, ]
+    expect_equal(as.numeric(row$n), ref$n, info = s)
+    expect_equal(as.numeric(row$optimal_price), ref$opt, info = s)
+    expect_equal(as.numeric(row$purchase_intent),
+                 round(100 * ref$smooth[prices == ref$opt], 1), info = s)
+    expect_equal(sim$segments[[s]]$demand_curve, ref$smooth, tolerance = 1e-5, info = s)
+    expect_equal(sim$segments[[s]]$price_range, prices, info = s)
+  }
+  tot <- ref_gg(KAROO, gg_cols, prices, cost = 38)
+  expect_equal(sim$optimal_price, tot$opt)
+})
