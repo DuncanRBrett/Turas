@@ -54,109 +54,15 @@ synthesize_recommendation <- function(vw_results = NULL,
   project_name <- config$project_name %||% synth_config$project_name %||% "Pricing Analysis"
 
   # ============================================================================
-  # STEP 2: Extract price recommendations from each method
+  # STEPS 2-3: The price each method recommends, the anchor, the rounding
   # ============================================================================
-
-  method_prices <- list()
-
-  if (!is.null(vw_results)) {
-    method_prices$vw_opp <- list(
-      price = vw_results$price_points$OPP,
-      label = "Van Westendorp OPP",
-      description = "Optimal Price Point - minimal resistance"
-    )
-    method_prices$vw_idp <- list(
-      price = vw_results$price_points$IDP,
-      label = "Van Westendorp IDP",
-      description = "Indifference Price - balanced perception"
-    )
-    method_prices$vw_midpoint <- list(
-      price = (vw_results$price_points$OPP + vw_results$price_points$IDP) / 2,
-      label = "VW Optimal Zone Midpoint",
-      description = "Center of optimal zone"
-    )
-
-    # NMS if available (guard against NA revenue_optimal)
-    if (!is.null(vw_results$nms_results) &&
-        !is.null(vw_results$nms_results$revenue_optimal) &&
-        !is.na(vw_results$nms_results$revenue_optimal)) {
-      method_prices$nms_revenue <- list(
-        price = vw_results$nms_results$revenue_optimal,
-        label = "NMS Revenue Optimal",
-        description = "Revenue-maximizing price (purchase calibrated)"
-      )
-    }
-  }
-
-  if (!is.null(gg_results)) {
-    method_prices$gg_optimal <- list(
-      price = gg_results$optimal_price$price,
-      label = "Gabor-Granger Optimal",
-      description = sprintf("Revenue-maximizing (%.0f%% intent)",
-                            gg_results$optimal_price$purchase_intent * 100)
-    )
-  }
-
-  if (!is.null(monadic_results)) {
-    method_prices$monadic_optimal <- list(
-      price = monadic_results$optimal_price$price,
-      label = "Monadic Revenue Optimal",
-      description = sprintf("Revenue-maximizing (%.0f%% predicted intent)",
-                            monadic_results$optimal_price$predicted_intent * 100)
-    )
-    if (!is.null(monadic_results$optimal_price_profit)) {
-      method_prices$monadic_profit <- list(
-        price = monadic_results$optimal_price_profit$price,
-        label = "Monadic Profit Optimal",
-        description = "Profit-maximizing price from logistic model"
-      )
-    }
-  }
-
-  # ============================================================================
-  # STEP 3: Calculate consensus price
-  # ============================================================================
-
-  prices <- sapply(method_prices, function(x) x$price)
-  prices <- prices[!is.na(prices) & is.finite(prices)]
-
-  # Use NMS or GG or Monadic as primary if available (behaviorally calibrated)
-  if (!is.null(method_prices$nms_revenue)) {
-    primary_price <- method_prices$nms_revenue$price
-    primary_source <- "NMS revenue optimal"
-  } else if (!is.null(method_prices$gg_optimal)) {
-    primary_price <- method_prices$gg_optimal$price
-    primary_source <- "Gabor-Granger optimal"
-  } else if (!is.null(method_prices$monadic_optimal)) {
-    primary_price <- method_prices$monadic_optimal$price
-    primary_source <- "Monadic revenue optimal"
-  } else {
-    primary_price <- method_prices$vw_midpoint$price
-    primary_source <- "Van Westendorp optimal zone midpoint"
-  }
-
-  # Apply constraints (guard against NA primary_price)
-  if (!is.null(synth_config$price_floor) && !is.na(primary_price) &&
-      !is.na(synth_config$price_floor)) {
-    if (primary_price < synth_config$price_floor) {
-      primary_price <- synth_config$price_floor
-      primary_source <- paste(primary_source, "(constrained to floor)")
-    }
-  }
-
-  if (!is.null(synth_config$price_ceiling) && !is.na(primary_price) &&
-      !is.na(synth_config$price_ceiling)) {
-    if (primary_price > synth_config$price_ceiling) {
-      primary_price <- synth_config$price_ceiling
-      primary_source <- paste(primary_source, "(constrained to ceiling)")
-    }
-  }
-
-  # Round to psychological price point. The anchor before rounding is kept:
-  # the confidence's zone fit is judged on it, and the price ladder's anchor
-  # tier shows the same recommended price (Duncan, 25 Sep 2026).
-  anchor_price <- primary_price
-  recommended_price <- round_to_psychological(primary_price)
+  # One function owns this so the price ladder's anchor tier shows the same
+  # recommended price (pricing_recommended_price(), below).
+  rec <- pricing_recommended_price(vw_results, gg_results, monadic_results, config)
+  method_prices <- rec$method_prices
+  primary_source <- rec$source
+  anchor_price <- rec$anchor_price
+  recommended_price <- rec$price
 
   # ============================================================================
   # STEP 4: Assess confidence
@@ -283,6 +189,135 @@ synthesize_recommendation <- function(vw_results = NULL,
     executive_summary = executive_summary,
     method_prices = method_prices
   )
+}
+
+
+#' The Recommended Price And The Prices Behind It
+#'
+#' The price each method recommends (method_prices), the anchor (NMS, then
+#' the Gabor-Granger optimum, then the monadic optimum, then the Van
+#' Westendorp OPP-IDP midpoint), the synthesis floor and ceiling, and the
+#' psychological rounding. synthesize_recommendation() and
+#' build_price_ladder() both call it, so the ladder's anchor tier shows the
+#' recommended price rather than the same anchor rounded another way
+#' (Duncan, 25 Sep 2026: R99.99 recommended beside a R100.99 Standard tier).
+#'
+#' @param vw_results,gg_results,monadic_results Method results or NULL.
+#' @param config The loaded configuration.
+#' @return list(price, anchor_price, source, method_prices).
+#' @keywords internal
+pricing_recommended_price <- function(vw_results = NULL, gg_results = NULL,
+                                      monadic_results = NULL, config = NULL) {
+  synth_config <- config$synthesis %||% list()
+
+  # ============================================================================
+  # STEP 2: Extract price recommendations from each method
+  # ============================================================================
+
+  method_prices <- list()
+
+  if (!is.null(vw_results)) {
+    method_prices$vw_opp <- list(
+      price = vw_results$price_points$OPP,
+      label = "Van Westendorp OPP",
+      description = "Optimal Price Point - minimal resistance"
+    )
+    method_prices$vw_idp <- list(
+      price = vw_results$price_points$IDP,
+      label = "Van Westendorp IDP",
+      description = "Indifference Price - balanced perception"
+    )
+    method_prices$vw_midpoint <- list(
+      price = (vw_results$price_points$OPP + vw_results$price_points$IDP) / 2,
+      label = "VW Optimal Zone Midpoint",
+      description = "Center of optimal zone"
+    )
+
+    # NMS if available (guard against NA revenue_optimal)
+    if (!is.null(vw_results$nms_results) &&
+        !is.null(vw_results$nms_results$revenue_optimal) &&
+        !is.na(vw_results$nms_results$revenue_optimal)) {
+      method_prices$nms_revenue <- list(
+        price = vw_results$nms_results$revenue_optimal,
+        label = "NMS Revenue Optimal",
+        description = "Revenue-maximizing price (purchase calibrated)"
+      )
+    }
+  }
+
+  if (!is.null(gg_results)) {
+    method_prices$gg_optimal <- list(
+      price = gg_results$optimal_price$price,
+      label = "Gabor-Granger Optimal",
+      description = sprintf("Revenue-maximizing (%.0f%% intent)",
+                            gg_results$optimal_price$purchase_intent * 100)
+    )
+  }
+
+  if (!is.null(monadic_results)) {
+    method_prices$monadic_optimal <- list(
+      price = monadic_results$optimal_price$price,
+      label = "Monadic Revenue Optimal",
+      description = sprintf("Revenue-maximizing (%.0f%% predicted intent)",
+                            monadic_results$optimal_price$predicted_intent * 100)
+    )
+    if (!is.null(monadic_results$optimal_price_profit)) {
+      method_prices$monadic_profit <- list(
+        price = monadic_results$optimal_price_profit$price,
+        label = "Monadic Profit Optimal",
+        description = "Profit-maximizing price from logistic model"
+      )
+    }
+  }
+
+  # ============================================================================
+  # STEP 3: Calculate consensus price
+  # ============================================================================
+
+  prices <- sapply(method_prices, function(x) x$price)
+  prices <- prices[!is.na(prices) & is.finite(prices)]
+
+  # Use NMS or GG or Monadic as primary if available (behaviorally calibrated)
+  if (!is.null(method_prices$nms_revenue)) {
+    primary_price <- method_prices$nms_revenue$price
+    primary_source <- "NMS revenue optimal"
+  } else if (!is.null(method_prices$gg_optimal)) {
+    primary_price <- method_prices$gg_optimal$price
+    primary_source <- "Gabor-Granger optimal"
+  } else if (!is.null(method_prices$monadic_optimal)) {
+    primary_price <- method_prices$monadic_optimal$price
+    primary_source <- "Monadic revenue optimal"
+  } else {
+    primary_price <- method_prices$vw_midpoint$price
+    primary_source <- "Van Westendorp optimal zone midpoint"
+  }
+
+  # Apply constraints (guard against NA primary_price)
+  if (!is.null(synth_config$price_floor) && !is.na(primary_price) &&
+      !is.na(synth_config$price_floor)) {
+    if (primary_price < synth_config$price_floor) {
+      primary_price <- synth_config$price_floor
+      primary_source <- paste(primary_source, "(constrained to floor)")
+    }
+  }
+
+  if (!is.null(synth_config$price_ceiling) && !is.na(primary_price) &&
+      !is.na(synth_config$price_ceiling)) {
+    if (primary_price > synth_config$price_ceiling) {
+      primary_price <- synth_config$price_ceiling
+      primary_source <- paste(primary_source, "(constrained to ceiling)")
+    }
+  }
+
+  # Round to psychological price point. The anchor before rounding is kept:
+  # the confidence's zone fit is judged on it, and the price ladder's anchor
+  # tier shows the same recommended price (Duncan, 25 Sep 2026).
+  anchor_price <- primary_price
+  recommended_price <- round_to_psychological(primary_price)
+
+
+  list(price = recommended_price, anchor_price = anchor_price,
+       source = primary_source, method_prices = method_prices)
 }
 
 

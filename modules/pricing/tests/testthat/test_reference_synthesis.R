@@ -114,14 +114,19 @@ test_that("the price ladder equals the hand calculation from the VW points", {
   #   floor   = PMC = 50.00,  ceiling = PME = 77.25
   #   Value   = 62.75 - (62.75 - 50.00) / 1.5 = 54.25   (>= 1.05 x 50 = 52.50)
   #   Premium = 62.75 + (77.25 - 62.75) / 1.5 = 72.4167 (<= 0.95 x 77.25 = 73.39)
-  #   ".99" ending on the whole rand: 54.99, 62.99, 72.99
-  #   gaps: 62.99 / 54.99 - 1 = 14.55%, 72.99 / 62.99 - 1 = 15.88%
+  #   ".99" ending on the whole rand for the other tiers: 54.99, 72.99
+  #   Standard, the anchor tier, shows the recommended price: 62.75 under the
+  #   recommendation's rounding rule is 64.99 (Duncan, 25 Sep 2026: one
+  #   number for one anchor; it printed 62.99 beside a R64.99 recommendation)
+  #   gaps: 64.99 / 54.99 - 1 = 18.19%, 72.99 / 64.99 - 1 = 12.31%
   r <- syn_vw_run("drop")
   lad <- quiet(build_price_ladder(vw_results = r, config = syn_vw_cfg("drop")))
   expect_equal(lad$tier_table$tier, c("Value", "Standard", "Premium"))
-  expect_equal(lad$tier_table$price, c(54.99, 62.99, 72.99))
+  expect_equal(lad$tier_table$price, c(54.99, 64.99, 72.99))
   expect_equal(lad$tier_table$gap_to_next_pct[1:2],
-               c((62.99 / 54.99 - 1) * 100, (72.99 / 62.99 - 1) * 100), tolerance = 1e-9)
+               c((64.99 / 54.99 - 1) * 100, (72.99 / 64.99 - 1) * 100), tolerance = 1e-9)
+  s <- quiet(synthesize_recommendation(vw_results = r, ladder_results = lad, config = syn_vw_cfg("drop")))
+  expect_equal(lad$tier_table$price[lad$tier_table$tier == "Standard"], s$recommendation$price)
 })
 
 test_that("ladder rounding keeps its 10% guard on a low-priced product", {

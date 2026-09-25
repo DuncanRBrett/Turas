@@ -449,3 +449,13 @@ test_that("the GG-base note counts only the respondents excluded for their VW an
   txt <- paste(unlist(pricing_sheet(r$workbook, "Validation", colNames = FALSE)), collapse = " ")
   expect_true(grepl(GG_BASE_NOTE, txt, fixed = TRUE))
 })
+
+test_that("the ladder's anchor tier shows the recommended price", {
+  # Karoo both-methods: the anchor is the GG optimum R100.00; the
+  # recommendation shows R99.99 and the Standard tier printed R100.99.
+  lad <- pricing_sheet(BOTH$workbook, "Price_Ladder")
+  rec <- pricing_sheet(BOTH$workbook, "Recommendation", colNames = FALSE)
+  shown <- rec$X2[which(rec$X1 == "Recommended Price")]
+  std <- lad[which(lad[[1]] == "Standard"), ]
+  expect_equal(sprintf("R%.2f", as.numeric(std$price)), shown)
+})

@@ -368,8 +368,9 @@ P >= 100       round(P / 5) × 5 - 0.01
 ```
 
 unless the rounding moves the price more than 10%, when it is kept to the
-cent. The price ladder's tiers use their own `Round_To` ending
-(floor(P) + ending) under the same 10% rule.
+cent. The price ladder's anchor tier shows this recommended price; the other
+tiers are stepped from the unrounded anchor towards PMC and PME and use their
+own `Round_To` ending (floor(P) + ending) under the same 10% rule.
 
 The confidence score is the mean of these factor scores:
 
