@@ -72,7 +72,11 @@ extract_wtp_vw <- function(data, config, method = "median") {
   }
 
   # Remove missing WTP
-  wtp_df <- wtp_df[!is.na(wtp_df$wtp) & is.finite(wtp_df$wtp) & wtp_df$weight > 0, ]
+  # which(): a blank weight compares NA, and an NA in a logical index adds a
+  # junk all-NA row, which then broke the tabs export's id match ("NAs are
+  # not allowed in subscripted assignments") and lost the whole file
+  # (robustness gate, 25 Sep 2026).
+  wtp_df <- wtp_df[which(!is.na(wtp_df$wtp) & is.finite(wtp_df$wtp) & wtp_df$weight > 0), ]
 
   return(wtp_df)
 }
@@ -123,7 +127,11 @@ extract_wtp_gg <- function(gg_data, config) {
   wtp_df <- do.call(rbind, wtp_list)
 
   # Remove missing WTP
-  wtp_df <- wtp_df[!is.na(wtp_df$wtp) & is.finite(wtp_df$wtp) & wtp_df$weight > 0, ]
+  # which(): a blank weight compares NA, and an NA in a logical index adds a
+  # junk all-NA row, which then broke the tabs export's id match ("NAs are
+  # not allowed in subscripted assignments") and lost the whole file
+  # (robustness gate, 25 Sep 2026).
+  wtp_df <- wtp_df[which(!is.na(wtp_df$wtp) & is.finite(wtp_df$wtp) & wtp_df$weight > 0), ]
 
   return(wtp_df)
 }

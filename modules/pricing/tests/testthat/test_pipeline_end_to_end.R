@@ -265,3 +265,58 @@ test_that("stop-early ladder with NO_AFTER_STOP equals the hand-imputed ladder",
   opt <- pricing_kv(sei$workbook, "GG_Optimal_Revenue")
   expect_equal(num(opt["Revenue-Maximizing Price"]), c(60, 80, 100, 120, 140)[which.max(c(60, 80, 100, 120, 140) * sm)])
 })
+
+# ------------------------------------------------------------------------------
+# The tabs export (Generate_Tabs_Export), per respondent
+# ------------------------------------------------------------------------------
+test_that("tabs export: grid, no-accept, pricing_valid and WTP equal the data, and pool to the sheet", {
+  tx <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx",
+                             edits = c(FAST, "cfg$generate_tabs_export <- TRUE", "cfg$export_wtp <- TRUE",
+                                       "cfg$generate_simulator <- FALSE"))
+  expect_equal(tx$status, "PASS", info = paste(tail(tx$log, 20), collapse = "\n"))
+  path <- sub("[.]xlsx$", "_tabs_pricing.xlsx", tx$workbook)
+  x <- pricing_sheet(path, "DATA")
+  expect_equal(x$RespID, KAROO$RespID)
+  prices <- c(60, 80, 100, 120, 140)
+  labels <- sprintf("R%.2f", prices)
+  analysed <- KAROO$RespID %in% KB$RespID
+  expect_equal(x$pricing_valid, as.numeric(analysed))
+  for (k in seq_along(gg_cols)) {
+    want <- ifelse(analysed & KAROO[[gg_cols[k]]] == 1, labels[k], NA_character_)
+    expect_equal(x[[paste0("GGACC_", k)]], want, info = gg_cols[k])
+  }
+  none <- analysed & rowSums(KAROO[, gg_cols] == 1) == 0
+  expect_equal(x$GGACC_6, unname(ifelse(none, "Would not buy at any price", NA_character_)))
+  # WTP: the highest rung with a Yes, blank for the analysed rejecters.
+  wtp <- apply(KAROO[, gg_cols], 1, function(r) if (any(r == 1)) max(prices[r == 1]) else NA_real_)
+  expect_equal(x$GGACC_WTP, ifelse(analysed, wtp, NA_real_))
+  # Consistency: a weighted Multi_Mention on the export, base = anyone with a
+  # mention (the no-accept column included), gives the workbook's curve.
+  base <- x$pricing_valid == 1
+  w <- KAROO$Weight[base]
+  share <- vapply(1:5, function(k) sum(w[!is.na(x[[paste0("GGACC_", k)]][base])]) / sum(w), numeric(1))
+  dc <- pricing_sheet(tx$workbook, "GG_Demand_Curve")
+  expect_equal(share, dc$purchase_intent_raw, tolerance = 1e-9)
+})
+
+test_that("tabs export: VW-only WTP is the cheap/expensive midpoint, and blank weights do not break it", {
+  # Two respondents lose their weight: validation excludes them, and the
+  # export still writes one row per respondent in the data.
+  d <- KAROO
+  d$Weight[c(3, 7)] <- NA
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(d, csv, row.names = FALSE, na = "")
+  tx <- pricing_pipeline_run("Karoo_Pricing_Config.xlsx", data_file = csv,
+                             edits = c(FAST, "cfg$analysis_method <- 'van_westendorp'",
+                                       "cfg$segmentation$segment_column <- NA_character_",
+                                       "cfg$generate_tabs_export <- TRUE", "cfg$export_wtp <- TRUE",
+                                       "cfg$generate_simulator <- FALSE"))
+  expect_equal(tx$status, "PASS", info = paste(tail(tx$log, 20), collapse = "\n"))
+  x <- pricing_sheet(sub("[.]xlsx$", "_tabs_pricing.xlsx", tx$workbook), "DATA")
+  expect_equal(nrow(x), nrow(d))
+  expect_equal(x$RespID, d$RespID)
+  mid <- (d$VW_Cheap + d$VW_Expensive) / 2
+  ok <- !is.na(d$Weight)
+  expect_equal(x$GGACC_WTP[ok], mid[ok])
+  expect_equal(x$pricing_valid[!ok], c(0, 0))
+})
