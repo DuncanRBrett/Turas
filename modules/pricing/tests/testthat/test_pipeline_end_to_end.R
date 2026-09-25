@@ -371,3 +371,20 @@ test_that("both-methods run: the shared base and the VW-only segments are disclo
   expect_false(grepl("Gabor-Granger base", paste(unlist(isl_m$meta), collapse = " "), fixed = TRUE))
   expect_false(grepl(SEGMENTS_NOTE, isl_m$meta$filterNote, fixed = TRUE))
 })
+
+# ------------------------------------------------------------------------------
+# Display follow-ups (25 Sep 2026)
+# ------------------------------------------------------------------------------
+test_that("the method spread names the methods it is taken across", {
+  # The spread is the CV of one price per method (VW midpoint, GG optimum),
+  # so on a both-methods run it is across 2 methods, not the 4 entries of
+  # method_prices (OPP, IDP, midpoint, GG).
+  isl <- jsonlite::fromJSON(BOTH$island)
+  expect_equal(isl$recommendation$nMethodPrices, 2L)
+  vw_mid <- (REF_VW[["OPP"]] + REF_VW[["IDP"]]) / 2
+  cv <- sd(c(vw_mid, REF_GG$opt)) / mean(c(vw_mid, REF_GG$opt))
+  expect_equal(isl$recommendation$methodSpreadPct, 100 * cv, tolerance = 1e-6)
+  txt <- pricing_render_tab(BOTH$island)
+  expect_true(grepl(sprintf("spread %.1f%% across 2 methods", 100 * cv), txt, fixed = TRUE))
+  expect_false(grepl("estimates", txt, fixed = TRUE))
+})

@@ -340,13 +340,13 @@ run("a one-estimate spread is not reported (F9)", () => {
   one.recommendation.nMethodPrices = 1;
   one.recommendation.methodSpreadPct = 0;
   const h = render(one);
-  lacks(h, "across 1 estimates", "a spread across one estimate");
+  lacks(h, "across 1 methods", "a spread across one method");
   lacks(h, "prices spread", "a spread with nothing to spread across");
   // Several estimates still report it.
   const many = clone();
-  many.recommendation.nMethodPrices = 4;
+  many.recommendation.nMethodPrices = 2;
   many.recommendation.methodSpreadPct = 4.72;
-  has(render(many), "across 4 estimates", "the spread when there is one");
+  has(render(many), "across 2 methods", "the spread when there is one");
 });
 
 run("the profit curve the prose names is in the table (F10)", () => {

@@ -467,7 +467,7 @@
     // "spread 0.0% across 1 estimates", which is not information (review F9).
     if (r.methodSpreadPct != null && (r.nMethodPrices == null || r.nMethodPrices > 1)) {
       bits.push("the methods' own prices spread " + esc(num(r.methodSpreadPct)) + "%" +
-        (r.nMethodPrices ? " across " + esc(num(r.nMethodPrices, 0)) + " estimates" : ""));
+        (r.nMethodPrices ? " across " + esc(num(r.nMethodPrices, 0)) + " methods" : ""));
     }
 
     var range = "";
