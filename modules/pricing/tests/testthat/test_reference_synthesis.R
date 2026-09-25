@@ -77,16 +77,23 @@ test_that("the data-quality factor scores the violations found, not the ones lef
   #   method agreement  one method, CV 0            1.0
   #   sample size       n = 52 (< 100)              0.4
   #   data quality      13.3% violations            0.7
-  #   zone fit          recommended R64.99 is above
-  #                     IDP R64.00, inside PMC-PME  0.6
+  #   zone fit          judged on the unrounded anchor
+  #                     R62.75, inside OPP R61.50 to
+  #                     IDP R64.00 (Duncan, 25 Sep:
+  #                     rounding is presentation;
+  #                     the R64.99 shown is above
+  #                     IDP and scored 0.6 before)   1.0
   #   method coverage   one method                  0.4
-  #   mean = 3.1 / 5 = 0.62 -> MEDIUM
+  #   mean = 3.5 / 5 = 0.70 -> MEDIUM
   r <- syn_vw_run("drop")
   s <- quiet(synthesize_recommendation(vw_results = r, config = syn_vw_cfg("drop")))
   expect_equal(s$recommendation$price, 64.99)
-  conf <- assess_recommendation_confidence(s$method_prices, s$recommendation$price, r, NULL)
+  expect_equal(s$recommendation$anchor_price, 62.75)
+  conf <- assess_recommendation_confidence(s$method_prices, s$recommendation$price, r, NULL,
+                                           zone_price = s$recommendation$anchor_price)
   expect_match(conf$factors$data_quality, "Acceptable data quality \\(13% violations\\)")
-  expect_equal(s$recommendation$confidence_score, 0.62)
+  expect_equal(conf$factors$zone_fit, "Recommended price within optimal zone")
+  expect_equal(s$recommendation$confidence_score, 0.70)
   expect_equal(s$recommendation$confidence, "MEDIUM")
   # The same rate reaches the risks: over 10% adds the reliability caveat.
   expect_true(any(grepl("^13% of respondents gave inconsistent prices", s$risks$assumptions)))

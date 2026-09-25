@@ -379,7 +379,7 @@ The confidence score is the mean of these factor scores:
 | Sample size (largest base across methods) | >= 300 | 100-299 | | < 100 | |
 | Data quality (VW violations in the sample, counted before drop or fix) | < 5% | 5-15% | | >= 15% | |
 | Monadic model (if run) | p <= 0.01 and pseudo-R2 >= 0.05 | p <= 0.05 | | | p > 0.05 |
-| Zone fit (VW) | inside OPP-IDP | | inside PMC-PME | | outside |
+| Zone fit (VW), judged on the anchor before rounding | inside OPP-IDP | | inside PMC-PME | | outside |
 | Method coverage | 3+ methods | 2 methods | | 1 method | |
 
 HIGH at 0.75 or more, MEDIUM at 0.55 or more, LOW below (an unassessable

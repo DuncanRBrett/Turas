@@ -152,7 +152,10 @@ synthesize_recommendation <- function(vw_results = NULL,
     }
   }
 
-  # Round to psychological price point
+  # Round to psychological price point. The anchor before rounding is kept:
+  # the confidence's zone fit is judged on it, and the price ladder's anchor
+  # tier shows the same recommended price (Duncan, 25 Sep 2026).
+  anchor_price <- primary_price
   recommended_price <- round_to_psychological(primary_price)
 
   # ============================================================================
@@ -164,7 +167,8 @@ synthesize_recommendation <- function(vw_results = NULL,
     recommended_price = recommended_price,
     vw_results = vw_results,
     gg_results = gg_results,
-    monadic_results = monadic_results
+    monadic_results = monadic_results,
+    zone_price = anchor_price
   )
 
   # ============================================================================
@@ -264,6 +268,7 @@ synthesize_recommendation <- function(vw_results = NULL,
   list(
     recommendation = list(
       price = recommended_price,
+      anchor_price = anchor_price,
       source = primary_source,
       confidence = confidence$level,
       confidence_score = confidence$score
@@ -361,13 +366,15 @@ method_family_prices <- function(method_prices) {
 #'
 #' @param method_prices List of prices from each method
 #' @param recommended_price Final recommended price
+#' @param zone_price The anchor before rounding; the zone-fit factor is judged on it
 #' @param vw_results Van Westendorp results
 #' @param gg_results Gabor-Granger results
 #' @return List with score, level, and factors
 #' @keywords internal
 assess_recommendation_confidence <- function(method_prices, recommended_price,
                                              vw_results, gg_results,
-                                             monadic_results = NULL) {
+                                             monadic_results = NULL,
+                                             zone_price = recommended_price) {
 
   factors <- list()
   scores <- numeric(0)
@@ -462,18 +469,21 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
     }
   }
 
-  # Factor 5: Price within optimal zone
-  if (!is.null(vw_results) && !is.na(recommended_price)) {
+  # Factor 5: Price within optimal zone, judged on the anchor BEFORE
+  # psychological rounding (Duncan, 25 Sep 2026). Rounding is presentation:
+  # R62.75 inside a R61.50 to R64.00 zone rounded to R64.99 and cost the
+  # recommendation zone-fit points it had earned.
+  if (!is.null(vw_results) && !is.null(zone_price) && !is.na(zone_price)) {
     opp <- vw_results$price_points$OPP
     idp <- vw_results$price_points$IDP
     pmc <- vw_results$price_points$PMC
     pme <- vw_results$price_points$PME
 
     if (!is.na(opp) && !is.na(idp) && !is.na(pmc) && !is.na(pme)) {
-      if (recommended_price >= opp && recommended_price <= idp) {
+      if (zone_price >= opp && zone_price <= idp) {
         factors$zone_fit <- "Recommended price within optimal zone"
         scores <- c(scores, 1.0)
-      } else if (recommended_price >= pmc && recommended_price <= pme) {
+      } else if (zone_price >= pmc && zone_price <= pme) {
         factors$zone_fit <- "Recommended price within acceptable range (outside optimal zone)"
         scores <- c(scores, 0.6)
       } else {
